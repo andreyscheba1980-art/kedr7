@@ -1,0 +1,4 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+[Director] [20:00] пул: 11 испугов
+[Game] night 1, seed = 3457582467

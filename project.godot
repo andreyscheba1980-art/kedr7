@@ -1,0 +1,86 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="Кедр-7"
+config/description="Хоррор на радиометеостанции в уральской тайге, 1983."
+config/version="1.26.0-test"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/icon.png"
+config/windows_native_icon="res://assets/icon.ico"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/minimum_display_time=0
+
+[audio]
+
+driver/enable_input=true
+
+[autoload]
+
+
+Loc="*res://scripts/autoload/loc.gd"
+Settings="*res://scripts/autoload/settings.gd"
+SaveGame="*res://scripts/autoload/save_game.gd"
+EventBus="*res://scripts/autoload/event_bus.gd"
+Game="*res://scripts/autoload/game.gd"
+Director="*res://scripts/director/director.gd"
+Mic="*res://scripts/autoload/mic_manager.gd"
+Net="*res://scripts/autoload/net.gd"
+
+[display]
+
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/vsync/vsync_mode=1
+
+[filesystem]
+
+import/blender/enabled=false
+
+[layer_names]
+
+3d_physics/layer_1="world"
+3d_physics/layer_2="glass"
+3d_physics/layer_3="player"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+lights_and_shadows/positional_shadow/atlas_size=2048
+lights_and_shadows/positional_shadow/atlas_size.mobile=1024
+limits/opengl/max_lights_per_object=16
+occlusion_culling/use_occlusion_culling=true
+
+[shader_globals]
+
+wind={
+"type": "float",
+"value": 0.3
+}
+ps1_snap={
+"type": "float",
+"value": 140.0
+}
+ps1_post={
+"type": "float",
+"value": 1.0
+}
+brightness={
+"type": "float",
+"value": 1.0
+}

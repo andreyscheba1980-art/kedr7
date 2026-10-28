@@ -1,0 +1,26 @@
+# Godot: кэш импорта и сборки
+.godot/
+*.tmp
+export/
+build/
+Kedr7.exe
+Kedr7.pck
+*.zip
+*.tgz
+
+# Отчёты F9 и временное
+reports/
+scratch/
+_to_delete/
+.backup_*/
+_wav_backup/
+
+# Сырые исходники звука и музыки (игра берёт готовое из assets/) — большие и не меняются
+assets_src/
+voice_src/
+sfx_src/
+music/
+
+# Страница itch: тексты храним, картинки и архивы — нет
+itch/*
+!itch/*.md

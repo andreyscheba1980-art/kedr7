@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ScareDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/director/scare_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/scares/radio_scream.gd" id="2_ev"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"radio_scream"
+creature = &"auka"
+type = 0
+event_script = ExtResource("2_ev")
+nights = Vector2i(3, 7)
+zones = Array[StringName]([])
+activities = Array[StringName]([&"radio"])
+min_tension = 60.0
+min_fatigue = 0.0
+weight = 2.0
+max_per_run = 1
+tension_release = 75.0
+cooldown_sec = 60.0

@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ScareDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/director/scare_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/scares/house_change.gd" id="2_ev"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"house_change"
+creature = &"none"
+type = 1
+event_script = ExtResource("2_ev")
+nights = Vector2i(2, 7)
+zones = Array[StringName]([&"corridor", &"yard", &"meteo", &"mast", &"shed"])
+activities = Array[StringName]([])
+min_tension = 40.0
+min_fatigue = 0.0
+weight = 1.4
+max_per_run = 3
+tension_release = 15.0
+cooldown_sec = 25.0

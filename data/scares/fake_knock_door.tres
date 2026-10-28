@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ScareDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/director/scare_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/scares/fake_knock_door.gd" id="2_ev"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"fake_knock_door"
+creature = &"obmiralo"
+type = 2
+event_script = ExtResource("2_ev")
+nights = Vector2i(3, 7)
+zones = Array[StringName]([&"room", &"corridor"])
+activities = Array[StringName]([])
+min_tension = 40.0
+min_fatigue = 35.0
+weight = 1.0
+max_per_run = 1
+tension_release = 30.0
+cooldown_sec = 35.0

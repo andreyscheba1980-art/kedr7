@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="ScareDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/director/scare_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/scares/semenov_call.gd" id="2_ev"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"semenov_call"
+creature = &"semenov"
+type = 2
+event_script = ExtResource("2_ev")
+nights = Vector2i(2, 2)
+zones = Array[StringName]([&"room", &"corridor"])
+activities = Array[StringName]([])
+min_tension = 0.0
+min_fatigue = 0.0
+weight = 1.0
+max_per_run = 1
+tension_release = 0.0
+cooldown_sec = 20.0
+is_beat = true
+beat_from_min = 270
+beat_to_min = 390

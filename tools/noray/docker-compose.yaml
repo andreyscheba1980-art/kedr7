@@ -1,0 +1,10 @@
+# Сервер комнат «Кедр-7» (noray, https://github.com/foxssake/noray, MIT).
+# Запуск на VPS:  docker compose up -d   (рядом с этим файлом должен лежать .env)
+services:
+  noray:
+    image: ghcr.io/foxssake/noray:main
+    container_name: kedr7-rooms
+    restart: unless-stopped
+    network_mode: host        # сотня UDP-портов ретранслятора — через host-сеть быстрее и проще
+    env_file:
+      - .env

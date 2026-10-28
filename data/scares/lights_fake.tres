@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ScareDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/director/scare_def.gd" id="1_def"]
+[ext_resource type="Script" path="res://scripts/scares/lights_fake.gd" id="2_ev"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"lights_fake"
+creature = &"none"
+type = 3
+event_script = ExtResource("2_ev")
+nights = Vector2i(1, 7)
+zones = Array[StringName]([&"room", &"corridor"])
+activities = Array[StringName]([])
+min_tension = 0.0
+min_fatigue = 0.0
+weight = 1.0
+max_per_run = 0
+tension_release = 15.0
+cooldown_sec = 25.0
