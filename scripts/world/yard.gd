@@ -1806,7 +1806,16 @@ func _build_izba() -> void:
 	var stove_body := StaticBody3D.new()
 	stove_body.collision_layer = Geo.LAYER_WORLD
 	stove_body.position = cabin_center + Vector3(-0.8, 0.0, -1.6)
-	stove_body.add_child(Props.russian_stove())
+	# Изба внутри — модель (yard_props.py izba_interior): печь устьем к входу, нары, полка, шкурки, утварь
+	var interior := Models.spawn(self, "kedr/izba_interior", cabin_center, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.15, "sat": 1.0})
+	if interior == null:
+		stove_body.add_child(Props.russian_stove())
+	else:
+		var nary := StaticBody3D.new()
+		nary.collision_layer = Geo.LAYER_WORLD
+		nary.position = cabin_center + Vector3(1.6, 0.28, -2.5)
+		nary.add_child(Geo.box_shape(Vector3(2.4, 0.56, 0.85)))
+		add_child(nary)
 	stove_body.add_child(Geo.box_shape(Vector3(1.3, 1.4, 1.4), Vector3(0, 0.7, 0)))
 	add_child(stove_body)
 
@@ -1973,15 +1982,59 @@ func _build_lake() -> void:
 	hm.top_radius = 0.75
 	hm.bottom_radius = 0.75
 	hm.height = 0.02
-	hm.radial_segments = 10
+	hm.radial_segments = 24
 	hole.mesh = hm
-	hole.material_override = Palette.m(&"water")
+	var water := StandardMaterial3D.new()
+	water.albedo_color = Color(0.03, 0.06, 0.07)
+	water.roughness = 0.04
+	water.metallic_specular = 1.0   # фонарь бликует на чёрной воде
+	hole.material_override = water
 	hole.position = HOLE + Vector3(0, 0.045, 0)
 	add_child(hole)
-	for i in range(7):
-		var a := i * TAU / 7.0 + 0.3
-		var chunk := Geo.block(self, Vector3(0.5, 0.12, 0.35), HOLE + Vector3(cos(a) * 1.05, 0.06, sin(a) * 1.05), Palette.m(&"ice"), false)
-		chunk.rotation = Vector3(0.2, a, 0.15)
+	# Шуга у кромки: серое кольцо мокрого льда
+	var slush := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.7
+	tm.outer_radius = 0.95
+	tm.rings = 20
+	tm.ring_segments = 6
+	slush.mesh = tm
+	var slush_m := StandardMaterial3D.new()
+	slush_m.albedo_color = Color(0.5, 0.58, 0.64)
+	slush_m.roughness = 0.2
+	slush.material_override = slush_m
+	slush.position = HOLE + Vector3(0, 0.05, 0)
+	slush.scale = Vector3(1.0, 0.25, 1.0)
+	add_child(slush)
+	var lrng := RandomNumberGenerator.new()
+	lrng.seed = 34
+	for i in range(9):
+		var a := i * TAU / 9.0 + lrng.randf_range(-0.2, 0.2)
+		var r := lrng.randf_range(1.0, 1.5)
+		var chunk := Geo.block(self, Vector3(lrng.randf_range(0.3, 0.7), lrng.randf_range(0.06, 0.16), lrng.randf_range(0.2, 0.45)), HOLE + Vector3(cos(a) * r, 0.06, sin(a) * r), Palette.m(&"ice"), false)
+		chunk.rotation = Vector3(lrng.randf_range(-0.35, 0.35), a + lrng.randf_range(-0.5, 0.5), lrng.randf_range(-0.3, 0.3))
+	# Старые лунки — затянуло льдом; ледобур воткнут в снег; рыбацкий ящик-сиденье
+	for e: Array in [[Vector3(2.6, 0.03, -1.4), 0.12], [Vector3(-2.2, 0.03, -2.0), 0.1]]:
+		var old := MeshInstance3D.new()
+		var om := CylinderMesh.new()
+		om.top_radius = e[1]
+		om.bottom_radius = e[1]
+		om.height = 0.02
+		om.radial_segments = 14
+		old.mesh = om
+		old.material_override = slush_m
+		old.position = HOLE + e[0]
+		add_child(old)
+	var drill := Node3D.new()
+	drill.position = HOLE + Vector3(2.4, 0.0, -1.1)
+	drill.rotation = Vector3(0.15, 0.6, -0.12)
+	add_child(drill)
+	Geo.block(drill, Vector3(0.035, 1.25, 0.035), Vector3(0, 0.5, 0), Palette.m(&"metal"), false)
+	Geo.block(drill, Vector3(0.5, 0.03, 0.03), Vector3(0, 1.1, 0), Palette.m(&"metal"), false)
+	Geo.block(drill, Vector3(0.03, 0.03, 0.18), Vector3(0.24, 1.1, 0.08), Palette.m(&"wood"), false)
+	var box_seat := Geo.block(self, Vector3(0.42, 0.32, 0.28), HOLE + Vector3(-1.1, 0.16, -1.0), Palette.m(&"canister"), true)
+	box_seat.rotation.y = 0.5
+	Geo.block(box_seat, Vector3(0.44, 0.02, 0.05), Vector3(0, 0.17, 0), Palette.m(&"dark"), false)
 	# Вешка-жерлица у проруби со смоленой бечевкой, уходящей в воду
 	var ice_rig := Props.ice_hole_rig()
 	ice_rig.position = HOLE + Vector3(1.3, 0.0, 0.2)
@@ -3806,6 +3859,15 @@ func _build_helipad() -> void:
 		st.position = c_pos
 		add_child(st)
 
+	# 1б. Обвязка площадки — модель (yard_props.py helipad_kit): колдун, шины, фонари, бочки с помпой
+	if Models.spawn(self, "kedr/helipad_kit", HELIPAD, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.1, "sat": 1.0}) != null:
+		var hp_col := StaticBody3D.new()
+		hp_col.collision_layer = Geo.LAYER_WORLD
+		hp_col.position = HELIPAD
+		add_child(hp_col)
+		hp_col.add_child(Geo.box_shape(Vector3(1.7, 1.0, 1.2), Vector3(-7.2, 0.5, 4.0)))
+		hp_col.add_child(Geo.box_shape(Vector3(0.2, 6.0, 0.2), Vector3(6.8, 3.0, -6.8)))
+
 	# 2. Деревянный посадочный крест 8х8 метров
 	var cross_a := Geo.box_mesh(Vector3(8.0, 0.04, 1.2), Palette.m(&"wood"))
 	cross_a.position = HELIPAD + Vector3(0, 0.02, 0)
@@ -3821,14 +3883,22 @@ func _build_helipad() -> void:
 	var mound := SphereMesh.new()
 	mound.radius = 1.0
 	mound.height = 2.0
-	mound.radial_segments = 12
-	mound.rings = 5
+	mound.radial_segments = 28
+	mound.rings = 10
 	var drift_mesh := MeshInstance3D.new()
 	drift_mesh.mesh = mound
 	drift_mesh.material_override = Palette.m(&"drift")
-	drift_mesh.position = HELIPAD
-	drift_mesh.scale = Vector3(3.6, 0.36, 3.4)
+	drift_mesh.position = HELIPAD + Vector3(0, -0.12, 0)
+	drift_mesh.scale = Vector3(3.6, 0.42, 3.4)
 	add_child(drift_mesh)
+	# Намёт неровный: пара перемётов сверху — в осях сугроба (гаснут вместе с ним)
+	for e: Array in [[Vector3(0.35, 0.55, -0.2), Vector3(0.45, 0.6, 0.35)], [Vector3(-0.3, 0.5, 0.3), Vector3(0.4, 0.55, 0.3)], [Vector3(0.05, 0.62, 0.05), Vector3(0.3, 0.5, 0.45)]]:
+		var lump := MeshInstance3D.new()
+		lump.mesh = mound
+		lump.material_override = Palette.m(&"drift")
+		lump.position = e[0]
+		lump.scale = e[1]
+		drift_mesh.add_child(lump)
 
 	var drift_it := Geo.interactable(self, Vector3(6.4, 0.7, 6.0), HELIPAD + Vector3(0, 0.35, 0), null, "", func(_p: Player) -> void:
 		Game.helipad_cleared = true

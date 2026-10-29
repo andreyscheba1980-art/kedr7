@@ -3697,6 +3697,40 @@ func _tower_walk() -> void:
 func _yard_review() -> void:
 	Game.yrka.enabled = false
 	var tag := "night" if Game.is_night() else "day"
+	var round2: Array = [["r2_helipad", Vector3(38.0, 0.05, 1.0), Vector3(44.0, 0.5, 6.0)], ["r2_hangar_out", Vector3(134.0, 0.05, -28.0), Vector3(122.0, 2.5, -36.0)],
+			["r2_hangar_in", Vector3(126.5, 0.2, -36.0), Vector3(117.0, 1.6, -36.0)], ["r2_izba_out", Vector3(-9.0, 0.05, -33.0), Vector3(-16.0, 1.5, -30.0)],
+			["r2_izba_in", Vector3(-14.2, 0.2, -29.0), Vector3(-18.5, 1.0, -31.0)], ["r2_izba_in2", Vector3(-18.5, 0.2, -28.0), Vector3(-14.5, 0.9, -32.0)], ["r2_lake_shack", Vector3(-29.0, 0.05, 24.0), Vector3(-36.0, 1.5, 20.0)],
+			["r2_lake_hole", Vector3(-33.0, 0.05, 30.0), Vector3(-38.0, 0.2, 34.0)], ["r2_repeater", Vector3(64.0, 0.05, -55.0), Vector3(72.0, 3.0, -62.0)],
+			["r2_zimnik", Vector3(-62.0, 0.05, -86.0), Vector3(-70.0, 1.0, -94.0)], ["r2_tower", Vector3(286.0, 0.05, -308.0), Vector3(300.0, 4.0, -322.0)],
+			["r2_camp", Vector3(-345.0, 0.05, 20.0), Vector3(-362.0, 1.5, 10.0)], ["r2_drill", Vector3(66.0, 0.05, 310.0), Vector3(80.0, 4.0, 324.0)],
+			["r2_ams", Vector3(170.0, 0.05, -160.0), Vector3(177.0, 1.5, -168.0)]]
+	if OS.get_cmdline_user_args().has("probe_hangar"):
+		for n in Game.level.find_children("*", "GeometryInstance3D", true, false):
+			var g := n as GeometryInstance3D
+			var bb := g.global_transform * g.get_aabb()
+			if bb.intersects(AABB(Vector3(117.0, 0.0, -39.5), Vector3(10.0, 4.5, 7.0))) and bb.size.length() < 12.0:
+				print("[probe] ", g.name, " ", g.get_parent().name, " c=", bb.get_center(), " size=", bb.size, " vis=", g.is_visible_in_tree())
+		for ck: Vector2i in SpruceNear._grid:
+			for v in 3:
+				var buf: PackedFloat32Array = SpruceNear._grid[ck][v]
+				for i in range(0, buf.size(), 12):
+					var o := Vector3(buf[i + 3], buf[i + 7], buf[i + 11])
+					if o.x > 113.0 and o.x < 131.0 and o.z > -43.0 and o.z < -25.0:
+						print("[probe] ель ", v, " в ", o)
+		for e: Array in [[Vector3(126.5, 1.7, -36.0), Vector3(-1, 0, 0)], [Vector3(122.0, 1.7, -36.0), Vector3(0, 0, -1)], [Vector3(122.0, 1.7, -36.0), Vector3(0, 0, 1)]]:
+			var hit := Game.level.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(e[0], e[0] + (e[1] as Vector3) * 12.0))
+			print("[probe] ray ", e, " → ", hit.get("position", "нет"), " ", (hit["collider"] as Node).name if hit.has("collider") else "")
+		return
+	if OS.get_cmdline_user_args().has("round2"):
+		for v: Array in round2:
+			var at: Vector3 = Terrain.at(v[1]) + Vector3(0, 0.05, 0)
+			if (v[1] as Vector3).y > 0.15:
+				at = v[1]
+			Game.player.set_flashlight(String(v[0]).contains("_in"))
+			_look(at, Terrain.at(v[2]) + Vector3(0, (v[2] as Vector3).y, 0))
+			await _wait(1.6)
+			await _shot("%s_%s" % [v[0], tag])
+		return
 	for v: Array in [["junction", Vector3(24.0, 0.05, -4.5), Vector3(32.0, 0.8, -1.0)], ["fork_house", Vector3(22.5, 0.05, 6.5), Vector3(16.0, 1.4, 3.0)],
 			["shed", Vector3(40.0, 0.05, 30.0), Vector3(48.0, 1.5, 34.0)], ["woodpile", Vector3(8.0, 0.05, 35.0), Vector3(4.0, 0.8, 40.0)],
 			["helipad", Vector3(36.0, 0.05, 2.0), Vector3(44.0, 0.3, 6.0)], ["hangar", Vector3(118.0, 0.05, -26.0), Vector3(128.0, 2.5, -36.0)],

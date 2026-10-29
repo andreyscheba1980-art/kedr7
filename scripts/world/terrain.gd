@@ -138,6 +138,18 @@ static func is_clear(x: float, z: float) -> bool:
 	return _clear[_idx(roundi(g.x), roundi(g.y))] == 0
 
 
+## Постройки за квадратом лесного двора (корпус с ангаром): дальний лес сюда не сажаем —
+## ели росли прямо внутри ангара.
+const BUILDINGS: Array[Rect2] = [Rect2(84.0, -50.0, 54.0, 36.0)]
+
+
+static func _in_buildings(x: float, z: float) -> bool:
+	for r: Rect2 in BUILDINGS:
+		if r.has_point(Vector2(x, z)):
+			return true
+	return false
+
+
 static func in_map(x: float, z: float) -> bool:
 	return absf(x - CENTER.x) < HALF - 14.0 and absf(z - CENTER.y) < HALF - 14.0
 
@@ -392,7 +404,7 @@ static func build_forest(parent: Node3D, far: float, inner_center: Vector3, inne
 			z += spacing
 			if absf(px - inner_center.x) < inner_half and absf(pz - inner_center.z) < inner_half:
 				continue       # двор засажен своим лесом (Yard._build_forest)
-			if not is_clear(px, pz):
+			if not is_clear(px, pz) or _in_buildings(px, pz):
 				continue
 			var h := height(px, pz)
 			var g := _grid_xy(px, pz)
@@ -424,7 +436,7 @@ static func build_forest(parent: Node3D, far: float, inner_center: Vector3, inne
 					if rng.randf() < 0.18:
 						continue
 					var q: Vector3 = p + side * sgn * rng.randf_range(band.x, band.y) + dir * rng.randf_range(-1.0, 1.0)
-					if _near_pad(q.x, q.z):
+					if _near_pad(q.x, q.z) or _in_buildings(q.x, q.z):
 						continue
 					place.call(q.x, q.z, true)
 	var count := 0

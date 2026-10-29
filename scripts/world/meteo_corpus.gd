@@ -310,7 +310,7 @@ func _build_lights() -> void:
 	var red := Geo.omni(self, Vector3(97.5, 2.6, -27.2), 4.0, 0.7, Color(1.0, 0.18, 0.12))
 	red.light_cull_mask = 1 | LAYER_IN
 	_lamps.append(red)
-	for e: Array in [[Vector3(89.75, 2.75, -27.25), 7.0, 1.0], [Vector3(128.3, 3.2, HANGAR_ZC), 8.0, 0.9]]:
+	for e: Array in [[Vector3(89.75, 2.75, -27.25), 7.0, 1.0], [Vector3(128.3, 3.2, HANGAR_ZC), 8.0, 0.9], [Vector3(121.5, 4.3, HANGAR_ZC), 9.0, 0.7]]:   # последняя — лампа под балкой оболочечной
 		var l := Geo.omni(self, e[0], e[1], e[2], Color(1.0, 0.78, 0.5))
 		l.light_cull_mask = 1 | LAYER_OUT
 		_lamps.append(l)
