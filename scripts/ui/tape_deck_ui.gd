@@ -60,8 +60,8 @@ func _ready() -> void:
 	var left := VBoxContainer.new()
 	left.custom_minimum_size.x = 380
 	cols.add_child(left)
-	var title := UiKit.label(Loc.t(&"tape.title"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
+	var title := UiStyle.brass_plate(Loc.t(&"tape.title"), 18)
+	title.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	left.add_child(title)
 
 	_list = ItemList.new()

@@ -41,7 +41,7 @@ func _ready() -> void:
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
 
 	# Корпус терминала «Нева-МТ» (молотковая серая эмаль со стальной окантовкой)
-	var panel := UiKit.panel(Color(0.12, 0.14, 0.13, 0.98))
+	var panel := UiKit.panel()
 	UiKit.place(self, panel, 0.5, 0.5, 0.5, 0.5, -480, -320, 480, 320)
 
 	var root_vbox := VBoxContainer.new()
@@ -52,9 +52,7 @@ func _ready() -> void:
 	var top_bar := HBoxContainer.new()
 	root_vbox.add_child(top_bar)
 
-	var title := UiKit.label(Loc.p("ИСЗ «МЕТЕОР-2» • ФОТОТЕЛЕГРАФ «НЕВА-МТ»", "«METEOR-2» SATELLITE • «NEVA-MT» PHOTOTELEGRAPH"), 17)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	top_bar.add_child(title)
+	top_bar.add_child(UiStyle.brass_plate(Loc.p("ИСЗ «МЕТЕОР-2» • ФОТОТЕЛЕГРАФ «НЕВА-МТ»", "«METEOR-2» SATELLITE • «NEVA-MT» PHOTOTELEGRAPH"), 17))
 
 	top_bar.add_spacer(false)
 	var close_btn := UiKit.button(Loc.t(&"ui.close"), _close)

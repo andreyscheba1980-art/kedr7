@@ -67,8 +67,8 @@ func _ready() -> void:
 	hud_box.add_theme_constant_override("separation", 6)
 	UiKit.place(self, hud_box, 0.05, 0.05, 0.4, 0.2, 0, 0, 0, 0)
 
-	var title := UiKit.label(Loc.t(&"theodolite.title"), 18)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
+	var title := UiStyle.brass_plate(Loc.t(&"theodolite.title"), 17)
+	title.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	hud_box.add_child(title)
 
 	_azimuth_label = UiKit.label("", 14)

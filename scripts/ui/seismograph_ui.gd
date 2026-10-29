@@ -33,9 +33,7 @@ func _ready() -> void:
 	# Заголовок
 	var top_bar := HBoxContainer.new()
 	root_vbox.add_child(top_bar)
-	var title := UiKit.label(Loc.t(&"sv20.title"), 18)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	top_bar.add_child(title)
+	top_bar.add_child(UiStyle.brass_plate(Loc.t(&"sv20.title"), 17))
 
 	top_bar.add_spacer(false)
 	var close_btn := UiKit.button(Loc.t(&"ui.close"), _close)

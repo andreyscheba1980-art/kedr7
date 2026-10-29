@@ -4,12 +4,14 @@ extends Control
 ## Строка — {"label": String, "cells": [&"sign" | &"digit" | &"rumb"], "dot": индекс ячейки, перед которой
 ## десятичная точка (-1 — нет), "unit": String}. Ввод: клик по верхней/нижней половине барабана,
 ## колёсико, стрелки, цифры, «−»/«+», крестовина. Enter (записать) ловит владелец.
+## Вид — листок книжки (UiStyle): бумага шейдером, типографская сетка бланка, вписанное — почерком
+## синей ручкой; выбранная клетка подсвечена карандашом.
 
 const C_PAGE := Color(0.93, 0.90, 0.82)
 const C_INK := Color(0.10, 0.12, 0.28)
 const C_MUTED := Color(0.42, 0.40, 0.36)
 const TICK_SFX := "res://assets/audio/ui_tick.ogg"
-const TOP := 72.0
+const TOP := 92.0
 const BOTTOM := 40.0
 const CELL_W := 46.0
 const RUMB_W := 78.0
@@ -21,6 +23,8 @@ var vals: Array = []        ## по строке: Array[int] (знак: 1 — м
 var _flat: Array = []       ## [[строка, ячейка]] в порядке обхода
 var _sel := 0
 var _rumbs: PackedStringArray
+var _ink: Control
+var _hover := -1
 
 
 func setup(p_rows: Array) -> void:
@@ -41,7 +45,22 @@ func setup(p_rows: Array) -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	if not gui_input.is_connected(_mouse):
 		gui_input.connect(_mouse)
+	if _ink == null:
+		UiStyle.paper(self, float(get_instance_id() % 97) * 0.37)
+		_ink = Control.new()
+		_ink.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_ink)
+		_ink.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_ink.draw.connect(_draw_ink)
+		rotation_degrees = -0.8
+		resized.connect(func() -> void: pivot_offset = size * 0.5)
+	_redraw()
+
+
+func _redraw() -> void:
 	queue_redraw()
+	if _ink != null:
+		_ink.queue_redraw()
 
 
 func _cell(i: int) -> StringName:
@@ -107,14 +126,14 @@ func set_value(r: int, v: float) -> void:
 				vals[r][c] = 1 if v < 0.0 else 0
 			&"rumb":
 				vals[r][c] = posmod(int(v), 16)
-	queue_redraw()
+	_redraw()
 
 
 # --- Правка -----------------------------------------------------------------------------
 
 func select(i: int) -> void:
 	_sel = clampi(i, 0, _flat.size() - 1)
-	queue_redraw()
+	_redraw()
 
 
 func bump(step: int) -> void:
@@ -127,7 +146,7 @@ func bump(step: int) -> void:
 		&"rumb":
 			vals[rc[0]][rc[1]] = posmod(int(vals[rc[0]][rc[1]]) + step, 16)
 	Game.audio.play_2d(TICK_SFX, -14.0)
-	queue_redraw()
+	_redraw()
 
 
 func type_digit(n: int) -> void:
@@ -151,7 +170,7 @@ func set_sign(neg: bool) -> void:
 				if _flat[i][0] == r and _flat[i][1] == c + 1:
 					select(i)
 					return
-	queue_redraw()
+	_redraw()
 
 
 ## Клавиатура и крестовина; true — событие съедено.
@@ -196,6 +215,15 @@ func handle_key(event: InputEvent) -> bool:
 
 
 func _mouse(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		var hv := -1
+		for i in _flat.size():
+			if cell_rect(_flat[i][0], _flat[i][1]).grow_individual(4, 20, 4, 20).has_point((event as InputEventMouseMotion).position):
+				hv = i
+		if hv != _hover:
+			_hover = hv
+			_redraw()
+		return
 	if not (event is InputEventMouseButton) or not event.is_pressed():
 		return
 	var mb := event as InputEventMouseButton
@@ -217,28 +245,38 @@ func _mouse(event: InputEvent) -> void:
 
 # --- Рисунок ----------------------------------------------------------------------------
 
+## Под листком — тень (сам листок с чернилами рисуют дети: бумага и слой чернил).
 func _draw() -> void:
+	draw_rect(Rect2(Vector2(6, 8), size), Color(0, 0, 0, 0.45))
+
+
+func _draw_ink() -> void:
+	var ci := _ink
 	var w := size
-	var font := ThemeDB.fallback_font
-	draw_rect(Rect2(Vector2.ZERO, w), Color(0.20, 0.18, 0.15))
-	draw_rect(Rect2(6, 6, w.x - 12, w.y - 12), C_PAGE)
-	for y in range(70, int(w.y) - 10, 22):
-		draw_line(Vector2(16, y), Vector2(w.x - 16, y), Color(0.78, 0.74, 0.64, 0.4), 1.0)
-	draw_line(Vector2(46, 12), Vector2(46, w.y - 12), Color(0.75, 0.25, 0.25, 0.45), 1.0)
-	draw_string(font, Vector2(58, 36), Loc.t(&"thermo.book"), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, C_INK)
-	draw_string(font, Vector2(58, 57), Loc.t(&"thermo.term", [Game.clock_text()]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, C_MUTED)
+	var tf := UiStyle.type_font()
+	var hf := UiStyle.hand_font()
+	# Типографская разлиновка и поля
+	for y in range(TOP - 6, int(w.y) - 12, 24):
+		ci.draw_line(Vector2(14, y), Vector2(w.x - 12, y), Color(UiStyle.INK_PRINT, 0.16), 1.0)
+	ci.draw_line(Vector2(44, 6), Vector2(44, w.y - 6), Color(UiStyle.INK_RED, 0.45), 1.0)
+	ci.draw_line(Vector2(47, 6), Vector2(47, w.y - 6), Color(UiStyle.INK_RED, 0.3), 1.0)
+	# Шапка бланка
+	ci.draw_string(tf, Vector2(56, 24), Loc.t(&"km.head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UiStyle.INK_PRINT, 0.9))
+	ci.draw_string(tf, Vector2(56, 46), Loc.t(&"thermo.book"), HORIZONTAL_ALIGNMENT_LEFT, -1, 19, UiStyle.INK_TYPE)
+	ci.draw_string(tf, Vector2(56, 70), Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(UiStyle.INK_TYPE, 0.8))
+	ci.draw_string(hf, Vector2(56 + tf.get_string_size(Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 8, 72), Game.clock_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, UiStyle.INK_PEN)
 	var ch := _cell_h()
-	var fs := 34 if ch >= 56.0 else 28
+	var fs := 50 if ch >= 56.0 else 42
 	for r in rows.size():
 		var cells: Array = rows[r]["cells"]
-		draw_string(font, Vector2(58, TOP + r * _row_h() + 16), String(rows[r]["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, C_INK)
+		ci.draw_string(tf, Vector2(56, TOP + r * _row_h() + 16), String(rows[r]["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UiStyle.INK_TYPE)
 		for c in cells.size():
 			var rect := cell_rect(r, c)
-			var sel: bool = _flat[_sel][0] == r and _flat[_sel][1] == c
-			draw_rect(rect, Color(0.16, 0.15, 0.14))
-			draw_rect(rect.grow(-3), Color(0.97, 0.95, 0.88) if sel else Color(0.88, 0.85, 0.77))
+			var idx := _flat.find([r, c])
+			var sel := idx == _sel
 			if sel:
-				draw_rect(rect.grow(2), Color(0.75, 0.45, 0.1), false, 2.0)
+				ci.draw_rect(rect.grow(2), Color(1.0, 0.86, 0.35, 0.28))       # подсвечено карандашом
+			ci.draw_rect(rect, Color(UiStyle.INK_PRINT, 0.55), false, 1.0)   # клетка бланка
 			var d: int = vals[r][c]
 			var s := ""
 			var size_f := fs
@@ -249,17 +287,22 @@ func _draw() -> void:
 					s = str(d)
 				&"rumb":
 					s = _rumbs[d] if d < _rumbs.size() else "?"
-					size_f = fs - 6
-			var sw := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size_f).x
-			draw_string(font, Vector2(rect.position.x + (rect.size.x - sw) * 0.5, rect.position.y + rect.size.y * 0.5 + size_f * 0.36), s, HORIZONTAL_ALIGNMENT_LEFT, -1, size_f, C_INK)
+					size_f = fs - 12
+			var sw := hf.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, size_f).x
+			var base := rect.position.y + rect.size.y * 0.5 + hf.get_ascent(size_f) * 0.36
+			# почерк чуть пляшет: у каждой клетки свой наклон и сдвиг
+			var jit := Vector2(float((r * 7 + c * 13) % 5) - 2.0, float((r * 3 + c * 5) % 3) - 1.0)
+			ci.draw_string(hf, Vector2(rect.position.x + (rect.size.x - sw) * 0.5, base) + jit, s, HORIZONTAL_ALIGNMENT_LEFT, -1, size_f, UiStyle.INK_PEN)
 			var cx := rect.get_center().x
-			var ac := C_INK if sel else C_MUTED
-			draw_colored_polygon(PackedVector2Array([Vector2(cx - 8, rect.position.y - 5), Vector2(cx + 8, rect.position.y - 5), Vector2(cx, rect.position.y - 14)]), ac)
-			draw_colored_polygon(PackedVector2Array([Vector2(cx - 8, rect.end.y + 5), Vector2(cx + 8, rect.end.y + 5), Vector2(cx, rect.end.y + 14)]), ac)
+			var a := 0.8 if sel else (0.35 if idx == _hover else 0.0)
+			if a > 0.0:
+				var col := Color(UiStyle.PENCIL, a)
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(cx - 7, rect.position.y - 5), Vector2(cx + 7, rect.position.y - 5), Vector2(cx, rect.position.y - 13)]), col)
+				ci.draw_colored_polygon(PackedVector2Array([Vector2(cx - 7, rect.end.y + 5), Vector2(cx + 7, rect.end.y + 5), Vector2(cx, rect.end.y + 13)]), col)
 		var dot := int(rows[r].get("dot", -1))
 		if dot > 0:
 			var prev := cell_rect(r, dot - 1)
-			draw_circle(Vector2(prev.end.x + 9, prev.end.y - 9), 3.5, C_INK)
+			ci.draw_string(hf, Vector2(prev.end.x + 2, prev.end.y - 4), ",", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiStyle.INK_PEN)
 		var last := cell_rect(r, cells.size() - 1)
-		draw_string(font, Vector2(last.end.x + 8, last.end.y - ch * 0.3), String(rows[r].get("unit", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, C_INK)
-	draw_string(font, Vector2(58, w.y - 16), Loc.t(&"thermo.keys"), HORIZONTAL_ALIGNMENT_LEFT, w.x - 70, 12, C_MUTED)
+		ci.draw_string(tf, Vector2(last.end.x + 8, last.end.y - ch * 0.3), String(rows[r].get("unit", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UiStyle.INK_TYPE)
+	ci.draw_string(tf, Vector2(56, w.y - 14), Loc.t(&"thermo.keys"), HORIZONTAL_ALIGNMENT_LEFT, w.x - 66, 11, Color(UiStyle.PENCIL, 0.75))

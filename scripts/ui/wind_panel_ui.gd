@@ -47,14 +47,10 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.78)
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
-	var title := UiKit.label(Loc.t(&"pult.title"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	UiKit.place(self, title, 0.5, 0.5, 0.5, 0.5, -500, -318, 500, -286)
-	var panel := UiKit.panel()
-	UiKit.place(self, panel, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
+	ThermometerUI.title_plate(self, Loc.t(&"pult.title"))
 	_dial = Control.new()
 	_dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiKit.place(self, _dial, 0.5, 0.5, 0.5, 0.5, -490, -242, 90, 250)
+	UiKit.place(self, _dial, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
 	_dial.draw.connect(_draw_dials)
 
 	_book = KMBook.new()
@@ -98,14 +94,13 @@ func _process(delta: float) -> void:
 
 func _draw_dials() -> void:
 	var w := _dial.size
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.plate_font()
 	var ink := Color(0.12, 0.11, 0.09)
-	var face := Color(0.86, 0.83, 0.74)
-	var r := minf(w.x * 0.235, w.y * 0.36)
+	var r := minf(w.x * 0.22, w.y * 0.34)
+	UiStyle.bakelite(_dial, Rect2(Vector2.ZERO, w))
 	# --- Скорость ---
-	var c1 := Vector2(w.x * 0.25, w.y * 0.48)
-	_dial.draw_circle(c1, r + 12, Color(0.08, 0.08, 0.08))
-	_dial.draw_circle(c1, r, face)
+	var c1 := Vector2(w.x * 0.26, w.y * 0.46)
+	UiStyle.dial_face(_dial, c1, r)
 	var a0 := deg_to_rad(135.0)
 	var span := deg_to_rad(270.0)
 	for v in range(0, int(MAX_SPEED) + 1):
@@ -120,12 +115,14 @@ func _draw_dials() -> void:
 	var ag := a0 + span * clampf(_gust_max, 0.0, MAX_SPEED) / MAX_SPEED
 	_dial.draw_line(c1, c1 + Vector2(cos(ag), sin(ag)) * (r - 14), Color(0.7, 0.1, 0.08), 3.0)
 	var an := a0 + span * clampf(_needle, 0.0, MAX_SPEED) / MAX_SPEED
+	_dial.draw_line(c1 + Vector2(2, 3), c1 + Vector2(cos(an), sin(an)) * (r - 8) + Vector2(2, 3), Color(0, 0, 0, 0.25), 4.0)   # тень стрелки
 	_dial.draw_line(c1, c1 + Vector2(cos(an), sin(an)) * (r - 8), ink, 4.0)
-	_dial.draw_circle(c1, 9, ink)
+	_dial.draw_circle(c1, 9, Color(0.3, 0.29, 0.27))
+	_dial.draw_circle(c1, 5, ink)
+	UiStyle.dial_glass(_dial, c1, r)
 	# --- Румб ---
-	var c2 := Vector2(w.x * 0.75, w.y * 0.48)
-	_dial.draw_circle(c2, r + 12, Color(0.08, 0.08, 0.08))
-	_dial.draw_circle(c2, r, face)
+	var c2 := Vector2(w.x * 0.74, w.y * 0.46)
+	UiStyle.dial_face(_dial, c2, r)
 	var names := Loc.t(&"pult.rumbs").split(",")
 	for i in 16:
 		var a := deg_to_rad(i * 22.5 - 90.0)
@@ -138,14 +135,20 @@ func _draw_dials() -> void:
 	var az := deg_to_rad(_az_needle - 90.0)
 	var tip := c2 + Vector2(cos(az), sin(az)) * (r - 12)
 	var tl := c2 - Vector2(cos(az), sin(az)) * (r * 0.35)
+	_dial.draw_line(tl + Vector2(2, 3), tip + Vector2(2, 3), Color(0, 0, 0, 0.25), 4.0)
 	_dial.draw_line(tl, tip, ink, 4.0)
 	_dial.draw_circle(tip, 6, Color(0.7, 0.1, 0.08))
-	_dial.draw_circle(c2, 9, ink)
+	_dial.draw_circle(c2, 9, Color(0.3, 0.29, 0.27))
+	_dial.draw_circle(c2, 5, ink)
+	UiStyle.dial_glass(_dial, c2, r)
 	# Подписи под шкалами
 	for pair: Array in [[c1, Loc.t(&"pult.cap_speed")], [c2, Loc.t(&"pult.cap_dir")]]:
 		var s: String = pair[1]
-		var sw := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-		_dial.draw_string(font, (pair[0] as Vector2) + Vector2(-sw * 0.5, r + 40), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.85, 0.82, 0.72))
+		var sw := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+		var pr := Rect2((pair[0] as Vector2) + Vector2(-sw * 0.5 - 8, r + 28), Vector2(sw + 16, 22))
+		_dial.draw_rect(pr.grow(1), UiStyle.BRASS.darkened(0.5))
+		UiStyle.vgrad(_dial, pr, UiStyle.BRASS.lightened(0.15), UiStyle.BRASS.darkened(0.15))
+		_dial.draw_string(font, pr.position + Vector2(8, 17), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.18, 0.13, 0.06))
 
 
 func _write() -> void:

@@ -26,6 +26,8 @@ var scroll_fn: Callable
 var cursor := Vector2(300, 270)
 var needs_light := false
 var mouse_wipe := false
+## Где на кадре стекло: полосы [x0, x1] в долях ширины — иней только там (пусто — везде)
+var frost_bands: Array = []
 var _frost_img: Image
 var _frost_tex: ImageTexture
 var _frost_dirty := false
@@ -34,7 +36,8 @@ var _wipe_snd := 0.0
 
 
 ## frost_amount: 0 — чисто, 1 — всё в инее.
-func setup(p_draw: Callable, p_scroll: Callable, frost_amount: float) -> void:
+func setup(p_draw: Callable, p_scroll: Callable, frost_amount: float, bands: Array = []) -> void:
+	frost_bands = bands
 	draw_fn = p_draw
 	scroll_fn = p_scroll
 	needs_light = not Game.is_daylight()
@@ -65,6 +68,20 @@ func setup(p_draw: Callable, p_scroll: Callable, frost_amount: float) -> void:
 	dark.visible = needs_light
 	add_child(dark)
 	dark.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# Рама: косяк дверцы прибора — дерево с тенью внутрь
+	var frame := Control.new()
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(frame)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame.draw.connect(func() -> void:
+		var s := frame.size
+		var wood := Color(0.24, 0.2, 0.16)
+		for r: Rect2 in [Rect2(0, 0, s.x, 12), Rect2(0, s.y - 12, s.x, 12), Rect2(0, 0, 12, s.y), Rect2(s.x - 12, 0, 12, s.y)]:
+			frame.draw_rect(r, wood)
+		UiStyle.vgrad(frame, Rect2(12, 12, s.x - 24, 18), Color(0, 0, 0, 0.55), Color(0, 0, 0, 0))
+		UiStyle.hgrad(frame, Rect2(12, 12, 14, s.y - 24), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0))
+		frame.draw_rect(Rect2(Vector2(1, 1), s - Vector2(2, 2)), Color(0.45, 0.38, 0.3), false, 1.0)
+		frame.draw_rect(Rect2(Vector2(12, 12), s - Vector2(24, 24)), Color(0.08, 0.06, 0.05), false, 2.0))
 
 
 ## Мороз сильнее −20 и метель — инея больше.
@@ -85,8 +102,14 @@ func _make_frost(amount: float) -> void:
 			if amount > 0.0:
 				var n := noise.get_noise_2d(x, y) * 0.5 + 0.5
 				var g := grain.get_noise_2d(x, y) * 0.5 + 0.5
-				a = clampf((n - 0.55 + amount * 0.45) * 3.4, 0.0, 1.0) * (0.72 + g * 0.28)
-			_frost_img.set_pixel(x, y, Color(0.88, 0.93, 0.98, a))
+				a = clampf((n - 0.55 + amount * 0.45) * 3.4, 0.0, 1.0) * (0.55 + g * 0.3)
+				if not frost_bands.is_empty():
+					var u := (float(x) + 0.5) / FROST_W
+					var inside := 0.0
+					for b: Array in frost_bands:
+						inside = maxf(inside, clampf(minf(u - float(b[0]), float(b[1]) - u) * FROST_W * 0.7, 0.0, 1.0))
+					a *= inside
+			_frost_img.set_pixel(x, y, Color(0.84, 0.88, 0.93, a))   # иней на стекле, в луче фонаря не выжигается
 
 
 func lit() -> bool:

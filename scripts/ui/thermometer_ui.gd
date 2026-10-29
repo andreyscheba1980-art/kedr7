@@ -37,13 +37,12 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.78)
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
-	var title := UiKit.label(Loc.t(&"thermo.title"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	UiKit.place(self, title, 0.5, 0.5, 0.5, 0.5, -500, -318, 500, -286)
+	title_plate(self, Loc.t(&"thermo.title"))
 
 	_view = InstrumentView.new()
 	UiKit.place(self, _view, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
-	_view.setup(_draw_view, func(n: float) -> void: _scroll(n * DEG_PER_NOTCH), InstrumentView.frost_for_weather(_truth.x))
+	_view.setup(_draw_view, func(n: float) -> void: _scroll(n * DEG_PER_NOTCH), InstrumentView.frost_for_weather(_truth.x),
+		[[0.32 - 0.085, 0.32 + 0.085], [0.70 - 0.085, 0.70 + 0.085]])   # иней — на стекле термометров
 
 	_book = KMBook.new()
 	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
@@ -61,20 +60,24 @@ func _ready() -> void:
 
 
 ## Кнопки «Записать» / «Закрыть» под книжкой — общие для всех приборов.
+## Кнопки под книжкой — общие для всех приборов: «Записать» — штампом, «Закрыть» — машинописью.
 static func add_buttons(owner: Control, again: bool, on_write: Callable, on_close: Callable) -> void:
-	var write_btn := UiKit.button(Loc.t(&"thermo.write_again" if again else &"thermo.write"), on_write)
-	write_btn.focus_mode = Control.FOCUS_NONE
-	UiKit.place(owner, write_btn, 0.5, 0.5, 0.5, 0.5, 120, 192, 500, 230)
-	var close_btn := UiKit.button(Loc.t(&"thermo.close"), on_close)
-	close_btn.focus_mode = Control.FOCUS_NONE
-	UiKit.place(owner, close_btn, 0.5, 0.5, 0.5, 0.5, 220, 236, 400, 268)
+	var write_btn := UiStyle.stamp_button(Loc.t(&"thermo.write_again" if again else &"thermo.write").to_upper(), on_write)
+	UiKit.place(owner, write_btn, 0.5, 0.5, 0.5, 0.5, 170, 196, 450, 238)
+	var close_btn := UiStyle.text_button(Loc.t(&"thermo.close_key"), on_close)
+	UiKit.place(owner, close_btn, 0.5, 0.5, 0.5, 0.5, 220, 244, 400, 270)
 
 
+## Латунный шильдик прибора над кадром.
+static func title_plate(owner: Control, text: String) -> void:
+	var plate := UiStyle.brass_plate(text, 17)
+	UiKit.place(owner, plate, 0.5, 0.5, 0.5, 0.5, -500, -318, -500, -286)
+
+
+## Подсказка по клавишам — машинописью над кадром.
 static func hint_label(owner: Control) -> Label:
-	var hint := UiKit.label("", 14, HORIZONTAL_ALIGNMENT_LEFT)
-	hint.modulate = Color(1, 1, 1, 0.72)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UiKit.place(owner, hint, 0.5, 0.5, 0.5, 0.5, -500, -282, 500, -258)
+	var hint := UiStyle.hint()
+	UiKit.place(owner, hint, 0.5, 0.5, 0.5, 0.5, -500, -276, 500, -256)
 	return hint
 
 
@@ -121,58 +124,62 @@ func _y(t: float) -> float:
 
 func _draw_view() -> void:
 	var w := _view.size
-	# Нутро будки Селянинова: белёные жалюзи
-	_view.draw_rect(Rect2(Vector2.ZERO, w), Color(0.70, 0.70, 0.66))
-	for y in range(0, int(w.y), 24):
-		_view.draw_rect(Rect2(0, y + 15, w.x, 6), Color(0.52, 0.53, 0.52))
-		_view.draw_line(Vector2(0, y + 15), Vector2(w.x, y + 15), Color(0.82, 0.82, 0.78), 1.0)
+	# Нутро будки Селянинова: белёные жалюзи — объёмные планки, в щелях темно
+	_view.draw_rect(Rect2(Vector2.ZERO, w), Color(0.16, 0.17, 0.18))
+	for y in range(-10, int(w.y), 26):
+		UiStyle.vgrad(_view, Rect2(0, y, w.x, 19), Color(0.80, 0.80, 0.76), Color(0.56, 0.57, 0.55))
+		_view.draw_line(Vector2(0, y), Vector2(w.x, y), Color(0.9, 0.9, 0.86), 1.0)
+	UiStyle.hgrad(_view, Rect2(0, 0, 70, w.y), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0))   # стойки будки в тени
+	UiStyle.hgrad(_view, Rect2(w.x - 70, 0, 70, w.y), Color(0, 0, 0, 0), Color(0, 0, 0, 0.45))
 	_draw_thermo(w.x * 0.32, _shown.x, Loc.t(&"thermo.dry"), false)
 	_draw_thermo(w.x * 0.70, _shown.y, Loc.t(&"thermo.wet"), true)
 
 
 func _draw_thermo(x: float, value: float, label: String, wet: bool) -> void:
 	var h := _view.size.y
-	var font := ThemeDB.fallback_font
+	var pf := UiStyle.plate_font()
 	var ink := Color(0.10, 0.10, 0.12)
-	# Молочная шкальная пластина и стеклянная оболочка
-	_view.draw_rect(Rect2(x - 52, 0, 104, h), Color(0.18, 0.2, 0.22, 0.35))
-	_view.draw_rect(Rect2(x - 46, 0, 92, h), Color(0.94, 0.94, 0.91))
+	# Тень и молочная шкальная пластина
+	_view.draw_rect(Rect2(x - 44, 0, 100, h), Color(0, 0, 0, 0.35))
+	UiStyle.hgrad(_view, Rect2(x - 48, 0, 96, h), Color(0.86, 0.87, 0.85), Color(0.97, 0.97, 0.95))
 	var lo := _center - h * 0.5 / PPD - 1.0
 	var hi := _center + h * 0.5 / PPD + 1.0
 	for k in range(int(floor(lo * 5.0)), int(ceil(hi * 5.0)) + 1):
 		var t := k / 5.0
 		var y := _y(t)
 		var len := 7.0
-		var width := 1.2
+		var width := 1.0
 		if k % 25 == 0:
 			len = 24.0
-			width = 2.2
+			width = 2.0
 		elif k % 5 == 0:
 			len = 15.0
-			width = 1.6
-		_view.draw_line(Vector2(x - 7 - len, y), Vector2(x - 7, y), ink, width)
-		_view.draw_line(Vector2(x + 7, y), Vector2(x + 7 + len * 0.6, y), ink, width)
+			width = 1.5
+		_view.draw_line(Vector2(x - 9 - len, y), Vector2(x - 9, y), ink, width)
+		_view.draw_line(Vector2(x + 9, y), Vector2(x + 9 + len * 0.6, y), ink, width)
 		if k % 25 == 0:
 			var n := int(roundf(t))
 			var s := ("−" if n < 0 else "+" if n > 0 else "") + str(absi(n))
-			_view.draw_string(font, Vector2(x - 44, y - 4), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ink)
-	# Капилляр и спиртовой столбик
-	_view.draw_rect(Rect2(x - 3, 0, 6, h), Color(0.82, 0.86, 0.88))
+			_view.draw_string(pf, Vector2(x - 46, y + 6), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ink)
+	# Стеклянная трубка: блик слева, тень справа
+	UiStyle.hgrad(_view, Rect2(x - 8, 0, 8, h), Color(1, 1, 1, 0.55), Color(0.85, 0.9, 0.95, 0.25))
+	UiStyle.hgrad(_view, Rect2(x, 0, 8, h), Color(0.8, 0.86, 0.9, 0.25), Color(0.35, 0.4, 0.45, 0.45))
+	# Спиртовой столбик в капилляре
 	var top := clampf(_y(value), -4.0, h + 4.0)
 	if top < h:
-		_view.draw_rect(Rect2(x - 2.5, top, 5, h - top), Color(0.72, 0.08, 0.08))
+		UiStyle.hgrad(_view, Rect2(x - 2.5, top, 5, h - top), Color(0.85, 0.15, 0.12), Color(0.5, 0.03, 0.04))
 		if top > -4.0:
-			_view.draw_circle(Vector2(x, top + 0.5), 2.6, Color(0.6, 0.05, 0.05))
-	# Блик на стекле
-	_view.draw_line(Vector2(x - 11, 0), Vector2(x - 11, h), Color(1, 1, 1, 0.35), 2.0)
-	_view.draw_line(Vector2(x + 13, 0), Vector2(x + 13, h), Color(0.4, 0.45, 0.5, 0.35), 1.0)
-	# Табличка над прибором
-	var lw := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-	_view.draw_rect(Rect2(x - lw * 0.5 - 6, 6, lw + 12, 20), Color(0.16, 0.16, 0.15, 0.9))
-	_view.draw_string(font, Vector2(x - lw * 0.5, 21), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.92, 0.9, 0.82))
-	_view.draw_string(font, Vector2(x + 20, h - 10), "°C", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
+			_view.draw_circle(Vector2(x, top + 1.0), 2.6, Color(0.62, 0.06, 0.06))
+	_view.draw_line(Vector2(x - 6, 0), Vector2(x - 6, h), Color(1, 1, 1, 0.65), 1.5)
+	# Латунная табличка над прибором
+	var lw := pf.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+	var pr := Rect2(x - lw * 0.5 - 8, 8, lw + 16, 22)
+	_view.draw_rect(pr.grow(1), UiStyle.BRASS.darkened(0.5))
+	UiStyle.vgrad(_view, pr, UiStyle.BRASS.lightened(0.15), UiStyle.BRASS.darkened(0.15))
+	_view.draw_string(pf, Vector2(x - lw * 0.5, 25), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.18, 0.13, 0.06))
+	_view.draw_string(pf, Vector2(x + 22, h - 10), "°C", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ink)
 	if wet:   # батист смоченного: обледенелая ткань уходит вниз, к резервуару
-		_view.draw_rect(Rect2(x - 9, h - 26, 18, 26), Color(0.86, 0.9, 0.93, 0.85))
+		UiStyle.vgrad(_view, Rect2(x - 10, h - 30, 20, 30), Color(0.9, 0.93, 0.95, 0.6), Color(0.82, 0.86, 0.9, 0.95))
 
 
 # --- Запись -----------------------------------------------------------------------------

@@ -9,9 +9,24 @@ const PAD := 60.0
 var _bounds := Rect2(-45, -62, 150, 100)    ## мировые XZ, которые помещаются на лист (пересчёт по леерам)
 
 
+var _paper: ColorRect
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	resized.connect(queue_redraw)
+	resized.connect(_layout)
+	_layout.call_deferred()
+
+
+## Фактура листа поверх нарисованного (умножением: подписи и карандаш — «на бумаге»).
+func _layout() -> void:
+	var sheet := Rect2(size * 0.5 - Vector2(470, 330), Vector2(940, 660))
+	if _paper == null:
+		_paper = UiStyle.paper_mul(self, sheet, 4.4, 1.0)
+	_paper.position = sheet.position
+	_paper.size = sheet.size
+	(_paper.material as ShaderMaterial).set_shader_parameter(&"px_size", sheet.size)
+	queue_redraw()
 
 
 func handle_input(event: InputEvent) -> void:
@@ -151,13 +166,13 @@ func _draw_efir(area: Rect2, to_map: Callable, font: Font) -> void:
 				continue
 			draw_dashed_line(seg[0], seg[1], blue, 1.4, 6.0)
 			var at: Vector2 = to_map.call(p)
-			draw_string(font, (at + (seg[1] - at).normalized() * 70.0).clamp(area.position, area.end - Vector2(60, 0)), str(f), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, blue)
+			draw_string(UiStyle.hand_font(), (at + (seg[1] - at).normalized() * 70.0).clamp(area.position, area.end - Vector2(60, 0)), str(f), HORIZONTAL_ALIGNMENT_LEFT, -1, 22, blue)
 		var cr := Efir.cross(id)
 		if cr.size() == 2:
 			var c: Vector2 = to_map.call(cr[0])
 			var rr := float(cr[1]) * area.size.x / _bounds.size.x
 			draw_rect(Rect2(c - Vector2(rr, rr), Vector2(rr, rr) * 2.0), red, false, 2.2)
-			draw_string(font, c + Vector2(rr + 4, -rr + 12), Loc.t(&"df.map_square", [f]), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, red)
+			draw_string(UiStyle.hand_font(), c + Vector2(rr + 4, -rr + 16), Loc.t(&"df.map_square", [f]), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, red)
 
 
 ## Отрезок, обрезанный по прямоугольнику листа ([] — весь снаружи).

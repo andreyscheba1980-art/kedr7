@@ -44,10 +44,14 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.78)
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
-	var title := UiKit.label(Loc.t(&"barograph.title"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	UiKit.place(self, title, 0.5, 0.5, 0.5, 0.5, -500, -318, 500, -286)
+	ThermometerUI.title_plate(self, Loc.t(&"barograph.title"))
 
+	# Лента на барабане — настоящая бумага под сеткой
+	var tape := Control.new()
+	tape.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tape.clip_contents = true
+	UiKit.place(self, tape, 0.5, 0.5, 0.5, 0.5, -494, -246, 94, 190)
+	UiStyle.paper(tape, 3.3, Color(0.93, 0.91, 0.84), 0.4)
 	_chart = Control.new()
 	_chart.clip_contents = true
 	_chart.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -58,16 +62,13 @@ func _ready() -> void:
 			_ruler_y = (e as InputEventMouseMotion).position.y)
 	_chart.mouse_exited.connect(func() -> void: _ruler_y = -1.0)
 
-	_status = UiKit.label("", 14)
-	_status.add_theme_color_override("font_color", Color(0.9, 0.55, 0.4))
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UiKit.place(self, _status, 0.5, 0.5, 0.5, 0.5, -500, 200, 100, 226)
-	var wind_btn := UiKit.button(Loc.t(&"barograph.wind_key"), _wind_mechanism)
-	wind_btn.focus_mode = Control.FOCUS_NONE
-	UiKit.place(self, wind_btn, 0.5, 0.5, 0.5, 0.5, -500, 232, -205, 268)
-	var listen_btn := UiKit.button(Loc.t(&"barograph.listen_pen"), _listen_pen)
-	listen_btn.focus_mode = Control.FOCUS_NONE
-	UiKit.place(self, listen_btn, 0.5, 0.5, 0.5, 0.5, -195, 232, 100, 268)
+	_status = UiStyle.hint()
+	_status.add_theme_color_override("font_color", Color(0.92, 0.62, 0.45, 0.9))
+	UiKit.place(self, _status, 0.5, 0.5, 0.5, 0.5, -500, 202, 100, 226)
+	var wind_btn := UiStyle.text_button(Loc.t(&"barograph.wind_key"), _wind_mechanism)
+	UiKit.place(self, wind_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -205, 266)
+	var listen_btn := UiStyle.text_button(Loc.t(&"barograph.listen_pen"), _listen_pen)
+	UiKit.place(self, listen_btn, 0.5, 0.5, 0.5, 0.5, -195, 230, 100, 266)
 
 	_book = KMBook.new()
 	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
@@ -154,12 +155,14 @@ func _pen(h: float) -> float:
 
 func _draw_chart() -> void:
 	var w := _chart.size
-	var font := ThemeDB.fallback_font
-	var grid := Color(0.55, 0.42, 0.55, 0.35)
-	var grid_b := Color(0.45, 0.3, 0.45, 0.7)
-	var ink_l := Color(0.25, 0.2, 0.25)
-	_chart.draw_rect(Rect2(Vector2.ZERO, w), Color(0.10, 0.10, 0.11))
-	_chart.draw_rect(Rect2(6, 6, w.x - 12, w.y - 12), Color(0.93, 0.91, 0.84))
+	var font := UiStyle.plate_font()
+	var grid := Color(0.55, 0.42, 0.55, 0.30)
+	var grid_b := Color(0.45, 0.3, 0.45, 0.6)
+	var ink_l := Color(0.32, 0.2, 0.32)
+	# Барабан: тёмная кромка вокруг ленты, тень сверху (лента изогнута)
+	_chart.draw_rect(Rect2(Vector2.ZERO, w), Color(0.10, 0.09, 0.08), false, 12.0)
+	UiStyle.vgrad(_chart, Rect2(6, 6, w.x - 12, 26), Color(0, 0, 0, 0.3), Color(0, 0, 0, 0))
+	UiStyle.vgrad(_chart, Rect2(6, w.y - 32, w.x - 12, 26), Color(0, 0, 0, 0), Color(0, 0, 0, 0.3))
 	# Давление: линия через 1 мм, жирная и подпись — через 5
 	for mm in range(int(_center_p - MM_HALF) - 1, int(_center_p + MM_HALF) + 2):
 		var y := _y(mm)

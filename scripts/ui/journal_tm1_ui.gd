@@ -111,6 +111,7 @@ func _ready() -> void:
 
 	# 3. Чистая бумажная тема для документов (полное отключение HUD-обводок и теней)
 	var paper_theme := Theme.new()
+	paper_theme.default_font = UiStyle.type_font()
 	paper_theme.set_constant("outline_size", "Label", 0)
 	paper_theme.set_color("font_outline_color", "Label", Color.TRANSPARENT)
 	paper_theme.set_constant("shadow_offset_x", "Label", 0)
@@ -180,6 +181,10 @@ func _ready() -> void:
 	_notes_spread.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_notes_spread.visible = false
 	book_root.add_child(_notes_spread)
+
+	# Фактура бумаги поверх обеих страниц (умножением: текст, линовка и штампы остаются видны)
+	UiStyle.paper_mul(book_root, Rect2(24, 48, PAGE_W, PAGE_H), 2.1, 0.6)
+	UiStyle.paper_mul(book_root, Rect2(BOOK_W - 24 - PAGE_W, 48, PAGE_W, PAGE_H), 5.7, 0.8)
 
 	_switch_tab(0)
 
@@ -283,7 +288,7 @@ func _on_draw_book() -> void:
 		var trans_rect := Rect2(right_page.position.x + 120, right_page.end.y - 120, 260, 48)
 		_canvas.draw_rect(trans_rect, Color(0.15, 0.35, 0.75, 0.12))
 		_canvas.draw_rect(trans_rect, Color(0.15, 0.35, 0.75, 0.65), false, 2.0)
-		_canvas.draw_string(ThemeDB.fallback_font, trans_rect.position + Vector2(18, 30), Loc.p("ПЕРЕДАНО В УГМС • 22:15 МСК", "SENT TO UGMS • 22:15 MSK"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.15, 0.35, 0.75, 0.85))
+		_canvas.draw_string(UiStyle.type_font(), trans_rect.position + Vector2(18, 30), Loc.p("ПЕРЕДАНО В УГМС • 22:15 МСК", "SENT TO UGMS • 22:15 MSK"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.15, 0.35, 0.75, 0.85))
 
 	# Анимация перелистывания страницы (3 кадра низкий FPS)
 	if _flipping and _flip_frame > 0:
@@ -301,7 +306,7 @@ func _draw_soviet_station_stamp(pos: Vector2) -> void:
 	_canvas.draw_arc(pos, 34.0, 0, TAU, 48, stamp_col, 1.4)
 	_canvas.draw_arc(pos, 26.0, 0, TAU, 40, Color(stamp_col.r, stamp_col.g, stamp_col.b, stamp_col.a * 0.8), 0.8)
 
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.type_font()
 	_canvas.draw_string(font, pos + Vector2(-24, -6), Loc.p("КЕДР-7", "KEDR-7"), HORIZONTAL_ALIGNMENT_CENTER, 48, 10, stamp_col)
 	_canvas.draw_string(font, pos + Vector2(-24, 6), Loc.p("УГМС", "UGMS"), HORIZONTAL_ALIGNMENT_CENTER, 48, 10, stamp_col)
 	_canvas.draw_string(font, pos + Vector2(-24, 17), "1983", HORIZONTAL_ALIGNMENT_CENTER, 48, 9, Color(stamp_col.r, stamp_col.g, stamp_col.b, stamp_col.a * 0.75))

@@ -44,9 +44,7 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.8)
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
-	var title := UiKit.label(Loc.t(&"df.title_house" if point == &"house" else &"df.title_tower"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	UiKit.place(self, title, 0.5, 0.5, 0.5, 0.5, -500, -318, 500, -286)
+	ThermometerUI.title_plate(self, Loc.t(&"df.title_house" if point == &"house" else &"df.title_tower"))
 
 	_panel = Control.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -182,14 +180,15 @@ func _hint_text(id: StringName) -> String:
 
 func _draw_panel() -> void:
 	var w := _panel.size
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.plate_font()
 	var face := Color(0.86, 0.83, 0.74)
 	var ink := Color(0.12, 0.11, 0.09)
-	_panel.draw_rect(Rect2(Vector2.ZERO, w), Color(0.12, 0.13, 0.12))
+	UiStyle.bakelite(_panel, Rect2(Vector2.ZERO, w))
 	# --- Шкала частот ---
 	var strip := Rect2(14, 14, w.x - 190, 74)
 	_panel.draw_rect(strip, Color(0.08, 0.07, 0.05))
-	_panel.draw_rect(strip.grow(-3), Color(0.85, 0.72, 0.42, 0.9))
+	UiStyle.vgrad(_panel, strip.grow(-3), Color(0.95, 0.8, 0.5), Color(0.75, 0.6, 0.32))   # подсвеченная шкала верньера
+	UiStyle.vgrad(_panel, Rect2(strip.position + Vector2(3, 3), Vector2(strip.size.x - 6, 10)), Color(1, 1, 1, 0.25), Color(1, 1, 1, 0))
 	var lo := _freq - SPAN_KHZ * 0.5
 	for k in range(int(lo / 5.0) * 5, int(lo + SPAN_KHZ) + 6, 5):
 		var x := strip.position.x + (float(k) - lo) / SPAN_KHZ * strip.size.x
@@ -202,9 +201,10 @@ func _draw_panel() -> void:
 			_panel.draw_string(font, Vector2(x - 18, strip.position.y + 26), str(k), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
 	var cx := strip.get_center().x
 	_panel.draw_line(Vector2(cx, strip.position.y + 2), Vector2(cx, strip.end.y - 2), Color(0.75, 0.1, 0.08), 2.5)
-	_panel.draw_string(font, Vector2(strip.end.x - 132, strip.end.y + 26), Loc.t(&"df.khz", [int(roundf(_freq))]), HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.95, 0.85, 0.6))
+	_panel.draw_string(font, Vector2(strip.end.x - 132, strip.end.y + 28), Loc.t(&"df.khz", [int(roundf(_freq))]), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.95, 0.85, 0.6))
 	# --- S-метр ---
 	var mc := Vector2(w.x - 88, 92)
+	_panel.draw_circle(mc, 72, Color(0.45, 0.44, 0.42))
 	_panel.draw_circle(mc, 70, Color(0.08, 0.08, 0.08))
 	_panel.draw_arc(mc, 62, PI * 1.15, PI * 1.85, 24, face, 22.0)
 	for i in 11:
@@ -216,8 +216,7 @@ func _draw_panel() -> void:
 	# --- Лимб и рамка ---
 	var c := Vector2(w.x * 0.5, w.y * 0.62)
 	var r := minf(w.x * 0.36, w.y * 0.34)
-	_panel.draw_circle(c, r + 14, Color(0.06, 0.06, 0.06))
-	_panel.draw_circle(c, r, face)
+	UiStyle.dial_face(_panel, c, r)
 	for d in 360:
 		var a := deg_to_rad(float(d) - 90.0)
 		var dir := Vector2(cos(a), sin(a))
@@ -240,8 +239,10 @@ func _draw_panel() -> void:
 	_panel.draw_line(c - fr * (r * 0.55), c + fr * (r * 0.55), Color(0.25, 0.25, 0.27), 9.0)
 	_panel.draw_line(c - pd * (r - 6), c + pd * (r - 6), Color(0.75, 0.1, 0.08), 2.0)
 	_panel.draw_circle(c + pd * (r - 8), 5.0, Color(0.75, 0.1, 0.08))
-	_panel.draw_circle(c, 10, ink)
-	_panel.draw_string(font, c + Vector2(-6, -r - 22), Loc.t(&"map.north"), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, face)
+	_panel.draw_circle(c, 10, Color(0.3, 0.29, 0.27))
+	_panel.draw_circle(c, 6, ink)
+	UiStyle.dial_glass(_panel, c, r)
+	_panel.draw_string(font, c + Vector2(-6, -r - 22), Loc.t(&"map.north"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, face)
 
 
 # --- Запись пеленга ---------------------------------------------------------------------

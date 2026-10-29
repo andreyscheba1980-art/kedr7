@@ -2518,6 +2518,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _corpus_review()
 		get_tree().quit()
 		return
+	if args.has("uishots"):
+		await _ui_review()
+		get_tree().quit()
+		return
 	if args.has("efir"):
 		await _efir_review()
 		get_tree().quit()
@@ -4200,3 +4204,24 @@ func _efir_review() -> void:
 		if n is Session:
 			print("[efir] дело:
 ", (n as Session)._case_file(&"answer"))
+
+
+## Все окна игры по очереди — кадр каждого (проверка единого стиля).
+func _ui_review() -> void:
+	Game.yrka.enabled = false
+	Game.give_item(&"tape_recorder")
+	Game.give_item(&"codebook")
+	Game.add_tape(&"code")
+	Game.hud.visible = true
+	_look(Vector3(8.6, 0.05, 0.4), Vector3(9.2, 1.0, -1.4))
+	await _wait(0.5)
+	for id: StringName in [&"journal", &"intercepts", &"codebook", &"tape", &"seismograph", &"meteor_fax", &"supply", &"theodolite", &"map", &"barograph", &"wind_panel"]:
+		EventBus.ui_requested.emit(id)
+		await _wait(1.2)
+		await _shot("ui_" + String(id))
+		Game.hud.close_modal()
+		await _wait(0.3)
+	Game.hud.show_note(Loc.t(&"efir.find.alone"))
+	await _wait(0.6)
+	await _shot("ui_note")
+	Game.hud.hide_note()

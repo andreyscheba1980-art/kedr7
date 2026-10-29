@@ -29,14 +29,12 @@ func _ready() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.78)
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
-	var title := UiKit.label(Loc.t(&"snow.title"), 20)
-	title.add_theme_color_override("font_color", UiKit.AMBER)
-	UiKit.place(self, title, 0.5, 0.5, 0.5, 0.5, -500, -318, 500, -286)
+	ThermometerUI.title_plate(self, Loc.t(&"snow.title"))
 
 	_view = InstrumentView.new()
 	UiKit.place(self, _view, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
 	var temp := Game.air_temp().x
-	_view.setup(_draw_view, func(n: float) -> void: _center = clampf(_center + n * CM_PER_NOTCH, 45.0, H_MAX - 45.0), InstrumentView.frost_for_weather(temp) * 0.8)
+	_view.setup(_draw_view, func(n: float) -> void: _center = clampf(_center + n * CM_PER_NOTCH, 45.0, H_MAX - 45.0), InstrumentView.frost_for_weather(temp) * 0.8, [[0.44, 0.56]])
 
 	_book = KMBook.new()
 	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
@@ -65,7 +63,7 @@ func _surface(x: float, rod_x: float) -> float:
 
 func _draw_view() -> void:
 	var w := _view.size
-	var font := ThemeDB.fallback_font
+	var font := UiStyle.plate_font()
 	var ink := Color(0.08, 0.08, 0.1)
 	var day := Game.is_daylight()
 	# Фон: лес за площадкой
@@ -76,7 +74,8 @@ func _draw_view() -> void:
 			Color(0.32, 0.38, 0.4) if day else Color(0.05, 0.07, 0.1))
 	var rx := w.x * 0.5
 	# Рейка: белая, деления слева (см / 5 / 10), справа — красно-белые полосы по 10 см
-	_view.draw_rect(Rect2(rx - 30, 0, 60, w.y), Color(0.93, 0.93, 0.9))
+	_view.draw_rect(Rect2(rx - 26, 0, 60, w.y), Color(0, 0, 0, 0.35))   # тень рейки
+	UiStyle.hgrad(_view, Rect2(rx - 30, 0, 60, w.y), Color(0.82, 0.82, 0.8), Color(0.97, 0.97, 0.95))
 	var lo := _center - w.y * 0.5 / PPCM - 2.0
 	var hi := _center + w.y * 0.5 / PPCM + 2.0
 	for cm in range(int(floor(lo)), int(ceil(hi)) + 1):
@@ -95,7 +94,7 @@ func _draw_view() -> void:
 			width = 1.6
 		_view.draw_line(Vector2(rx - 30, y), Vector2(rx - 30 + len, y), ink, width)
 		if cm % 10 == 0:
-			_view.draw_string(font, Vector2(rx - 2, y - 3), str(cm), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
+			_view.draw_string(font, Vector2(rx - 2, y - 3), str(cm), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
 	_view.draw_line(Vector2(rx - 30, 0), Vector2(rx - 30, w.y), Color(0.5, 0.5, 0.5), 1.0)
 	_view.draw_line(Vector2(rx + 30, 0), Vector2(rx + 30, w.y), Color(0.5, 0.5, 0.5), 1.0)
 	# Снег поверх нижней части рейки
