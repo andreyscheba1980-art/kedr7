@@ -630,25 +630,49 @@ func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
 			posts.append(Terrain.at(a.lerp(b, float(k) / n)))   # вешка — на снегу, и на склоне тоже
 	posts.append(Terrain.at(line[line.size() - 1]))
 
+	# Вешки ставили на глаз: каждая чуть кренится и разной высоты; трос провисает между ними дугой.
+	# На развилках трос разорван — несколько лееров не перекрещиваются сеткой.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(absf(line[0].x * 31.0 + line[0].z * 17.0)) + posts.size()
+	var tops: Array[Vector3] = []
 	for i in range(posts.size()):
 		var p := posts[i]
 		var post := Props.rope_post(i % 2 == 0 and flag_col.a > 0.0, flag_col, flag_shape)
 		post.position = p
+		var sy := rng.randf_range(0.92, 1.06)
+		post.scale = Vector3(1.0, sy, 1.0)
+		post.rotation = Vector3(rng.randf_range(-0.05, 0.05), rng.randf_range(-PI, PI), rng.randf_range(-0.05, 0.05))
 		add_child(post)
 		_rope_nodes.append(post)
-		if i > 0:
-			var a := posts[i - 1] + Vector3(0, 1.05, 0)
-			var b := p + Vector3(0, 1.05, 0)
-			var mid := (a + b) / 2.0 + Vector3(0, -0.08, 0)
-			var seg_len := a.distance_to(b)
-			var dir := (b - a).normalized()
-			var yaw := atan2(dir.x, dir.z)
-			var pitch := -asin(clampf(dir.y, -1.0, 1.0))
-			var seg := Geo.box_mesh(Vector3(0.02, 0.02, seg_len), Palette.m(&"rope"))
-			seg.position = mid
-			seg.rotation = Vector3(pitch, yaw, 0.0)
-			add_child(seg)
-			_rope_nodes.append(seg)
+		tops.append(post.transform * Vector3(0, 1.05, 0))
+		if i > 0 and not _near_fork((posts[i - 1] + p) * 0.5):
+			_rope_span(tops[i - 1], tops[i])
+
+
+## Трос между вешками: провисает параболой (4 куска), провис — от длины пролёта.
+func _rope_span(a: Vector3, b: Vector3) -> void:
+	var sag := 0.05 + a.distance_to(b) * 0.018
+	var n := 4
+	var prev := a
+	for k in range(1, n + 1):
+		var t := float(k) / n
+		var cur := a.lerp(b, t) + Vector3(0, -4.0 * sag * t * (1.0 - t), 0)
+		var seg_len := prev.distance_to(cur)
+		var dir := (cur - prev).normalized()
+		var seg := Geo.box_mesh(Vector3(0.022, 0.022, seg_len + 0.01), Palette.m(&"rope"))
+		seg.position = (prev + cur) * 0.5
+		seg.rotation = Vector3(-asin(clampf(dir.y, -1.0, 1.0)), atan2(dir.x, dir.z), 0.0)
+		add_child(seg)
+		_rope_nodes.append(seg)
+		prev = cur
+
+
+## Развилка: здесь сходятся несколько лееров — трос не тянем, чтобы не было сетки из верёвок.
+func _near_fork(p: Vector3) -> bool:
+	for f: Vector3 in [JUNCTION, FORK, MAST_FORK]:
+		if _flat_dist(p, f) < 3.2:
+			return true
+	return false
 
 
 ## Таблички на развилках: стоят на самой ветке, лицом к развилке. Видны только в свете.
@@ -696,7 +720,7 @@ func _sign(at: Vector3, toward: Vector3, key: StringName) -> void:
 	root.look_at(pos - dir, Vector3.UP)        # лицом к развилке
 	root.scale = Vector3.ONE * 0.6             # маленькая обветренная табличка, а не вывеска
 	for sx: float in [-w / 2.0 + 0.04, w / 2.0 - 0.04]:
-		Geo.block(root, Vector3(0.05, 1.55 + h / 2.0, 0.05), Vector3(sx, (1.55 + h / 2.0) / 2.0, 0.045), Palette.m(&"dark"), false)
+		Geo.block(root, Vector3(0.06, 1.55 + h / 2.0, 0.06), Vector3(sx, (1.55 + h / 2.0) / 2.0, 0.045), Palette.m(&"weathered"), false)
 	Geo.block(root, Vector3(w, h, 0.03), Vector3(0, 1.55, 0), Palette.m(&"white"), false)
 	for back in [false, true]:
 		var l := Label3D.new()
@@ -1527,27 +1551,28 @@ func _build_woodpile() -> void:
 	var it := Geo.interactable(self, Vector3(2.4, 0.9, 1.2), WOODPILE + Vector3(0, 0.45, 0), null, "", _on_woodpile_used)
 	it.hold_time = 1.4
 	it.hold_sound = HIT_SOUND
-	var pile := Props.woodpile(2.4, 0.85)
-	add_child(pile)
-	pile.position = WOODPILE
+	# Навес с поленницей — модель (tools/blender/yard_props.py): стойки из брёвен, кровля из досок со снегом,
+	# колотые чурбаки со светлыми торцами, щепа. Коллизии — стойки и сама поленница.
+	var shed_model := Props._kedr_model("woodshed", {"bright": 1.1})
+	if shed_model != null:
+		shed_model.position = WOODPILE
+		add_child(shed_model)
+	else:
+		var pile := Props.woodpile(2.4, 0.85)
+		add_child(pile)
+		pile.position = WOODPILE
+	var col := StaticBody3D.new()
+	col.collision_layer = Geo.LAYER_WORLD
+	col.position = WOODPILE
+	add_child(col)
+	col.add_child(Geo.box_shape(Vector3(2.7, 1.0, 0.65), Vector3(0, 0.5, -0.15)))
+	for sx: float in [-1.5, 1.5]:
+		for sz: float in [-0.75, 0.75]:
+			col.add_child(Geo.box_shape(Vector3(0.16, 2.3, 0.16), Vector3(sx, 1.15, sz)))
 	it.prompt_provider = func() -> String:
 		if Game.player != null and Game.player.held != &"":
 			return Loc.t(&"it.wood_full")
 		return Loc.t(&"it.wood")
-
-	# Навес над поленницей: 4 бревенчатые стойки, наклонная односкатная крыша с шапкой снега
-	var dark := Palette.m(&"dark")
-	for sx: float in [-1.4, 1.4]:
-		for sz: float in [-0.7, 0.7]:
-			var post_h := 2.3 if sz < 0.0 else 1.95
-			Geo.cylinder(self, 0.075, post_h, WOODPILE + Vector3(sx, post_h * 0.5, sz), dark, true)
-	var roof_angle := deg_to_rad(-10.0)
-	Geo.block_rotated(self, Vector3(3.3, 0.08, 1.8), WOODPILE + Vector3(0.0, 2.15, 0.0), roof_angle, Palette.m(&"plank"))
-	Geo.block_rotated(self, Vector3(3.35, 0.09, 1.85), WOODPILE + Vector3(0.0, 2.23, 0.0), roof_angle, Palette.m(&"snow"))
-	# Сосульки по свесу навеса
-	var pile_ice := Props.icicles(3.1, 9)
-	pile_ice.position = WOODPILE + Vector3(0.0, 1.95, 0.85)
-	add_child(pile_ice)
 
 	# Колода для колки дров с расколотым чурбаком и застрявшим колуном
 	var stump := Props.axe_stump()
@@ -1568,11 +1593,10 @@ func _build_woodpile() -> void:
 	)
 	saw_it.name = "Sawhorse"
 
-	# Брёвна, опилки и сугробы вокруг лесопильного навеса
+	# Хлысты, ждущие пилы, у козел
 	var log_mat := Palette.m(&"log")
-	Geo.cylinder(self, 0.14, 3.0, WOODPILE + Vector3(-1.2, 0.14, 1.9), log_mat, true).rotation.y = deg_to_rad(30.0)
-	Geo.cylinder(self, 0.13, 2.5, WOODPILE + Vector3(0.9, 0.13, 2.2), log_mat, true).rotation.y = deg_to_rad(-22.0)
-	Geo.block(self, Vector3(3.3, 0.5, 0.7), WOODPILE + Vector3(0.0, 0.25, -1.0), Palette.m(&"snow"))
+	Geo.cylinder(self, 0.14, 3.0, WOODPILE + Vector3(-1.2, 0.14, 2.3), log_mat, true).rotation.y = deg_to_rad(30.0)
+	Geo.cylinder(self, 0.13, 2.5, WOODPILE + Vector3(1.0, 0.13, 2.6), log_mat, true).rotation.y = deg_to_rad(-22.0)
 
 
 func _on_woodpile_used(p: Player) -> void:

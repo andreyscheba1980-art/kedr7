@@ -2085,15 +2085,24 @@ static func rope_post(has_flag := false, flag_col := Color(0.82, 0.14, 0.12), sh
 	k.blob(Vector3(0.004, 1.365, 0.0), Vector3(0.05, 0.028, 0.048), Color(0.72, 0.78, 0.86), 3, 6)   # снежная шапка
 	# Металлическая скоба-рым для продевания троса на высоте 1.05м
 	k.tube([Vector3(0.035, 1.05, -0.02), Vector3(0.065, 1.05, 0.0), Vector3(0.035, 1.05, 0.02)], [0.007], staple, 4)
+	# Снег, обтоптанный у основания вешки
+	k.blob(Vector3(0, 0.02, 0), Vector3(0.16, 0.06, 0.16), Color(0.72, 0.78, 0.86), 3, 7)
 
 	# Красный треугольный сигнальный вымпел на ветру
 	if has_flag:
 		var flag_slant := Basis(Vector3.UP, deg_to_rad(15.0)) * Basis(Vector3.FORWARD, deg_to_rad(-8.0))
+		# Ткань флажка — изломами (складки на ветру), а не плоская пластина
+		var cloth := func(c: Vector3, sz: Vector3) -> void:
+			var n := 3
+			for j in n:
+				var seg_w := sz.x / n
+				var bend := Basis(Vector3.UP, deg_to_rad(18.0 if j % 2 == 0 else -18.0))
+				k.box(c + Vector3(-sz.x * 0.5 + seg_w * (j + 0.5), 0, 0.012 * (j % 2)), Vector3(seg_w + 0.01, sz.y - 0.012 * j, sz.z), red_flag, flag_slant * bend)
 		# Флажок покрупнее: по нему теперь читают маршрут (щитов-указателей больше нет).
 		# Форма — для тех, кто не различает цвета (см. Yard.ROUTES).
 		match shape:
 			1:   # прямоугольник
-				k.box(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015), red_flag, flag_slant)
+				cloth.call(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015))
 			2:   # «ласточкин хвост»: два языка
 				k.box(Vector3(0.13, 1.2, 0), Vector3(0.2, 0.2, 0.015), red_flag, flag_slant)
 				k.spike(Vector3(0.23, 1.25, 0), Vector3(0.4, 1.27, 0.02), 0.045, red_flag, 4)
@@ -2103,10 +2112,10 @@ static func rope_post(has_flag := false, flag_col := Color(0.82, 0.14, 0.12), sh
 					k.box(Vector3(0.12, fy, 0), Vector3(0.18, 0.1, 0.015), red_flag, flag_slant)
 					k.spike(Vector3(0.21, fy, 0), Vector3(0.34, fy, 0.02), 0.04, red_flag, 4)
 			4:   # прямоугольник с белой полосой
-				k.box(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015), red_flag, flag_slant)
+				cloth.call(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015))
 				k.box(Vector3(0.2, 1.2, 0.009), Vector3(0.34, 0.06, 0.004), Color(0.92, 0.92, 0.9), flag_slant)
 			_:   # вымпел
-				k.box(Vector3(0.15, 1.20, 0), Vector3(0.24, 0.15, 0.015), red_flag, flag_slant)
+				cloth.call(Vector3(0.15, 1.20, 0), Vector3(0.24, 0.15, 0.015))
 				k.spike(Vector3(0.27, 1.20, 0), Vector3(0.44, 1.20, 0.02), 0.055, red_flag, 4)
 
 	return _mi(k, key, "tex_wood.png")

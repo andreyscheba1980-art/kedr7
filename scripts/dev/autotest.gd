@@ -2522,6 +2522,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _tower_walk()
 		get_tree().quit()
 		return
+	if args.has("yardshots"):
+		await _yard_review()
+		get_tree().quit()
+		return
 	if args.has("house"):
 		await _house_review()
 		get_tree().quit()
@@ -3687,6 +3691,20 @@ func _tower_walk() -> void:
 				break
 		Input.action_release(&"move_forward")
 		print("[tower] %s → %s" % [leg[3], p.global_position])
+
+
+## Двор: развилки с леерами, сараи, поленница, вертолётка, ангар, навес с баллонами, бункер, изба.
+func _yard_review() -> void:
+	Game.yrka.enabled = false
+	var tag := "night" if Game.is_night() else "day"
+	for v: Array in [["junction", Vector3(24.0, 0.05, -4.5), Vector3(32.0, 0.8, -1.0)], ["fork_house", Vector3(22.5, 0.05, 6.5), Vector3(16.0, 1.4, 3.0)],
+			["shed", Vector3(40.0, 0.05, 30.0), Vector3(48.0, 1.5, 34.0)], ["woodpile", Vector3(8.0, 0.05, 35.0), Vector3(4.0, 0.8, 40.0)],
+			["helipad", Vector3(36.0, 0.05, 2.0), Vector3(44.0, 0.3, 6.0)], ["hangar", Vector3(118.0, 0.05, -26.0), Vector3(128.0, 2.5, -36.0)],
+			["gas_shelter", Vector3(110.0, 0.05, -27.0), Vector3(114.6, 1.2, -32.0)], ["bunker", Vector3(52.0, 0.05, 8.0), Vector3(58.0, 0.5, 12.0)],
+			["mast", Vector3(20.0, 0.05, -52.0), Vector3(24.0, 4.0, -62.0)], ["izba", Vector3(-8.0, 0.05, -26.0), Vector3(-16.0, 1.5, -30.0)]]:
+		_look(Terrain.at(v[1]) + Vector3(0, 0.05, 0), v[2])
+		await _wait(1.2)
+		await _shot("yard_%s_%s" % [v[0], tag])
 
 
 ## Дом изнутри: каждая комната с двух сторон (свет — как есть в этой фазе).

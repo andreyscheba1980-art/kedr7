@@ -104,15 +104,29 @@ for x in (SX0, SX1):
 box(((SX0 + SX1) / 2, 2.32, (SZ0 + SZ1) / 2), (SX1 - SX0 + 0.5, 0.06, SZ1 - SZ0 + 0.6), M["slate"], tilt_x=0.14)
 box(((SX0 + SX1) / 2, 2.4, (SZ0 + SZ1) / 2), (SX1 - SX0 + 0.3, 0.1, SZ1 - SZ0 + 0.4), M["snow"], tilt_x=0.14, bevel=0.03)
 box(((SX0 + SX1) / 2, 0.9, SZ0 + 0.25), (SX1 - SX0, 0.06, 0.08), M["wood"])
+M["band"] = kit.mat("y_band", (0.55, 0.1, 0.07), rough=0.5, wear=0.5)
+M["stencil"] = kit.mat("y_stencil", (0.82, 0.82, 0.78), rough=0.8)
+box(((SX0 + SX1) / 2, 1.3, SZ0 + 0.25), (SX1 - SX0, 0.06, 0.08), M["wood"])     # второй брус-упор
 for i in range(9):
     x = SX0 + 0.35 + i * 0.5
-    lean = 0.12 if i in (3, 7) else 0.0
-    cyl((x, 0.75, SZ0 + 0.35), 0.11, 1.5, M["cyl"], verts=10)
-    cyl((x, 1.55, SZ0 + 0.35), 0.05, 0.12, M["iron"], verts=6)
-    colbox((x, 0.75, SZ0 + 0.35), (0.22, 1.5, 0.22))
+    zc = SZ0 + 0.35
+    # баллон: корпус, плечики, вентиль под колпаком, красный поясок «водород», трафарет, башмак
+    cyl((x, 0.66, zc), 0.11, 1.32, M["cyl"], verts=12)
+    cyl((x, 1.38, zc), 0.11, 0.12, M["cyl"], verts=12, r2=0.055)
+    cyl((x, 1.5, zc), 0.058, 0.13, M["iron"], verts=8)
+    cyl((x, 1.58, zc), 0.045, 0.04, M["iron"], verts=8, r2=0.02)
+    cyl((x, 1.18, zc), 0.113, 0.06, M["band"], verts=12)
+    box((x, 0.85, zc + 0.108), (0.08, 0.3, 0.008), M["stencil"])
+    cyl((x, 0.03, zc), 0.12, 0.06, M["iron"], verts=12)
+    colbox((x, 0.75, zc), (0.22, 1.5, 0.22))
 for k, (x, z) in enumerate(((118.6, SZ1 - 0.4), (119.4, SZ1 - 0.4), (121.2, SZ1 - 0.45))):
-    cyl((x, 0.45, z), 0.3, 0.9, M["barrel"], verts=12)
-    box((x, 0.92, z), (0.5, 0.04, 0.5), M["snow"], bevel=0.02) if k != 1 else None
+    cyl((x, 0.45, z), 0.3, 0.9, M["barrel"], verts=14)
+    for yy in (0.0, 0.3, 0.6, 0.88):   # зиги и закатанные края
+        cyl((x, yy + 0.01, z), 0.305, 0.025, M["iron"], verts=14)
+    cyl((x + 0.15, 0.905, z - 0.08), 0.03, 0.012, M["iron"], verts=8)        # пробка
+    box((x, 0.5, z + 0.29), (0.22, 0.12, 0.01), M["stencil"])
+    if k != 1:
+        kit.sphere(ugms._nm("bs"), 1.0, ugms.g2b((x, 0.92, z)), M["snow"], scale=ugms.gsize((0.27, 0.05, 0.27)), segs=12, rings=6)
     colbox((x, 0.45, z), (0.6, 0.9, 0.6))
 sign((SX0 - 0.07, 1.6, (SZ0 + SZ1) / 2), -math.pi / 2, ["ОГНЕОПАСНО", "Водород"], M, w=0.6, h=0.3, size=0.06)
 for x in (SX0, SX1):
