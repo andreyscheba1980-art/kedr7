@@ -2,23 +2,24 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ct62krof4b5sa"
-path="res://.godot/imported/corpus_ext_corpus_ext.png-d32fcf72530e407a398c0a00342c04fb.ctex"
+uid="uid://cbv0q084f4hju"
+path.s3tc="res://.godot/imported/corpus_ext_corpus_ext.png-d32fcf72530e407a398c0a00342c04fb.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
-"md5": "b524833a751adc6d0e522749ede7f601"
+"md5": "60f4c63e146007730744d0db9da7d7fe"
 }
 
 [deps]
 
 source_file="res://assets/models/kedr/corpus_ext_corpus_ext.png"
-dest_files=["res://.godot/imported/corpus_ext_corpus_ext.png-d32fcf72530e407a398c0a00342c04fb.ctex"]
+dest_files=["res://.godot/imported/corpus_ext_corpus_ext.png-d32fcf72530e407a398c0a00342c04fb.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

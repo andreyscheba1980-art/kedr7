@@ -3710,7 +3710,9 @@ func _house_review() -> void:
 			["plot_gate", Vector3(60.0, 0.05, -23.0), Vector3(66.0, 0.8, -21.0)], ["plot_booth", Vector3(64.8, 0.05, -21.0), Vector3(64.8, 1.4, -23.6)],
 			["plot_old", Vector3(66.5, 0.05, -18.0), Vector3(63.5, 1.0, -21.0)],
 			["radio_desk", Vector3(9.2, 0.6, 0.05), Vector3(9.2, 0.75, -1.25)], ["living_ne", Vector3(0.6, 0.05, 2.6), Vector3(2.85, 0.4, 0.5)],
-			["living_table", Vector3(0.0, 0.3, 3.1), Vector3(1.4, 0.75, 4.1)]]:
+			["living_table", Vector3(0.0, 0.3, 3.1), Vector3(1.4, 0.75, 4.1)],
+			["corpus_w", Vector3(83.0, 0.05, -27.0), Vector3(90.0, 2.2, -27.0)], ["corpus_sw", Vector3(84.0, 0.05, -14.5), Vector3(95.0, 2.5, -27.0)],
+			["corpus_n", Vector3(90.5, 0.05, -44.0), Vector3(97.0, 4.0, -34.0)]]:
 		_look(v[1], v[2])
 		await _wait(1.2)
 		await _shot("house_%s_%s" % [v[0], tag])

@@ -19,10 +19,49 @@ M = ugms.mats()
 EXT, INT = PART == "ext", PART == "int"
 p_in = lambda *a, **k: ugms.painted(*a, grain=0.05, detail=3, streaks=False, **k)
 # Без вертикальных потёков: ночью в PS1-свете они читались широкими полосами («зебра»); обвалы до кирпича — пятнами
-M["plaster"] = ugms.painted("c_plaster", (0.78, 0.77, 0.72), under=(0.52, 0.47, 0.42), peel=0.16, scale=0.9, grain=0.16, detail=8, streaks=False)
+M["plaster"] = ugms.painted("c_plaster", (0.74, 0.73, 0.68), under=(0.5, 0.42, 0.37), peel=0.36, scale=1.2, grain=0.2, detail=10, streaks=False)
+M["grime"] = kit.mat("c_grime", (0.32, 0.3, 0.27), rough=0.95, noise=0.4, noise_scale=7, dirt=0.9)
+M["ice"] = kit.mat("c_ice", (0.78, 0.86, 0.92), rough=0.15)
+M["drift"] = kit.mat("c_drift", (0.6, 0.66, 0.74), rough=0.85, noise=0.06, noise_scale=3)
 M["reveal"] = ugms.painted("c_reveal", (0.70, 0.69, 0.64), under=(0.44, 0.19, 0.12), peel=0.3, scale=5.0, streaks=False)
 M["whitewash"] = p_in("c_white", (0.80, 0.79, 0.72), under=(0.58, 0.55, 0.48), peel=0.1, scale=3.0)
 M["panel"] = p_in("c_panel", (0.27, 0.37, 0.43), under=(0.40, 0.38, 0.33), peel=0.08, scale=5.0)
+# Масляная панель — у каждой комнаты своя (как красили в УГМС: аппаратная зелёная, кабинет — охра, склад — серый)
+M["panel_green"] = p_in("c_pgreen", (0.25, 0.37, 0.31), under=(0.40, 0.38, 0.33), peel=0.1, scale=5.0)
+M["panel_ochre"] = p_in("c_pochre", (0.46, 0.34, 0.2), under=(0.40, 0.38, 0.33), peel=0.1, scale=5.0)
+M["panel_grey"] = p_in("c_pgrey", (0.38, 0.39, 0.37), under=(0.30, 0.28, 0.25), peel=0.14, scale=5.0)
+M["panel_brown"] = p_in("c_pbrown", (0.3, 0.22, 0.16), under=(0.40, 0.38, 0.33), peel=0.1, scale=5.0)
+M["skirt"] = kit.mat("c_skirt", (0.2, 0.13, 0.08), rough=0.7, wear=0.5, dirt=0.4)
+
+
+def panel_at(x, z):
+    """Какая панель у стены, что смотрит в комнату с точкой (x, z)."""
+    if x < 94.8:
+        return M["panel_green"] if z < -28.52 else (M["panel_grey"] if z < -25.93 else M["panel_ochre"])
+    if x < 96.4:
+        return M["panel"]
+    if x < 99.0:
+        return M["panel_green"] if z < -29.52 else (M["panel_brown"] if z < -24.92 else M["panel_grey"])
+    return M["panel_grey"]
+
+
+# Границы комнат вдоль стены: по ним режем полосу панели, чтобы краска менялась на углу комнаты
+BREAKS = {0: [94.8, 96.4], 2: [-29.52, -28.52, -25.93, -24.92]}
+
+
+def _split(lo, hi, axis):
+    cuts = [lo] + [b for b in BREAKS[axis] if lo < b < hi] + [hi]
+    return list(zip(cuts, cuts[1:]))
+
+
+def _trim(axis, u0, u1, c, out, y0, y1):
+    """Плинтус и отбивка поверх полосы панели (out — сдвиг от плоскости стены в комнату)."""
+    if u1 - u0 < 0.05:
+        return
+    um = (u0 + u1) / 2
+    for yy, hh, dd in ((y0 + 0.05, 0.1, 0.025), (y1, 0.04, 0.02)):
+        sz = (u1 - u0, hh, dd) if axis == 0 else (dd, hh, u1 - u0)
+        box(_uv(axis, um, c, yy, out), sz, M["skirt"])
 M["floor"] = p_in("c_floor", (0.33, 0.17, 0.08), under=(0.30, 0.25, 0.19), peel=0.18, scale=3.0, boards="x", step=0.14)
 M["cfloor"] = kit.mat("c_cfloor", (0.36, 0.35, 0.33), rough=0.95, noise=0.25, noise_scale=6, wear=0.3, dirt=0.8)
 M["frame"] = kit.mat("c_frame", (0.16, 0.13, 0.10), rough=0.8, wear=0.4)
@@ -90,10 +129,20 @@ def wall(axis, u0, u1, c, n, y0, y1, holes=(), outer=True, out_y0=None, inner=(F
     if INT and inner:
         lo, hi = in_u if in_u else (min(u0, u1) + T, max(u0, u1) - T)
         ci = c - n * T
-        bands = [(inner[0], inner[0] + 1.5, M["panel"]), (inner[0] + 1.5, inner[1], M["whitewash"])] if panel else [(inner[0], inner[1], M["whitewash"])]
-        for b0, b1, m in bands:
-            for r in _rects(lo, hi, b0, b1, hs):
-                prism(axis, ci, -n, rect_pts(r), 0.0, 0.02, m)
+        if panel:
+            for (a, b) in _split(lo, hi, axis):
+                um = (a + b) / 2
+                px, _, pz = _uv(axis, um, ci, 1.0, -n * 0.3)
+                pm = panel_at(px, pz)
+                for r in _rects(a, b, inner[0], inner[0] + 1.5, hs):
+                    prism(axis, ci, -n, rect_pts(r), 0.0, 0.02, pm)
+                    if r[2] <= inner[0] + 0.01 and r[3] >= inner[0] + 1.49:
+                        _trim(axis, r[0], r[1], ci, -n * 0.03, inner[0], inner[0] + 1.5)
+            for r in _rects(lo, hi, inner[0] + 1.5, inner[1], hs):
+                prism(axis, ci, -n, rect_pts(r), 0.0, 0.02, M["whitewash"])
+        else:
+            for r in _rects(lo, hi, inner[0], inner[1], hs):
+                prism(axis, ci, -n, rect_pts(r), 0.0, 0.02, M["whitewash"])
     if collide:
         doors = [h[:4] for h in holes if h[4] == "door"]
         for r in _rects(min(u0, u1), max(u0, u1), y0, y1, doors):
@@ -142,9 +191,15 @@ def partition(axis, u0, u1, c, holes=(), y0=FL, y1=CEIL, t=0.14):
     hs = [h[:4] for h in holes]
     for side in (-1, 1):
         if INT:
-            for b0, b1, m in ((y0, y0 + 1.5, M["panel"]), (y0 + 1.5, y1, M["whitewash"])):
-                for r in _rects(u0, u1, b0, b1, hs):
-                    prism(axis, c, side, rect_pts(r), t / 2, t / 2 + 0.01, m)
+            for (a, b) in _split(min(u0, u1), max(u0, u1), axis):
+                px, _, pz = _uv(axis, (a + b) / 2, c, 1.0, side * 0.3)
+                pm = panel_at(px, pz)
+                for r in _rects(a, b, y0, y0 + 1.5, hs):
+                    prism(axis, c, side, rect_pts(r), t / 2, t / 2 + 0.01, pm)
+                    if r[2] <= y0 + 0.01 and r[3] >= y0 + 1.49:
+                        _trim(axis, r[0], r[1], c, side * (t / 2 + 0.02), y0, y0 + 1.5)
+            for r in _rects(u0, u1, y0 + 1.5, y1, hs):
+                prism(axis, c, side, rect_pts(r), t / 2, t / 2 + 0.01, M["whitewash"])
     S = (lambda su, sy, sd: (su, sy, sd) if axis == 0 else (sd, sy, su))
     for r in _rects(u0, u1, y0, y1, hs):
         colbox(_uv(axis, (r[0] + r[1]) / 2, c, (r[2] + r[3]) / 2, 0), S(r[1] - r[0], r[3] - r[2], t))
@@ -430,6 +485,76 @@ inner_floor(SX0 + T, SX1 - T, SZ0 + T, SZ1 - T, FL, M["cfloor"])
 ceiling(SX0 + T, SX1 - T, SZ0 + T, SZ1 - T, CEIL)
 colbox(((SX0 + SX1) / 2, FL / 2 - 0.05, (SZ0 + SZ1) / 2), (SX1 - SX0, FL - 0.1, SZ1 - SZ0))
 
+# --- Фасад: водостоки, сосульки, переметы снега у стен, грязь у цоколя, светильник, кабель ввода ---
+def drainpipe(x, z, top=PAR, ox=0.0, oz=0.0):
+    """Водосточная труба: воронка под парапетом, колено, колено внизу на отмостку."""
+    cyl((x + ox, (top - 0.3 + 0.3) / 2, z + oz), 0.055, top - 0.3 - 0.3, M["iron"], verts=8)
+    cyl((x + ox, top - 0.2, z + oz), 0.12, 0.2, M["iron"], verts=8, r2=0.06)
+    for k in range(5):
+        box((x + ox * 0.6, 0.6 + k * (top - 1.2) / 4, z + oz * 0.6), (0.14 if not oz else 0.03, 0.03, 0.03 if not oz else 0.14), M["iron"])
+    cyl((x + ox * 1.5, 0.22, z + oz * 1.5), 0.055, 0.25, M["iron"], verts=8)
+
+
+def icicles(axis, u0, u1, c, out, y, seed):
+    import random
+    rnd = random.Random(seed)
+    u = u0 + 0.1
+    while u < u1 - 0.1:
+        L = rnd.uniform(0.08, 0.45) if rnd.random() < 0.7 else rnd.uniform(0.45, 0.8)
+        x, _, z = _uv(axis, u, c, 0, out)
+        cone((x, y, z), (x, y - L, z), 0.02 + L * 0.05, M["ice"], verts=5)
+        u += rnd.uniform(0.12, 0.5)
+
+
+def drift(axis, u0, u1, c, out, h=0.35, d=0.7):
+    """Перемёт снега у стены: цепочка сплюснутых бугров разной длины и высоты, наполовину в земле."""
+    import random
+    rnd = random.Random(int(u0 * 100 + c))
+    u = u0
+    while u < u1:
+        L = min(rnd.uniform(2.0, 3.6), u1 - u + 0.4)
+        hh = h * rnd.uniform(0.45, 0.8)
+        dd = d * rnd.uniform(0.75, 1.2)
+        x, _, z = _uv(axis, u + L / 2, c, 0, out * dd * 0.35)
+        sc = (L / 2, hh, dd / 2) if axis == 0 else (dd / 2, hh, L / 2)
+        kit.sphere(ugms._nm("dr"), 1.0, ugms.g2b((x, -hh * 0.45, z)), M["drift"], scale=ugms.gsize(sc), segs=14, rings=8)
+        u += L * 0.55
+
+
+if EXT:
+    # водостоки — по углам длинного крыла и у башни
+    for (x, z, ox, oz) in ((LX0, LZ1, -0.12, 0.12), (LX0, LZ0, -0.12, -0.12), (LX1, LZ1, 0.12, 0.12), (SX1, SZ0, 0.12, -0.12), (SX1, SZ1, 0.12, 0.12)):
+        drainpipe(x, z, ox=ox, oz=oz)
+    # сосульки по парапету с подветренных сторон
+    icicles(0, LX0, LX1, LZ1, 0.08, PAR - 0.02, 1)
+    icicles(2, LZ0, LZ1, LX0, -0.08, PAR - 0.02, 2)
+    icicles(2, SZ0, SZ1, SX1, 0.08, PAR - 0.02, 3)
+    icicles(0, TX0, TX1, TZ0, -0.08, TW_TOP - 0.05, 4)
+    # переметы у стен (вход и пандус оставлены чистыми)
+    drift(2, LZ0 + 0.5, DOOR_Z[0] - 1.6, LX0, -1, h=0.45, d=0.9)
+    drift(2, DOOR_Z[1] + 1.6, LZ1 - 0.4, LX0, -1, h=0.35, d=0.8)
+    drift(0, LX0 + 0.4, LX1 - 0.4, LZ1, 1, h=0.4, d=0.9)
+    drift(0, SX0 + 0.3, SX1 - 0.3, SZ0, -1, h=0.5, d=1.0)
+    drift(2, TZ0 + 0.3, TZ1 - 0.3, TX0, -1, h=0.4, d=0.8)
+    # грязь и сырость у цоколя — тёмная полоса поверх штукатурки
+    for (a, b, c, n, ax) in ((LZ0, LZ1, LX0, -1, 2), (LX0, LX1, LZ1, 1, 0), (SX0, SX1, SZ0, -1, 0), (TZ0, TZ1, TX0, -1, 2)):
+        lo, hi = min(a, b), max(a, b)
+        x, _, z = _uv(ax, (lo + hi) / 2, c, 0, n * 0.035)
+        box((x, 0.75, z), (hi - lo, 0.5, 0.01) if ax == 0 else (0.01, 0.5, hi - lo), M["grime"])
+    # светильник над входом (свет даёт игра): кронштейн, жестяной абажур, патрон
+    LZC = sum(DOOR_Z) / 2
+    box((LX0 - 0.25, 2.95, LZC), (0.5, 0.03, 0.03), M["iron"])
+    cyl((LX0 - 0.48, 2.85, LZC), 0.17, 0.12, M["green"], verts=12, r2=0.05)
+    cyl((LX0 - 0.48, 2.78, LZC), 0.04, 0.05, M["white"], verts=8)
+    # кабель ввода с изолятором под парапетом и вентрешётки
+    for k in range(3):
+        cyl((LX0 - 0.1, PAR - 0.5, -21.0 - k * 0.15), 0.03, 0.08, M["white"], verts=8, axis="x")
+    for (zz, yy) in ((-33.9, 3.1), (-25.2, 3.1), (-21.0, 0.25)):
+        box((LX0 - 0.02, yy, zz), (0.02, 0.22, 0.3), M["rail"])
+        for k in range(4):
+            box((LX0 - 0.035, yy - 0.075 + k * 0.05, zz), (0.01, 0.015, 0.26), M["soot"])
+
+
 # --- Дизельная пристройка во внутреннем углу (вход с юга) -----------------------------------
 GFL = 0.15
 GEN_DOOR = [100.1, 101.0, GFL, GFL + 2.0, "door"]
@@ -489,7 +614,7 @@ colbox((LX0 - 1.5 - 0.625, FL / 2 - 0.05, sum(DOOR_Z) / 2), (2.0, 0.1, math.hypo
 # --- Сборка ------------------------------------------------------------------------------
 name = "corpus_" + PART
 # Фасады — со слабым AO: каждая плита стены запекалась со своим затенением краёв, и ночью корпус «гофрировался»
-obj, img, tris = kit.finish(name, OUT, res=2048, origin="keep", samples=24, pack=0.002, ao_blur=2, ao_min=0.62 if EXT else 0.35)
+obj, img, tris = kit.finish(name, OUT, res=4096, origin="keep", samples=24, pack=0.002, ao_blur=2, ao_min=0.62 if EXT else 0.35)
 kit.export(os.path.join(OUT, name + ".glb"), None)
 lo = min((obj.matrix_world @ v.co).z for v in obj.data.vertices)
 dst = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "scripts", "data", "corpus_col_%s.gd" % PART)

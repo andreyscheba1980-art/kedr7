@@ -2,23 +2,24 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://wvgffvn830md"
-path="res://.godot/imported/corpus_furn_corpus_furn.png-5656b0df494bcc00dcd0e63f1cb0e434.ctex"
+uid="uid://xxij1gw8qict"
+path.s3tc="res://.godot/imported/corpus_furn_corpus_furn.png-5656b0df494bcc00dcd0e63f1cb0e434.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
-"md5": "da31be46048f72cf13aef65705ce0e0a"
+"md5": "f7bbda9871c5a8eaa96ddb6dcc8117ad"
 }
 
 [deps]
 
 source_file="res://assets/models/kedr/corpus_furn_corpus_furn.png"
-dest_files=["res://.godot/imported/corpus_furn_corpus_furn.png-5656b0df494bcc00dcd0e63f1cb0e434.ctex"]
+dest_files=["res://.godot/imported/corpus_furn_corpus_furn.png-5656b0df494bcc00dcd0e63f1cb0e434.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
