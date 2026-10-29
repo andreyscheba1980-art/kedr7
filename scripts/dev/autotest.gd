@@ -4327,3 +4327,12 @@ func _lore_review() -> void:
 	_look(Vector3(StationLore.TUN_X - 3.0, StationLore.TUN_Y + 0.05, StationLore.TUN_Z), Vector3(StationLore.TUN_W, StationLore.TUN_Y + 1.2, StationLore.TUN_Z))
 	await _wait(0.6)
 	await _shot("lore_tunnel_b")
+	# Корпус: то, что было халтурным в отчётах F9
+	p.set_flashlight(false)
+	for v: Array in [["pult", Vector3(91.7, 0.5, -32.6), Vector3(91.7, 1.4, -33.8)], ["baro", Vector3(93.3, 0.5, -30.0), Vector3(94.3, 1.2, -30.0)],
+			["poster", Vector3(93.0, 0.5, -32.3), Vector3(94.7, 2.0, -32.3)], ["office", Vector3(93.6, 0.5, -22.0), Vector3(91.0, 1.4, -25.0)],
+			["board", Vector3(95.9, 0.5, -29.6), Vector3(94.9, 1.9, -29.6)], ["stores", Vector3(97.0, 0.5, -21.4), Vector3(98.4, 1.3, -23.4)],
+			["gas", Vector3(102.5, 0.5, -36.5), Vector3(100.6, 0.6, -34.6)], ["gap_tower", Vector3(95.23, 0.45, -34.11), Vector3(97.0, 1.4, -34.6)]]:
+		_look(v[1], v[2])
+		await _wait(0.7)
+		await _shot("corpus_" + String(v[0]))

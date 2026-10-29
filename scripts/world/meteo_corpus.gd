@@ -82,6 +82,7 @@ func _ready() -> void:
 	_build_ladders()
 	_build_stove()
 	_build_things()
+	add_child(CorpusDressing.new())   # пульт со шкалами, самописцы под стеклом, плакаты, мелочи
 	_set_power(false)
 	_next_ring = randf_range(90.0, 200.0)
 	_roof_t = randf_range(70.0, 200.0)

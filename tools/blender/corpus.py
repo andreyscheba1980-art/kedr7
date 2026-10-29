@@ -149,6 +149,9 @@ def partition(axis, u0, u1, c, holes=(), y0=FL, y1=CEIL, t=0.14):
     for r in _rects(u0, u1, y0, y1, hs):
         colbox(_uv(axis, (r[0] + r[1]) / 2, c, (r[2] + r[3]) / 2, 0), S(r[1] - r[0], r[3] - r[2], t))
     if INT:
+        # торцы перегородки: без них между двумя листами панели видна щель насквозь
+        for uu in (u0, u1):
+            box(_uv(axis, uu, c, (y0 + y1) / 2, 0), S(0.03, y1 - y0, t + 0.02), M["whitewash"])
         for h in holes:
             # торцы проёма и наличник; полотно двери — приоткрыто к стене
             for uu in (h[0], h[1]):
@@ -202,8 +205,9 @@ colbox(((LX0 + LX1) / 2, (CEIL + ROOF) / 2, (LZ0 + LZ1) / 2), (LX1 - LX0, ROOF -
 
 # Перегородки и комнаты длинного крыла
 IX0, IX1, IZ0, IZ1 = LX0 + T, LX1 - T, LZ0 + T, LZ1 - T
-partition(2, IZ0, IZ1, CW0, [[-31.8, -30.9, FL, DOOR_H, 0], [DOOR_Z[0], DOOR_Z[1], FL, DOOR_H, 0], [-23.5, -22.6, FL, DOOR_H, 0]])
-partition(2, IZ0, IZ1, CW1, [[-32.5, -31.6, FL, DOOR_H, 0], [-27.6, -26.7, FL, DOOR_H, 0], [-22.0, -21.1, FL, DOOR_H, 0]])
+# у башни стена корпуса тоньше (общая с башней, z = LZ0) — перегородки коридора доводим до неё
+partition(2, LZ0, IZ1, CW0, [[-31.8, -30.9, FL, DOOR_H, 0], [DOOR_Z[0], DOOR_Z[1], FL, DOOR_H, 0], [-23.5, -22.6, FL, DOOR_H, 0]])
+partition(2, LZ0, IZ1, CW1, [[-32.5, -31.6, FL, DOOR_H, 0], [-27.6, -26.7, FL, DOOR_H, 0], [-22.0, -21.1, FL, DOOR_H, 0]])
 partition(0, IX0, CW0 - 0.07, -28.52)
 partition(0, IX0, CW0 - 0.07, -25.93)
 partition(0, CW1 + 0.07, IX1, -29.52)
