@@ -1,28 +1,38 @@
 class_name ThermometerUI
 extends Control
-## Психрометрическая будка: крупный кадр двух спиртовых термометров (сухой и смоченный) и книжка КМ-1.
-## Цифр игра не подсказывает: шкалу читаешь сам (колёсико / W S — вдоль шкалы), ночью видно только
-## в пятне фонаря, иней на стекле стираешь рукавицей (InstrumentView). Вписал барабанчиками (KMBook) —
-## замер снят; по рации Свердловск сверит книжку с соседями (Game.report_check).
+## Психрометрическая будка: два спиртовых термометра (сухой и смоченный) — настоящие модели в будке,
+## камера подходит к ним вплотную (Closeup3D) и ездит вдоль шкалы (колёсико / W S). Цифр игра не
+## подсказывает. Ночью видно только в пятне фонаря; иней на стекле стираешь рукавицей (ЛКМ — прямо по
+## стеклу). Книжка КМ-1 — в правой руке (HeldPaper). Свердловск сверит книжку (Game.report_check).
 
 signal closed
 
 const T_MIN := -60.0
 const T_MAX := 40.0
-const PPD := 34.0                       ## пикселей на градус
+const T_MID := -10.0
+const LEN := 0.52                       ## длина шкалы, м (−60…+40)
 const DEG_PER_NOTCH := 0.6
 const FEVER := 36.6
 const PEN_SFX := "res://assets/audio/clank.ogg"
+const SEP := 0.05                       ## термометры — в 5 см от оси будки, сухой слева
+const DIST := 0.26                      ## глаз — в 26 см от шкал
 
 var _truth := Vector2(-28.0, -30.0)     ## что на самом деле в воздухе
 var _shown := Vector2(-28.0, -30.0)     ## что показывают столбики (в «жар» сухой врёт)
-var _center := 0.0
 var _fever := false
 var _fever_seen := false
-var _view: InstrumentView
 var _book: KMBook
 var _hint: Label
 var _done := false
+var _close: Closeup3D
+var _rig: Node3D                        ## термометры в будке (на время крупного плана)
+var _frost: Array = []
+var _plates: Array[StandardMaterial3D] = []
+var _light := 0.0
+var _base := Vector3.ZERO               ## центр шкал (T_MID) в мире
+var _start_t := 0.0
+var _wipe := false
+var _mouse := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -32,15 +42,15 @@ func _ready() -> void:
 	if Game.yard != null and Game.yard.has_method(&"claim_fever") and Game.yard.claim_fever():
 		_fever = true
 		_shown.x = FEVER
-	_center = clampf(_truth.x + randf_range(-4.0, 4.0), T_MIN + 7.0, T_MAX - 7.0)
+	_start_t = clampf(_truth.x + randf_range(-4.0, 4.0), T_MIN + 8.0, T_MAX - 8.0)
 
-	ThermometerUI.backdrop(self)
 	title_plate(self, Loc.t(&"thermo.title"))
-
-	_view = InstrumentView.new()
-	UiKit.place(self, _view, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
-	_view.setup(_draw_view, func(n: float) -> void: _scroll(n * DEG_PER_NOTCH), InstrumentView.frost_for_weather(_truth.x),
-		[[0.32 - 0.085, 0.32 + 0.085], [0.70 - 0.085, 0.70 + 0.085]])   # иней — на стекле термометров
+	_build_rig()
+	_close = Closeup3D.new()
+	Game.level.add_child(_close)
+	var eye_x := _base.x - SEP + 0.09
+	var eye := Vector3(eye_x, _y(_start_t), _base.z + DIST)
+	_close.setup(eye, Vector3(eye_x, _y(_start_t), _base.z), 34.0, Vector3.UP, _y(T_MIN + 8.0) - eye.y, _y(T_MAX - 8.0) - eye.y, 0.0)
 
 	_book = KMBook.new()
 	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
@@ -55,6 +65,156 @@ func _ready() -> void:
 	add_buttons(self, Game.notebook.has(&"temp_dry"), _write, func() -> void: closed.emit())
 	_hint = hint_label(self)
 	Game.audio.play_2d("res://assets/sfx/door_handle.ogg", -10.0)   # дверца будки
+
+
+func _exit_tree() -> void:
+	var bm := _booth_model()
+	if bm != null:
+		bm.visible = true
+	if _close != null and is_instance_valid(_close):
+		_close.queue_free()
+	if _rig != null and is_instance_valid(_rig):
+		_rig.queue_free()
+
+
+static func _booth_model() -> Node3D:
+	if Game.yard == null or not is_instance_valid(Game.yard):
+		return null
+	return Game.yard.get_node_or_null("BoothModel") as Node3D
+
+
+## Высота точки шкалы T над землёй (мир).
+func _y(t: float) -> float:
+	return _base.y + (t - T_MID) / (T_MAX - T_MIN) * LEN
+
+
+## Два термометра на передней стенке будки: молочная пластина со шкалой, капилляр, стекло, иней.
+func _build_rig() -> void:
+	var booth := Yard.METEO + Yard.M_BOOTH
+	_base = booth + Vector3(0, 1.6, 0.268)
+	_rig = Node3D.new()
+	Game.level.add_child(_rig)
+	# Модель будки целиком лезет в кадр досками — на время крупного плана вместо неё нутро будки:
+	# белёная задняя стенка, жалюзи по бокам, полка под термометрами
+	var booth_model := _booth_model()
+	if booth_model != null:
+		booth_model.visible = false
+	var white := StandardMaterial3D.new()
+	white.albedo_color = Color(0.78, 0.79, 0.78)
+	white.roughness = 1.0
+	white.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	var back := Geo.box_mesh(Vector3(0.7, 0.7, 0.02), white)
+	back.position = Vector3(_base.x, _base.y, _base.z - 0.03)
+	_rig.add_child(back)
+	for side: int in [-1, 1]:
+		for k in 8:
+			var lv := Geo.box_mesh(Vector3(0.01, 0.025, 0.3), white)
+			lv.position = Vector3(_base.x + side * 0.3, _base.y - 0.3 + k * 0.085, _base.z + 0.12)
+			lv.rotation.z = side * 0.45
+			_rig.add_child(lv)
+	var shelf := Geo.box_mesh(Vector3(0.5, 0.02, 0.12), white)
+	shelf.position = Vector3(_base.x, _base.y - LEN * 0.5 - 0.06, _base.z + 0.03)
+	_rig.add_child(shelf)
+	var glass := StandardMaterial3D.new()
+	glass.albedo_color = Color(0.85, 0.92, 0.96, 0.16)
+	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass.roughness = 0.05
+	glass.metallic_specular = 1.0
+	var amount := InstrumentView.frost_for_weather(_truth.x)
+	for i in 2:
+		var wet := i == 1
+		var x := _base.x + (SEP if wet else -SEP)
+		var value := _shown.y if wet else _shown.x
+		var label := Loc.t(&"thermo.wet") if wet else Loc.t(&"thermo.dry")
+		# шкала двумя половинами по 2048 px: текстура выше 2048 в GL Compatibility обрезается
+		for half in 2:
+			var lo := T_MIN if half == 0 else T_MID
+			var hi := T_MID if half == 0 else T_MAX
+			var tex := Closeup3D.canvas_tex(_rig, Vector2i(128, 2048), func(c: Control) -> void: _draw_scale(c, value, lo, hi))
+			var q := QuadMesh.new()
+			q.size = Vector2(0.06, LEN * 0.5)
+			var plate := MeshInstance3D.new()
+			plate.mesh = q
+			var pm := StandardMaterial3D.new()
+			pm.albedo_texture = tex
+			# Свет считаем сами (_process): у будки сходятся фонарь в руке и фонарь игрока — шкала пересвечивалась
+			pm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_plates.append(pm)
+			pm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+			plate.material_override = pm
+			plate.position = Vector3(x, _y((lo + hi) * 0.5), _base.z)
+			_rig.add_child(plate)
+		# стеклянная оболочка и резервуар внизу
+		var tube := CylinderMesh.new()
+		tube.top_radius = 0.011
+		tube.bottom_radius = 0.011
+		tube.height = LEN + 0.04
+		var tm := MeshInstance3D.new()
+		tm.mesh = tube
+		tm.material_override = glass
+		tm.position = Vector3(x, _base.y, _base.z + 0.014)
+		_rig.add_child(tm)
+		var bulb := SphereMesh.new()
+		bulb.radius = 0.012
+		bulb.height = 0.032
+		var bm := MeshInstance3D.new()
+		bm.mesh = bulb
+		var bmat := StandardMaterial3D.new()
+		bmat.albedo_color = Color(0.86, 0.9, 0.93) if wet else Color(0.7, 0.08, 0.08)
+		bmat.roughness = 0.8 if wet else 0.2
+		bm.material_override = bmat
+		bm.position = Vector3(x, _base.y - LEN * 0.5 - 0.03, _base.z + 0.014)
+		_rig.add_child(bm)
+		var l := Label3D.new()
+		l.text = label
+		l.font = UiStyle.plate_font()
+		l.font_size = 40
+		l.pixel_size = 0.0004
+		l.modulate = Color(0.2, 0.15, 0.08)
+		l.outline_size = 0
+		l.shaded = true
+		l.position = Vector3(x, _base.y + LEN * 0.5 + 0.012, _base.z + 0.002)
+		_rig.add_child(l)
+		var fr := Closeup3D.Frost.new(Vector2(0.06, LEN), amount, Vector2i(16, 220))
+		fr.position = Vector3(x, _base.y, _base.z + 0.026)
+		_rig.add_child(fr)
+		_frost.append(fr)
+
+
+## Шкала во весь термометр: −60 внизу, +40 вверху; спиртовой столбик до value.
+func _draw_scale(c: Control, value: float, t_lo: float, t_hi: float) -> void:
+	var w := c.size.x
+	var h := c.size.y
+	var ink := Color(0.1, 0.1, 0.12)
+	var pf := UiStyle.plate_font()
+	c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(0.95, 0.95, 0.92))
+	var y_of := func(t: float) -> float: return (t_hi - t) / (t_hi - t_lo) * h
+	var cx := w * 0.62
+	for k in range(int(t_lo * 5.0) - 1, int(t_hi * 5.0) + 2):
+		var t := k / 5.0
+		var y: float = y_of.call(t)
+		var len := 10.0
+		var width := 1.6
+		if k % 25 == 0:
+			len = 30.0
+			width = 3.0
+		elif k % 5 == 0:
+			len = 20.0
+			width = 2.2
+		c.draw_line(Vector2(cx - 8 - len, y), Vector2(cx - 8, y), ink, width)
+		c.draw_line(Vector2(cx + 8, y), Vector2(cx + 8 + len * 0.6, y), ink, width)
+		if k % 25 == 0:
+			var n := int(roundf(t))
+			var s := ("−" if n < 0 else "+" if n > 0 else "") + str(absi(n))
+			c.draw_string(pf, Vector2(4, y + 12), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 30, ink)
+	c.draw_rect(Rect2(cx - 4, 0, 8, h), Color(0.84, 0.88, 0.9))
+	var top: float = clampf(y_of.call(value), -4.0, h + 4.0)
+	if top < h:
+		c.draw_rect(Rect2(cx - 3, top, 6, h - top), Color(0.72, 0.08, 0.08))
+		if top > 0.0:
+			c.draw_circle(Vector2(cx, top + 1.0), 3.2, Color(0.6, 0.05, 0.05))
+	if t_lo <= T_MIN:
+		c.draw_string(pf, Vector2(cx + 14, h - 14), "°C", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, ink)
 
 
 ## Кнопки «Записать» / «Закрыть» под книжкой — общие для всех приборов.
@@ -106,21 +266,54 @@ static func tail() -> String:
 	return Loc.t(&"read.all") if left == 0 else Loc.t(&"read.left", [left])
 
 
-func _process(_delta: float) -> void:
-	_hint.text = Loc.t(&"thermo.hint") if _view.can_see() else Loc.t(&"thermo.hint_dark")
+func _process(delta: float) -> void:
+	var dy := float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
+	var ry := -Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+	if absf(ry) > 0.2:
+		dy += ry
+	if absf(dy) > 0.01:
+		_scroll(dy * 9.0 * delta)
+	if _wipe or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT) > 0.5:
+		var r := _close.ray(get_global_transform_with_canvas() * _mouse)
+		var hit := false
+		for f: Closeup3D.Frost in _frost:
+			var lp: Variant = Closeup3D.hit_plane(r, f)
+			if lp != null and f.wipe(lp, delta):
+				hit = true
+		if hit:
+			_wipe_sfx(delta)
+	_light = lerpf(_light, (1.0 if Game.is_daylight() else 0.85) if _close.can_see() else 0.03, clampf(delta * 8.0, 0.0, 1.0))
+	for pm in _plates:
+		pm.albedo_color = Color(_light, _light, _light * 0.95)
+	_hint.text = Loc.t(&"thermo.hint") if _close.can_see() else Loc.t(&"thermo.hint_dark")
 	_check_fever()
 
 
+var _wipe_t := 0.0
+
+
+func _wipe_sfx(delta: float) -> void:
+	_wipe_t -= delta
+	if _wipe_t <= 0.0:
+		_wipe_t = 0.32
+		Game.audio.play_2d(InstrumentView.WIPE_SFX, -20.0, 0.25)
+
+
 func _scroll(deg: float) -> void:
-	_center = clampf(_center + deg, T_MIN + 7.0, T_MAX - 7.0)
+	_close.scroll(deg / (T_MAX - T_MIN) * LEN)
+
+
+## Какая температура сейчас в центре кадра.
+func _view_t() -> float:
+	var eye_y := _y(_start_t) + _close.offset()
+	return T_MID + (eye_y - _base.y) / LEN * (T_MAX - T_MIN)
 
 
 ## Сухой показывает +36,6: заметили столбик — тот же холодок, что раньше давала подпись.
 func _check_fever() -> void:
-	if not _fever or _fever_seen or not _view.can_see():
+	if not _fever or _fever_seen or not _close.can_see():
 		return
-	var half := _view.size.y * 0.5 / PPD
-	if absf(_center - FEVER) > half - 1.0:
+	if absf(_view_t() - FEVER) > 6.0:
 		return
 	_fever_seen = true
 	if Game.anomalies != null:
@@ -133,70 +326,21 @@ func _check_fever() -> void:
 			Game.hud.subtitle(Loc.t(&"sub.fever_meteo"), 4.5))
 
 
-# --- Шкалы ------------------------------------------------------------------------------
-
-func _y(t: float) -> float:
-	return _view.size.y * 0.5 - (t - _center) * PPD
-
-
-func _draw_view() -> void:
-	var w := _view.size
-	# Нутро будки Селянинова: белёные жалюзи — объёмные планки, в щелях темно
-	_view.draw_rect(Rect2(Vector2.ZERO, w), Color(0.16, 0.17, 0.18))
-	for y in range(-10, int(w.y), 26):
-		UiStyle.vgrad(_view, Rect2(0, y, w.x, 19), Color(0.80, 0.80, 0.76), Color(0.56, 0.57, 0.55))
-		_view.draw_line(Vector2(0, y), Vector2(w.x, y), Color(0.9, 0.9, 0.86), 1.0)
-	UiStyle.hgrad(_view, Rect2(0, 0, 70, w.y), Color(0, 0, 0, 0.45), Color(0, 0, 0, 0))   # стойки будки в тени
-	UiStyle.hgrad(_view, Rect2(w.x - 70, 0, 70, w.y), Color(0, 0, 0, 0), Color(0, 0, 0, 0.45))
-	_draw_thermo(w.x * 0.32, _shown.x, Loc.t(&"thermo.dry"), false)
-	_draw_thermo(w.x * 0.70, _shown.y, Loc.t(&"thermo.wet"), true)
-
-
-func _draw_thermo(x: float, value: float, label: String, wet: bool) -> void:
-	var h := _view.size.y
-	var pf := UiStyle.plate_font()
-	var ink := Color(0.10, 0.10, 0.12)
-	# Тень и молочная шкальная пластина
-	_view.draw_rect(Rect2(x - 44, 0, 100, h), Color(0, 0, 0, 0.35))
-	UiStyle.hgrad(_view, Rect2(x - 48, 0, 96, h), Color(0.86, 0.87, 0.85), Color(0.97, 0.97, 0.95))
-	var lo := _center - h * 0.5 / PPD - 1.0
-	var hi := _center + h * 0.5 / PPD + 1.0
-	for k in range(int(floor(lo * 5.0)), int(ceil(hi * 5.0)) + 1):
-		var t := k / 5.0
-		var y := _y(t)
-		var len := 7.0
-		var width := 1.0
-		if k % 25 == 0:
-			len = 24.0
-			width = 2.0
-		elif k % 5 == 0:
-			len = 15.0
-			width = 1.5
-		_view.draw_line(Vector2(x - 9 - len, y), Vector2(x - 9, y), ink, width)
-		_view.draw_line(Vector2(x + 9, y), Vector2(x + 9 + len * 0.6, y), ink, width)
-		if k % 25 == 0:
-			var n := int(roundf(t))
-			var s := ("−" if n < 0 else "+" if n > 0 else "") + str(absi(n))
-			_view.draw_string(pf, Vector2(x - 46, y + 6), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, ink)
-	# Стеклянная трубка: блик слева, тень справа
-	UiStyle.hgrad(_view, Rect2(x - 8, 0, 8, h), Color(1, 1, 1, 0.55), Color(0.85, 0.9, 0.95, 0.25))
-	UiStyle.hgrad(_view, Rect2(x, 0, 8, h), Color(0.8, 0.86, 0.9, 0.25), Color(0.35, 0.4, 0.45, 0.45))
-	# Спиртовой столбик в капилляре
-	var top := clampf(_y(value), -4.0, h + 4.0)
-	if top < h:
-		UiStyle.hgrad(_view, Rect2(x - 2.5, top, 5, h - top), Color(0.85, 0.15, 0.12), Color(0.5, 0.03, 0.04))
-		if top > -4.0:
-			_view.draw_circle(Vector2(x, top + 1.0), 2.6, Color(0.62, 0.06, 0.06))
-	_view.draw_line(Vector2(x - 6, 0), Vector2(x - 6, h), Color(1, 1, 1, 0.65), 1.5)
-	# Латунная табличка над прибором
-	var lw := pf.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
-	var pr := Rect2(x - lw * 0.5 - 8, 8, lw + 16, 22)
-	_view.draw_rect(pr.grow(1), UiStyle.BRASS.darkened(0.5))
-	UiStyle.vgrad(_view, pr, UiStyle.BRASS.lightened(0.15), UiStyle.BRASS.darkened(0.15))
-	_view.draw_string(pf, Vector2(x - lw * 0.5, 25), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.18, 0.13, 0.06))
-	_view.draw_string(pf, Vector2(x + 22, h - 10), "°C", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ink)
-	if wet:   # батист смоченного: обледенелая ткань уходит вниз, к резервуару
-		UiStyle.vgrad(_view, Rect2(x - 10, h - 30, 20, 30), Color(0.9, 0.93, 0.95, 0.6), Color(0.82, 0.86, 0.9, 0.95))
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse = (event as InputEventMouseMotion).position
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		_mouse = mb.position
+		match mb.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				if mb.pressed:
+					_scroll(DEG_PER_NOTCH)
+			MOUSE_BUTTON_WHEEL_DOWN:
+				if mb.pressed:
+					_scroll(-DEG_PER_NOTCH)
+			MOUSE_BUTTON_LEFT:
+				_wipe = mb.pressed
 
 
 # --- Запись -----------------------------------------------------------------------------

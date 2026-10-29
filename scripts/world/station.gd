@@ -628,7 +628,7 @@ func _process_lamp_sag(delta: float) -> void:
 	_sag_t = randf_range(40.0, 110.0)
 	var pool: Array[Light3D] = []
 	for l in _lamps:
-		if is_instance_valid(l) and l.visible and l is OmniLight3D and is_pos_inside_house(l.global_position):
+		if is_instance_valid(l) and l.visible and (l is OmniLight3D or l is SpotLight3D) and l.light_energy > 0.3 and is_pos_inside_house(l.global_position):
 			pool.append(l)
 	if pool.is_empty():
 		return
@@ -1599,7 +1599,7 @@ func _build_living_quarters() -> void:
 
 	# 4. Книжные полки / шкаф у восточной стены
 	_collider(Vector3(0.4, 1.6, 1.2), Vector3(3.2, 0.8, 5.5))
-	_place(Props.shelf(), Vector3(3.2, 0.0, 5.5))
+	_place(Props.shelf(), Vector3(3.2, 0.0, 5.5)).rotation.y = PI   # задней стенкой к стене, полками в комнату
 
 	# 5. Настенные часы «Янтарь» с маятником и мерным тиканьем
 	var clock := Props.wall_clock()

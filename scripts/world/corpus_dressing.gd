@@ -101,9 +101,8 @@ func _canvas_tex(size: Vector2i, draw_fn: Callable) -> Texture2D:
 	vp.size = size
 	vp.transparent_bg = false
 	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS   # пару кадров, пока шрифт готов; потом — стоп
-	get_tree().create_timer(1.5, false).timeout.connect(func() -> void:
-		if is_instance_valid(vp):
-			vp.render_target_update_mode = SubViewport.UPDATE_DISABLED)
+	# связь через метод самого вьюпорта: если уровень пересобрали раньше таймера — связь снимется сама
+	get_tree().create_timer(1.5, false).timeout.connect(vp.set.bind(&"render_target_update_mode", SubViewport.UPDATE_DISABLED))
 	add_child(vp)
 	var c := Control.new()
 	c.size = Vector2(size)

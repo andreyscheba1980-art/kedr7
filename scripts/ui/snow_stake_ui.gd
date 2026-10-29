@@ -1,38 +1,120 @@
 class_name SnowStakeUI
 extends Control
-## Снегомерная рейка М-103 на площадке: крупный кадр и книжка КМ-1. Деления — через сантиметр,
-## цифры — через десять; читать там, где снег сходится с рейкой (вокруг наметает гребни и ямы).
-## Ночью — в пятне фонаря; налипший снег на рейке стирается рукавицей (InstrumentView).
+## Снегомерная рейка М-103 на площадке. Рейка в мире (build_stake) — настоящая: вбита в грунт, снег
+## стоит на ней ровно на высоте покрова, деления через сантиметр, цифры через десять. Крупный план
+## (Closeup3D) подводит камеру к рейке; колёсико / W S — вдоль рейки. Вокруг наметает гребни и ямы —
+## читать у самой рейки. Ночью — в пятне фонаря; налипший снег стираешь рукавицей (ЛКМ по рейке).
 
 signal closed
 
-const H_MAX := 200.0
-const PPCM := 5.2                      ## пикселей на сантиметр
-const CM_PER_NOTCH := 3.0
+const H_TOTAL := 250.0                 ## длина рейки, см (снизу — в грунте, под снегом)
+const CM_PER_NOTCH := 2.0
 const PEN_SFX := "res://assets/audio/clank.ogg"
+const FACE_W := 0.06
 
 var _truth := 100.0
-var _center := 100.0
-var _view: InstrumentView
 var _book: KMBook
 var _hint: Label
-var _drift_seed := 0.0
 var _done := false
+var _close: Closeup3D
+var _frost: Closeup3D.Frost
+var _wipe := false
+var _mouse := Vector2.ZERO
+var _wipe_t := 0.0
+
+
+## Высота снега сегодня (см).
+static func depth() -> float:
+	return float(Game.synoptic.snow_depth_cm) if Game.synoptic != null else 100.0
+
+
+## Рейка в мире: снег — уровень земли (y = 0), над ним торчит (H_TOTAL − depth) см с делениями.
+static func build_stake(parent: Node3D, at: Vector3) -> Node3D:
+	var d := depth()
+	var vis := (H_TOTAL - d) / 100.0
+	var root := Node3D.new()
+	root.name = "SnowStakeModel"
+	root.position = at
+	parent.add_child(root)
+	var post := Geo.box_mesh(Vector3(FACE_W, vis, 0.035), StandardMaterial3D.new())
+	(post.material_override as StandardMaterial3D).albedo_color = Color(0.9, 0.9, 0.88)
+	post.position.y = vis * 0.5
+	root.add_child(post)
+	var tex := Closeup3D.canvas_tex(root, Vector2i(96, int(vis * 100.0 * 10.0)), func(c: Control) -> void: _draw_face(c, d))
+	var q := QuadMesh.new()
+	q.size = Vector2(FACE_W, vis)
+	var face := MeshInstance3D.new()
+	face.name = "Face"
+	face.mesh = q
+	var fm := StandardMaterial3D.new()
+	fm.albedo_texture = tex
+	fm.roughness = 1.0
+	fm.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	fm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	face.material_override = fm
+	face.position = Vector3(0, vis * 0.5, 0.0178)
+	root.add_child(face)
+	# Сугробы вокруг: гребни и ямки в стороне, у самой рейки — ровно
+	var snow := Palette.m(&"snow")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(d) * 7 + Game.phase_index
+	for k in 7:
+		var ang := rng.randf() * TAU
+		var r := rng.randf_range(0.28, 0.7)
+		var m := SphereMesh.new()
+		m.radius = rng.randf_range(0.14, 0.3)
+		m.height = m.radius * rng.randf_range(0.5, 0.9)
+		var mi := MeshInstance3D.new()
+		mi.mesh = m
+		mi.material_override = snow
+		mi.position = Vector3(sin(ang) * r, -m.height * 0.2, cos(ang) * r)
+		root.add_child(mi)
+	return root
+
+
+## Лицо рейки: красно-белые полосы по 10 см, деления через 1 см, цифры через 10 (от уровня снега вверх).
+static func _draw_face(c: Control, from_cm: float) -> void:
+	var w := c.size.x
+	var h := c.size.y
+	var ppcm := h / (H_TOTAL - from_cm)
+	var ink := Color(0.08, 0.08, 0.1)
+	var pf := UiStyle.plate_font()
+	c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(0.93, 0.93, 0.9))
+	var y_of := func(cm: float) -> float: return h - (cm - from_cm) * ppcm
+	for dec in range(int(floor(from_cm / 10.0)), int(H_TOTAL / 10.0)):
+		if dec % 2 == 1:
+			var y0: float = y_of.call(dec * 10.0 + 10.0)
+			c.draw_rect(Rect2(w - 30, y0, 30, 10.0 * ppcm), Color(0.72, 0.1, 0.08))
+	for cm in range(int(ceil(from_cm)), int(H_TOTAL) + 1):
+		var y: float = y_of.call(cm)
+		var len := 12.0
+		var width := 1.6
+		if cm % 10 == 0:
+			len = 36.0
+			width = 3.0
+		elif cm % 5 == 0:
+			len = 22.0
+			width = 2.2
+		c.draw_line(Vector2(0, y), Vector2(len, y), ink, width)
+		if cm % 10 == 0:
+			c.draw_string(pf, Vector2(8, y - 4), str(cm), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, ink)
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_truth = float(Game.synoptic.snow_depth_cm) if Game.synoptic != null else float(randi_range(84, 112))
-	_center = clampf(_truth + randf_range(-18.0, 18.0), 45.0, H_MAX - 45.0)
-	_drift_seed = randf() * 100.0
-
-	ThermometerUI.backdrop(self)
+	_truth = depth()
 	ThermometerUI.title_plate(self, Loc.t(&"snow.title"))
-
-	_view = InstrumentView.new()
-	UiKit.place(self, _view, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
-	var temp := Game.air_temp().x
-	_view.setup(_draw_view, func(n: float) -> void: _center = clampf(_center + n * CM_PER_NOTCH, 45.0, H_MAX - 45.0), InstrumentView.frost_for_weather(temp) * 0.8, [[0.44, 0.56]])
+	var stake := Yard.METEO + Yard.M_ROD
+	var face_z := stake.z + 0.0178
+	var start := randf_range(0.05, 0.35)
+	var eye := Vector3(stake.x + 0.12, start, face_z + 0.42)
+	_close = Closeup3D.new()
+	Game.level.add_child(_close)
+	_close.setup(eye, Vector3(stake.x + 0.12, start, stake.z), 36.0, Vector3.UP, 0.08 - start, (H_TOTAL - _truth) / 100.0 - 0.1 - start, 0.0)
+	var vis := (H_TOTAL - _truth) / 100.0
+	_frost = Closeup3D.Frost.new(Vector2(FACE_W + 0.01, vis), InstrumentView.frost_for_weather(Game.air_temp().x) * 0.8, Vector2i(10, 160))
+	_frost.position = Vector3(stake.x, vis * 0.5, face_z + 0.004)
+	Game.level.add_child(_frost)
 
 	_book = KMBook.new()
 	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
@@ -43,72 +125,45 @@ func _ready() -> void:
 	_hint = ThermometerUI.hint_label(self)
 
 
-func _process(_delta: float) -> void:
-	_hint.text = Loc.t(&"snow.hint") if _view.can_see() else Loc.t(&"thermo.hint_dark")
+func _exit_tree() -> void:
+	if _close != null and is_instance_valid(_close):
+		_close.queue_free()
+	if _frost != null and is_instance_valid(_frost):
+		_frost.queue_free()
 
 
-func _y(cm: float) -> float:
-	return _view.size.y * 0.5 - (cm - _center) * PPCM
+func _process(delta: float) -> void:
+	var dy := float(Input.is_physical_key_pressed(KEY_W)) - float(Input.is_physical_key_pressed(KEY_S))
+	var ry := -Input.get_joy_axis(0, JOY_AXIS_RIGHT_Y)
+	if absf(ry) > 0.2:
+		dy += ry
+	if absf(dy) > 0.01:
+		_close.scroll(dy * 0.3 * delta)
+	if _wipe or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT) > 0.5:
+		var lp: Variant = Closeup3D.hit_plane(_close.ray(get_global_transform_with_canvas() * _mouse), _frost)
+		if lp != null and _frost.wipe(lp, delta):
+			_wipe_t -= delta
+			if _wipe_t <= 0.0:
+				_wipe_t = 0.32
+				Game.audio.play_2d(InstrumentView.WIPE_SFX, -20.0, 0.25)
+	_hint.text = Loc.t(&"snow.hint") if _close.can_see() else Loc.t(&"thermo.hint_dark")
 
 
-## Поверхность снега по горизонтали: у самой рейки — ровно высота, в стороны — гребни и ямки.
-func _surface(x: float, rod_x: float) -> float:
-	var d := absf(x - rod_x)
-	var k := clampf((d - 26.0) / 120.0, 0.0, 1.0)
-	var wav := sin(x * 0.021 + _drift_seed) * 6.0 + sin(x * 0.057 + _drift_seed * 2.0) * 2.5
-	return _truth + wav * k
-
-
-func _draw_view() -> void:
-	var w := _view.size
-	var font := UiStyle.plate_font()
-	var ink := Color(0.08, 0.08, 0.1)
-	var day := Game.is_daylight()
-	# Фон: лес за площадкой
-	_view.draw_rect(Rect2(Vector2.ZERO, w), Color(0.55, 0.6, 0.66) if day else Color(0.1, 0.13, 0.19))
-	for i in 9:
-		var tx := fmod(i * 83.0 + _drift_seed * 7.0, w.x)
-		_view.draw_colored_polygon(PackedVector2Array([Vector2(tx - 40, w.y), Vector2(tx, w.y * 0.05), Vector2(tx + 40, w.y)]),
-			Color(0.32, 0.38, 0.4) if day else Color(0.05, 0.07, 0.1))
-	var rx := w.x * 0.5
-	# Рейка: белая, деления слева (см / 5 / 10), справа — красно-белые полосы по 10 см
-	_view.draw_rect(Rect2(rx - 26, 0, 60, w.y), Color(0, 0, 0, 0.35))   # тень рейки
-	UiStyle.hgrad(_view, Rect2(rx - 30, 0, 60, w.y), Color(0.82, 0.82, 0.8), Color(0.97, 0.97, 0.95))
-	var lo := _center - w.y * 0.5 / PPCM - 2.0
-	var hi := _center + w.y * 0.5 / PPCM + 2.0
-	for cm in range(int(floor(lo)), int(ceil(hi)) + 1):
-		if cm < 0 or cm > int(H_MAX):
-			continue
-		var y := _y(cm)
-		if cm % 10 == 0 and (cm / 10) % 2 == 0 and cm < int(H_MAX):
-			_view.draw_rect(Rect2(rx + 14, _y(cm + 10), 16, 10 * PPCM), Color(0.72, 0.1, 0.08))
-		var len := 8.0
-		var width := 1.2
-		if cm % 10 == 0:
-			len = 26.0
-			width = 2.2
-		elif cm % 5 == 0:
-			len = 16.0
-			width = 1.6
-		_view.draw_line(Vector2(rx - 30, y), Vector2(rx - 30 + len, y), ink, width)
-		if cm % 10 == 0:
-			_view.draw_string(font, Vector2(rx - 2, y - 3), str(cm), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
-	_view.draw_line(Vector2(rx - 30, 0), Vector2(rx - 30, w.y), Color(0.5, 0.5, 0.5), 1.0)
-	_view.draw_line(Vector2(rx + 30, 0), Vector2(rx + 30, w.y), Color(0.5, 0.5, 0.5), 1.0)
-	# Снег поверх нижней части рейки
-	var pts := PackedVector2Array()
-	pts.append(Vector2(0, w.y))
-	var x := 0.0
-	while x <= w.x:
-		pts.append(Vector2(x, _y(_surface(x, rx))))
-		x += 8.0
-	pts.append(Vector2(w.x, w.y))
-	_view.draw_colored_polygon(pts, Color(0.84, 0.88, 0.93) if day else Color(0.62, 0.68, 0.78))
-	var edge := PackedVector2Array()
-	for i in range(1, pts.size() - 1):
-		edge.append(pts[i])
-	_view.draw_polyline(edge, Color(1, 1, 1, 0.6), 2.0)
-	_view.draw_string(font, Vector2(rx + 38, w.y - 10), Loc.t(&"snow.cm"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.9, 0.9, 0.9))
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse = (event as InputEventMouseMotion).position
+	elif event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		_mouse = mb.position
+		match mb.button_index:
+			MOUSE_BUTTON_WHEEL_UP:
+				if mb.pressed:
+					_close.scroll(CM_PER_NOTCH / 100.0)
+			MOUSE_BUTTON_WHEEL_DOWN:
+				if mb.pressed:
+					_close.scroll(-CM_PER_NOTCH / 100.0)
+			MOUSE_BUTTON_LEFT:
+				_wipe = mb.pressed
 
 
 func _write() -> void:

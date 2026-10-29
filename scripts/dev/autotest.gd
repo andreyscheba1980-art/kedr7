@@ -2518,6 +2518,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _corpus_review()
 		get_tree().quit()
 		return
+	if args.has("house"):
+		await _house_review()
+		get_tree().quit()
+		return
 	if args.has("lore"):
 		await _lore_review()
 		get_tree().quit()
@@ -3640,6 +3644,22 @@ func _visual_review() -> void:
 		await _shot("vis_%s_%s" % [v[0], tag])
 
 
+## Дом изнутри: каждая комната с двух сторон (свет — как есть в этой фазе).
+func _house_review() -> void:
+	Game.yrka.enabled = false
+	var tag := "night" if Game.is_night() else "day"
+	for v: Array in [["room_a", Vector3(2.8, 0.05, 1.0), Vector3(-2.0, 1.2, 5.5)], ["room_b", Vector3(-2.0, 0.05, 5.8), Vector3(3.0, 1.2, 0.5)],
+			["room_c", Vector3(-1.8, 0.05, 0.6), Vector3(3.0, 1.0, 6.0)],
+			["radio_a", Vector3(4.2, 0.05, 1.8), Vector3(11.0, 1.2, -1.5)], ["radio_b", Vector3(11.0, 0.05, -1.6), Vector3(4.0, 1.2, 1.5)],
+			["storage", Vector3(6.6, 0.05, -2.4), Vector3(3.8, 0.8, -5.2)], ["corridor", Vector3(4.0, 0.05, 4.4), Vector3(12.0, 1.4, 4.4)],
+			["vestibule", Vector3(14.0, 0.05, 6.2), Vector3(11.8, 1.2, 2.0)], ["attic", Vector3(0.0, 3.0, 3.3), Vector3(12.0, 3.6, 3.3)],
+			["plot_gate", Vector3(60.0, 0.05, -23.0), Vector3(66.0, 0.8, -21.0)], ["plot_booth", Vector3(64.8, 0.05, -21.0), Vector3(64.8, 1.4, -23.6)],
+			["plot_old", Vector3(66.5, 0.05, -18.0), Vector3(63.5, 1.0, -21.0)]]:
+		_look(v[1], v[2])
+		await _wait(1.2)
+		await _shot("house_%s_%s" % [v[0], tag])
+
+
 ## Кадры каждые interval секунд, пока идёт сцена (холодный старт идёт до того, как тур получит управление).
 func _shoot_loop(prefix: String, count: int, interval: float) -> void:
 	for i in count:
@@ -3953,22 +3973,25 @@ func _thermo_review() -> void:
 		print("[held] клик по листу: десятки %d → %d" % [before, bk.vals[0][1]])
 	await _shot("thermo_dark")
 	p.set_flashlight(true)
-	var v: InstrumentView = ui.get(&"_view")
-	var dry_x: float = v.size.x * 0.32
+	var cl: Closeup3D = ui.get(&"_close")
 	var truth: Vector2 = ui.get(&"_truth")
-	v.cursor = Vector2(dry_x, ui.call(&"_y", truth.x))
-	await _wait(0.5)
+	ui.call(&"_scroll", truth.x - float(ui.call(&"_view_t")))
+	await _wait(0.6)
 	await _shot("thermo_lit")
-	v.mouse_wipe = true
-	for i in 30:
-		v.cursor = Vector2(dry_x + sin(i * 0.7) * 30.0, ui.call(&"_y", truth.x) + cos(i * 0.5) * 50.0)
+	# стереть иней мышью по сухому термометру: точка шкалы в центре кадра
+	var fr: Closeup3D.Frost = (ui.get(&"_frost") as Array)[0]
+	for i in 25:
+		var sp := cl.cam.unproject_position(fr.global_position + Vector3(sin(i * 0.7) * 0.02, (cl.cam.global_position.y - fr.global_position.y) + cos(i * 0.5) * 0.03, 0))
+		var mm := InputEventMouseMotion.new()
+		mm.position = sp
+		ui.call(&"_gui_input", mm)
+		ui.set(&"_wipe", true)
 		await _wait(0.05)
-	v.mouse_wipe = false
+	ui.set(&"_wipe", false)
 	await _wait(0.3)
 	await _shot("thermo_wiped")
 	if ui.get(&"_fever"):
-		ui.call(&"_scroll", 36.6 - float(ui.get(&"_center")))
-		v.cursor = Vector2(dry_x, ui.call(&"_y", 36.6))
+		ui.call(&"_scroll", 36.6 - float(ui.call(&"_view_t")))
 		await _wait(2.4)
 		print("[thermo] жар замечен: ", ui.get(&"_fever_seen"))
 		await _shot("thermo_fever")
@@ -3988,13 +4011,9 @@ func _thermo_review() -> void:
 	EventBus.ui_requested.emit(&"snow_stake")
 	await _wait(0.8)
 	var su: Variant = Game.hud.modal()
-	var sv: InstrumentView = su.get(&"_view")
 	var depth: float = su.get(&"_truth")
-	su.set(&"_center", depth + 6.0)
-	sv.cursor = Vector2(sv.size.x * 0.5, su.call(&"_y", depth))
-	sv.mouse_wipe = true
-	await _wait(1.2)
-	sv.mouse_wipe = false
+	(su.get(&"_close") as Closeup3D).scroll(-1.0)
+	await _wait(0.6)
 	await _shot("snow_stake")
 	(su.get(&"_book") as KMBook).set_value(0, depth)
 	await _wait(0.2)

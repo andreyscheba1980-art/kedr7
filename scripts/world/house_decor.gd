@@ -330,6 +330,40 @@ static func _beams(st: Station) -> void:
 	Geo.block(st, Vector3(0.18, 0.14, 6.56), Vector3(-0.9, Station.ROOM_H - 0.07, 3.3), Palette.m(&"log"), false)
 
 
+## Пылинки в конусе лампы: медленно плывут и вспыхивают, попадая в свет. В осях прожектора (−Z — вниз).
+static func _lamp_dust() -> CPUParticles3D:
+	var p := CPUParticles3D.new()
+	p.amount = 28
+	p.lifetime = 9.0
+	p.preprocess = 9.0
+	p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	p.emission_box_extents = Vector3(0.45, 0.45, 0.7)
+	p.position = Vector3(0, 0, -1.0)
+	p.direction = Vector3(0, 0, 1)
+	p.spread = 180.0
+	p.initial_velocity_min = 0.005
+	p.initial_velocity_max = 0.03
+	p.gravity = Vector3(0, -0.004, 0)
+	var q := QuadMesh.new()
+	q.size = Vector2(0.006, 0.006)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_color = Color(1.0, 0.85, 0.6, 0.55)
+	m.vertex_color_use_as_albedo = true
+	q.material = m
+	p.mesh = q
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	fade.add_point(0.3, Color(1, 1, 1, 1))
+	fade.add_point(0.7, Color(1, 1, 1, 1))
+	p.color_ramp = fade
+	return p
+
+
 ## Потолочные лампы: резче спад к углам (тёплое пятно под лампой, тёмные углы) и эмалированный абажур.
 static func _lamps(st: Station) -> void:
 	for n: Node in st.get_children():
@@ -339,6 +373,27 @@ static func _lamps(st: Station) -> void:
 		for at: Vector3 in [Vector3(0.5, 2.65, 3.3), Vector3(7.5, 2.65, 0.1), Vector3(13.0, 2.65, 3.5)]:
 			if l.position.distance_to(at) < 0.05:
 				l.omni_attenuation = 1.6
+				# Абажур бросает свет вниз: круг на полу и столе, потолок над лампой — в тени.
+				# Голая лампочка (omni) остаётся слабой подсветкой стен и углов.
+				var spot := SpotLight3D.new()
+				spot.position = at + Vector3(0, -0.05, 0)
+				spot.rotation.x = -PI * 0.5
+				spot.spot_range = 4.6
+				spot.spot_angle = 58.0
+				spot.spot_angle_attenuation = 1.5
+				spot.spot_attenuation = 0.5
+				spot.light_energy = l.light_energy * 3.2
+				spot.light_color = l.light_color
+				spot.shadow_enabled = false
+				st.add_child(spot)
+				st.register_lamp(spot)
+				spot.add_child(_lamp_dust())   # гаснет вместе с лампой
+				# Рассеянный свет — из-под края абажура (ниже), а не у самого потолка: тот светился пятном
+				var fill := Geo.omni(st, at + Vector3(0, -0.7, 0), l.omni_range, l.light_energy * 0.35, l.light_color)
+				fill.omni_attenuation = 1.6
+				fill.shadow_enabled = false
+				st.register_lamp(fill)
+				l.light_energy *= 0.08
 				var k := MeshKit.new(91)
 				# Конус абажура над лампочкой: снаружи зелёная эмаль, изнутри белый
 				k.tube([at + Vector3(0, 0.12, 0), at + Vector3(0, 0.02, 0), at + Vector3(0, -0.06, 0)], [0.03, 0.12, 0.2], Color(0.1, 0.17, 0.13), 8, false, false)

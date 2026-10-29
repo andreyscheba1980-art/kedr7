@@ -726,6 +726,7 @@ func _build_meteo() -> void:
 	var booth_pos := METEO + M_BOOTH
 	var booth_prop := Props.meteo_screen()
 	booth_prop.position = booth_pos
+	booth_prop.name = "BoothModel"
 	add_child(booth_prop)
 	# Крупный кадр термометров (ThermometerUI): шкалу читаешь сам и вписываешь в книжку КМ-1.
 	var booth_it := Geo.interactable(self, Vector3(0.65, 0.55, 0.55), booth_pos + Vector3(0.0, 1.55, 0.0), null, "", func(_p: Player) -> void:
@@ -756,9 +757,7 @@ func _build_meteo() -> void:
 	old_it.name = "OldMeteoScreen"
 
 	# Советская снегомерная рейка М-103
-	var rod_prop := Props.snow_gauge_rod()
-	rod_prop.position = METEO + M_ROD
-	add_child(rod_prop)
+	SnowStakeUI.build_stake(self, METEO + M_ROD)   # снег на рейке — ровно на сегодняшней высоте
 	# Крупный кадр рейки (SnowStakeUI): высоту снега читаешь сам — и в книжку КМ-1
 	var stake_it := Geo.interactable(self, Vector3(0.25, 2.0, 0.25), METEO + M_ROD + Vector3(0, 1.0, 0), null, "", func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"snow_stake"))

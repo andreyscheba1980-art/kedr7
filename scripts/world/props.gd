@@ -4,8 +4,8 @@ extends RefCounted
 ## генератор, бочка, журнал, поленница. Только визуал — столкновения и взаимодействие остаются
 ## на прежних коробках в Station/Yard. Начало координат — пол под центром предмета, если не сказано иначе.
 
-const WOOD := Color(0.22, 0.17, 0.12)
-const WOOD_DARK := Color(0.14, 0.11, 0.08)
+const WOOD := Color(0.3, 0.23, 0.16)        ## × текстура дерева: светлее — иначе мебель в доме читалась чёрными коробками
+const WOOD_DARK := Color(0.2, 0.155, 0.11)
 const METAL := Color(0.32, 0.34, 0.35)
 const METAL_DARK := Color(0.14, 0.15, 0.16)
 const RADIO := Color(0.20, 0.23, 0.21)
@@ -1234,24 +1234,43 @@ static func old_meteo_screen() -> Node3D:
 	if cached != null:
 		return cached
 	var k := _kit(66, 0.09)
-	var weathered_wood := Color(0.38, 0.36, 0.34)
-	var rot_wood := Color(0.22, 0.20, 0.18)
+	var paint := Color(0.62, 0.62, 0.6)          # остатки белил
+	var bare := Color(0.36, 0.33, 0.3)           # серое, выбеленное ветром дерево
+	var rot_wood := Color(0.24, 0.21, 0.18)
 	var rusted_hinge := Color(0.32, 0.18, 0.12)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1961
+	# Будку повело целиком: всё строим прямо и наклоняем вокруг точки на земле
+	var tilt := Basis(Vector3.FORWARD, deg_to_rad(-7.0)) * Basis(Vector3.RIGHT, deg_to_rad(4.0))
+	var b := func(pos: Vector3, size: Vector3, col: Color, rot := Basis()) -> void:
+		k.box(tilt * pos, size, col, tilt * rot)
+	var wood := func() -> Color: return paint if rng.randf() < 0.45 else bare
 
-	# Наклонные подгнившие ножки (будка сильно перекошена)
-	var tilt := Basis(Vector3.FORWARD, deg_to_rad(-12.0)) * Basis(Vector3.RIGHT, deg_to_rad(6.0))
-	for dx in [-0.35, 0.35]:
-		for dz in [-0.3, 0.3]:
-			k.box(Vector3(dx, 0.6, dz), Vector3(0.07, 1.25, 0.07), rot_wood, tilt)
-
-	# Корпус будки с жалюзи
-	k.box(Vector3(0, 1.55, 0), Vector3(0.85, 0.75, 0.75), weathered_wood, tilt)
-	# Двускатная крыша с отломанным краем
-	k.box(Vector3(0, 1.95, 0), Vector3(0.98, 0.06, 0.88), weathered_wood, tilt)
-	# Выломанная дверца, висящая на одной ржавой петле
-	var door_tilt := tilt * Basis(Vector3.UP, deg_to_rad(75.0))
-	k.box(Vector3(0.42, 1.50, 0.45), Vector3(0.70, 0.65, 0.04), rot_wood, door_tilt)
-	k.box(Vector3(0.42, 1.80, 0.15), Vector3(0.04, 0.08, 0.04), rusted_hinge)
+	for dx: float in [-0.32, 0.32]:
+		for dz: float in [-0.27, 0.27]:
+			b.call(Vector3(dx, 0.62, dz), Vector3(0.06, 1.25, 0.06), rot_wood)
+	b.call(Vector3(0, 1.24, 0), Vector3(0.78, 0.04, 0.68), bare)
+	b.call(Vector3(0, 1.58, -0.02), Vector3(0.64, 0.6, 0.52), Color(0.06, 0.06, 0.06))   # темнота внутри
+	# Жалюзи: часть планок выбита — сквозь дыры чернота
+	for c in range(8):
+		var ly := 1.31 + float(c) * 0.075
+		for side: float in [-0.355, 0.355]:
+			if rng.randf() > 0.18:
+				b.call(Vector3(side, ly, -0.01), Vector3(0.05, 0.026, 0.58), wood.call(), Basis(Vector3.FORWARD, deg_to_rad(40.0 * signf(side))))
+		if rng.randf() > 0.15:
+			b.call(Vector3(0, ly, -0.3), Vector3(0.66, 0.026, 0.05), wood.call(), Basis(Vector3.RIGHT, deg_to_rad(-40.0)))
+		if rng.randf() > 0.35:   # уцелевшая левая створка спереди
+			b.call(Vector3(-0.17, ly, 0.3), Vector3(0.3, 0.026, 0.05), wood.call(), Basis(Vector3.RIGHT, deg_to_rad(40.0)))
+	for cx: float in [-0.35, 0.35]:
+		for cz: float in [-0.3, 0.3]:
+			b.call(Vector3(cx, 1.58, cz), Vector3(0.05, 0.66, 0.05), bare)
+	# Крыша: одна доска обломана, на ней — шапка снега
+	b.call(Vector3(-0.12, 1.94, 0), Vector3(0.62, 0.05, 0.84), bare, Basis(Vector3.RIGHT, deg_to_rad(-5.0)))
+	b.call(Vector3(0.3, 1.94, 0.08), Vector3(0.3, 0.05, 0.6), rot_wood, Basis(Vector3.RIGHT, deg_to_rad(-5.0)))
+	b.call(Vector3(-0.1, 1.99, 0.0), Vector3(0.6, 0.06, 0.74), Color(0.86, 0.88, 0.92))
+	# Правая створка висит на одной ржавой петле
+	b.call(Vector3(0.42, 1.46, 0.45), Vector3(0.3, 0.6, 0.04), paint, Basis(Vector3.UP, deg_to_rad(75.0)) * Basis(Vector3.FORWARD, deg_to_rad(9.0)))
+	b.call(Vector3(0.36, 1.76, 0.31), Vector3(0.04, 0.08, 0.04), rusted_hinge)
 	return _mi(k, &"old_meteo_screen", "tex_wood.png")
 
 
@@ -1874,9 +1893,7 @@ static func meteo_screen() -> Node3D:
 	var k := _kit(94, 0.04)
 	var white := Color(0.86, 0.88, 0.90)
 	var white_wood := Color(0.78, 0.80, 0.82)
-	var glass := Color(0.85, 0.92, 0.98, 0.8)
 	var brass := Color(0.72, 0.62, 0.32)
-	var red_mercury := Color(0.82, 0.12, 0.12)
 	var dark_interior := Color(0.18, 0.19, 0.20)
 
 	for dx: float in [-0.32, 0.32]:
@@ -1888,32 +1905,34 @@ static func meteo_screen() -> Node3D:
 	k.box(Vector3(0, 0.75, 0.38), Vector3(0.55, 0.04, 0.22), white)
 
 	k.box(Vector3(0, 1.26, 0), Vector3(0.78, 0.04, 0.68), white)
-	k.box(Vector3(0, 1.62, -0.02), Vector3(0.68, 0.66, 0.56), dark_interior)
+	k.box(Vector3(0, 1.62, -0.02), Vector3(0.66, 0.66, 0.54), dark_interior)   # темнота в щелях жалюзи
 
-	for side: float in [-0.36, 0.36]:
-		k.box(Vector3(side, 1.62, 0), Vector3(0.04, 0.70, 0.62), white)
-		for l in range(6):
-			var ly := 1.34 + float(l) * 0.10
-			k.box(Vector3(side, ly, 0), Vector3(0.06, 0.03, 0.58), white_wood, Basis(Vector3.FORWARD, deg_to_rad(25.0 * signf(side))))
-	k.box(Vector3(0, 1.62, -0.32), Vector3(0.74, 0.70, 0.04), white)
+	# Жалюзи со всех сторон (будка Селянинова): наклонные планки, между ними — темнота внутри
+	var slat_x := Basis(Vector3.RIGHT, deg_to_rad(40.0))
+	for c in range(9):
+		var ly := 1.33 + float(c) * 0.072
+		for side: float in [-0.365, 0.365]:
+			k.box(Vector3(side, ly, -0.01), Vector3(0.05, 0.026, 0.6), white_wood, Basis(Vector3.FORWARD, deg_to_rad(40.0 * signf(side))))
+		k.box(Vector3(0, ly, -0.315), Vector3(0.68, 0.026, 0.05), white_wood, slat_x.inverse())
+		for dx: float in [-0.17, 0.17]:   # створки дверцы — закрыты
+			k.box(Vector3(dx, ly, 0.305), Vector3(0.3, 0.026, 0.05), white_wood, slat_x)
+	# Каркас: угловые стойки, обвязка, рамки створок, ручка и щеколда
+	for cx: float in [-0.36, 0.36]:
+		for cz: float in [-0.31, 0.31]:
+			k.box(Vector3(cx, 1.62, cz), Vector3(0.05, 0.72, 0.05), white)
+	for y: float in [1.29, 1.95]:
+		k.box(Vector3(0, y, 0.31), Vector3(0.76, 0.04, 0.05), white)
+		k.box(Vector3(0, y, -0.31), Vector3(0.76, 0.04, 0.05), white)
+		for side: float in [-0.36, 0.36]:
+			k.box(Vector3(side, y, 0), Vector3(0.05, 0.04, 0.64), white)
+	for dx: float in [-0.015, 0.015]:
+		k.box(Vector3(dx, 1.62, 0.322), Vector3(0.026, 0.66, 0.03), white)
+	k.box(Vector3(0.06, 1.64, 0.345), Vector3(0.02, 0.09, 0.02), brass)
+	k.box(Vector3(-0.02, 1.7, 0.342), Vector3(0.07, 0.018, 0.015), Color(0.3, 0.3, 0.32))
 
 	var roof_tilt := Basis(Vector3.RIGHT, deg_to_rad(-6.0))
 	k.box(Vector3(0, 1.98, 0.02), Vector3(0.88, 0.05, 0.82), white, roof_tilt)
 	k.box(Vector3(0, 2.05, 0.02), Vector3(0.92, 0.04, 0.86), white, roof_tilt)
-
-	var door_left := Basis(Vector3.UP, deg_to_rad(105.0))
-	var door_right := Basis(Vector3.UP, deg_to_rad(-105.0))
-	k.box(Vector3(-0.36, 1.62, 0.32) + door_left * Vector3(0.18, 0, 0), Vector3(0.34, 0.66, 0.03), white, door_left)
-	k.box(Vector3(0.36, 1.62, 0.32) + door_right * Vector3(-0.18, 0, 0), Vector3(0.34, 0.66, 0.03), white, door_right)
-
-	k.tube([Vector3(0, 1.30, 0), Vector3(0, 1.85, 0)], [0.01], brass, 4)
-	k.tube([Vector3(-0.08, 1.45, 0), Vector3(-0.08, 1.80, 0)], [0.008], glass, 6)
-	k.tube([Vector3(-0.08, 1.45, 0), Vector3(-0.08, 1.58, 0)], [0.005], red_mercury, 4)
-	k.tube([Vector3(0.08, 1.45, 0), Vector3(0.08, 1.80, 0)], [0.008], glass, 6)
-	k.tube([Vector3(0.08, 1.45, 0), Vector3(0.08, 1.55, 0)], [0.005], red_mercury, 4)
-	k.tube([Vector3(0.08, 1.35, 0), Vector3(0.08, 1.44, 0)], [0.016], glass, 6)
-	k.box(Vector3(0, 1.78, -0.15), Vector3(0.12, 0.16, 0.04), white)
-	k.tube([Vector3(0, 1.80, -0.12), Vector3(0, 1.80, -0.11)], [0.05], brass, 10)
 
 	return _mi(k, &"meteo_screen", "tex_planks.png")
 

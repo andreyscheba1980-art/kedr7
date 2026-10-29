@@ -58,7 +58,7 @@ static func notebook(owner: Control, book: Control, base := Vector2i(400, 460)) 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var cam: Camera3D = Game.player.camera if Game.player != null and is_instance_valid(Game.player) else null
+	var cam: Camera3D = _cam()
 	if cam == null:
 		_fallback = true
 		_place_2d()
@@ -87,6 +87,14 @@ func _ready() -> void:
 		_build_notebook(cam)
 	_root.transform = _hidden
 	Game.audio.play_2d("res://assets/audio/ui_tick.ogg", -10.0)
+
+
+## Камера, которая сейчас рисует мир (у прибора — камера крупного плана, Closeup3D).
+static func _cam() -> Camera3D:
+	if Game.player == null or not is_instance_valid(Game.player):
+		return null
+	var c := Game.player.camera.get_viewport().get_camera_3d()
+	return c if c != null else Game.player.camera
 
 
 func _exit_tree() -> void:
@@ -195,7 +203,7 @@ func _vp_to_screen(cam: Camera3D) -> Transform2D:
 func _draw() -> void:
 	if _fallback or _root == null:
 		return
-	var cam: Camera3D = Game.player.camera
+	var cam: Camera3D = _cam()
 	var inv := get_global_transform_with_canvas().affine_inverse() * _vp_to_screen(cam)
 	var to_cam := cam.global_transform.affine_inverse()
 	for s: Dictionary in _slabs:
@@ -255,7 +263,7 @@ func _close() -> void:
 
 ## Точка экрана → пиксель листа (или null, если мимо).
 func _screen_to_page(screen: Vector2) -> Variant:
-	var cam: Camera3D = Game.player.camera
+	var cam: Camera3D = _cam()
 	var vp_pos := _vp_to_screen(cam).affine_inverse() * screen
 	var from := cam.project_ray_origin(vp_pos)
 	var dir := cam.project_ray_normal(vp_pos)
@@ -310,7 +318,7 @@ func page_to_local(px: Vector2) -> Vector2:
 	var uv := (px / Vector2(_base) - r2.position) / r2.size
 	var sz: Vector2 = p["size"]
 	var w := (p["node"] as Node3D).global_transform * Vector3((uv.x - 0.5) * sz.x, (0.5 - uv.y) * sz.y, 0.0)
-	var cam: Camera3D = Game.player.camera
+	var cam: Camera3D = _cam()
 	return get_global_transform_with_canvas().affine_inverse() * _vp_to_screen(cam) * cam.unproject_position(w)
 
 
