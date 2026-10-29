@@ -1501,13 +1501,14 @@ func _build_living_quarters() -> void:
 	spirit_it.prompt_provider = func() -> String:
 		return "" if Game.spirit_treat else Loc.t(&"it.spirit_treat")
 
-	# Пачка папирос «Беломорканал» на подоконнике
+	# Пачка папирос «Беломорканал» на краю обеденного стола (висела в воздухе: подоконника там нет)
 	var belomor_prop := Node3D.new()
-	belomor_prop.position = Vector3(2.4, 1.02, 5.15)
+	belomor_prop.position = Vector3(1.7, 0.762, 4.32)
+	belomor_prop.rotation.y = 0.4
 	Geo.block(belomor_prop, Vector3(0.08, 0.02, 0.12), Vector3.ZERO, Palette.m(&"paper"), false)
 	Geo.block(belomor_prop, Vector3(0.082, 0.022, 0.04), Vector3(0.0, 0.0, -0.04), Palette.m(&"metal"), false)
 	add_child(belomor_prop)
-	Geo.interactable(self, Vector3(0.25, 0.2, 0.25), Vector3(2.4, 1.05, 5.15), null, Loc.t(&"it.belomor"), func(_p: Player) -> void:
+	Geo.interactable(self, Vector3(0.25, 0.2, 0.25), Vector3(1.7, 0.79, 4.32), null, Loc.t(&"it.belomor"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.belomor"), 4.0)
 	)
 
@@ -1665,7 +1666,7 @@ func _build_radio_room() -> void:
 	register_lamp(scale_lamp)
 
 	# Бланк заявки на снабжение (пайки → ящик с вертолёта)
-	var form := Geo.interactable(self, Vector3(0.28, 0.05, 0.22), Vector3(9.95, 0.78, -1.15), null, Loc.t(&"it.supply_form"), func(_p: Player) -> void:
+	var form := Geo.interactable(self, Vector3(0.28, 0.05, 0.22), Vector3(8.8, 0.78, -1.0), null, Loc.t(&"it.supply_form"), func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"supply"))
 	form.name = "SupplyForm"
 	var paper := MeshInstance3D.new()
@@ -1680,20 +1681,20 @@ func _build_radio_room() -> void:
 	form.add_child(paper)
 
 	# Журнал метеонаблюдений
-	var journal := Geo.interactable(self, Vector3(0.3, 0.06, 0.36), Vector3(8.5, 0.78, -1.2), null, Loc.t(&"it.journal"), _on_journal_used)
+	var journal := Geo.interactable(self, Vector3(0.3, 0.06, 0.36), Vector3(9.1, 0.78, -1.05), null, Loc.t(&"it.journal"), _on_journal_used)
 	var book := Props.book()
 	book.position.y = -0.03
 	book.rotation.y = deg_to_rad(12.0)
 	journal.add_child(book)
 
 	# Магнитофон «Весна-306»
-	_tape_deck = Geo.interactable(self, Vector3(0.38, 0.12, 0.26), Vector3(9.9, 0.81, -1.2), null, Loc.t(&"it.tape"), _on_tape_used)
+	_tape_deck = Geo.interactable(self, Vector3(0.38, 0.12, 0.26), Vector3(9.92, 0.81, -1.02), null, Loc.t(&"it.tape"), _on_tape_used)
 	var deck_model := Props.tape_deck()
 	deck_model.position.y = -0.06
 	_tape_deck.add_child(deck_model)
 
 	# Советский недельный барограф М-22 («Дыхание станции») под стеклянным колпаком
-	var barograph_it := Geo.interactable(self, Vector3(0.38, 0.24, 0.24), Vector3(8.40, 0.87, -1.35), null, Loc.t(&"it.barograph"), func(_p: Player) -> void:
+	var barograph_it := Geo.interactable(self, Vector3(0.38, 0.24, 0.24), Vector3(8.5, 0.87, -1.48), null, Loc.t(&"it.barograph"), func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"barograph")
 	)
 	barograph_it.name = "BarographM22"
@@ -1702,7 +1703,7 @@ func _build_radio_room() -> void:
 	barograph_it.add_child(baro_model)
 	# Крупный план (BarographUI) прячет модель и ставит на её место свой барабан: где стол и куда лицом
 	baro_model.add_to_group(&"barograph_model")
-	baro_model.set_meta(&"rig_base", Vector3(8.55, 0.75, -1.35))   # чуть правее: тумба «Слухача» не лезет в кадр
+	baro_model.set_meta(&"rig_base", Vector3(8.55, 0.75, -1.45))   # чуть правее: тумба «Слухача» не лезет в кадр
 	baro_model.set_meta(&"rig_yaw", 0.0)
 
 	# Грунтовый геофон и сейсмоприемник СВ-20 («Слухач») на отдельной виброизолированной тумбе
@@ -1725,12 +1726,12 @@ func _build_radio_room() -> void:
 		add_child(radio)
 
 	# Настольная лампа на гибкой ножке
-	_place(Props.desk_lamp(), Vector3(10.1, 0.75, -1.55))
-	register_lamp(Geo.omni(self, Vector3(10.1, 1.15, -1.25), 2.4, 0.7, Color(1.0, 0.82, 0.6)))
+	_place(Props.desk_lamp(), Vector3(8.22, 0.75, -1.6))
+	register_lamp(Geo.omni(self, Vector3(8.35, 1.15, -1.3), 2.4, 0.7, Color(1.0, 0.82, 0.6)))
 
 	# Мельхиоровый советский подстаканник с горячим чаем
 	# Чай — один на двоих с чайником: общий «откат», и горячий он, только пока топится печь.
-	var tea_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), Vector3(8.65, 0.85, -1.05), null, Loc.t(&"it.podstakannik"), func(_p: Player) -> void:
+	var tea_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), Vector3(8.52, 0.85, -0.98), null, Loc.t(&"it.podstakannik"), func(_p: Player) -> void:
 		if Game.tea_cd > 0.0:
 			Game.hud.subtitle(Loc.t(&"sub.kettle_recent"), 2.5)
 			return
@@ -1746,7 +1747,7 @@ func _build_radio_room() -> void:
 	)
 
 	# Вахтенный журнал метеонаблюдений ТМ-1 (на столе перед оператором)
-	var journal_it := Geo.interactable(self, Vector3(0.42, 0.12, 0.36), Vector3(9.38, 0.77, -1.05), null, Loc.t(&"it.journal_tm1"), func(_p: Player) -> void:
+	var journal_it := Geo.interactable(self, Vector3(0.42, 0.12, 0.36), Vector3(9.5, 0.77, -1.05), null, Loc.t(&"it.journal_tm1"), func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"journal")
 	)
 	var j_model := Props.journal_tm1()
@@ -1754,7 +1755,7 @@ func _build_radio_room() -> void:
 	journal_it.add_child(j_model)
 
 	# Фототелеграфный факс-терминал ИСЗ «Метеор-2» (на правом крыле стола)
-	var fax_it := Geo.interactable(self, Vector3(0.48, 0.32, 0.40), Vector3(10.15, 0.88, -1.18), null, Loc.t(&"it.meteor_fax"), func(_p: Player) -> void:
+	var fax_it := Geo.interactable(self, Vector3(0.48, 0.32, 0.40), Vector3(10.0, 0.88, -1.47), null, Loc.t(&"it.meteor_fax"), func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"meteor_fax")
 	)
 	var fax_model := Props.meteor_fax()
@@ -1847,14 +1848,14 @@ func _build_radio_room() -> void:
 
 	# Настольная керосиновая лампа «Летучая мышь» на операторском столе (аварийный свет без генератора)
 	_kerosene_lamp_prop = Props.kerosene_lamp()
-	_kerosene_lamp_prop.position = Vector3(8.35, 0.75, -1.02)
+	_kerosene_lamp_prop.position = Vector3(8.28, 0.75, -1.0)
 	add_child(_kerosene_lamp_prop)
 
-	_kerosene_light = Geo.omni(self, Vector3(8.35, 1.0, -1.02), 4.2, 0.0, Color(1.0, 0.65, 0.25))
+	_kerosene_light = Geo.omni(self, Vector3(8.28, 1.0, -1.0), 4.2, 0.0, Color(1.0, 0.65, 0.25))
 	_kerosene_light.shadow_enabled = false
 	_kerosene_light.visible = false
 
-	var lamp_it := Geo.interactable(self, Vector3(0.35, 0.45, 0.35), Vector3(8.35, 0.95, -1.02), null, "", _on_kerosene_lamp_used)
+	var lamp_it := Geo.interactable(self, Vector3(0.3, 0.45, 0.3), Vector3(8.28, 0.95, -1.0), null, "", _on_kerosene_lamp_used)
 	lamp_it.name = "KeroseneLamp"
 	lamp_it.prompt_provider = func() -> String:
 		return Loc.t(&"it.kerosene_lamp_off") if _kerosene_lit else Loc.t(&"it.kerosene_lamp_on")

@@ -2518,6 +2518,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _corpus_review()
 		get_tree().quit()
 		return
+	if args.has("towerwalk"):
+		await _tower_walk()
+		get_tree().quit()
+		return
 	if args.has("house"):
 		await _house_review()
 		get_tree().quit()
@@ -3644,9 +3648,59 @@ func _visual_review() -> void:
 		await _shot("vis_%s_%s" % [v[0], tag])
 
 
+## Башня: последний марш → кабина → дверь на балкон → балкон по кругу. Пишет, где игрок упёрся.
+func _tower_walk() -> void:
+	var p := Game.player
+	Game.yrka.enabled = false
+	MeteoCorpus.instance.call(&"_set_power", true)
+	# [старт, поворот, сколько идти, имя]; дальше — повороты на ходу
+	var legs: Array = [[Vector3(98.0, 7.1, -35.15), 0.0, 4.5, "марш_E3"], [null, 90.0, 2.6, "кабина_на_запад"],
+			[null, 0.0, 2.5, "к_двери_балкона"], [null, 90.0, 2.0, "балкон_запад"], [null, 180.0, 5.5, "балкон_юг"],
+			[null, -90.0, 6.0, "балкон_восток"], [null, 0.0, 5.5, "балкон_север"]]
+	for leg: Array in legs:
+		if leg[0] != null:
+			_tp(leg[0], leg[1])
+		else:
+			p.rotation.y = deg_to_rad(leg[1])
+		await _wait(0.2)
+		Input.action_press(&"move_forward")
+		var last := p.global_position
+		var stuck := 0.0
+		var t := 0.0
+		while t < float(leg[2]):
+			await _wait(0.25)
+			t += 0.25
+			var moved := p.global_position.distance_to(last)
+			last = p.global_position
+			stuck = stuck + 0.25 if moved < 0.05 else 0.0
+			if stuck >= 0.75:
+				print("[tower] %s: упёрся в %s" % [leg[3], p.global_position])
+				var fwd := -p.global_basis.z
+				for hy: float in [0.3, 0.9, 1.5]:
+					var from := p.global_position + Vector3(0, hy, 0)
+					var hit := p.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + fwd * 0.8, 0xFFFFFFFF, [p.get_rid()]))
+					if not hit.is_empty():
+						print("[tower]   h=%.1f → %s (%s) в %s" % [hy, (hit["collider"] as Node).get_path(), (hit["collider"] as Node).get_class(), hit["position"]])
+				_look(p.global_position, p.global_position + p.global_basis * Vector3(0, 1.4, -2.0))
+				await _wait(0.3)
+				await _shot("tower_stuck_%s" % leg[3])
+				break
+		Input.action_release(&"move_forward")
+		print("[tower] %s → %s" % [leg[3], p.global_position])
+
+
 ## Дом изнутри: каждая комната с двух сторон (свет — как есть в этой фазе).
 func _house_review() -> void:
 	Game.yrka.enabled = false
+	if OS.get_cmdline_user_args().has("probe"):
+		for n in Game.level.find_children("*", "GeometryInstance3D", true, false):
+			var g := n as GeometryInstance3D
+			if not g.is_visible_in_tree():
+				continue
+			var bb := g.global_transform * g.get_aabb()
+			var c := bb.get_center()
+			if bb.size.y > 0.6 and bb.size.length() < 4.0 and Rect2(-2.6, -0.1, 6.2, 6.8).has_point(Vector2(c.x, c.z)) and c.y < 2.4:
+				print("[probe] ", g.get_path(), " c=", c, " size=", bb.size, " parent=", g.get_parent().name)
 	var tag := "night" if Game.is_night() else "day"
 	for v: Array in [["room_a", Vector3(2.8, 0.05, 1.0), Vector3(-2.0, 1.2, 5.5)], ["room_b", Vector3(-2.0, 0.05, 5.8), Vector3(3.0, 1.2, 0.5)],
 			["room_c", Vector3(-1.8, 0.05, 0.6), Vector3(3.0, 1.0, 6.0)],
@@ -3654,7 +3708,9 @@ func _house_review() -> void:
 			["storage", Vector3(6.6, 0.05, -2.4), Vector3(3.8, 0.8, -5.2)], ["corridor", Vector3(4.0, 0.05, 4.4), Vector3(12.0, 1.4, 4.4)],
 			["vestibule", Vector3(14.0, 0.05, 6.2), Vector3(11.8, 1.2, 2.0)], ["attic", Vector3(0.0, 3.0, 3.3), Vector3(12.0, 3.6, 3.3)],
 			["plot_gate", Vector3(60.0, 0.05, -23.0), Vector3(66.0, 0.8, -21.0)], ["plot_booth", Vector3(64.8, 0.05, -21.0), Vector3(64.8, 1.4, -23.6)],
-			["plot_old", Vector3(66.5, 0.05, -18.0), Vector3(63.5, 1.0, -21.0)]]:
+			["plot_old", Vector3(66.5, 0.05, -18.0), Vector3(63.5, 1.0, -21.0)],
+			["radio_desk", Vector3(9.2, 0.6, 0.05), Vector3(9.2, 0.75, -1.25)], ["living_ne", Vector3(0.6, 0.05, 2.6), Vector3(2.85, 0.4, 0.5)],
+			["living_table", Vector3(0.0, 0.3, 3.1), Vector3(1.4, 0.75, 4.1)]]:
 		_look(v[1], v[2])
 		await _wait(1.2)
 		await _shot("house_%s_%s" % [v[0], tag])
@@ -4149,7 +4205,7 @@ func _efir_review() -> void:
 	# --- Башня ---
 	if MeteoCorpus.instance != null:
 		MeteoCorpus.instance.call(&"_set_power", true)
-	_look(Vector3(96.4, MeteoCorpus.CAB + 0.05, -37.0), Vector3(95.45, MeteoCorpus.CAB + 0.9, -38.35))
+	_look(Vector3(96.6, MeteoCorpus.CAB + 0.05, -37.1), Vector3(95.35, MeteoCorpus.CAB + 0.9, -37.12))
 	await _wait(0.5)
 	DirectionFinderUI.tower_freq = 7713.0
 	DirectionFinderUI.next_point = &"tower"

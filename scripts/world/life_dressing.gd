@@ -185,7 +185,5 @@ func _interiors() -> void:
 	_on_table("books", Vector3(1.95, 0.75, 3.75), -0.25, Vector3(0.05, 0, 0.1))
 	# Коридор: вешалка с ватником и ушанкой на южной стене
 	_on_wall("coat_hooks", Vector3(6.2, 1.4, 4.4), Vector3.BACK, 0.82)
-	# Радиорубка: мелочи на краю операторского стола
-	_on_table("table_clutter", Vector3(8.4, 0.75, -1.05), -0.35, Vector3(-0.08, 0, 0))
 	# Кладовая: ещё полка с запасами — на западной стене
 	_on_wall("shelf_jars", Vector3(5.8, 1.3, -4.0), Vector3.FORWARD, 0.5)

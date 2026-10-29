@@ -203,7 +203,7 @@ func _build() -> void:
 	for id: StringName in [&"baro_tooth", &"anemo_calm", &"sv20_house", &"therm_366", &"num_name"]:
 		_apply[id] = func() -> void: pass
 		_revert[id] = func() -> void: pass
-	_pos[&"baro_tooth"] = func() -> Vector3: return Vector3(8.4, 0.95, -1.35)
+	_pos[&"baro_tooth"] = func() -> Vector3: return Vector3(8.5, 0.95, -1.48)
 	_pos[&"sv20_house"] = func() -> Vector3: return Vector3(7.7, 0.95, -1.35)
 	_pos[&"anemo_calm"] = func() -> Vector3: return Yard.METEO + Yard.M_VANE + Vector3(0, 1.6, 0)
 	_pos[&"therm_366"] = func() -> Vector3: return Yard.METEO + Yard.M_BOOTH + Vector3(0, 1.5, 0)

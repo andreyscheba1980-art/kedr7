@@ -1,8 +1,8 @@
 class_name TutorialGuide
 extends Node
 ## Пролог-обучение делом, а не строкой в углу (план «демо → 1.0», этап 4).
-## Когда начинается шаг (Game.TUTORIAL_STEPS после приезда), по центру экрана — карточка: что сделать и как,
-## с клавишей. В мире над нужной вещью мерцает тусклый янтарный огонёк (виден сквозь метель, гаснет вблизи):
+## Когда начинается шаг (Game.TUTORIAL_STEPS после приезда), справа сверху — небольшая плашка: что сделать и как,
+## с клавишей (не поверх центра экрана; пока открыт прибор или книга — спрятана). В мире над нужной вещью мерцает тусклый янтарный огонёк (виден сквозь метель, гаснет вблизи):
 ## будка/флюгер/рейка, рация, канистры → генератор, поленница → печь, «Буран», журнал.
 ## Стоишь без дела 45 с — карточка повторяется, огонёк вспыхивает. Шаг сделан — короткое «✓».
 
@@ -33,6 +33,8 @@ func _process(delta: float) -> void:
 		_idle = 0.0
 		if step != &"":
 			_show_step(4.0 if _card == null else 6.5)
+	if _card != null and is_instance_valid(_card):
+		_card.visible = Game.hud.modal() == null
 	if step == &"":
 		_hide_marker()
 		return
@@ -68,7 +70,7 @@ func _show_step(delay: float) -> void:
 	_pulse = 1.5
 
 
-## Карточка по центру сверху: заголовок крупно, ниже — как сделать.
+## Плашка справа под часами: заголовок, ниже — как сделать.
 func _card_show(title: String, how: String, dur: float) -> void:
 	if _card != null and is_instance_valid(_card):
 		_card.queue_free()
@@ -77,16 +79,17 @@ func _card_show(title: String, how: String, dur: float) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	card.add_child(box)
-	var t := UiKit.label(title, 24, HORIZONTAL_ALIGNMENT_CENTER)
+	var t := UiKit.label(title, 17, HORIZONTAL_ALIGNMENT_LEFT)
 	t.modulate = Color(0.98, 0.86, 0.55)
 	box.add_child(t)
 	if how != "":
-		var h := UiKit.label(how, 17, HORIZONTAL_ALIGNMENT_CENTER)
+		var h := UiKit.label(how, 13, HORIZONTAL_ALIGNMENT_LEFT)
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		h.custom_minimum_size = Vector2(640, 0)
+		h.custom_minimum_size = Vector2(380, 0)
 		h.modulate = Color(0.9, 0.9, 0.86)
 		box.add_child(h)
-	Game.hud._place(card, 0.5, 0.0, 0.5, 0.0, -360, 110, 360, 110)   # HUD — CanvasLayer, у него свой корневой контейнер
+	Game.hud._place(card, 1.0, 0.0, 1.0, 0.0, -430, 78, -20, 78)   # HUD — CanvasLayer, у него свой корневой контейнер
+	card.visible = Game.hud.modal() == null
 	card.modulate.a = 0.0
 	_card = card
 	var tw := card.create_tween()
@@ -104,7 +107,7 @@ func _target() -> Vector3:
 		&"readings":
 			var best := Vector3.INF
 			for r: Array in [[&"temp", Yard.METEO + Yard.M_BOOTH + Vector3(0, 1.6, 0)], [&"wind", MeteoCorpus.PULT_POS + Vector3(0, 1.0, 0.4)],
-					[&"snow", Yard.METEO + Yard.M_ROD + Vector3(0, 1.6, 0)], [&"baro", Vector3(8.40, 1.2, -1.35)],
+					[&"snow", Yard.METEO + Yard.M_ROD + Vector3(0, 1.6, 0)], [&"baro", Vector3(8.5, 1.2, -1.48)],
 					[&"baro", MeteoCorpus.BARO_POS + Vector3(0, 1.2, 0)]]:
 				if not Game.readings.get(r[0], false):
 					if best == Vector3.INF or p.global_position.distance_to(r[1]) < p.global_position.distance_to(best):
@@ -124,7 +127,7 @@ func _target() -> Vector3:
 			if Snowmobile.instance != null and is_instance_valid(Snowmobile.instance):
 				return Snowmobile.instance.global_position + Vector3(0, 1.4, 0)
 		&"journal":
-			return Vector3(8.5, 1.05, -1.2)
+			return Vector3(9.1, 1.05, -1.05)
 	return Vector3.INF
 
 

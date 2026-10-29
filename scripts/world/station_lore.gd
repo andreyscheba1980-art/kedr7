@@ -8,7 +8,7 @@ extends Node3D
 const FL := MeteoCorpus.FL
 const CAB := MeteoCorpus.CAB
 const CELLAR := Vector3(0.0, -15.0, 3.0)
-const TRUNK := Vector3(1.7, 0.0, 1.7)            ## сундук Брагина стоит на люке
+const TRUNK := Vector3(2.85, 0.0, 0.45)          ## сундук Брагина стоит на люке — в северо-восточном углу комнаты
 const WALLED := Vector3(100.35, FL, -26.7)       ## центр пола кабинета Голубева
 const ARCHIVE_WIN := Vector3(98.5, FL, -27.2)    ## заколоченное окно архива (изнутри)
 const TUN_Y := -30.0
@@ -144,15 +144,18 @@ func _build_trunk_and_cellar() -> void:
 		return Loc.t(&"it.bcellar_night") if Game.is_night() else Loc.t(&"it.bcellar")
 	_hatch.collision_layer = 0
 	# Сундук на люке
-	_trunk = Geo.interactable(self, Vector3(0.95, 0.55, 0.55), TRUNK + Vector3(0, 0.275, 0), wood, "", Callable())
-	for y: float in [-0.12, 0.12]:
-		var band := Geo.box_mesh(Vector3(0.97, 0.04, 0.57), iron)
-		band.position.y = y
-		_trunk.add_child(band)
+	_trunk = Geo.interactable(self, Vector3(0.95, 0.55, 0.55), TRUNK + Vector3(0, 0.275, 0), null, "", Callable())
+	var chest := Props._kedr_model("bragin_chest", {"bright": 1.15})
+	if chest != null:
+		chest.position.y = -0.275
+		_trunk.add_child(chest)
 	_trunk.hold_time = 2.2
 	_trunk.hold_sound = "res://assets/sfx/scratch_wall.ogg"
-	_trunk.prompt_provider = func() -> String: return Loc.t(&"it.trunk")
-	_trunk.used.connect(func(_p: Player) -> void: _move_trunk(true))
+	# Сдвинуть можно, только когда знаешь, что под ним (записка Семёнова за фото); в прологе — просто сундук
+	_trunk.prompt_provider = func() -> String: return Loc.t(&"it.trunk") if _trunk_known() else ""
+	_trunk.used.connect(func(_p: Player) -> void:
+		if _trunk_known():
+			_move_trunk(true))
 	if Game.has_flag("trunk_moved"):
 		_move_trunk(false)
 
@@ -195,9 +198,13 @@ func _build_trunk_and_cellar() -> void:
 		add_child(scr)
 
 
+func _trunk_known() -> bool:
+	return not Game.is_prologue() and Books.is_read(&"semenov_photo")
+
+
 func _move_trunk(animate: bool) -> void:
 	Game.set_flag("trunk_moved", true)
-	var to := TRUNK + Vector3(0, 0.275, 1.05)
+	var to := TRUNK + Vector3(-0.15, 0.275, 0.85)
 	if animate:
 		var tw := create_tween()
 		tw.tween_property(_trunk, "position", to, 0.8).set_trans(Tween.TRANS_SINE)

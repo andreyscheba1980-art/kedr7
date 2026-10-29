@@ -2524,43 +2524,98 @@ static func barometer() -> Node3D:
 	return _mi(k, key, "tex_metal.png")
 
 
-## Тканая дорожка / домотканый половик на дощатый пол
+## Тканая дорожка / домотканый половик на дощатый пол: выцветшие тряпичные полосы неровной ширины,
+## уток виден, середина вытоптана до серого, по краям бахрома. Картинка рисуется один раз и кэшируется.
+static var _rug_tex: ImageTexture
+
+
 static func carpet(width := 1.05, length := 3.4) -> Node3D:
 	var root := Node3D.new()
 	root.name = "Carpet"
-	var base_mat := Palette.m(&"cloth")
-	var red_mat := Palette.m(&"red")
-	var dark_mat := Palette.m(&"dark")
-
-	# Основа плотной тканой дорожки
-	var base := Geo.box_mesh(Vector3(width, 0.008, length), base_mat)
-	base.position.y = 0.004
-	root.add_child(base)
-
-	# Продольные боковые канты дорожки (бордюр)
-	for side: float in [-1.0, 1.0]:
-		var border := Geo.box_mesh(Vector3(0.05, 0.009, length), dark_mat)
-		border.position = Vector3((width * 0.5 - 0.035) * side, 0.005, 0)
-		root.add_child(border)
-
-	# Поперечный узор в полоску (классический домотканый советский половик)
-	var num_bands := int(length / 0.42)
-	for i in range(-num_bands, num_bands + 1):
-		var z_pos: float = float(i) * 0.38
-		if absf(z_pos) > length * 0.45:
-			continue
-		var band_mat := red_mat if abs(i) % 2 == 1 else dark_mat
-		var band := Geo.box_mesh(Vector3(width * 0.88, 0.009, 0.12), band_mat)
-		band.position = Vector3(0, 0.005, z_pos)
-		root.add_child(band)
-
-	# Бахрома по торцам дорожки
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(width, length)
+	var mi := MeshInstance3D.new()
+	mi.mesh = plane
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = _rug_texture()
+	m.roughness = 1.0
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.uv1_scale = Vector3(1.0, length / 3.2, 1.0)
+	mi.material_override = m
+	mi.position.y = 0.007
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	# Толщина половика — тёмная кромка снизу, чтобы край не «лип» к полу
+	var under := Geo.box_mesh(Vector3(width - 0.01, 0.006, length - 0.01), _rug_edge_mat())
+	under.position.y = 0.003
+	root.add_child(under)
+	# Бахрома по торцам: короткие кисти из той же основы
+	var fr := _rug_edge_mat()
 	for end_side: float in [-1.0, 1.0]:
-		var fringe := Geo.box_mesh(Vector3(width * 0.94, 0.005, 0.06), Palette.m(&"paper"))
-		fringe.position = Vector3(0, 0.003, end_side * (length * 0.5 + 0.025))
-		root.add_child(fringe)
-
+		var n := int(width / 0.035)
+		for k in n:
+			var tassel := Geo.box_mesh(Vector3(0.012, 0.004, 0.06 + 0.02 * float(k % 3)), fr)
+			tassel.position = Vector3(-width * 0.5 + 0.02 + k * (width - 0.04) / maxf(n - 1, 1), 0.004, end_side * (length * 0.5 + 0.03))
+			tassel.rotation.y = 0.15 * sin(k * 1.7)
+			root.add_child(tassel)
 	return root
+
+
+static func _rug_edge_mat() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.48, 0.44, 0.38)
+	m.roughness = 1.0
+	return m
+
+
+static func _rug_texture() -> ImageTexture:
+	if _rug_tex != null:
+		return _rug_tex
+	var w := 256
+	var h := 768
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1964
+	# Полосы тряпичного утка: приглушённые, выцветшие (свёкла, пыльная синь, охра, серо-зелёный, суровый)
+	var palette := [Color(0.46, 0.22, 0.2), Color(0.3, 0.36, 0.44), Color(0.58, 0.48, 0.3), Color(0.38, 0.42, 0.34),
+		Color(0.62, 0.58, 0.5), Color(0.27, 0.24, 0.24), Color(0.52, 0.34, 0.3)]
+	var bands: Array = []
+	var y := 0
+	while y < h:
+		var bw := rng.randi_range(10, 46)
+		bands.append([y, y + bw, palette[rng.randi() % palette.size()]])
+		y += bw
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.frequency = 0.02
+	var wear := FastNoiseLite.new()
+	wear.seed = 9
+	wear.frequency = 0.008
+	var base := Color(0.62, 0.58, 0.5)   # основа (суровая нить) — видна у краёв и в просветах
+	for band: Array in bands:
+		var c: Color = band[2]
+		for yy in range(band[0], mini(band[1], h)):
+			for x in w:
+				var col := c
+				# Тряпичная лента: каждая нить утка чуть другого тона, просветы основы через 4 пикселя
+				var row_tone := 0.9 + 0.2 * sin(float(yy) * 2.1 + float(band[0]))
+				col = col * row_tone
+				if (x + (yy % 2) * 2) % 4 == 0:
+					col = col.lerp(base, 0.35)
+				# Неровно окрашено и выцвело пятнами
+				col = col.lerp(base, 0.25 + 0.15 * noise.get_noise_2d(x, yy))
+				# Вытоптанная середина — к серому
+				var mid := 1.0 - absf(float(x) / w - 0.5) * 2.0
+				var worn := clampf(mid * 0.55 + wear.get_noise_2d(x, yy) * 0.3, 0.0, 1.0)
+				col = col.lerp(Color(0.45, 0.43, 0.4), worn * 0.45)
+				# Кромка — плотная основа
+				if x < 7 or x >= w - 7:
+					col = base.darkened(0.15)
+				img.set_pixel(x, yy, Color(col.r * 0.82, col.g * 0.8, col.b * 0.78, 1.0))   # приглушить: рядом с тёмным полом пастель резала глаз
+	img.generate_mipmaps()
+	_rug_tex = ImageTexture.create_from_image(img)
+	return _rug_tex
 
 
 ## Настольная жестяная керосиновая лампа «Летучая мышь»

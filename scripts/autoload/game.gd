@@ -1097,7 +1097,8 @@ func tasks_text() -> String:
 				if s == &"driver":
 					continue
 				var mark := "[x]" if tutorial.get(s, false) else "[ ]"
-				lines.append("%s %s" % [mark, Loc.t(StringName("tut." + String(s)))])
+				var line := Loc.t(&"tut.readings", [readings_count()]) if s == &"readings" else Loc.t(StringName("tut." + String(s)))
+				lines.append("%s %s" % [mark, line])
 	elif is_day():
 		lines.append(("[x] " if day_goal_done else "[ ] ") + Loc.t(StringName("day%d.goal" % phase_index)))
 		lines.append_array(_far_sites_lines())

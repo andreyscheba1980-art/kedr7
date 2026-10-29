@@ -67,7 +67,7 @@ func _build_house_loop() -> void:
 
 
 func _build_tower_receiver() -> void:
-	var at := Vector3(95.45, MeteoCorpus.CAB + 0.78, -38.35)
+	var at := Vector3(95.35, MeteoCorpus.CAB + 0.78, -37.12)   # на столе у западной стены кабины (проход к балкону свободен)
 	Geo.block(self, Vector3(0.5, 0.26, 0.3), at + Vector3(0, 0.13, 0), Palette.m(&"canister"), false)
 	Geo.block(self, Vector3(0.44, 0.1, 0.02), at + Vector3(0, 0.16, 0.155), Palette.m(&"paper"), false)
 	_loop_frame(Vector3(96.75, MeteoCorpus.CAB + 3.3, -36.75), 0.7, Palette.m(&"metal"))   # рамка на крыше кабины

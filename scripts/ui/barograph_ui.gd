@@ -157,7 +157,7 @@ func _room_lit() -> bool:
 
 
 func _build_rig() -> void:
-	var base := Vector3(8.40, 0.75, -1.35)
+	var base := Vector3(8.55, 0.75, -1.45)
 	var yaw := 0.0
 	_hidden = _find_model()
 	if _hidden != null:
