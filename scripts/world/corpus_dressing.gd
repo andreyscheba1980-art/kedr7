@@ -10,7 +10,12 @@ const CAB := MeteoCorpus.CAB
 const PX := 91.7
 const PZ := -33.75
 
+static var instance: CorpusDressing
+
 var _needles: Array[Node3D] = []      ## [скорость, румб]
+var _gust_pivot: Node3D               ## красный контрольный указатель максимума (порыв)
+var _drive := Vector3.ZERO            ## стрелки ведёт экран пульта (WindPanelUI): x — скорость, y — порыв, z — румб
+var _drive_t := 0.0
 var _lamp_net: MeshInstance3D
 var _lamp_ice: MeshInstance3D
 var _pens: Array[Node3D] = []
@@ -20,6 +25,7 @@ var _dust: CPUParticles3D
 
 
 func _ready() -> void:
+	instance = self
 	_build_pult()
 	_build_recorders()
 	_build_posters()
@@ -28,6 +34,22 @@ func _ready() -> void:
 	for g: GeometryInstance3D in find_children("*", "GeometryInstance3D", true, false):
 		g.layers = Station.LAYER_IN
 		g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+func _exit_tree() -> void:
+	if instance == self:
+		instance = null
+
+
+## Экран пульта ведёт стрелки сам (аномалии, порывы, контрольный указатель) — пока зовёт каждый кадр.
+func drive(speed: float, gust: float, az: float) -> void:
+	_drive = Vector3(speed, gust, az)
+	_drive_t = 0.25
+
+
+## Центр шкалы (0 — скорость, 1 — румб) в мире; лицо шкалы смотрит на +Z.
+static func dial_center(i: int) -> Vector3:
+	return Vector3(PX - 0.35 if i == 0 else PX + 0.35, FL + 1.02, PZ - 0.12 + 0.031)
 
 
 # --- Помощники ----------------------------------------------------------------------------
@@ -124,8 +146,8 @@ func _tex_mat(tex: Texture2D) -> StandardMaterial3D:
 func _build_pult() -> void:
 	var face_z := PZ - 0.12 + 0.031
 	var bez := _mat(Color(0.12, 0.12, 0.12), 0.4)
-	var speed_tex := _canvas_tex(Vector2i(256, 256), _draw_speed_face)
-	var rumb_tex := _canvas_tex(Vector2i(256, 256), _draw_rumb_face)
+	var speed_tex := _canvas_tex(Vector2i(512, 512), _draw_speed_face)   # 512 — крупный план читает их вблизи
+	var rumb_tex := _canvas_tex(Vector2i(512, 512), _draw_rumb_face)
 	for i in 2:
 		var cx := PX - 0.35 if i == 0 else PX + 0.35
 		var q := QuadMesh.new()
@@ -142,6 +164,12 @@ func _build_pult() -> void:
 		_box(Vector3(0.006, 0.13, 0.004), Vector3(0, 0.055, 0), _mat(Color(0.08, 0.08, 0.08)), Vector3.ZERO, pivot)
 		_cyl(0.012, 0.008, Vector3.ZERO, _mat(Color(0.3, 0.3, 0.3), 0.3), Vector3(PI * 0.5, 0, 0), pivot)
 		_needles.append(pivot)
+		if i == 0:
+			_gust_pivot = Node3D.new()
+			_gust_pivot.position = pivot.position - Vector3(0, 0, 0.002)
+			add_child(_gust_pivot)
+			_box(Vector3(0.004, 0.14, 0.002), Vector3(0, 0.06, 0), _mat(Color(0.7, 0.08, 0.06), 0.5), Vector3.ZERO, _gust_pivot)
+			_gust_pivot.rotation.z = _speed_angle(0.0)
 		_label(Loc.t(&"corpus.dial_speed") if i == 0 else Loc.t(&"corpus.dial_dir"), Vector3(cx, FL + 0.82, face_z + 0.004), 0.0, 22, UiStyle.plate_font(), Color(0.85, 0.8, 0.65))
 	_label(Loc.t(&"corpus.pult_plate"), Vector3(PX, FL + 1.21, face_z + 0.004), 0.0, 24, UiStyle.plate_font(), Color(0.85, 0.8, 0.65))
 	# Лампы «СЕТЬ» и «ОБЛЕДЕНЕНИЕ», тумблеры на столешнице, самописец ленты сбоку
@@ -171,6 +199,7 @@ func _build_pult() -> void:
 
 func _draw_speed_face(c: Control) -> void:
 	_dial_bg(c)
+	var k := c.size.x / 256.0
 	var cc := c.size * 0.5
 	var r := c.size.x * 0.46
 	var f := UiStyle.plate_font()
@@ -180,15 +209,20 @@ func _draw_speed_face(c: Control) -> void:
 		var a := a0 + span * v / 40.0
 		var d := Vector2(cos(a), sin(a))
 		var long := v % 5 == 0
-		c.draw_line(cc + d * (r - (22 if long else 11)), cc + d * (r - 3), Color(0.1, 0.1, 0.1), 3.0 if long else 1.5)
+		c.draw_line(cc + d * (r - (22 if long else 11) * k), cc + d * (r - 3 * k), Color(0.1, 0.1, 0.1), (3.0 if long else 1.5) * k)
 		if long:
 			var s := str(v)
-			c.draw_string(f, cc + d * (r - 42) - Vector2(7 * s.length(), -8), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.1, 0.1, 0.1))
-	c.draw_string(f, cc + Vector2(-16, r * 0.5), "м/с", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color(0.1, 0.1, 0.1))
+			var fs := int(22 * k)
+			var sw := f.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			c.draw_string(f, cc + d * (r - 42 * k) + Vector2(-sw * 0.5, 8 * k), s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.1, 0.1, 0.1))
+	var unit := Loc.t(&"pult.ms")
+	var uw := f.get_string_size(unit, HORIZONTAL_ALIGNMENT_LEFT, -1, int(20 * k)).x
+	c.draw_string(f, cc + Vector2(-uw * 0.5, r * 0.5), unit, HORIZONTAL_ALIGNMENT_LEFT, -1, int(20 * k), Color(0.1, 0.1, 0.1))
 
 
 func _draw_rumb_face(c: Control) -> void:
 	_dial_bg(c)
+	var k := c.size.x / 256.0
 	var cc := c.size * 0.5
 	var r := c.size.x * 0.46
 	var f := UiStyle.plate_font()
@@ -197,16 +231,23 @@ func _draw_rumb_face(c: Control) -> void:
 		var a := deg_to_rad(i * 22.5 - 90.0)
 		var d := Vector2(cos(a), sin(a))
 		var major := i % 4 == 0
-		c.draw_line(cc + d * (r - (24 if major else 12)), cc + d * (r - 3), Color(0.1, 0.1, 0.1), 3.0 if major else 1.5)
-		if major and names.size() == 16:
-			c.draw_string(f, cc + d * (r - 46) - Vector2(9, -10), names[i], HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color(0.1, 0.1, 0.1))
+		c.draw_line(cc + d * (r - (24 if major else 12) * k), cc + d * (r - 3 * k), Color(0.1, 0.1, 0.1), (3.0 if major else 1.5) * k)
+		if names.size() == 16 and i % 2 == 0:   # главные румбы крупно, промежуточные (СВ, ЮЗ…) — мельче
+			var fs := int((28 if major else 17) * k)
+			var sw := f.get_string_size(names[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+			c.draw_string(f, cc + d * (r - (46 if major else 40) * k) + Vector2(-sw * 0.5, fs * 0.36), names[i], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.1, 0.1, 0.1))
+
+
+static func _speed_angle(v: float) -> float:
+	return -(deg_to_rad(-135.0) + deg_to_rad(270.0) * clampf(v / 40.0, 0.0, 1.0))
 
 
 static func _dial_bg(c: Control) -> void:
 	c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(0.12, 0.12, 0.12))
 	c.draw_circle(c.size * 0.5, c.size.x * 0.47, Color(0.87, 0.84, 0.74))
+	var k := c.size.x / 256.0
 	for i in 6:
-		c.draw_arc(c.size * 0.5, c.size.x * 0.47 - i * 3.0, 0.0, TAU, 64, Color(0.5, 0.45, 0.35, 0.05 * (6 - i)), 3.0)
+		c.draw_arc(c.size * 0.5, c.size.x * 0.47 - i * 3.0 * k, 0.0, TAU, 96, Color(0.5, 0.45, 0.35, 0.05 * (6 - i)), 3.0 * k)
 
 
 # --- Барограф и термограф под колпаками -------------------------------------------------
@@ -224,30 +265,37 @@ func _build_recorders() -> void:
 	glass.metallic_specular = 0.9
 	for k in 2:
 		var o := Vector3(94.3, FL + 0.76, -30.4 if k == 0 else -29.65)
-		_box(Vector3(0.24, 0.05, 0.38), o + Vector3(0, 0.025, 0), wood)
-		_box(Vector3(0.2, 0.008, 0.34), o + Vector3(0, 0.054, 0), _mat(Color(0.3, 0.3, 0.3), 0.4))
+		# Каждый прибор — свой узел: крупный план барографа (BarographUI) прячет его и ставит свой барабан
+		var holder := Node3D.new()
+		add_child(holder)
+		if k == 0:
+			holder.add_to_group(&"barograph_model")
+			holder.set_meta(&"rig_base", o)
+			holder.set_meta(&"rig_yaw", -PI * 0.5)   # стол у перегородки: смотрят на прибор с запада
+		_box(Vector3(0.24, 0.05, 0.38), o + Vector3(0, 0.025, 0), wood, Vector3.ZERO, holder)
+		_box(Vector3(0.2, 0.008, 0.34), o + Vector3(0, 0.054, 0), _mat(Color(0.3, 0.3, 0.3), 0.4), Vector3.ZERO, holder)
 		# барабан с лентой
-		_cyl(0.05, 0.09, o + Vector3(-0.03, 0.105, 0.08), drum_mat)
-		_cyl(0.052, 0.006, o + Vector3(-0.03, 0.153, 0.08), brass)
+		_cyl(0.05, 0.09, o + Vector3(-0.03, 0.105, 0.08), drum_mat, Vector3.ZERO, holder)
+		_cyl(0.052, 0.006, o + Vector3(-0.03, 0.153, 0.08), brass, Vector3.ZERO, holder)
 		# чувствительный элемент: анероидные коробки / биметаллическая пластина
 		if k == 0:
 			for j in 6:
-				_cyl(0.035, 0.008, o + Vector3(0.0, 0.065 + j * 0.011, -0.09), brass)
+				_cyl(0.035, 0.008, o + Vector3(0.0, 0.065 + j * 0.011, -0.09), brass, Vector3.ZERO, holder)
 		else:
-			_box(Vector3(0.012, 0.012, 0.16), o + Vector3(0.06, 0.09, -0.06), brass, Vector3(0, 0.2, 0))
+			_box(Vector3(0.012, 0.012, 0.16), o + Vector3(0.06, 0.09, -0.06), brass, Vector3(0, 0.2, 0), holder)
 		# перо на рычаге — от элемента к барабану
 		var pen := Node3D.new()
 		pen.position = o + Vector3(0.0, 0.12, -0.09)
-		add_child(pen)
+		holder.add_child(pen)
 		_box(Vector3(0.004, 0.004, 0.18), Vector3(-0.015, 0, 0.09), _mat(Color(0.1, 0.1, 0.1)), Vector3(0, 0.15, 0), pen)
 		_box(Vector3(0.006, 0.012, 0.006), Vector3(-0.03, 0, 0.17), _mat(Color(0.35, 0.1, 0.5)), Vector3.ZERO, pen)
 		_pens.append(pen)
 		# колпак: стекло в латунной рамке
-		_box(Vector3(0.22, 0.17, 0.36), o + Vector3(0, 0.14, 0), glass)
+		_box(Vector3(0.22, 0.17, 0.36), o + Vector3(0, 0.14, 0), glass, Vector3.ZERO, holder)
 		for e: Array in [[Vector3(0.22, 0.008, 0.008), Vector3(0, 0.225, 0.18)], [Vector3(0.22, 0.008, 0.008), Vector3(0, 0.225, -0.18)],
 				[Vector3(0.008, 0.008, 0.36), Vector3(0.11, 0.225, 0)], [Vector3(0.008, 0.008, 0.36), Vector3(-0.11, 0.225, 0)]]:
-			_box(e[0], o + e[1], brass)
-		_label(Loc.t(&"corpus.baro_plate") if k == 0 else Loc.t(&"corpus.thermo_plate"), o + Vector3(-0.121, 0.03, 0), -PI * 0.5, 14, UiStyle.plate_font(), Color(0.85, 0.75, 0.45))
+			_box(e[0], o + e[1], brass, Vector3.ZERO, holder)
+		_label(Loc.t(&"corpus.baro_plate") if k == 0 else Loc.t(&"corpus.thermo_plate"), o + Vector3(-0.121, 0.03, 0), -PI * 0.5, 14, UiStyle.plate_font(), Color(0.85, 0.75, 0.45)).reparent(holder)
 	# Флакон чернил и кисточка — перо надо заправлять
 	_cyl(0.018, 0.04, Vector3(94.45, FL + 0.78, -30.0), _mat(Color(0.25, 0.1, 0.4), 0.2))
 
@@ -375,8 +423,14 @@ func _process(delta: float) -> void:
 		target = sy.wind_speed + (sy.wind_gusts - sy.wind_speed) * 0.4 * (sin(_t * 0.9) * 0.5 + 0.5)
 		az = sy.wind_azimuth_deg + sin(_t * 0.7) * 6.0
 	_speed = lerpf(_speed, target, clampf(delta * 3.0, 0.0, 1.0))
+	var shown := _speed
+	if _drive_t > 0.0:
+		_drive_t -= delta
+		shown = _drive.x
+		az = _drive.z
+		_gust_pivot.rotation.z = _speed_angle(_drive.y)
 	if _needles.size() == 2:
-		_needles[0].rotation.z = -(deg_to_rad(-135.0) + deg_to_rad(270.0) * clampf(_speed / 40.0, 0.0, 1.0))
+		_needles[0].rotation.z = _speed_angle(shown)
 		_needles[1].rotation.z = -deg_to_rad(az)
 	_lamp_net.visible = on
 	_lamp_ice.visible = on and Game.anemo_iced and fmod(_t, 1.0) < 0.5

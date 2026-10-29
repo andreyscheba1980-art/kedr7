@@ -6,7 +6,7 @@ render_mode blend_mix, depth_draw_opaque, cull_back;
 
 global uniform float ps1_snap;
 uniform vec4 albedo : source_color = vec4(1.0);
-uniform sampler2D tex : source_color, filter_nearest, repeat_enable;
+uniform sampler2D tex : source_color, filter_nearest_mipmap, repeat_enable;
 uniform float tex_scale = 3.0;
 uniform float macro = 0.55;
 uniform vec2 wind_dir = vec2(0.8, 0.6);     // заструги вытянуты поперёк ветра

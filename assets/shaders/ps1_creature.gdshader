@@ -5,7 +5,7 @@ render_mode blend_mix, depth_draw_opaque, cull_disabled, diffuse_lambert, specul
 
 global uniform float ps1_snap;
 uniform vec4 albedo : source_color = vec4(1.0);
-uniform sampler2D tex : source_color, filter_nearest, repeat_enable;
+uniform sampler2D tex : source_color, filter_nearest_mipmap, repeat_enable;
 uniform float use_tex = 0.0;
 uniform float tex_scale = 0.35;
 uniform float emission = 0.0;   // лёгкое свечение кожи — чтобы бледное лицо читалось в темноте

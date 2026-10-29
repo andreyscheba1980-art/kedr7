@@ -46,8 +46,26 @@ def norm01(a):
     return a / (a.max() if a.max() > 0 else 1.0)
 
 
+UPSCALE = 2   # тексель вдвое мельче: рядом с запечёнными моделями (1–2К) квадраты 128-px текстур лезли в глаза
+
+
+def upscale(rgb, k=UPSCALE, seed=0):
+    """Бесшовно увеличить в k раз (Ланцош по тайлу 3×3, центр) и добавить тонкое зерно нового размера."""
+    if k <= 1:
+        return rgb
+    h, w, _ = rgb.shape
+    out = np.empty((h * k, w * k, 3))
+    for c in range(3):
+        tile = np.tile(rgb[:, :, c].astype(np.float32), (3, 3))
+        big = np.asarray(Image.fromarray(tile, "F").resize((w * 3 * k, h * 3 * k), Image.LANCZOS))
+        out[:, :, c] = big[h * k:2 * h * k, w * k:2 * w * k]
+    grain = fnoise(h * k, h * k // 4, h * k // 2, 7000 + seed) * 0.012
+    return out + grain[:, :, None]
+
+
 def finish(rgb, name, mean=TARGET_MEAN, levels=None):
     """rgb: HxWx3 в [0..1]. Подгоняем среднее, слегка квантуем (PS1 — 5 бит на канал)."""
+    rgb = upscale(np.clip(rgb, 0, None), seed=len(name))
     rgb = np.clip(rgb, 0, None)
     m = rgb.mean()
     rgb = rgb * (mean / m)

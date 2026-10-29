@@ -5,7 +5,7 @@ shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_lambert, specular_disabled;
 
 global uniform float ps1_snap;
-uniform sampler2D tex : source_color, filter_nearest, repeat_enable;
+uniform sampler2D tex : source_color, filter_nearest_mipmap, repeat_enable;
 uniform float tex_scale = 1.6;
 uniform vec3 panel_col : source_color = vec3(0.24, 0.33, 0.33);
 uniform vec3 stripe_col : source_color = vec3(0.36, 0.13, 0.1);

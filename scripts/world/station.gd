@@ -1700,6 +1700,10 @@ func _build_radio_room() -> void:
 	var baro_model := Props.barograph()
 	baro_model.position.y = -0.12
 	barograph_it.add_child(baro_model)
+	# Крупный план (BarographUI) прячет модель и ставит на её место свой барабан: где стол и куда лицом
+	baro_model.add_to_group(&"barograph_model")
+	baro_model.set_meta(&"rig_base", Vector3(8.55, 0.75, -1.35))   # чуть правее: тумба «Слухача» не лезет в кадр
+	baro_model.set_meta(&"rig_yaw", 0.0)
 
 	# Грунтовый геофон и сейсмоприемник СВ-20 («Слухач») на отдельной виброизолированной тумбе
 	_collider(Vector3(0.50, 0.75, 0.50), Vector3(7.70, 0.375, -1.35))

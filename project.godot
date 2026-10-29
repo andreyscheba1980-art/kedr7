@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Кедр-7"
 config/description="Хоррор на радиометеостанции в уральской тайге, 1983."
-config/version="1.29.0-test"
+config/version="1.29.1-test"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/icon.png"

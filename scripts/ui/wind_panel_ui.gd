@@ -1,6 +1,7 @@
 class_name WindPanelUI
 extends Control
-## Пульт анеморумбометра М-63 в аппаратной: крупный кадр двух шкал и книжка КМ-1.
+## Пульт анеморумбометра М-63 в аппаратной: камера подходит к настоящим шкалам пульта (CorpusDressing),
+## колёсико / A D — от шкалы скорости к шкале румба. Стрелками на это время правит экран.
 ## Слева — скорость (0..40 м/с): стрелка гуляет вокруг средней, на порывах рывком уходит выше;
 ## красный «контрольный» указатель держит максимум — это порыв. Справа — румб (16 направлений).
 ## Цифр нет: среднюю скорость дежурный оценивает на глаз, порыв и румб считывает и вписывает сам.
@@ -10,7 +11,7 @@ signal closed
 const MAX_SPEED := 40.0
 const PEN_SFX := "res://assets/audio/clank.ogg"
 
-var _dial: Control
+var _close: Closeup3D
 var _book: KMBook
 var _hint: Label
 var _t := 0.0
@@ -44,12 +45,13 @@ func _ready() -> void:
 	_az_needle = _az
 	_spike_in = randf_range(1.0, 2.5)
 
-	ThermometerUI.backdrop(self)
 	ThermometerUI.title_plate(self, Loc.t(&"pult.title"))
-	_dial = Control.new()
-	_dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiKit.place(self, _dial, 0.5, 0.5, 0.5, 0.5, -500, -252, 100, 260)
-	_dial.draw.connect(_draw_dials)
+	# Шкала скорости — левее центра кадра: справа книжка в руке
+	var c0 := CorpusDressing.dial_center(0)
+	var eye := c0 + Vector3(0.15, 0.0, 0.75)
+	_close = Closeup3D.new()
+	Game.level.add_child(_close)
+	_close.setup(eye, eye + Vector3(0, 0, -1), 34.0, Vector3.RIGHT, 0.0, CorpusDressing.dial_center(1).x - c0.x, 0.0)
 
 	_book = KMBook.new()
 	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
@@ -87,66 +89,28 @@ func _process(delta: float) -> void:
 	_needle = lerpf(_needle, target, clampf(delta * 6.0, 0.0, 1.0))
 	_gust_max = maxf(_gust_max, _needle)
 	_az_needle = _az + sin(_t * 0.7) * 6.0 + sin(_t * 2.1) * 3.0 if _speed > 0.0 else _az_needle
-	_dial.queue_redraw()
+	if CorpusDressing.instance != null:
+		CorpusDressing.instance.drive(_needle, _gust_max, _az_needle)
+	var dx := float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A))
+	var rx := Input.get_joy_axis(0, JOY_AXIS_RIGHT_X)
+	if absf(rx) > 0.2:
+		dx += rx
+	if absf(dx) > 0.01:
+		_close.scroll(dx * 0.8 * delta)
 
 
-func _draw_dials() -> void:
-	var w := _dial.size
-	var font := UiStyle.plate_font()
-	var ink := Color(0.12, 0.11, 0.09)
-	var r := minf(w.x * 0.22, w.y * 0.34)
-	UiStyle.bakelite(_dial, Rect2(Vector2.ZERO, w))
-	# --- Скорость ---
-	var c1 := Vector2(w.x * 0.26, w.y * 0.46)
-	UiStyle.dial_face(_dial, c1, r)
-	var a0 := deg_to_rad(135.0)
-	var span := deg_to_rad(270.0)
-	for v in range(0, int(MAX_SPEED) + 1):
-		var a := a0 + span * v / MAX_SPEED
-		var dir := Vector2(cos(a), sin(a))
-		var long := v % 5 == 0
-		_dial.draw_line(c1 + dir * (r - (18 if long else 9)), c1 + dir * (r - 3), ink, 2.5 if long else 1.2)
-		if long:
-			var s := str(v)
-			_dial.draw_string(font, c1 + dir * (r - 32) - Vector2(6 * s.length(), -6), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
-	_dial.draw_string(font, c1 + Vector2(-16, r * 0.45), Loc.t(&"pult.ms"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, ink)
-	var ag := a0 + span * clampf(_gust_max, 0.0, MAX_SPEED) / MAX_SPEED
-	_dial.draw_line(c1, c1 + Vector2(cos(ag), sin(ag)) * (r - 14), Color(0.7, 0.1, 0.08), 3.0)
-	var an := a0 + span * clampf(_needle, 0.0, MAX_SPEED) / MAX_SPEED
-	_dial.draw_line(c1 + Vector2(2, 3), c1 + Vector2(cos(an), sin(an)) * (r - 8) + Vector2(2, 3), Color(0, 0, 0, 0.25), 4.0)   # тень стрелки
-	_dial.draw_line(c1, c1 + Vector2(cos(an), sin(an)) * (r - 8), ink, 4.0)
-	_dial.draw_circle(c1, 9, Color(0.3, 0.29, 0.27))
-	_dial.draw_circle(c1, 5, ink)
-	UiStyle.dial_glass(_dial, c1, r)
-	# --- Румб ---
-	var c2 := Vector2(w.x * 0.74, w.y * 0.46)
-	UiStyle.dial_face(_dial, c2, r)
-	var names := Loc.t(&"pult.rumbs").split(",")
-	for i in 16:
-		var a := deg_to_rad(i * 22.5 - 90.0)
-		var dir := Vector2(cos(a), sin(a))
-		var major := i % 4 == 0
-		_dial.draw_line(c2 + dir * (r - (20 if major else 10)), c2 + dir * (r - 3), ink, 2.5 if major else 1.2)
-		if names.size() == 16 and (major or i % 2 == 0):
-			var s: String = names[i]
-			_dial.draw_string(font, c2 + dir * (r - (40 if major else 36)) - Vector2(6 * s.length(), -6), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 19 if major else 14, ink)
-	var az := deg_to_rad(_az_needle - 90.0)
-	var tip := c2 + Vector2(cos(az), sin(az)) * (r - 12)
-	var tl := c2 - Vector2(cos(az), sin(az)) * (r * 0.35)
-	_dial.draw_line(tl + Vector2(2, 3), tip + Vector2(2, 3), Color(0, 0, 0, 0.25), 4.0)
-	_dial.draw_line(tl, tip, ink, 4.0)
-	_dial.draw_circle(tip, 6, Color(0.7, 0.1, 0.08))
-	_dial.draw_circle(c2, 9, Color(0.3, 0.29, 0.27))
-	_dial.draw_circle(c2, 5, ink)
-	UiStyle.dial_glass(_dial, c2, r)
-	# Подписи под шкалами
-	for pair: Array in [[c1, Loc.t(&"pult.cap_speed")], [c2, Loc.t(&"pult.cap_dir")]]:
-		var s: String = pair[1]
-		var sw := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-		var pr := Rect2((pair[0] as Vector2) + Vector2(-sw * 0.5 - 8, r + 28), Vector2(sw + 16, 22))
-		_dial.draw_rect(pr.grow(1), UiStyle.BRASS.darkened(0.5))
-		UiStyle.vgrad(_dial, pr, UiStyle.BRASS.lightened(0.15), UiStyle.BRASS.darkened(0.15))
-		_dial.draw_string(font, pr.position + Vector2(8, 17), s, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.18, 0.13, 0.06))
+func _exit_tree() -> void:
+	if _close != null and is_instance_valid(_close):
+		_close.queue_free()
+
+
+func _gui_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb != null and mb.pressed:
+		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_close.scroll(0.1)
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_close.scroll(-0.1)
 
 
 func _write() -> void:
