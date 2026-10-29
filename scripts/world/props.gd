@@ -1457,7 +1457,7 @@ static func bunker_blast_door() -> Node3D:
 	var k := _kit(72, 0.05)
 	var steel_heavy := Color(0.20, 0.22, 0.24)
 	var steel_plate := Color(0.28, 0.30, 0.32)
-	var wheel_paint := Color(0.65, 0.18, 0.14)   # Сурик / красно-коричневый штурвал
+	var wheel_paint := Color(0.4, 0.14, 0.1)     # Сурик, потемневший и затёртый до металла
 
 	# Мощная чугунная коробка портала
 	k.box(Vector3(0, 1.1, 0), Vector3(1.35, 2.3, 0.22), steel_heavy)
@@ -1470,9 +1470,24 @@ static func bunker_blast_door() -> Node3D:
 	# Центральный штурвал запирания
 	var wheel_pos := Vector3(0.45, 1.1, 0.35) + door_b * Vector3(0, 0, 0.09)
 	k.tube([wheel_pos, wheel_pos + door_b * Vector3(0, 0, 0.06)], [0.04], steel_heavy, 8)
-	# Обод и спицы штурвала
+	# Штурвал: обод из 16 звеньев, ступица, три спицы
+	var wc := wheel_pos + door_b * Vector3(0, 0, 0.07)
+	for s in 16:
+		var a := s * TAU / 16.0
+		var seg_c := wc + door_b * Vector3(cos(a) * 0.2, sin(a) * 0.2, 0)
+		k.box(seg_c, Vector3(0.085, 0.028, 0.028), wheel_paint, door_b * Basis(Vector3.FORWARD, a + PI * 0.5))
+	k.tube([wc - door_b * Vector3(0, 0, 0.02), wc + door_b * Vector3(0, 0, 0.03)], [0.05], steel_heavy, 8)
 	for ang in [0.0, 60.0, 120.0]:
-		k.box(wheel_pos + door_b * Vector3(0, 0, 0.07), Vector3(0.38, 0.025, 0.025), wheel_paint, door_b * Basis(Vector3.FORWARD, deg_to_rad(ang)))
+		k.box(wc, Vector3(0.4, 0.02, 0.02), steel_plate, door_b * Basis(Vector3.FORWARD, deg_to_rad(ang)))
+	# Клиновые задрайки по краю полотна и резиновый уплотнитель
+	for e: Array in [[Vector3(0.0, 1.95, 0.42), 0.0], [Vector3(0.0, 0.25, 0.42), 0.0], [Vector3(0.38, 1.1, 0.42), 90.0], [Vector3(-0.38, 1.1, 0.42), 90.0]]:
+		var pp: Vector3 = Vector3(0.45, 0, 0.35) + door_b * (e[0] - Vector3(0.45, 0, 0.35) + Vector3(0.45, 0, 0))
+		k.box(pp, Vector3(0.14, 0.05, 0.05), steel_heavy, door_b * Basis(Vector3.FORWARD, deg_to_rad(e[1])))
+	k.box(Vector3(0, 1.1, 0.115), Vector3(1.0, 2.1, 0.012), Color(0.08, 0.08, 0.08))
+	# Заклёпки по раме портала
+	for j in 7:
+		for sx: float in [-0.6, 0.6]:
+			k.box(Vector3(sx, 0.15 + j * 0.32, 0.115), Vector3(0.035, 0.035, 0.02), steel_plate)
 	return _mi(k, &"bunker_blast_door", "tex_metal.png")
 
 

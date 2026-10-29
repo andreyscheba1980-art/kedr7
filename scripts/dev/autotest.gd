@@ -3701,8 +3701,13 @@ func _yard_review() -> void:
 			["shed", Vector3(40.0, 0.05, 30.0), Vector3(48.0, 1.5, 34.0)], ["woodpile", Vector3(8.0, 0.05, 35.0), Vector3(4.0, 0.8, 40.0)],
 			["helipad", Vector3(36.0, 0.05, 2.0), Vector3(44.0, 0.3, 6.0)], ["hangar", Vector3(118.0, 0.05, -26.0), Vector3(128.0, 2.5, -36.0)],
 			["gas_shelter", Vector3(110.0, 0.05, -27.0), Vector3(114.6, 1.2, -32.0)], ["bunker", Vector3(52.0, 0.05, 8.0), Vector3(58.0, 0.5, 12.0)],
-			["mast", Vector3(20.0, 0.05, -52.0), Vector3(24.0, 4.0, -62.0)], ["izba", Vector3(-8.0, 0.05, -26.0), Vector3(-16.0, 1.5, -30.0)]]:
-		_look(Terrain.at(v[1]) + Vector3(0, 0.05, 0), v[2])
+			["mast", Vector3(20.0, 0.05, -52.0), Vector3(24.0, 4.0, -62.0)], ["izba", Vector3(-8.0, 0.05, -26.0), Vector3(-16.0, 1.5, -30.0)],
+			["bunker_hall", Vector3(68.5, -29.95, 12.3), Vector3(60.0, -28.6, 12.0)], ["bunker_racks", Vector3(62.0, -29.95, 12.0), Vector3(60.0, -28.2, 14.4)],
+			["blast_door", Vector3(51.5, -29.95, 12.6), Vector3(53.5, -28.9, 12.0)], ["tunnel_b", Vector3(80.0, -29.95, 12.0), Vector3(90.0, -28.6, 11.4)],
+			["tunnel_a", Vector3(96.5, -29.95, -18.0), Vector3(96.8, -29.0, -8.0)]]:
+		var at: Vector3 = v[1] if (v[1] as Vector3).y < -5.0 else Terrain.at(v[1]) + Vector3(0, 0.05, 0)
+		Game.player.set_flashlight(at.y < -5.0)
+		_look(at, v[2])
 		await _wait(1.2)
 		await _shot("yard_%s_%s" % [v[0], tag])
 

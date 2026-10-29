@@ -304,6 +304,23 @@ func zone_at(pos: Vector3) -> StringName:
 
 
 
+static var _bunker_mats: Dictionary = {}
+
+
+## Материал аппаратуры бункера (кэш по цвету): шкалы, бобины, стёкла — не «тёмная палитра».
+static func _bunker_mat(c: Color, glass := false) -> StandardMaterial3D:
+	var key := "%s_%s" % [c.to_html(), glass]
+	if _bunker_mats.has(key):
+		return _bunker_mats[key]
+	var m := StandardMaterial3D.new()
+	m.albedo_color = c
+	m.roughness = 0.15 if glass else 0.6
+	if glass:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_bunker_mats[key] = m
+	return m
+
+
 ## Расстояние по горизонтали до ближайшего леера.
 func distance_to_path(pos: Vector3) -> float:
 	return _dist_to(paths, pos)
@@ -2288,9 +2305,31 @@ func _build_bunker() -> void:
 			var rx := hall_c.x - 4.5 + i * 1.5
 			# Высокая стойка
 			Geo.block(self, Vector3(1.1, 2.4, 0.7), Vector3(rx, r.y + 1.2, hall_c.z + rz), Palette.m(&"radio"))
-			# Бобины с магнитной лентой
+			# Лицевая панель: блоки с щелями, шкалы, тумблеры, бобины магнитной ленты за стеклом
+			var face_z := hall_c.z + rz - row * 0.36
+			var spool := _bunker_mat(Color(0.26, 0.17, 0.1))
+			var flange := _bunker_mat(Color(0.55, 0.56, 0.55))
 			for j in range(2):
-				Geo.cylinder(self, 0.22, 0.05, Vector3(rx + (j - 0.5) * 0.48, r.y + 1.8, hall_c.z + rz - row * 0.36), Palette.m(&"dark"), false).rotation.x = PI / 2.0
+				var rc := Vector3(rx + (j - 0.5) * 0.48, r.y + 1.85, face_z - row * 0.01)
+				var fl := Geo.cylinder(self, 0.2, 0.012, rc, flange, false)
+				fl.rotation.x = PI / 2.0
+				var tp := Geo.cylinder(self, 0.14 - j * 0.03, 0.03, rc - Vector3(0, 0, row * 0.015), spool, false)
+				tp.rotation.x = PI / 2.0
+				var hub := Geo.cylinder(self, 0.04, 0.04, rc - Vector3(0, 0, row * 0.02), flange, false)
+				hub.rotation.x = PI / 2.0
+				for cyl_n: Node3D in [fl, tp]:   # круглые, а не восьмигранные
+					((cyl_n as MeshInstance3D).mesh as CylinderMesh).radial_segments = 24
+			Geo.block(self, Vector3(1.0, 0.5, 0.012), Vector3(rx, r.y + 1.85, face_z - row * 0.03), _bunker_mat(Color(0.5, 0.6, 0.62, 0.25), true), false)
+			for j in range(3):
+				var dial := Geo.cylinder(self, 0.06, 0.015, Vector3(rx - 0.3 + j * 0.3, r.y + 1.38, face_z - row * 0.008), _bunker_mat(Color(0.82, 0.8, 0.72)), false)
+				dial.rotation.x = PI / 2.0
+				((dial as MeshInstance3D).mesh as CylinderMesh).radial_segments = 16
+				Geo.block(self, Vector3(0.012, 0.05, 0.004), Vector3(rx - 0.3 + j * 0.3 + 0.012, r.y + 1.395, face_z - row * 0.018), Palette.m(&"dark"), false)
+			for j in range(6):
+				Geo.block(self, Vector3(0.02, 0.05, 0.03), Vector3(rx - 0.35 + j * 0.14, r.y + 0.85, face_z - row * 0.015), Palette.m(&"metal"), false)
+			for j in range(4):
+				Geo.block(self, Vector3(1.05, 0.006, 0.006), Vector3(rx, r.y + 0.3 + j * 0.06, face_z - row * 0.004), Palette.m(&"dark"), false)
+			Geo.block(self, Vector3(1.1, 0.012, 0.01), Vector3(rx, r.y + 1.6, face_z - row * 0.004), Palette.m(&"metal"), false)
 			# Мерцающие янтарные индикаторы и лампы
 			Geo.block(self, Vector3(0.8, 0.06, 0.01), Vector3(rx, r.y + 1.1, hall_c.z + rz - row * 0.36), Palette.glow(&"amber"), false)
 			Geo.block(self, Vector3(0.4, 0.05, 0.01), Vector3(rx, r.y + 0.6, hall_c.z + rz - row * 0.36), Palette.glow(&"amber"), false)

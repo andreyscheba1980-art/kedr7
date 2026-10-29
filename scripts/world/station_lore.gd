@@ -391,17 +391,13 @@ func _build_tunnel() -> void:
 	_box(Vector3(b_len + 0.3, h, 0.3), Vector3(b_cx, y + h * 0.5, TUN_Z + 1.25), conc)
 	_box(Vector3(TUN_X - 1.1 - TUN_W, h, 0.3), Vector3((TUN_W + TUN_X - 1.1) * 0.5, y + h * 0.5, TUN_Z - 1.25), conc)
 	_box(Vector3(0.3, h, 2.5), Vector3(TUN_W - 0.15, y + h * 0.5, TUN_Z), conc)
-	# Кабельные лотки вдоль стены, мёртвые светильники, лужи
-	var cable := Palette.m(&"dark")
-	for k in 3:
-		var ca := Geo.box_mesh(Vector3(0.05, 0.05, a_len), cable)
-		ca.position = Vector3(TUN_X + 1.05, y + 1.6 + k * 0.12, a_cz)
-		add_child(ca)
-		var cb := Geo.box_mesh(Vector3(b_len, 0.05, 0.05), cable)
-		cb.position = Vector3(b_cx, y + 1.6 + k * 0.12, TUN_Z - 1.05)
-		add_child(cb)
-	var water := _mat(Color(0.05, 0.06, 0.07))
-	water.roughness = 0.05
+	# Кабельные полки вдоль стены (оцинковка на кронштейнах) с толстыми кабелями в резине, мёртвые светильники, лужи
+	_cable_run(Vector3(TUN_X + 1.05, y, TUN_N + 0.4), Vector3(TUN_X + 1.05, y, TUN_Z + 1.0), Vector3(-1, 0, 0))
+	_cable_run(Vector3(TUN_X + 1.0, y, TUN_Z - 1.05), Vector3(TUN_W + 0.3, y, TUN_Z - 1.05), Vector3(0, 0, 1))
+	var water := _mat(Color(0.16, 0.18, 0.19, 0.85))
+	water.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water.roughness = 0.04
+	water.metallic_specular = 1.0
 	var lamp_pts: Array[Vector3] = []
 	var z := TUN_N + 3.0
 	while z < TUN_Z - 1.0:
@@ -412,20 +408,33 @@ func _build_tunnel() -> void:
 		lamp_pts.append(Vector3(x, y + h - 0.12, TUN_Z))
 		x -= 6.5
 	for i in lamp_pts.size():
-		_box(Vector3(0.3, 0.1, 0.3), lamp_pts[i], _mat(Color(0.3, 0.32, 0.3)), false)
+		# Светильник «НСП» в решётке: корпус, колпак, проволочная сетка
+		_box(Vector3(0.22, 0.06, 0.22), lamp_pts[i] + Vector3(0, 0.07, 0), _mat(Color(0.3, 0.32, 0.3)), false)
+		var cap := Geo.cylinder(self, 0.1, 0.14, lamp_pts[i] - Vector3(0, 0.02, 0), _mat(Color(0.7, 0.72, 0.66, 0.85)), false)
+		cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for a in 4:
+			var wire := Geo.box_mesh(Vector3(0.012, 0.16, 0.012), Palette.m(&"metal"))
+			wire.position = lamp_pts[i] + Vector3(cos(a * PI * 0.5) * 0.11, -0.02, sin(a * PI * 0.5) * 0.11)
+			add_child(wire)
 		if i == 2 or i == 7:   # горят две лампы из всех — и те моргают
 			var l := Geo.omni(self, lamp_pts[i] - Vector3(0, 0.2, 0), 6.0, 0.55, Color(1.0, 0.82, 0.55))
 			l.shadow_enabled = false
 			_lamps.append(l)
 		if i % 3 == 1:
-			_box(Vector3(1.2, 0.01, 0.9), Vector3(lamp_pts[i].x, y + 0.006, lamp_pts[i].z), water, false)
+			_puddle(Vector3(lamp_pts[i].x + 0.2, y + 0.004, lamp_pts[i].z - 0.3), water, i)
 	# Надписи мелом
 	_text(Loc.t(&"lore.chalk_1"), Vector3(TUN_X - 1.09, y + 1.4, TUN_N + 12.0), PI * 0.5)
 	_text(Loc.t(&"lore.chalk_2"), Vector3(TUN_X, y + 1.3, TUN_Z + 1.09), PI, 0.0045)
 	_text(Loc.t(&"lore.chalk_3"), Vector3(TUN_X - 16.0, y + 1.5, TUN_Z - 1.09), 0.0, 0.007, Color(0.85, 0.82, 0.78, 0.9))
-	# Ниша с подписками
-	_box(Vector3(0.12, 0.6, 0.7), Vector3(TUN_X + 1.14, y + 1.2, -4.0), Palette.m(&"dark"), false)
+	# Ниша с подписками: стенки и задник из того же бетона, только темнее (сырость), полка, рамка из уголка
+	var damp := _mat(Color(0.26, 0.26, 0.24))
+	_box(Vector3(0.02, 0.6, 0.7), Vector3(TUN_X + 1.19, y + 1.2, -4.0), damp, false)
+	for s2: float in [-0.35, 0.35]:
+		_box(Vector3(0.14, 0.6, 0.02), Vector3(TUN_X + 1.12, y + 1.2, -4.0 + s2), damp, false)
+	_box(Vector3(0.14, 0.02, 0.7), Vector3(TUN_X + 1.12, y + 1.5, -4.0), damp, false)
 	_box(Vector3(0.3, 0.04, 0.6), Vector3(TUN_X + 1.0, y + 0.92, -4.0), _mat(Color(0.3, 0.3, 0.28)), false)
+	for e: Array in [[Vector3(0.03, 0.66, 0.03), Vector3(0, 0, -0.37)], [Vector3(0.03, 0.66, 0.03), Vector3(0, 0, 0.37)], [Vector3(0.03, 0.03, 0.77), Vector3(0, 0.32, 0)]]:
+		_box(e[0], Vector3(TUN_X + 1.06, y + 1.2, -4.0) + e[1], Palette.m(&"metal"), false)
 	BookUI.place(self, &"personnel", Vector3(TUN_X + 0.98, y + 0.94, -4.0), 90.0)
 
 	# Вход: половицы у северной стены архива ходят → люк
@@ -452,9 +461,13 @@ func _build_tunnel() -> void:
 	hatch.prompt_provider = func() -> String:
 		hatch.hold_time = 0.0 if Game.has_flag("tunnel_open") else 2.5
 		return Loc.t(&"it.tunnel_down") if Game.has_flag("tunnel_open") else Loc.t(&"it.tunnel_boards")
-	# Скобы наверх у северного торца
+	# Скобы наверх у северного торца: П-образные, ножками в бетон; ржавые потёки под ними
 	for k in 6:
-		_box(Vector3(0.5, 0.04, 0.04), Vector3(TUN_X, y + 0.35 + k * 0.38, TUN_N + 0.06), Palette.m(&"metal"), false)
+		var sy := y + 0.35 + k * 0.38
+		_box(Vector3(0.44, 0.035, 0.035), Vector3(TUN_X, sy, TUN_N + 0.16), Palette.m(&"metal"), false)
+		for sx: float in [-0.21, 0.21]:
+			_box(Vector3(0.035, 0.035, 0.17), Vector3(TUN_X + sx, sy, TUN_N + 0.08), Palette.m(&"metal"), false)
+		_box(Vector3(0.05, 0.25, 0.005), Vector3(TUN_X + 0.21, sy - 0.14, TUN_N + 0.003), _mat(Color(0.32, 0.17, 0.09, 0.7)), false)
 	var up := Geo.interactable(self, Vector3(0.7, 2.2, 0.4), Vector3(TUN_X, y + 1.1, TUN_N + 0.25), null, "", func(_p: Player) -> void:
 		go(HATCH_ARCHIVE + Vector3(0, 0.05, 0.7), PI))
 	up.prompt_provider = func() -> String: return Loc.t(&"it.tunnel_up")
@@ -467,6 +480,56 @@ func _build_tunnel() -> void:
 	var door_b := Geo.interactable(self, Vector3(0.4, 2.0, 1.2), Vector3(71.55, y + 1.0, TUN_Z), null, "", func(_p: Player) -> void:
 		go(Vector3(TUN_W + 1.0, y + 0.05, TUN_Z), -PI * 0.5, "res://assets/sfx/door_handle.ogg"))
 	door_b.prompt_provider = func() -> String: return Loc.t(&"it.tunnel_door_back")
+
+
+## Кабельная полка вдоль стены от a до b: кронштейны каждые 1.5 м, лоток, три кабеля в резине (не чисто-чёрные).
+## inward — от стены в тоннель.
+func _cable_run(a: Vector3, b: Vector3, inward: Vector3) -> void:
+	var length := a.distance_to(b)
+	var dir := (b - a).normalized()
+	var yaw := atan2(dir.x, dir.z)
+	var mid := (a + b) * 0.5
+	var steel := Palette.m(&"metal")
+	var rubber := _mat(Color(0.13, 0.13, 0.12))
+	rubber.roughness = 0.6
+	var n := int(length / 1.5)
+	for k in n + 1:
+		var p := a.lerp(b, float(k) / maxf(n, 1))
+		for hy: float in [1.55, 1.85]:
+			var br := Geo.box_mesh(Vector3(0.03, 0.03, 0.22), steel)
+			br.position = p + Vector3(0, hy, 0) + inward * 0.06
+			br.rotation.y = atan2(inward.x, inward.z)
+			add_child(br)
+	for hy: float in [1.57, 1.87]:
+		var tray := Geo.box_mesh(Vector3(0.2, 0.012, length), steel)
+		tray.position = mid + Vector3(0, hy, 0) + inward * 0.1
+		tray.rotation.y = yaw
+		add_child(tray)
+		for c in 3:
+			var cab := Geo.box_mesh(Vector3(0.045, 0.045, length), rubber)
+			cab.position = mid + Vector3(0, hy + 0.03, 0) + inward * (0.04 + c * 0.055)
+			cab.rotation.y = yaw
+			add_child(cab)
+
+
+## Лужа: неровное пятно из нескольких перекрывающихся овалов, мокрый блеск под фонарём.
+func _puddle(at: Vector3, water: Material, seed_n: int) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_n * 13 + 5
+	for k in 3:
+		var cm := CylinderMesh.new()
+		cm.top_radius = rng.randf_range(0.25, 0.45)
+		cm.bottom_radius = cm.top_radius
+		cm.height = 0.004
+		cm.radial_segments = 14
+		var mi := MeshInstance3D.new()
+		mi.mesh = cm
+		mi.material_override = water
+		mi.position = at + Vector3(rng.randf_range(-0.35, 0.35), 0.001 * k, rng.randf_range(-0.3, 0.3))
+		mi.scale = Vector3(rng.randf_range(0.8, 1.6), 1.0, rng.randf_range(0.6, 1.1))
+		mi.rotation.y = rng.randf_range(0, PI)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
 
 
 # --- Живое: шаги за стеной, стук снизу, моргание ----------------------------------------
