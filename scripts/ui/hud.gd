@@ -162,6 +162,10 @@ func _process(delta: float) -> void:
 				_fps_timer = 0.25
 				_fps.text = "FPS %d" % Engine.get_frames_per_second()
 	_clock.visible = not cinematic
+	# Книга в руках закрывает центр: субтитр торчал из-за листа по краям — пока читаешь, он ждёт
+	if _subtitle != null:
+		var m := modal()
+		_subtitle.self_modulate.a = 0.0 if m is HeldPaper and (m as HeldPaper).inner is BookUI else 1.0
 	if _flash_box != null and cinematic:
 		_flash_box.visible = false
 	if _objective != null:

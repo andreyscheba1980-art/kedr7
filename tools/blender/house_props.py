@@ -2,7 +2,7 @@
 # Запуск: blender --background --factory-startup --python house_props.py -- <out_dir> [имя ...]
 #   bragin_chest — старый деревянный сундук Брагина (1961) на люке в подпол: доски, кованые полосы,
 #                  выпуклая крышка, замочная накладка, ручки-скобы, стёртые углы.
-import bpy, math, sys, os
+import bpy, math, sys, os, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit
 from kit import box, cyl, tube, mat
@@ -72,5 +72,67 @@ def bragin_chest():
     print("[OK] bragin_chest: %d tris" % tris)
 
 
+def attic_junk():
+    """Чердачный хлам в координатах игры (origin «keep»): вдоль скатов, проход посередине свободен."""
+    import ugms
+    from ugms import box as gbox, cyl as gcyl
+    kit.reset()
+    rnd = random.Random(1970)
+    A = 2.93                                         # настил чердака
+    paper = mat("aj_paper", (0.62, 0.58, 0.48), rough=0.95, noise=0.3, noise_scale=40, dirt=0.6)
+    twine = mat("aj_twine", (0.5, 0.42, 0.28), rough=0.95)
+    wood = mat("aj_wood", (0.3, 0.2, 0.13), rough=0.85, noise=0.3, noise_scale=40, wear=0.5, dirt=0.6)
+    leather = mat("aj_leather", (0.24, 0.15, 0.1), rough=0.6, wear=0.7, dirt=0.5, wear_col=(0.4, 0.3, 0.22))
+    rug = mat("aj_rug", (0.36, 0.12, 0.1), rough=0.95, noise=0.4, noise_scale=20, dirt=0.6)
+    broom = mat("aj_broom", (0.34, 0.33, 0.2), rough=0.95, noise=0.4, noise_scale=30)
+    linen = mat("aj_linen", (0.7, 0.66, 0.56), rough=0.9, noise=0.2, noise_scale=10, dirt=0.7)
+    glass = mat("aj_glass", (0.2, 0.26, 0.16), rough=0.2)
+    iron = mat("aj_iron", (0.16, 0.15, 0.14), rough=0.6, wear=0.6, wear_col=(0.38, 0.25, 0.16))
+    # связки газет под бечёвкой
+    for (x, z, n) in ((0.2, 1.0, 3), (3.1, 5.6, 2), (9.0, 5.7, 2)):
+        for k in range(n):
+            y = A + 0.07 + k * 0.14
+            gbox((x + rnd.uniform(-0.03, 0.03), y, z), (0.42, 0.13, 0.32), paper, yaw=rnd.uniform(-0.2, 0.2), bevel=0.01)
+            gbox((x, y, z), (0.44, 0.135, 0.012), twine, yaw=0.0)
+    # рулон ковра вдоль ската
+    gcyl((4.6, A + 0.12, 5.55), 0.12, 1.7, rug, verts=12, axis="x")
+    # стопка чемоданов
+    for k, (w, h) in enumerate(((0.62, 0.2), (0.55, 0.18), (0.48, 0.16))):
+        y = A + 0.1 + sum(hh for _, hh in ((0.62, 0.2), (0.55, 0.18), (0.48, 0.16))[:k]) + h / 2 - 0.1
+        gbox((-1.6, y, 5.2), (w, h, 0.36), leather, yaw=0.1 * k, bevel=0.02)
+        gbox((-1.6, y + h / 2 + 0.01, 5.2 - 0.1), (0.12, 0.03, 0.03), iron)
+    # сломанный стул на боку
+    gbox((8.4, A + 0.22, 1.2), (0.42, 0.42, 0.04), wood, tilt_x=1.4, yaw=0.3)
+    gbox((8.4, A + 0.04, 1.4), (0.4, 0.04, 0.4), wood, yaw=0.3)
+    for k in range(3):
+        gbox((8.2 + k * 0.2, A + 0.03, 1.0 + k * 0.05), (0.04, 0.04, 0.45), wood, yaw=0.3 + k * 0.2)
+    # ящик с пустыми бутылями
+    gbox((7.4, A + 0.12, 5.6), (0.5, 0.24, 0.36), wood, bevel=0.01)
+    for k in range(6):
+        gcyl((7.24 + (k % 3) * 0.16, A + 0.3, 5.52 + (k // 3) * 0.16), 0.05, 0.3, glass, verts=8)
+    # веники на стропилах
+    for k in range(4):
+        x = 2.2 + k * 0.3
+        gcyl((x, A + 1.45, 3.3), 0.006, 0.4, twine, verts=4)
+        gcyl((x, A + 1.05, 3.3), 0.09, 0.45, broom, verts=8, r2=0.03)
+    # лыжи и палки на балке у ската
+    for k in range(2):
+        gbox((10.2, A + 0.62 + k * 0.03, 1.3 + k * 0.12), (1.9, 0.02, 0.07), wood, tilt_z=0.04)
+    # портновский манекен в дальнем углу: стойка, торс под простынёй
+    gcyl((13.6, A + 0.35, 4.9), 0.02, 0.7, iron, verts=6)
+    gcyl((13.6, A + 0.03, 4.9), 0.18, 0.04, iron, verts=10)
+    o = kit.sphere(ugms._nm("torso"), 1.0, ugms.g2b((13.6, A + 1.0, 4.9)), linen, scale=ugms.gsize((0.2, 0.32, 0.15)), segs=14, rings=10)
+    gcyl((13.6, A + 0.78, 4.9), 0.24, 0.5, linen, verts=12, r2=0.17)
+    # люлька на очепе у восточного фронтона
+    gcyl((13.4, A + 1.75, 3.3), 0.012, 0.9, twine, verts=4)
+    gbox((13.4, A + 1.12, 3.3), (0.75, 0.24, 0.42), wood, bevel=0.02)
+    gbox((13.4, A + 1.06, 3.3), (0.7, 0.04, 0.38), linen)
+    obj, img, tris = kit.finish("attic_junk", OUT, res=1024, origin="keep", samples=24, pack=0.003)
+    kit.export(os.path.join(OUT, "attic_junk.glb"), None)
+    print("[OK] attic_junk: %d tris" % tris)
+
+
 if want("bragin_chest"):
     bragin_chest()
+if want("attic_junk"):
+    attic_junk()

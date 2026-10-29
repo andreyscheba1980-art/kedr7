@@ -1512,9 +1512,14 @@ func _build_living_quarters() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.belomor"), 4.0)
 	)
 
+	# Полочка на кованых кронштейнах — на ней «Спидола» (раньше висела на голой стене)
+	Geo.block(self, Vector3(0.44, 0.025, 0.18), Vector3(0.8, 1.245, 0.19), Palette.m(&"wood"), false)
+	for sx: float in [-0.16, 0.16]:
+		var br := Geo.block(self, Vector3(0.02, 0.12, 0.14), Vector3(0.8 + sx, 1.175, 0.17), Palette.m(&"metal"), false)
+		br.rotation.x = 0.35
 	# Транзисторный приёмник «Спидола-232» на полке
 	var spidola_prop := Node3D.new()
-	spidola_prop.position = Vector3(0.8, 1.35, 0.15)
+	spidola_prop.position = Vector3(0.8, 1.348, 0.2)
 	Geo.block(spidola_prop, Vector3(0.28, 0.18, 0.08), Vector3.ZERO, Palette.m(&"wood"), false)
 	Geo.block(spidola_prop, Vector3(0.24, 0.06, 0.082), Vector3(0.0, 0.04, 0.0), Palette.m(&"metal"), false)
 	add_child(spidola_prop)
@@ -1926,10 +1931,10 @@ func _build_props() -> void:
 	photo.position = Vector3(0.5, 1.6, 0.12)
 	add_child(photo)
 	Geo.block(photo, Vector3(0.38, 0.48, 0.02), Vector3.ZERO, Palette.m(&"wood"), false)
-	Geo.block(photo, Vector3(0.32, 0.42, 0.005), Vector3(0.0, 0.0, 0.011), Palette.m(&"paper"), false)
-	for k in range(2):
-		Geo.block(photo, Vector3(0.05, 0.16, 0.005), Vector3(-0.07 + k * 0.08, -0.05, 0.014), Palette.m(&"dark"), false)
-	var extra := Geo.block(photo, Vector3(0.06, 0.22, 0.005), Vector3(0.09, -0.02, 0.014), Palette.m(&"dark"), false)
+	# Снимок: сепия, двое у ельника (рисуется один раз); третий — проступает поверх (паранойя)
+	photo.add_child(_photo_quad(_photo_image(false), Vector2(0.32, 0.42), 0.011))
+	var extra := _photo_quad(_photo_image(true), Vector2(0.32, 0.42), 0.013)
+	photo.add_child(extra)
 	extra.visible = false
 	props["photo"] = {"node": photo, "changed": false, "apply": _show_node.bind(extra)}
 
@@ -3171,6 +3176,66 @@ func _collider(size: Vector3, pos: Vector3) -> StaticBody3D:
 	return body
 
 
+## Квадрат со снимком в рамке (лицом в комнату, +Z).
+func _photo_quad(img: Image, size: Vector2, z: float) -> MeshInstance3D:
+	var q := QuadMesh.new()
+	q.size = size
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = ImageTexture.create_from_image(img)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.roughness = 0.6
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	mi.material_override = m
+	mi.position.z = z
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
+
+
+## Старая фотография: белое поле с зубчатым краем, сепия, ельник на горизонте, двое в ватниках.
+## third — только третий силуэт на прозрачном (поверх основного снимка).
+static func _photo_image(third: bool) -> Image:
+	var w := 128
+	var h := 168
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1961
+	var figs: Array = [[46.0, 1.0], [80.0, 0.95]] if not third else [[104.0, 1.08]]
+	for y in h:
+		for x in w:
+			var c := Color(0, 0, 0, 0)
+			var border := x < 8 or x >= w - 8 or y < 8 or y >= h - 22
+			if not third:
+				if border:
+					c = Color(0.86, 0.83, 0.74) if (x + y) % 5 != 0 or (x > 2 and x < w - 3 and y > 2 and y < h - 3) else Color(0, 0, 0, 0)
+				else:
+					var t := float(y) / h
+					var sky := Color(0.72, 0.62, 0.46).lerp(Color(0.6, 0.5, 0.36), t)
+					var tree_line := 70.0 + 10.0 * sin(x * 0.45) + 6.0 * sin(x * 1.3)
+					c = sky if y < tree_line else Color(0.34, 0.27, 0.19)
+					if y > 112:
+						c = Color(0.66, 0.58, 0.45)   # снег под ногами
+					c = c.darkened(rng.randf() * 0.06)
+			if border and third:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			for f: Array in figs:
+				var cx: float = f[0]
+				var sc: float = f[1]
+				var head := Vector2(x - cx, y - (60.0 / sc + 8.0)).length() < 7.0 * sc
+				var body := y >= 66.0 and y < 128.0 and absf(x - cx) < (9.0 + (y - 66.0) * 0.12) * sc
+				if head or body:
+					c = Color(0.16, 0.12, 0.09, 1.0) if not third else Color(0.1, 0.08, 0.07, 1.0)
+			if not border and not third:
+				var vig := Vector2(float(x) / w - 0.5, float(y) / h - 0.45).length()
+				c = c.darkened(clampf(vig - 0.25, 0.0, 0.4))
+			img.set_pixel(x, y, c)
+	img.generate_mipmaps()
+	return img
+
+
 func _place(n: Node3D, pos: Vector3) -> Node3D:
 	add_child(n)
 	n.position = pos
@@ -3300,6 +3365,12 @@ func _build_attic() -> void:
 	climb_down.name = "AtticClimbDown"
 	climb_down.collision_layer = Geo.LAYER_INTERACT
 
+	# Чердачный хлам вдоль скатов (tools/blender/house_props.py attic_junk, координаты игры): газеты, чемоданы,
+	# ковёр, бутыли, веники, лыжи, манекен под простынёй, люлька. Проход посередине свободен.
+	if Models.spawn(self, "kedr/attic_junk", Vector3.ZERO, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.4, "sat": 1.0}) != null:
+		for e: Array in [[Vector3(0.7, 0.5, 0.45), Vector3(-1.6, 3.18, 5.2)], [Vector3(0.5, 1.3, 0.5), Vector3(13.6, 3.6, 4.9)],
+				[Vector3(0.55, 0.45, 0.4), Vector3(7.4, 3.15, 5.6)], [Vector3(0.5, 0.45, 0.4), Vector3(0.2, 3.15, 1.0)]]:
+			_collider(e[0], e[1])
 	# Экспедиционный ящик со снаряжением на чердаке:
 	_attic_chest = Geo.interactable(self, Vector3(0.9, 0.6, 0.7), Vector3(1.5, 3.22, 2.4), null, "", func(_p: Player) -> void:
 		if not _attic_searched:
