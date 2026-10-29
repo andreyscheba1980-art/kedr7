@@ -44,9 +44,7 @@ func _ready() -> void:
 	_az_needle = _az
 	_spike_in = randf_range(1.0, 2.5)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
-	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
+	ThermometerUI.backdrop(self)
 	ThermometerUI.title_plate(self, Loc.t(&"pult.title"))
 	_dial = Control.new()
 	_dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -54,7 +52,7 @@ func _ready() -> void:
 	_dial.draw.connect(_draw_dials)
 
 	_book = KMBook.new()
-	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
+	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([
 		{"label": Loc.t(&"pult.row_speed"), "cells": [&"digit", &"digit"], "unit": Loc.t(&"pult.ms")},
 		{"label": Loc.t(&"pult.row_gust"), "cells": [&"digit", &"digit"], "unit": Loc.t(&"pult.ms")},

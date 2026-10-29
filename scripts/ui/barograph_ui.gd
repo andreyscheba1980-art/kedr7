@@ -41,9 +41,7 @@ func _ready() -> void:
 	# Лента стоит так, чтобы и «сейчас», и «три часа назад» были на ней
 	_center_p = roundf(_truth - _truth_tend * 0.5 + randf_range(-2.0, 2.0))
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
-	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
+	ThermometerUI.backdrop(self)
 	ThermometerUI.title_plate(self, Loc.t(&"barograph.title"))
 
 	# Лента на барабане — настоящая бумага под сеткой
@@ -71,7 +69,7 @@ func _ready() -> void:
 	UiKit.place(self, listen_btn, 0.5, 0.5, 0.5, 0.5, -195, 230, 100, 266)
 
 	_book = KMBook.new()
-	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
+	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([
 		{"label": Loc.t(&"barograph.row_p"), "cells": [&"digit", &"digit", &"digit", &"digit"], "dot": 3, "unit": Loc.t(&"barograph.mm")},
 		{"label": Loc.t(&"barograph.row_tend"), "cells": [&"sign", &"digit", &"digit"], "dot": 2, "unit": Loc.t(&"barograph.mm")},

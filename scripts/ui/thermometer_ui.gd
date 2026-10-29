@@ -34,9 +34,7 @@ func _ready() -> void:
 		_shown.x = FEVER
 	_center = clampf(_truth.x + randf_range(-4.0, 4.0), T_MIN + 7.0, T_MAX - 7.0)
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
-	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
+	ThermometerUI.backdrop(self)
 	title_plate(self, Loc.t(&"thermo.title"))
 
 	_view = InstrumentView.new()
@@ -45,7 +43,7 @@ func _ready() -> void:
 		[[0.32 - 0.085, 0.32 + 0.085], [0.70 - 0.085, 0.70 + 0.085]])   # иней — на стекле термометров
 
 	_book = KMBook.new()
-	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
+	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([
 		{"label": Loc.t(&"thermo.dry_row"), "cells": [&"sign", &"digit", &"digit", &"digit"], "dot": 3, "unit": "°C"},
 		{"label": Loc.t(&"thermo.wet_row"), "cells": [&"sign", &"digit", &"digit", &"digit"], "dot": 3, "unit": "°C"},
@@ -60,6 +58,25 @@ func _ready() -> void:
 
 
 ## Кнопки «Записать» / «Закрыть» под книжкой — общие для всех приборов.
+## Подложка экрана прибора: слева — темно (там кадр прибора), справа мир виден — там книжка в руке.
+static func backdrop(owner: Control) -> void:
+	var tex := GradientTexture2D.new()
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.5, 0.62, 1.0])
+	g.colors = PackedColorArray([Color(0, 0, 0, 0.85), Color(0, 0, 0, 0.8), Color(0, 0, 0, 0.35), Color(0, 0, 0, 0.25)])
+	tex.gradient = g
+	tex.fill_from = Vector2(0, 0)
+	tex.fill_to = Vector2(1, 0)
+	tex.width = 64
+	tex.height = 4
+	var r := TextureRect.new()
+	r.texture = tex
+	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	r.stretch_mode = TextureRect.STRETCH_SCALE
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiKit.place(owner, r, 0, 0, 1, 1, 0, 0, 0, 0)
+
+
 ## Кнопки под книжкой — общие для всех приборов: «Записать» — штампом, «Закрыть» — машинописью.
 static func add_buttons(owner: Control, again: bool, on_write: Callable, on_close: Callable) -> void:
 	var write_btn := UiStyle.stamp_button(Loc.t(&"thermo.write_again" if again else &"thermo.write").to_upper(), on_write)

@@ -111,7 +111,7 @@ static func stamp_button(text: String, on_press: Callable, ink := INK_STAMP) -> 
 	b.add_theme_font_size_override("font_size", 24)
 	for st: Array in [["normal", 0.0], ["hover", 0.10], ["pressed", 0.2], ["focus", 0.0]]:
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(ink, float(st[1]))
+		sb.bg_color = PAPER.lerp(ink, float(st[1]) * 2.0)   # бумажный ярлычок: штамп читается и на снегу
 		sb.border_color = Color(ink, 0.85)
 		sb.set_border_width_all(3)
 		sb.set_corner_radius_all(5)

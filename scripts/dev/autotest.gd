@@ -3932,6 +3932,21 @@ func _thermo_review() -> void:
 	await _wait(1.0)
 	var ui: Variant = Game.hud.modal()
 	print("[thermo] открыт: ", ui is ThermometerUI, " правда=", Game.air_temp(), " ночь=", Game.night)
+	await _wait(0.5)
+	for hp: HeldPaper in (ui as Node).find_children("*", "HeldPaper", true, false):
+		# Клик по нарисованному листу: верхняя половина клетки «десятки сухого» — +1
+		var bk: KMBook = ui.get(&"_book")
+		var cell := bk.cell_rect(0, 1)
+		var before: int = bk.vals[0][1]
+		var lp := hp.page_to_local(bk.position + cell.get_center() - Vector2(0, cell.size.y * 0.25))
+		for pressed in [true, false]:
+			var ev := InputEventMouseButton.new()
+			ev.button_index = MOUSE_BUTTON_LEFT
+			ev.pressed = pressed
+			ev.position = lp
+			hp._gui_input(ev)
+		await _wait(0.1)
+		print("[held] клик по листу: десятки %d → %d" % [before, bk.vals[0][1]])
 	await _shot("thermo_dark")
 	p.set_flashlight(true)
 	var v: InstrumentView = ui.get(&"_view")

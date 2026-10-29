@@ -26,9 +26,7 @@ func _ready() -> void:
 	_center = clampf(_truth + randf_range(-18.0, 18.0), 45.0, H_MAX - 45.0)
 	_drift_seed = randf() * 100.0
 
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.78)
-	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
+	ThermometerUI.backdrop(self)
 	ThermometerUI.title_plate(self, Loc.t(&"snow.title"))
 
 	_view = InstrumentView.new()
@@ -37,7 +35,7 @@ func _ready() -> void:
 	_view.setup(_draw_view, func(n: float) -> void: _center = clampf(_center + n * CM_PER_NOTCH, 45.0, H_MAX - 45.0), InstrumentView.frost_for_weather(temp) * 0.8, [[0.44, 0.56]])
 
 	_book = KMBook.new()
-	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
+	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([{"label": Loc.t(&"snow.row"), "cells": [&"digit", &"digit", &"digit"], "unit": Loc.t(&"snow.cm")}])
 	if Game.notebook.has(&"snow"):
 		_book.set_value(0, float(Game.notebook[&"snow"]["v"]))

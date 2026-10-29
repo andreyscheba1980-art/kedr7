@@ -505,7 +505,7 @@ func _open_ui(id: StringName) -> void:
 		&"theodolite":
 			ui = TheodoliteUI.new()
 		&"forecast", &"report", &"journal":
-			ui = JournalTM1UIScript.new()
+			ui = HeldPaper.journal(JournalTM1UIScript.new(), Vector2i(1080, 630))   # журнал — в руках
 		&"meteor_fax":
 			ui = MeteorFaxUIScript.new()
 		&"coop_report":

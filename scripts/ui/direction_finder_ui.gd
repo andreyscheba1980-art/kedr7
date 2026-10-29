@@ -41,9 +41,7 @@ func _ready() -> void:
 	point = next_point
 	_freq = Game.radio.freq if point == &"house" and Game.radio != null else tower_freq
 	_angle = randf_range(0.0, 360.0)
-	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.8)
-	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
+	ThermometerUI.backdrop(self)
 	ThermometerUI.title_plate(self, Loc.t(&"df.title_house" if point == &"house" else &"df.title_tower"))
 
 	_panel = Control.new()
@@ -54,7 +52,7 @@ func _ready() -> void:
 	_panel.gui_input.connect(_panel_input)
 
 	_book = KMBook.new()
-	UiKit.place(self, _book, 0.5, 0.5, 0.5, 0.5, 120, -252, 500, 180)
+	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([{"label": Loc.t(&"df.row"), "cells": [&"digit", &"digit", &"digit"], "unit": "°"}])
 	ThermometerUI.add_buttons(self, false, _write, _close)
 	_hint = ThermometerUI.hint_label(self)
