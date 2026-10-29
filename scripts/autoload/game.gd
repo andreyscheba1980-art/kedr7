@@ -806,6 +806,12 @@ func _tick_heat(delta: float) -> void:
 			warmth += (-0.25) * delta
 		&"bunker":
 			warmth += 0.2 * delta   # под землёй тепло от аппаратуры
+		&"cellar":
+			warmth += 0.3 * delta   # земля в подполе Брагина тёплая — и это неправильно
+		&"tunnel":
+			warmth -= 0.05 * delta
+		&"walled":
+			warmth -= 0.35 * delta   # кабинет Голубева выстужен до инея
 		&"corpus":
 			# Корпус кирпичный: без буржуйки остываешь медленно, растоплена — греет как дом
 			var lit := MeteoCorpus.instance != null and MeteoCorpus.instance.stove_lit
@@ -920,7 +926,7 @@ func is_home() -> bool:
 ## Под крышей (дом, сарай, изба, рыбацкий домик, бункер): снега и тумана нет, Ырка не войдёт.
 func is_indoors() -> bool:
 	return is_home() or zone == &"shed" or zone == &"izba" or zone == &"bunker" or zone == &"lake_shack" or zone == &"gen_shack" \
-		or zone == &"corpus" or zone == &"corpus_gen" or zone == &"hangar"
+		or zone == &"corpus" or zone == &"corpus_gen" or zone == &"hangar" or zone == &"cellar" or zone == &"tunnel" or zone == &"walled"
 
 
 
@@ -929,6 +935,8 @@ func is_outside() -> bool:
 
 
 func is_dark() -> bool:
+	if zone == &"cellar" or zone == &"tunnel" or zone == &"walled":
+		return true   # свет — только свой фонарь (в тоннеле две лампы на всю длину, и те моргают)
 	if is_day():
 		return (zone == &"shed" and not power_on) or zone == &"storage"
 	if is_home():

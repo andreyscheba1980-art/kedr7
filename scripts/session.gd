@@ -502,6 +502,8 @@ func _open_ui(id: StringName) -> void:
 			ui = DirectionFinderUI.new()
 		&"morse":
 			ui = MorseUI.new()
+		&"safe":
+			ui = SafeUI.new()
 		&"book":
 			ui = HeldPaper.journal(BookUI.new(), Vector2i(1080, 630))   # книга — в руках
 		&"theodolite":

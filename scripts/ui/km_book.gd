@@ -25,6 +25,7 @@ var _sel := 0
 var _rumbs: PackedStringArray
 var _ink: Control
 var _hover := -1
+var heading := ""           ## не книжка КМ-1, а что-то своё (сейф): заголовок вместо бланка
 
 
 func setup(p_rows: Array) -> void:
@@ -261,10 +262,13 @@ func _draw_ink() -> void:
 	ci.draw_line(Vector2(44, 6), Vector2(44, w.y - 6), Color(UiStyle.INK_RED, 0.45), 1.0)
 	ci.draw_line(Vector2(47, 6), Vector2(47, w.y - 6), Color(UiStyle.INK_RED, 0.3), 1.0)
 	# Шапка бланка
-	ci.draw_string(tf, Vector2(56, 24), Loc.t(&"km.head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UiStyle.INK_PRINT, 0.9))
-	ci.draw_string(tf, Vector2(56, 46), Loc.t(&"thermo.book"), HORIZONTAL_ALIGNMENT_LEFT, -1, 19, UiStyle.INK_TYPE)
-	ci.draw_string(tf, Vector2(56, 70), Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(UiStyle.INK_TYPE, 0.8))
-	ci.draw_string(hf, Vector2(56 + tf.get_string_size(Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 8, 72), Game.clock_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, UiStyle.INK_PEN)
+	if heading != "":
+		ci.draw_string(tf, Vector2(56, 52), heading, HORIZONTAL_ALIGNMENT_LEFT, -1, 19, UiStyle.INK_TYPE)
+	else:
+		ci.draw_string(tf, Vector2(56, 24), Loc.t(&"km.head"), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(UiStyle.INK_PRINT, 0.9))
+		ci.draw_string(tf, Vector2(56, 46), Loc.t(&"thermo.book"), HORIZONTAL_ALIGNMENT_LEFT, -1, 19, UiStyle.INK_TYPE)
+		ci.draw_string(tf, Vector2(56, 70), Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(UiStyle.INK_TYPE, 0.8))
+		ci.draw_string(hf, Vector2(56 + tf.get_string_size(Loc.t(&"km.term"), HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 8, 72), Game.clock_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, UiStyle.INK_PEN)
 	var ch := _cell_h()
 	var fs := 50 if ch >= 56.0 else 42
 	for r in rows.size():
