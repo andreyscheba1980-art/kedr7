@@ -36,6 +36,7 @@ var head: Node3D
 var camera: Camera3D
 var zoom_fov := 0.0               ## видоискатель «Зенита»: > 0 — куда тянуть угол обзора
 var flashlight: SpotLight3D
+var closeup_dim := false               ## крупный план прибора: свой фонарь гаснет, светит подсветка крупного плана
 var held: StringName = &""
 var stamina := 100.0
 var cranking := false
@@ -812,13 +813,17 @@ func _update_flashlight(delta: float) -> void:
 		energy *= lerpf(0.25, 1.0, c / 25.0)
 		if randf() < delta * (25.0 - c) * 0.25:
 			energy *= 0.2
-	# Вплотную к стене пятно не выжигает белым: ближе 2.5 м фонарь «приглушается» (как глаз привыкает)
+	# Вплотную к стене или прибору пятно не выжигает белым: ближе 2.5 м фонарь «приглушается» (как глаз
+	# привыкает). Приборы — на слое интерактива: раньше луч их не видел, и шкалы пересвечивало.
 	var from := flashlight.global_position
-	var q := PhysicsRayQueryParameters3D.create(from, from - flashlight.global_transform.basis.z * 2.6, Geo.LAYER_WORLD)
+	var q := PhysicsRayQueryParameters3D.create(from, from - flashlight.global_transform.basis.z * 2.6, Geo.LAYER_WORLD | Geo.LAYER_INTERACT)
+	q.exclude = [get_rid()]
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	var near_k := 1.0
 	if not hit.is_empty():
-		near_k = clampf(lerpf(0.3, 1.0, (from.distance_to(hit["position"]) - 0.35) / 2.2), 0.3, 1.0)
+		near_k = clampf(lerpf(0.18, 1.0, (from.distance_to(hit["position"]) - 0.35) / 2.2), 0.18, 1.0)
+	if closeup_dim:
+		near_k = 0.0
 	_flash_near = lerpf(_flash_near, near_k, minf(delta * 8.0, 1.0))
 	energy *= _flash_near
 	if absf(flashlight.light_energy - energy) > 0.01:

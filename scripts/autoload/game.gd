@@ -10,6 +10,13 @@ const READING_KEYS: Array[StringName] = [&"temp", &"wind", &"snow", &"baro"]
 const FUEL_DRAIN_PER_SEC := 100.0 / 480.0
 const STOVE_BURN_PER_SEC := 100.0 / 420.0
 const WOOD_PER_ARMFUL := 50.0
+## Жар кладки: пока горит, русская печь копит тепло (~2.5 мин до полного), прогорела — отдаёт ~5 мин
+## (вдвое дольше при закрытой вьюшке). Дом после прогорания остывает не сразу.
+const HEAT_CHARGE_PER_SEC := 100.0 / 150.0
+const HEAT_DECAY_PER_SEC := 100.0 / 300.0
+const DAMPER_BURN_K := 0.4             ## прикрытое поддувало: дрова тлеют в 2.5 раза дольше
+const DAMPER_WARM_K := 0.6             ## …и греют слабее
+const IDLE_FUEL_K := 0.35              ## рубильник выключен: дизель на холостом
 const WARMTH_LOSS_OUTSIDE := 0.6
 const WARMTH_GAIN_STOVE := 3.0
 const TUTORIAL_STEPS: Array[StringName] = [&"driver", &"readings", &"test_report", &"refuel", &"wood", &"buran", &"journal"]
@@ -56,6 +63,10 @@ var generator_fuel := 70.0
 var power_on := true
 var canisters_left := 3
 var stove_wood := 60.0
+var stove_heat := 0.0                   ## жар кладки, 0..100
+var stove_damper := false               ## поддувало прикрыто
+var stove_flue := false                 ## вьюшка закрыта (с огнём — угар; без огня — жар держится дольше)
+var house_switch_off := false           ## рубильник у двери: свет в доме погашен, дизель на холостом
 var warmth := 100.0
 var flash_charge := 100.0
 var fatigue := 0.0                  ## скрытая усталость: ложные звуки и галлюцинации
@@ -305,6 +316,7 @@ func setup_phase(kind: StringName, index: int) -> void:
 		minute_rate = float(cfg["min_per_sec"])
 		generator_fuel = float(cfg["gen_start"])
 		stove_wood = float(cfg["stove_start"])
+		_reset_stove_aux()
 		canisters_left = int(cfg["canisters"]) + (1 if is_story() else -1 if is_hard() else 0)
 		ice_at_min = rng.randi_range(290, 350) if bool(cfg["antenna_ice"]) else -1
 		fatigue = float(SaveGame.flags.get("fatigue", 10.0))
@@ -320,9 +332,25 @@ func setup_phase(kind: StringName, index: int) -> void:
 		minute_rate = float(cfg["min_per_sec"])
 		generator_fuel = 90.0
 		stove_wood = 0.0 if (is_prologue() and not has_flag("prologue_arrived")) else 80.0
+		_reset_stove_aux()
 		canisters_left = 3
 		ice_at_min = -1
 		fatigue = 0.0
+
+
+## Начало фазы: кладка прогрета по тому, сколько в печи, поддувало и вьюшка открыты, рубильник включён.
+func _reset_stove_aux() -> void:
+	stove_heat = clampf(stove_wood, 0.0, 100.0) * 0.8
+	stove_damper = false
+	stove_flue = false
+	house_switch_off = false
+
+
+## Сколько печь сейчас греет дом: 1 — топится вовсю, дальше — по жару кладки.
+func house_heat_k() -> float:
+	if stove_wood > 0.0:
+		return DAMPER_WARM_K if stove_damper else 1.0
+	return stove_heat / 100.0
 
 
 ## Чекпоинт ночи: состояние сразу после сводки на 00:00. Смерть позже — рестарт отсюда.
@@ -345,6 +373,7 @@ func _apply_checkpoint(index: int) -> void:
 	shift_minutes = float(d["minute"])
 	generator_fuel = maxf(float(d["fuel"]), 25.0)
 	stove_wood = maxf(float(d["stove"]), 30.0)
+	_reset_stove_aux()
 	canisters_left = int(d["cans"])
 	reports_sent = int(d["reports"])
 	fatigue = float(d["fatigue"])
@@ -523,7 +552,8 @@ func _process(delta: float) -> void:
 func _tick_generator(delta: float) -> void:
 	if not power_on:
 		return
-	generator_fuel = maxf(generator_fuel - FUEL_DRAIN_PER_SEC * (1.8 if fuel_sputter else 1.0) * delta, 0.0)   # густая солярка — дизель жрёт больше
+	var load_k := IDLE_FUEL_K if house_switch_off else 1.0   # свет в доме погашен — дизель на холостом
+	generator_fuel = maxf(generator_fuel - FUEL_DRAIN_PER_SEC * (1.8 if fuel_sputter else 1.0) * load_k * delta, 0.0)   # густая солярка — дизель жрёт больше
 	if generator_fuel <= 0.0:
 		set_power(false)
 
@@ -788,20 +818,28 @@ func _tick_heat(delta: float) -> void:
 			burn_k *= 1.35
 		if spirit_treat:
 			burn_k *= 0.85
+		if stove_damper:
+			burn_k *= DAMPER_BURN_K
+		if stove_flue:
+			burn_k *= 0.3   # без тяги дрова почти не горят — тлеют и дымят
 		stove_wood = maxf(stove_wood - STOVE_BURN_PER_SEC * burn_k * delta, 0.0)
+		stove_heat = minf(stove_heat + HEAT_CHARGE_PER_SEC * (0.6 if stove_damper else 1.0) * delta, 100.0)
+	else:
+		stove_heat = maxf(stove_heat - HEAT_DECAY_PER_SEC * (0.5 if stove_flue else 1.0) * delta, 0.0)
+	var hk := house_heat_k()
 
 	var storm := weather.intensity if weather != null else 0.0
 	var cold := threat_mult() * (0.5 if is_day() else 1.0)
 	match zone:
 		&"room":
-			warmth += (WARMTH_GAIN_STOVE if stove_wood > 0.0 else -0.15) * delta
+			warmth += (WARMTH_GAIN_STOVE * hk if hk > 0.05 else -0.15) * delta
 		&"radio_room":
 			# Радиорубка греется той же печью через стену — медленнее жилой комнаты.
-			warmth += (1.4 if stove_wood > 0.0 else -0.2) * delta
+			warmth += (1.4 * hk if hk > 0.05 else -0.2) * delta
 		&"corridor":
-			warmth += (1.0 if stove_wood > 0.0 else -0.2) * delta
+			warmth += (1.0 * hk if hk > 0.05 else -0.2) * delta
 		&"vestibule":
-			warmth += (0.4 if stove_wood > 0.0 else -0.3) * delta
+			warmth += (0.4 * hk if hk > 0.05 else -0.3) * delta
 		&"storage", &"attic":
 			warmth += (-0.25) * delta
 		&"bunker":
@@ -846,7 +884,7 @@ func _tick_heat(delta: float) -> void:
 	# Забитый дымоход при горящей печи: угар копится в тёплых комнатах (не на чердаке и не в кладовой).
 	# ~80 с до смерти — хватает, чтобы понять по кашлю и выйти чистить трубу или залить печь.
 	var smoky := zone == &"room" or zone == &"radio_room" or zone == &"corridor" or zone == &"vestibule"
-	if chimney_iced and stove_wood > 0.0 and smoky:
+	if (chimney_iced or stove_flue) and stove_wood > 0.0 and smoky:   # забитая труба или вьюшка закрыта при огне
 		co_poisoning = clampf(co_poisoning + 0.012 * delta, 0.0, 1.0)
 		if co_poisoning > 0.2 and rng.randf() < delta * (0.15 + co_poisoning * 0.5):
 			audio.play_2d("res://assets/audio/cough.ogg", 1.0)
@@ -893,7 +931,7 @@ func add_fatigue(amount: float) -> void:
 
 func stove_state() -> String:
 	if stove_wood <= 0.0:
-		return Loc.t(&"stove.out")
+		return Loc.t(&"stove.embers") if stove_heat > 15.0 else Loc.t(&"stove.out")
 	if stove_wood < 25.0:
 		return Loc.t(&"stove.low")
 	return Loc.t(&"stove.burning")

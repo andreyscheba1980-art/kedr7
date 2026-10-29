@@ -39,11 +39,13 @@ func setup(eye: Vector3, target: Vector3, fov: float, axis := Vector3.UP, lo := 
 	_spot = SpotLight3D.new()
 	_spot.spot_range = 3.5
 	_spot.spot_angle = 34.0
-	_spot.light_energy = 0.45
+	_spot.light_energy = 0.28
+	_spot.spot_attenuation = 1.4
 	_spot.light_color = Color(1.0, 0.93, 0.8)
 	_spot.shadow_enabled = false
 	_spot.position = Vector3(-0.08, -0.05, 0.0)
 	cam.add_child(_spot)
+	Game.player.closeup_dim = true   # фонарь в руке светил в прибор из-за спины — вдвое с подсветкой: пересвет
 	var s := get_tree().get_first_node_in_group(&"session")
 	if s != null:
 		_container = s.get(&"_container") as SubViewportContainer
@@ -57,6 +59,7 @@ func _exit_tree() -> void:
 		_container.stretch_shrink = _prev_shrink
 	if Game.player != null and is_instance_valid(Game.player):
 		Game.player.camera.current = true
+		Game.player.closeup_dim = false
 
 
 func scroll(meters: float) -> void:

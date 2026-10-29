@@ -136,7 +136,8 @@ func _canvas_tex(size: Vector2i, draw_fn: Callable) -> Texture2D:
 func _tex_mat(tex: Texture2D) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = tex
-	m.roughness = 0.6
+	m.roughness = 1.0
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED   # фонарь не даёт белого блика на шкалах и листах
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	return m
 

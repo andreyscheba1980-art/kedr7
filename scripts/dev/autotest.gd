@@ -2522,6 +2522,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _tower_walk()
 		get_tree().quit()
 		return
+	if args.has("stovetest"):
+		await _stove_test()
+		get_tree().quit()
+		return
 	if args.has("yardshots"):
 		await _yard_review()
 		get_tree().quit()
@@ -3691,6 +3695,45 @@ func _tower_walk() -> void:
 				break
 		Input.action_release(&"move_forward")
 		print("[tower] %s → %s" % [leg[3], p.global_position])
+
+
+## Печь и генератор на вылазке: сколько остаётся через 5 минут вне дома при разных настройках.
+func _stove_test() -> void:
+	Game.yrka.enabled = false
+	Game.clock_running = false
+	for mode: Array in [["как раньше", false, false], ["поддувало", true, false], ["поддувало+вьюшка после", true, true]]:
+		Game.stove_wood = 100.0
+		Game.stove_heat = 80.0
+		Game.stove_damper = mode[1]
+		Game.stove_flue = false
+		Game.zone = &"yard"
+		var t := 0.0
+		while t < 300.0:
+			if mode[2] and Game.stove_wood <= 0.0:
+				Game.stove_flue = true
+			Game.call(&"_tick_heat", 0.5)
+			t += 0.5
+		print("[stove] %s: через 5 мин дрова=%.0f жар=%.0f греет=%.2f" % [mode[0], Game.stove_wood, Game.stove_heat, Game.house_heat_k()])
+		Game.warmth = 40.0
+		Game.zone = &"room"
+		for i in 60:
+			Game.call(&"_tick_heat", 0.5)
+		print("[stove]   …30 с дома: тепло 40 → %.0f" % Game.warmth)
+	for off: bool in [false, true]:
+		Game.generator_fuel = 100.0
+		Game.house_switch_off = off
+		Game.set_power(true)
+		for i in 600:
+			Game.call(&"_tick_generator", 0.5)
+		print("[gen] рубильник %s: за 5 мин солярка 100 → %.0f" % ["выкл" if off else "вкл", Game.generator_fuel])
+	Game.house_switch_off = false
+	Game.stove_damper = false
+	Game.stove_flue = false
+	Game.stove_wood = 60.0
+	for v: Array in [["stove_controls", Vector3(-1.4, 0.05, 2.9), Vector3(-1.5, 0.6, 1.4)], ["house_switch", Vector3(13.2, 0.05, 2.4), Vector3(14.4, 1.4, 2.3)]]:
+		_look(v[1], v[2])
+		await _wait(0.8)
+		await _shot(v[0])
 
 
 ## Двор: развилки с леерами, сараи, поленница, вертолётка, ангар, навес с баллонами, бункер, изба.

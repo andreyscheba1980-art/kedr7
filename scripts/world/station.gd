@@ -113,6 +113,9 @@ var _treat_eaten_seen := true            ## игрок уже заметил п�
 var _clock_pendulum: Node3D
 var _kettle_steam: CPUParticles3D
 var _living_trunk: Node3D
+var _damper_door: Node3D
+var _flue_handle: Node3D
+var _switch_lever: Node3D
 
 
 
@@ -231,9 +234,11 @@ func _process(delta: float) -> void:
 	if _fire_glow != null:
 		_fire_glow.visible = burning
 	if _smoke != null:
-		_smoke.emitting = burning and not Game.chimney_iced
+		_smoke.emitting = burning and not Game.chimney_iced and not Game.stove_flue
 	if burning and _fire != null:
 		var strength := clampf(Game.stove_wood / 40.0, 0.25, 1.0)
+		if Game.stove_damper or Game.stove_flue:
+			strength *= 0.45   # прикрыто — огонь тлеет, топка светит тускло
 		_fire.light_energy = (0.55 + sin(_t * 7.3) * 0.06 + randf() * 0.05) * strength
 	if _stove_fire_player != null:
 		var target_fire_vol := -80.0
@@ -248,7 +253,7 @@ func _process(delta: float) -> void:
 	if _kettle_steam != null:
 		_kettle_steam.emitting = burning or not Game.is_prologue()
 	_update_living_trunk_visibility()
-	if _storm_beacon != null and lights_lit() and not _beacon_blackout_active:
+	if _storm_beacon != null and outside_lit() and not _beacon_blackout_active:
 		_storm_beacon.visible = true
 		_storm_beacon.light_energy = 1.7 + sin(_t * 3.0) * 0.65 + (randf() * 0.12)
 	elif _storm_beacon != null:
@@ -580,14 +585,26 @@ func kerosene_on() -> bool:
 	return _kerosene_lit
 
 
+## Свет в доме: есть ток и рубильник у двери не выключен.
 func lights_lit() -> bool:
+	return _lit and Game.power_on and not Game.house_switch_off
+
+
+## Свет снаружи (крыльцо, маяк, сарай): от рубильника дома не зависит.
+func outside_lit() -> bool:
 	return _lit and Game.power_on
+
+
+func _lamp_on(l: Light3D, base: bool) -> bool:
+	if not base:
+		return false
+	return not Game.house_switch_off or not is_pos_inside_house(l.global_position)
 
 
 ## Свет, питающийся от генератора (дом, фонарь у двери, сарай). Двор регистрирует свои лампы сюда.
 func register_lamp(l: Light3D) -> void:
 	_lamps.append(l)
-	l.visible = lights_lit()
+	l.visible = _lamp_on(l, outside_lit())
 
 
 func set_lit(on: bool) -> void:
@@ -596,9 +613,9 @@ func set_lit(on: bool) -> void:
 
 
 func _apply_lamps() -> void:
-	var on := lights_lit()
+	var on := outside_lit()
 	for l in _lamps:
-		l.visible = on
+		l.visible = _lamp_on(l, on)
 
 
 ## Мигание света. Корутина — испуги ждут её через await.
@@ -607,7 +624,7 @@ func flicker(duration: float) -> void:
 	while t < duration:
 		var on := randf() > 0.45 and Game.power_on
 		for l in _lamps:
-			l.visible = on
+			l.visible = _lamp_on(l, on)
 		var step := randf_range(0.04, 0.16)
 		await get_tree().create_timer(step, false).timeout
 		t += step
@@ -1452,6 +1469,7 @@ func _build_living_quarters() -> void:
 	else:
 		_fire_glow = Geo.block(self, Vector3(0.4, 0.25, 0.02), Vector3(-1.5, 0.35, 1.58), Palette.glow(&"amber"), false)
 	_fire = Geo.omni(self, Vector3(-1.5, 0.4, 1.2), 3.4, 0.65, Color(1.0, 0.5, 0.15))
+	_build_stove_controls()
 	_fire.shadow_enabled = false
 
 	# Звук горения и треска дров в печи
@@ -2123,6 +2141,7 @@ func _build_vestibule() -> void:
 	vs43_model.position = Vector3(0.0, -0.65, 0.0)
 	vs43_it.add_child(vs43_model)
 
+	_build_house_switch()
 	# Лампа в тамбуре
 	var l_vest := Geo.omni(self, Vector3(13.0, 2.65, 3.5), 4.5, 0.8, Color(1.0, 0.74, 0.46))
 	l_vest.omni_attenuation = 1.7
@@ -2833,6 +2852,64 @@ func _trigger_prologue_distant_engine_hook() -> void:
 	Game.hud.subtitle(Loc.t(&"sub.engine_warning_memory"), 5.5)
 
 
+## Поддувало (чугунная дверца внизу печи) и вьюшка (задвижка в трубе) — топить «на долго» перед выходом.
+func _build_stove_controls() -> void:
+	var iron := Palette.m(&"metal")
+	_damper_door = Node3D.new()
+	_damper_door.position = Vector3(-1.5, 0.12, 1.465)
+	add_child(_damper_door)
+	var plate := Geo.block(_damper_door, Vector3(0.26, 0.12, 0.015), Vector3(0, 0.06, 0), iron, false)
+	plate.name = "Plate"
+	Geo.block(_damper_door, Vector3(0.04, 0.015, 0.03), Vector3(0.09, 0.07, 0.015), Palette.m(&"dark"), false)
+	var damper := Geo.interactable(self, Vector3(0.4, 0.25, 0.25), Vector3(-1.5, 0.18, 1.5), null, "", func(_p: Player) -> void:
+		Game.stove_damper = not Game.stove_damper
+		_damper_door.rotation.x = -1.1 if not Game.stove_damper else 0.0
+		Game.audio.play_3d(CLANK_SOUND, Vector3(-1.5, 0.2, 1.5), -6.0)
+		Game.hud.subtitle(Loc.t(&"sub.damper_closed") if Game.stove_damper else Loc.t(&"sub.damper_opened"), 3.5))
+	damper.prompt_provider = func() -> String:
+		return Loc.t(&"it.damper_open") if Game.stove_damper else Loc.t(&"it.damper_close")
+	_damper_door.rotation.x = -1.1
+	# Вьюшка: задвижка в трубе над печью — ручка торчит из кладки
+	# (лицо трубы — z = 1.0, x −1.71..−1.29: ручка торчит из кладки, задвинута — вьюшка закрыта)
+	Geo.block(self, Vector3(0.14, 0.1, 0.01), Vector3(-1.4, 2.05, 1.005), iron, false)
+	_flue_handle = Geo.block(self, Vector3(0.035, 0.035, 0.14), Vector3(-1.4, 2.05, 1.07), iron, false)
+	var flue := Geo.interactable(self, Vector3(0.3, 0.25, 0.25), Vector3(-1.4, 2.05, 1.12), null, "", func(_p: Player) -> void:
+		Game.stove_flue = not Game.stove_flue
+		_flue_handle.position.z = 1.02 if Game.stove_flue else 1.07
+		Game.audio.play_3d(CLANK_SOUND, Vector3(-1.4, 2.05, 1.1), -8.0)
+		if not Game.stove_flue:
+			Game.hud.subtitle(Loc.t(&"sub.flue_opened"), 3.0)
+		elif Game.stove_wood > 0.0:
+			Game.hud.subtitle(Loc.t(&"sub.flue_closed_fire"), 4.0, 2)
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.flue_closed_cold"), 4.0))
+	flue.prompt_provider = func() -> String:
+		return Loc.t(&"it.flue_open") if Game.stove_flue else Loc.t(&"it.flue_close")
+
+
+## Рубильник у входной двери: погасить свет в доме — дизель на холостом тянет втрое дольше.
+func _build_house_switch() -> void:
+	var at := Vector3(14.37, 1.45, 2.3)   # по другую сторону двери от вешалки
+	Geo.block(self, Vector3(0.03, 0.26, 0.18), at, Palette.m(&"wood"), false)
+	Geo.block(self, Vector3(0.05, 0.18, 0.12), at + Vector3(-0.02, 0, 0), _switch_mat(), false)
+	_switch_lever = Geo.block(self, Vector3(0.12, 0.025, 0.025), at + Vector3(-0.08, 0.05, 0), Palette.m(&"metal"), false)
+	var it := Geo.interactable(self, Vector3(0.25, 0.35, 0.3), at + Vector3(-0.08, 0, 0), null, "", func(_p: Player) -> void:
+		Game.house_switch_off = not Game.house_switch_off
+		_switch_lever.position.y = at.y + (-0.05 if Game.house_switch_off else 0.05)
+		_apply_lamps()
+		Game.audio.play_3d(CLANK_SOUND, at, -2.0)
+		Game.hud.subtitle(Loc.t(&"sub.switch_off") if Game.house_switch_off else Loc.t(&"sub.switch_on"), 4.0))
+	it.prompt_provider = func() -> String:
+		return Loc.t(&"it.switch_on") if Game.house_switch_off else Loc.t(&"it.switch_off")
+
+
+static func _switch_mat() -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.16, 0.1, 0.07)
+	m.roughness = 0.35
+	return m
+
+
 func _stove_prompt() -> String:
 	if Game.player != null and Game.player.held == &"wood":
 		return Loc.t(&"it.stove_add")
@@ -2974,7 +3051,7 @@ func trigger_beacon_blackout(duration := 6.0) -> void:
 	Game.hud.subtitle(Loc.t(&"sub.beacon_blackout"), 4.0)
 	await get_tree().create_timer(duration, false).timeout
 	_beacon_blackout_active = false
-	if _storm_beacon != null and lights_lit():
+	if _storm_beacon != null and outside_lit():
 		_storm_beacon.visible = true
 		Game.audio.play_3d("res://assets/audio/hum_loop.ogg", Vector3(12.5, RIDGE_TOP + 0.75, 3.3), -4.0)
 
