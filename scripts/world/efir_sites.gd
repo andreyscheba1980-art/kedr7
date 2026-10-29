@@ -53,7 +53,7 @@ static func _ground(p: Vector3) -> Vector3:
 # --- Рамки ------------------------------------------------------------------------------
 
 func _build_house_loop() -> void:
-	var at := Vector3(11.05, 0.0, -1.55)
+	var at := Vector3(11.0, 0.0, -0.45)   # у восточной стены рубки, южнее сейфа
 	var metal := Palette.m(&"metal")
 	Geo.cylinder(self, 0.16, 0.04, at + Vector3(0, 0.02, 0), Palette.m(&"dark"), false)
 	Geo.block(self, Vector3(0.04, 1.1, 0.04), at + Vector3(0, 0.57, 0), metal, false)

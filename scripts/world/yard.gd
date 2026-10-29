@@ -176,6 +176,7 @@ func _ready() -> void:
 	add_child(FieldJobs.new())
 	add_child(SourceSite.new())
 	add_child(EfirSites.new())
+	add_child(StationLore.new())
 	Dog.ensure(self)
 	_build_woodpile()
 	_build_izba()

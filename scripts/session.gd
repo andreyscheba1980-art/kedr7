@@ -502,6 +502,8 @@ func _open_ui(id: StringName) -> void:
 			ui = DirectionFinderUI.new()
 		&"morse":
 			ui = MorseUI.new()
+		&"book":
+			ui = HeldPaper.journal(BookUI.new(), Vector2i(1080, 630))   # книга — в руках
 		&"theodolite":
 			ui = TheodoliteUI.new()
 		&"forecast", &"report", &"journal":
@@ -727,6 +729,7 @@ func _case_file(id: StringName) -> String:
 	if ev > 0:
 		lines.append(Loc.t(&"case.photos", [ev]))
 	lines.append(Loc.t(&"case.bearings", [FieldJobs.bearing_count()]))
+	lines.append(Loc.t(&"case.books", [Books.read_count(), Books.ORDER.size()]))
 	# Эфир: что нашёл по пеленгам и что прочитал
 	var decoded := 0
 	for d in SaveGame.decoded:

@@ -2518,6 +2518,10 @@ func _tour(args: PackedStringArray) -> void:
 		await _corpus_review()
 		get_tree().quit()
 		return
+	if args.has("lore"):
+		await _lore_review()
+		get_tree().quit()
+		return
 	if args.has("uishots"):
 		await _ui_review()
 		get_tree().quit()
@@ -4240,3 +4244,29 @@ func _ui_review() -> void:
 	await _wait(0.6)
 	await _shot("ui_note")
 	Game.hud.hide_note()
+
+
+## Лор: книги в руках (разные виды), книги на местах, тайники и комнаты.
+func _lore_review() -> void:
+	Game.yrka.enabled = false
+	Game.hud.visible = true
+	_look(Vector3(1.8, 0.05, 2.6), Vector3(1.0, 0.8, 3.85))
+	await _wait(0.6)
+	await _shot("lore_desk_book")
+	var placed := get_tree().root.find_children("Book_*", "", true, false).size()
+	print("[lore] книг на местах: ", placed)
+	for id: StringName in [&"bragin", &"permyakov", &"report", &"golubev", &"gazeta"]:
+		BookUI.pending_id = id
+		EventBus.ui_requested.emit(&"book")
+		await _wait(1.0)
+		await _shot("lore_book_" + String(id))
+		var hp: Variant = Game.hud.modal()
+		var bu: Variant = (hp as Node).find_children("*", "BookUI", true, false)[0] if hp != null else null
+		if bu != null:
+			bu.call(&"_flip", 1)
+			bu.call(&"_flip", 1)
+			await _wait(0.3)
+			await _shot("lore_book_" + String(id) + "_end")
+		Game.hud.close_modal()
+		await _wait(0.3)
+	print("[lore] прочитано: ", Books.read_count(), "/", Books.ORDER.size())
