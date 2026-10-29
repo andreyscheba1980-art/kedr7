@@ -14,6 +14,8 @@ const WHITEWASH := Color(0.65, 0.63, 0.58)
 const RED := Color(0.40, 0.10, 0.08)
 const BARK := Color(0.14, 0.10, 0.07)
 const LOG_END := Color(0.35, 0.28, 0.20)
+## Яркость предметов: цвет вершин × текстура (~0.6) давал альбедо 0.1–0.2 — втрое темнее стен из Blender
+const PROP_GAIN := 1.6
 
 
 static var _mesh_cache: Dictionary = {}
@@ -24,7 +26,7 @@ static func _instance_from_cache(key: StringName, tex := "") -> MeshInstance3D:
 		return null
 	var mi := MeshInstance3D.new()
 	mi.mesh = _mesh_cache[key]
-	mi.material_override = Creatures._mat(StringName("prop_" + String(key)), Color.WHITE, tex, 0.0)
+	mi.material_override = _prop_mat(key, tex)
 	return mi
 
 
@@ -37,8 +39,17 @@ static func _mi(kit: MeshKit, key: StringName, tex := "") -> MeshInstance3D:
 		mesh = kit.commit()
 		_mesh_cache[key] = mesh
 	mi.mesh = mesh
-	mi.material_override = Creatures._mat(StringName("prop_" + String(key)), Color.WHITE, tex, 0.0)
+	mi.material_override = _prop_mat(key, tex)
 	return mi
+
+
+static func _prop_mat(key: StringName, tex: String) -> ShaderMaterial:
+	return _gained(Creatures._mat(StringName("prop_" + String(key)), Color.WHITE, tex, 0.0))
+
+
+static func _gained(m: ShaderMaterial) -> ShaderMaterial:
+	m.set_shader_parameter(&"gain", PROP_GAIN)
+	return m
 
 
 static func _kit(seed_value: int, mottle := 0.08) -> MeshKit:
@@ -1717,7 +1728,7 @@ static func woodbox(count := 3) -> Node3D:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
-	mi.material_override = Creatures._mat(StringName("woodbox_%d" % count), Color.WHITE, "tex_wood.png", 0.0)
+	mi.material_override = _gained(Creatures._mat(StringName("woodbox_%d" % count), Color.WHITE, "tex_wood.png", 0.0))
 	root.add_child(mi)
 	return root
 
@@ -2751,7 +2762,7 @@ static func retro_transistor_radio() -> Node3D:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
-	var mat := Creatures._mat(&"retro_radio", Color.WHITE, "tex_metal.png", 0.0)
+	var mat := _gained(Creatures._mat(&"retro_radio", Color.WHITE, "tex_metal.png", 0.0))
 	mi.material_override = mat
 	root.add_child(mi)
 
@@ -2822,7 +2833,7 @@ static func barograph() -> Node3D:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
-	var mat := Creatures._mat(&"prop_barograph", Color.WHITE, "tex_metal.png", 0.0)
+	var mat := _gained(Creatures._mat(&"prop_barograph", Color.WHITE, "tex_metal.png", 0.0))
 	mi.material_override = mat
 	root.add_child(mi)
 
@@ -2898,7 +2909,7 @@ static func theodolite() -> Node3D:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
-	var mat := Creatures._mat(&"prop_theodolite", Color.WHITE, "tex_metal.png", 0.0)
+	var mat := _gained(Creatures._mat(&"prop_theodolite", Color.WHITE, "tex_metal.png", 0.0))
 	mi.material_override = mat
 	root.add_child(mi)
 
@@ -2945,7 +2956,7 @@ static func balloon_stand() -> Node3D:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
-	var mat := Creatures._mat(&"prop_balloon_stand", Color.WHITE, "tex_metal.png", 0.0)
+	var mat := _gained(Creatures._mat(&"prop_balloon_stand", Color.WHITE, "tex_metal.png", 0.0))
 	mi.material_override = mat
 	root.add_child(mi)
 

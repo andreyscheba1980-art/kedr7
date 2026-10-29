@@ -2086,10 +2086,12 @@ func _build_vestibule() -> void:
 	shovel2.rotation = Vector3(deg_to_rad(-4.0), deg_to_rad(90.0), 0.0)
 	add_child(shovel2)
 
-	# 2. Стеллаж / вешалка с тяжёлыми овчинными тулупами
-	Geo.block(self, Vector3(0.06, 0.1, 1.2), Vector3(14.4, 1.6, 4.5), Palette.m(&"wood"), false)
-	Geo.block(self, Vector3(0.2, 1.1, 0.45), Vector3(14.3, 1.1, 4.2), Palette.m(&"dark"), false)
-	Geo.block(self, Vector3(0.2, 1.15, 0.45), Vector3(14.3, 1.08, 4.8), Palette.m(&"cloth"), false)
+	# 2. Вешалка с тулупами и ушанками на восточной стене (та же модель, что в коридоре)
+	var coats := Props._kedr_model("coat_hooks", {"bright": 1.15})
+	if coats != null:
+		add_child(coats)
+		coats.position = Vector3(14.385, 0.82, 4.5)
+		coats.rotation.y = -PI * 0.5
 
 	# Охотничьи лыжи Семёнова у входа в сени
 	var skis_it := Geo.interactable(self, Vector3(0.5, 1.8, 0.4), Vector3(13.6, 0.9, 1.65), null, "", _on_skis_interact)
@@ -2100,8 +2102,8 @@ func _build_vestibule() -> void:
 	skis_it.add_child(skis_model)
 
 	# 3. Лавка для просушки обуви и полка для рукавиц
-	Geo.block(self, Vector3(1.8, 0.42, 0.5), Vector3(12.6, 0.21, 5.8), Palette.m(&"wood"), true)
-	Geo.block(self, Vector3(1.6, 0.05, 0.35), Vector3(12.6, 1.4, 5.85), Palette.m(&"wood"), false)
+	Geo.block(self, Vector3(1.8, 0.42, 0.5), Vector3(12.6, 0.21, 5.8), Palette.m(&"weathered"), true)
+	Geo.block(self, Vector3(1.6, 0.05, 0.35), Vector3(12.6, 1.4, 5.85), Palette.m(&"weathered"), false)
 
 	# Весовой снегомер ВС-43 на стене сеней над лавкой
 	var vs43_it := Geo.interactable(self, Vector3(0.4, 1.3, 0.3), Vector3(12.6, 1.35, 5.75), null, "", _on_vs43_interact)

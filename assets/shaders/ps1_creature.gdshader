@@ -11,6 +11,7 @@ uniform float tex_scale = 0.35;
 uniform float emission = 0.0;   // лёгкое свечение кожи — чтобы бледное лицо читалось в темноте
 uniform float eye_glow = 0.0;   // фосфорный блеск глаз только при прямом попадании луча фонаря
 uniform float alpha_scissor = 0.0; // отсечение прозрачности для лохмотьев ватника
+uniform float gain = 1.0;          // предметы (Props): в тон запечённым стенам, иначе мебель — чёрные коробки
 
 varying vec3 opos;
 varying vec3 onrm;
@@ -37,7 +38,7 @@ void fragment() {
 			discard;
 		}
 	}
-	ALBEDO = c;
+	ALBEDO = min(c * gain, vec3(1.0));
 	ROUGHNESS = 1.0;
 	// Базовое свечение кожи + фосфорный блеск глаз в луче фонарика
 	EMISSION = c * emission + vec3(0.65, 0.95, 0.45) * eye_glow * COLOR.g;

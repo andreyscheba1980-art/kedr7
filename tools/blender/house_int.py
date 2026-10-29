@@ -7,7 +7,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kit, ugms
 from ugms import box, prism, _rects
 
-OUT = sys.argv[-1] if len(sys.argv) > 1 and not sys.argv[-1].endswith(".py") else "."
+ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+OUT = ARGS[0] if ARGS else "."
 os.makedirs(OUT, exist_ok=True)
 
 H = 2.8          # потолок
@@ -24,7 +25,7 @@ def mats():
         "panel_green": p("i_pgreen", (0.24, 0.40, 0.34), under=(0.40, 0.38, 0.33), peel=0.08, scale=5.0, streaks=False),
         "panel_blue": p("i_pblue", (0.27, 0.37, 0.43), under=(0.40, 0.38, 0.33), peel=0.08, scale=5.0, streaks=False),
         "floor": p("i_floor", (0.33, 0.17, 0.08), under=(0.30, 0.25, 0.19), peel=0.18, scale=3.0, streaks=False, boards="x", step=0.14),
-        "floor_raw": p("i_floor_raw", (0.40, 0.33, 0.25), under=(0.33, 0.28, 0.22), peel=0.4, scale=6.0, streaks=False, boards="x", step=0.16),
+        "floor_raw": p("i_floor_raw", (0.40, 0.33, 0.25), under=(0.33, 0.28, 0.22), peel=0.16, scale=4.0, streaks=False, boards="x", step=0.16),
         "trim": p("i_trim", (0.74, 0.73, 0.68), under=(0.42, 0.40, 0.35), peel=0.12, scale=7.0, streaks=False),
         "plinth": p("i_plinth", (0.25, 0.14, 0.07), peel=0.1, scale=8.0, streaks=False),
         "strip": kit.mat("i_strip", (0.10, 0.12, 0.11), rough=0.6),
@@ -35,7 +36,7 @@ def mats():
     for axis, d in ((0, "v"), (2, "y")):
         m[("lining", axis)] = p("i_lining%d" % axis, (0.52, 0.34, 0.17), under=(0.36, 0.30, 0.22), peel=0.06, scale=6.0, streaks=False, boards=d, step=0.09)
         m[("wallpaper", axis)] = p("i_paper%d" % axis, (0.66, 0.58, 0.44), under=(0.52, 0.45, 0.34), peel=0.14, scale=2.5, streaks=False, boards=d, step=0.26)
-        m[("plank", axis)] = p("i_plank%d" % axis, (0.42, 0.35, 0.27), under=(0.32, 0.27, 0.21), peel=0.45, scale=5.0, streaks=False, boards=d, step=0.18)
+        m[("plank", axis)] = p("i_plank%d" % axis, (0.42, 0.35, 0.27), under=(0.32, 0.27, 0.21), peel=0.18, scale=3.5, streaks=False, boards=d, step=0.18)
     return m
 
 
@@ -102,7 +103,12 @@ def floor_ceiling(M, x0, x1, z0, z1, floor_key, beams_along_z=True, ceil_key="wh
 DOOR_H = 2.1
 
 
+ONLY = [a for a in sys.argv if a.startswith("house_int_")]   # -- <out_dir> house_int_store … — только эти комнаты
+
+
 def room(name, x0, x1, z0, z1, holes, lower, upper, floor_key, res, divider=True, beams_along_z=True, ceil_key="whitewash"):
+    if ONLY and name not in ONLY:
+        return
     kit.reset()
     M = mats()
     # N: z = z0 (внутрь +Z), S: z = z1 (внутрь −Z), W: x = x0 (внутрь +X), E: x = x1 (внутрь −X)
@@ -127,6 +133,6 @@ room("house_int_corridor", 3.5, 11.5, 2.2, 6.6,
      {"N": [D(7.0, 8.1)], "S": [[7.1, 7.9, 1.2, 2.0]], "W": [D(2.6, 3.7)], "E": [D(2.6, 3.7)]},
      "panel_blue", "whitewash", "floor", 2048)
 room("house_int_store", 3.5, 7.0, -5.5, -2.0, {"S": [D(4.8, 5.8)]},
-     "plank", "plank", "floor_raw", 1024, divider=False, beams_along_z=False, ceil_key="floor_raw")
+     "plank", "plank", "floor_raw", 2048, divider=False, beams_along_z=False, ceil_key="floor_raw")
 room("house_int_vest", 11.5, 14.5, 1.5, 6.6, {"W": [D(2.6, 3.7)], "E": [D(2.6, 3.6)]},
-     "plank", "plank", "floor_raw", 1024, divider=False, ceil_key="floor_raw")
+     "plank", "plank", "floor_raw", 2048, divider=False, ceil_key="floor_raw")

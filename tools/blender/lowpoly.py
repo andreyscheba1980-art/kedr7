@@ -196,7 +196,7 @@ def bake(name, build, res=256, shift=(0, 0, 0), extr=0.02, dist=0.05, margin=2, 
     img = bpy.data.images.new(name + "_lo", res, res)
     mat = bpy.data.materials.new(name + "_lo"); mat.use_nodes = True
     tn = mat.node_tree.nodes.new("ShaderNodeTexImage"); tn.image = img
-    tn.interpolation = "Closest"
+    tn.interpolation = "Linear"   # как у остальных текстур дома: без крупных пикселей
     mat.node_tree.links.new(tn.outputs["Color"], mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
     mat.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.9
     mat.node_tree.nodes.active = tn
@@ -435,12 +435,12 @@ def mast(p):
 
 JOBS = {
     "radio_mast16": (mast, dict(res=512, extr=0.025, dist=0.06, front=None)),
-    "r250": (r250, dict(res=256, shift=(0, -0.0275, 0), extr=0.03, dist=0.07)),
-    "vesna306": (vesna, dict(res=256, shift=(0.002, 0.018878, -0.005), extr=0.012, dist=0.03, front=(0, 0, 1))),
-    "barograph_m22": (barograph, dict(res=256, shift=(0, -0.00105, 0), extr=0.01, dist=0.025)),
-    "stove_brick": (stove, dict(res=256, extr=0.03, dist=0.08)),
-    "generator_ab4": (generator, dict(res=256, extr=0.03, dist=0.08, front=(0, 1, 0))),
-    "front_door": (front_door, dict(res=256, extr=0.02, dist=0.05, front=None)),
+    "r250": (r250, dict(res=512, shift=(0, -0.0275, 0), extr=0.03, dist=0.07)),
+    "vesna306": (vesna, dict(res=512, shift=(0.002, 0.018878, -0.005), extr=0.012, dist=0.03, front=(0, 0, 1))),
+    "barograph_m22": (barograph, dict(res=512, shift=(0, -0.00105, 0), extr=0.01, dist=0.025)),
+    "stove_brick": (stove, dict(res=1024, extr=0.03, dist=0.08)),
+    "generator_ab4": (generator, dict(res=1024, extr=0.03, dist=0.08, front=(0, 1, 0))),
+    "front_door": (front_door, dict(res=1024, extr=0.02, dist=0.05, front=None)),
     "zhuchok": (zhuchok, dict(res=256, extr=0.006, dist=0.015, front=(0, 1, 0))),
     "zhuchok_lever": (zhuchok_lever, dict(res=64, extr=0.004, dist=0.01)),
 }

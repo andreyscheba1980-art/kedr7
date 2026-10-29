@@ -24,3 +24,8 @@ music/
 # Страница itch: тексты храним, картинки и архивы — нет
 itch/*
 !itch/*.md
+
+# Промежуточное запекание Blender (хайполи → лоуполи)
+tools/blender/out/
+tools/blender/out_lo/
+tools/blender/out_int/

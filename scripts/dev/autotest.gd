@@ -3650,7 +3650,7 @@ func _house_review() -> void:
 	var tag := "night" if Game.is_night() else "day"
 	for v: Array in [["room_a", Vector3(2.8, 0.05, 1.0), Vector3(-2.0, 1.2, 5.5)], ["room_b", Vector3(-2.0, 0.05, 5.8), Vector3(3.0, 1.2, 0.5)],
 			["room_c", Vector3(-1.8, 0.05, 0.6), Vector3(3.0, 1.0, 6.0)],
-			["radio_a", Vector3(4.2, 0.05, 1.8), Vector3(11.0, 1.2, -1.5)], ["radio_b", Vector3(11.0, 0.05, -1.6), Vector3(4.0, 1.2, 1.5)],
+			["radio_a", Vector3(4.2, 0.05, 1.8), Vector3(11.0, 1.2, -1.5)], ["radio_b", Vector3(10.6, 0.05, 1.4), Vector3(4.0, 1.2, -1.5)],
 			["storage", Vector3(6.6, 0.05, -2.4), Vector3(3.8, 0.8, -5.2)], ["corridor", Vector3(4.0, 0.05, 4.4), Vector3(12.0, 1.4, 4.4)],
 			["vestibule", Vector3(14.0, 0.05, 6.2), Vector3(11.8, 1.2, 2.0)], ["attic", Vector3(0.0, 3.0, 3.3), Vector3(12.0, 3.6, 3.3)],
 			["plot_gate", Vector3(60.0, 0.05, -23.0), Vector3(66.0, 0.8, -21.0)], ["plot_booth", Vector3(64.8, 0.05, -21.0), Vector3(64.8, 1.4, -23.6)],
