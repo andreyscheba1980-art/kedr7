@@ -1,18 +1,22 @@
 class_name Vehicle
 extends Node3D
-## Пролог: «Последний рейс». ГТ-Т Михалыча везёт Мальцева по зимнику и встаёт у начала просеки.
-## Сцена в кабине — полминуты: проснулся, три реплики, «дальше пешком». Выходишь в буран, тягач
-## разворачивается и уходит обратно к краю карты; гул дизеля долго тает — потом тишина и лес.
+## Пролог: «Последний рейс». ГТ-Т Михалыча везёт Мальцева по зимнику — и садится в перемёт у начала
+## просеки. Вдвоём откапывают гусеницы: Виктор лопатой, Михалыч из кабины рассказывает про Семёнова и
+## ырку. Газует — лопается трак. «Дальше пешком»: Михалыч остаётся ночевать в тягаче с дизелем на холостых,
+## Виктор уходит по вешкам. Гул за спиной тает, а потом дизель глохнет сам — и в тишине зовут по имени.
+## (Ночью «Михалыч» зовёт с того самого поворота: «Застрял я, подсоби» — drv.night1.)
 ## Едет по настоящей дороге (Terrain.ROADS.zimnik) и по рельефу, а не по прямой между двумя точками.
 
 const ENGINE := "res://assets/audio/engine_loop.ogg"
 const CABIN_SEAT_LOCAL := Vector3(0.50, 0.42, -0.95)
 const CABIN_DRIVER_LOCAL := Vector3(-0.52, 0.10, -0.95)
-const DRIVE_TIME := 62.0          ## сколько едем по зимнику до остановки (разговор в кабине)
-const BACK_M := 250.0             ## откуда начинаем — метров дальше по дороге от высадки
+const DRIVE_TIME := 34.0          ## сколько едем по зимнику до перемёта (начало разговора в кабине)
+const BACK_M := 130.0             ## откуда начинаем — метров дальше по дороге от места, где сядем
+const DIG_SPOTS := [Vector3(-1.45, 0.0, -2.4), Vector3(1.45, 0.0, -2.4)]   ## перемёт у передних катков (оси тягача)
 const STEP_M := 2.0
 
 static var _instance: Vehicle
+static var _talk_over := false         ## Михалыч договорил (последняя — «Меня до весны не жди»): можно начинать просеку
 
 var _body: Node3D                 ## точка на дороге (позиция) — модель и кабина внутри
 var _tracked: Node3D              ## модель ГТ-Т с поворотом и наклоном
@@ -35,6 +39,15 @@ var _can_exit := false
 var _driving := false
 var _leaving := false
 var _yaw_set := false
+var _dug := 0                      ## сколько гусениц откопано
+var _dig_nodes: Array[Node3D] = []
+var _talk_done := false
+var _gave_up := false
+var _engine_dead := false
+var _beams: Array[Light3D] = []
+var _alone_said := false
+var _leash_hinted := false
+const LEASH_M := 30.0      ## пока Михалыч не договорил, дальше от тягача не уйти: иначе вся просека — молча
 
 
 # --- API для пролога и игрока ------------------------------------------------------
@@ -72,7 +85,10 @@ func _notification(what: int) -> void:
 
 func _ready() -> void:
 	_instance = self
+	_talk_over = false
 	if Game.has_flag("prologue_arrived") or Game.has_flag("left_cabin"):
+		_talk_over = true
+		Game.set_flag("dig_pending", false)   # загрузились после высадки — тягача уже нет, копать нечего
 		queue_free()
 		return
 	Terrain.ensure()
@@ -128,6 +144,7 @@ func _build_lights() -> void:
 		beam.light_color = Color(1.0, 0.92, 0.75)
 		beam.shadow_enabled = side > 0.0 and Settings.quality >= 1
 		_tracked.add_child(beam)
+		_beams.append(beam)
 	var rear := Geo.omni(_tracked, Vector3(0.0, 1.4, 3.1), 4.0, 0.6, Color(1.0, 0.2, 0.15))
 	rear.shadow_enabled = false
 
@@ -334,8 +351,6 @@ func _run_cabin() -> void:
 	var lines: Array = [
 		[&"cab.1", -42.0, 3.0], [&"cab.2", -12.0, 2.4], [&"cab.3", -36.0, 3.2], [&"cab.4", -10.0, 2.6],
 		[&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4],
-		[&"cab.11", -44.0, 5.0], [&"cab.12", -12.0, 5.0], [&"cab.13", -30.0, 3.4], [&"cab.14", -10.0, 2.6],
-		[&"cab.15", -46.0, 6.0], [&"cab.16", -10.0, 2.0], [&"cab.17", -48.0, 7.5], [&"cab.18", -50.0, 6.5],
 		[&"th.cab", -8.0, 3.6],
 	]
 	for ln: Array in lines:
@@ -346,19 +361,22 @@ func _run_cabin() -> void:
 	_talking = false
 	while _driving and _in_cabin:
 		await get_tree().process_frame
-	# Тормоз: рычаги на себя, тягач клюёт носом
-	AudioDirector.play_raw("res://assets/audio/clank.ogg", 0.0)
-	var tw := create_tween()
+	# Перемёт: тягач зарывается носом, его ведёт вбок, дизель воет — гусеницы буксуют в снегу
+	AudioDirector.play_raw("res://assets/audio/clank.ogg", 2.0)
+	var tw := create_tween().set_parallel(true)
 	tw.tween_property(self, "_lever_pull", deg_to_rad(-24.0), 0.35).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(self, "_lever_pull", 0.0, 0.8)
+	tw.tween_property(_tracked, "rotation:z", deg_to_rad(5.5), 0.5).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(_tracked, "position:y", -0.35, 0.5)
 	if Game.player != null:
-		Game.player.shake(0.05, 0.4)
-	create_tween().tween_property(_engine, "pitch_scale", 0.8, 1.2)
-	await get_tree().create_timer(1.2, false).timeout
+		Game.player.shake(0.12, 0.7)
+	create_tween().tween_property(_engine, "pitch_scale", 1.45, 0.6)
+	_spray(1.6)
+	await get_tree().create_timer(1.6, false).timeout
+	create_tween().tween_property(_engine, "pitch_scale", 0.8, 1.0)
+	create_tween().tween_property(self, "_lever_pull", 0.0, 0.8)
+	await get_tree().create_timer(0.8, false).timeout
 	_can_exit = true
-	if not await _say(&"cab.8", -48.0, 3.4):
-		return
-	if not await _say(&"cab.10", -50.0, 6.5):
+	if not await _say(&"cab.stuck", -48.0, 3.6):
 		return
 	if Game.hud != null and _in_cabin:
 		Game.hud.set_prompt(Loc.t(&"cab.exit"))
@@ -398,47 +416,201 @@ func _on_exit_cabin() -> void:
 		Game.player.shake(0.04, 0.3)
 	if Game.hud != null:
 		Game.hud.set_prompt("")
-	_depart()
+	_engine.volume_db = -6.0
+	Game.set_flag("dig_pending", true)
+	_build_dig_spots()
+	_talk_while_digging()
 
 
-## Михалыч не выходит: машет из окна, разворачивается и уходит туда, откуда приехали.
-func _depart() -> void:
-	await get_tree().create_timer(2.5, false).timeout
-	Voice.say(&"driver.farewell_3b", 3.5)
-	await get_tree().create_timer(3.0, false).timeout
+## Перемёт под передними катками: два сугроба, их надо откопать лопатой (удерживать [E]).
+func _build_dig_spots() -> void:
+	var mound := SphereMesh.new()
+	mound.radius = 1.0
+	mound.height = 2.0
+	mound.radial_segments = 18
+	mound.rings = 8
+	for i in DIG_SPOTS.size():
+		var local: Vector3 = DIG_SPOTS[i]
+		var at := _tracked.to_global(local)
+		at.y = Terrain.height(at.x, at.z)
+		var m := MeshInstance3D.new()
+		m.mesh = mound
+		m.material_override = Palette.m(&"drift")
+		m.scale = Vector3(0.9, 0.55, 1.4)
+		m.position = at + Vector3(0, 0.1, 0)
+		m.rotation.y = _tracked.global_rotation.y
+		add_child(m)
+		_dig_nodes.append(m)
+		var it := Geo.interactable(self, Vector3(1.6, 1.0, 2.0), at + Vector3(0, 0.45, 0), null, "", Callable())
+		it.hold_time = 2.8
+		it.hold_sound = "res://assets/audio/step_snow_3.ogg"
+		it.prompt_provider = func() -> String: return Loc.t(&"cab.dig") if m.visible else ""
+		it.used.connect(func(_p: Player) -> void:
+			if not m.visible:
+				return
+			m.visible = false
+			it.collision_layer = 0
+			_dug += 1
+			Game.audio.play_3d(SFX_SNOW_FALL, at + Vector3(0, 0.5, 0), -2.0, 5.0)
+			if Game.player != null:
+				Game.player.shake(0.03, 0.25)
+			_maybe_try())
+
+
+const SFX_SNOW_FALL := "res://assets/audio/snow_fall.ogg"
+
+
+## Пока Виктор копает — Михалыч из кабины: про Свердловск, про Семёнова, про ырку и три гудка.
+func _talk_while_digging() -> void:
+	await get_tree().create_timer(1.5, false).timeout
+	for ln: Array in [[&"cab.dig_hint", 3.4], [&"cab.11", 5.0], [&"cab.12", 5.0], [&"cab.13", 3.4], [&"cab.14", 2.6],
+			[&"cab.15", 6.0], [&"cab.16", 2.0], [&"cab.17", 7.5], [&"cab.18", 6.5]]:
+		if not is_inside_tree():
+			return
+		await get_tree().create_timer(Voice.say(ln[0], ln[1]), false).timeout
+		await get_tree().create_timer(0.4, false).timeout
+	_talk_done = true
+	_maybe_try()
+
+
+## Откопано и договорили (или Виктор ушёл, не докопав) — газует. Трак лопается: дальше пешком.
+func _maybe_try() -> void:
+	if _leaving or not _talk_done:
+		return
+	Game.set_flag("dig_pending", false)
+	if _gave_up:
+		_leaving = true
+		_finish_talk(false)    # ушёл, не докопав: газовать некому помогать — Михалыч кричит остальное вслед
+		return
+	if _dug < DIG_SPOTS.size():
+		return
 	_leaving = true
-	_exhaust.amount = 32
-	_exhaust.initial_velocity_max = 4.5
-	create_tween().tween_property(_engine, "pitch_scale", 1.15, 2.0)
-	# Разворот на месте (гусеницы в разные стороны) — медленно, со скрежетом
-	AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
-	var yaw0 := _tracked.rotation.y
+	await get_tree().create_timer(Voice.say(&"cab.try", 2.6), false).timeout
+	_exhaust.amount = 40
+	_exhaust.initial_velocity_max = 5.0
+	create_tween().tween_property(_engine, "pitch_scale", 1.6, 0.8)
+	_spray(2.4)
 	var tw := create_tween()
-	tw.tween_property(_tracked, "rotation:y", yaw0 + PI, 5.0).set_trans(Tween.TRANS_SINE)
-	await tw.finished
-	var pt := get_tree().root.find_child("PrologueTrail", true, false)
-	if pt != null and pt.has_method(&"on_vehicle_left"):
-		pt.on_vehicle_left()
-	# Уходит по зимнику к краю карты; дизель слышно ещё долго
-	var s0 := float(_drop_i)
-	var t := 0.0
-	while t < 26.0 and is_inside_tree():
-		var dt := get_process_delta_time()
-		t += dt
-		s0 = minf(s0 + dt * 4.0 / STEP_M * minf(t / 3.0, 1.0), _road.size() - 1)
-		_place(s0, false)
-		_engine.volume_db = lerpf(-2.0, -46.0, clampf(t / 26.0, 0.0, 1.0))
-		await get_tree().process_frame
-	queue_free()
+	for k in 4:
+		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.5), 0.3)
+	await get_tree().create_timer(2.2, false).timeout
+	if not is_inside_tree():
+		return
+	AudioDirector.play_raw("res://assets/audio/clank.ogg", 4.0)
+	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", _body.global_position + Vector3(0, 1, 0), -4.0, 12.0)
+	if Game.player != null:
+		Game.player.shake(0.06, 0.4)
+	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.4)
+	_exhaust.amount = 16
+	_exhaust.initial_velocity_max = 2.0
+	await get_tree().create_timer(1.4, false).timeout
+	_finish_talk(true)
+
+
+func _finish_talk(tried: bool) -> void:
+	var lines: Array = [[&"cab.8", 3.4], [&"cab.10", 6.5], [&"cab.stay", 4.6], [&"driver.farewell_3b", 3.5]]
+	if tried:
+		lines.push_front([&"cab.track", 3.2])
+	for ln: Array in lines:
+		if not is_inside_tree():
+			return
+		await get_tree().create_timer(Voice.say(ln[0], ln[1]), false).timeout
+		await get_tree().create_timer(0.3, false).timeout
+	_talk_over = true
+
+
+## Договорил ли Михалыч: до этого события просеки ждут, чтобы не перебить его реплики.
+static func talk_over() -> bool:
+	return _talk_over or _instance == null or not is_instance_valid(_instance)
+
+
+## Снег из-под гусениц — веером в стороны.
+func _spray(dur: float) -> void:
+	for side: float in [-1.0, 1.0]:
+		var p := CPUParticles3D.new()
+		p.one_shot = true
+		p.amount = 60
+		p.lifetime = 1.2
+		p.explosiveness = 0.1
+		p.direction = Vector3(side, 0.7, 0.6)
+		p.spread = 30.0
+		p.initial_velocity_min = 2.0
+		p.initial_velocity_max = 5.0
+		p.gravity = Vector3(0, -7.0, 0)
+		p.scale_amount_min = 0.4
+		p.scale_amount_max = 1.2
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.16, 0.16)
+		p.mesh = qm
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.albedo_color = Color(0.9, 0.93, 1.0, 0.8)
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		p.material_override = m
+		p.position = Vector3(side * 1.3, 0.4, -1.4)
+		_tracked.add_child(p)
+		p.emitting = true
+		get_tree().create_timer(dur + 1.4, false).timeout.connect(p.queue_free)
+
+
+## Дизель глохнет сам — гул за спиной обрывается, фары гаснут (событие просеки).
+static func engine_die() -> void:
+	if _instance == null or not is_instance_valid(_instance) or _instance._engine_dead:
+		return
+	var v := _instance
+	v._engine_dead = true
+	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", v._body.global_position + Vector3(0, 1, 0), 2.0, 40.0)
+	v.create_tween().tween_property(v._engine, "pitch_scale", 0.3, 1.0)
+	await v.get_tree().create_timer(1.0, false).timeout
+	if not is_instance_valid(v):
+		return
+	v._engine.stop()
+	v._exhaust.emitting = false
+	for b in v._beams:
+		b.visible = false
+
+
+## Мягкий поводок: игрок, ушедший раньше, чем Михалыч договорил, упирается в 30 м от тягача. Без него
+## быстрый игрок доходил до дома под разговор — и события просеки (ждущие конца разговора) пропадали.
+func _leash() -> void:
+	var c := _body.global_position
+	var off := Game.player.global_position - c
+	off.y = 0.0
+	if off.length() <= LEASH_M:
+		return
+	var out := off.normalized()
+	var p := c + out * LEASH_M
+	Game.player.global_position = Vector3(p.x, Game.player.global_position.y, p.z)
+	var vo := Game.player.velocity.dot(out)
+	if vo > 0.0:
+		Game.player.velocity -= out * vo
+	if not _leash_hinted:
+		_leash_hinted = true
+		Game.hud.hint(Loc.t(&"cab.wait_hint"), 6.0)
 
 
 func _process(delta: float) -> void:
 	if Game.player == null or _road.is_empty():
 		return
+	if not _in_cabin and Game.has_flag("left_cabin") and _body != null:
+		var far := Game.player.global_position.distance_to(_body.global_position)
+		if not _leaving and _dug < DIG_SPOTS.size() and far > 26.0 and not _gave_up:
+			_gave_up = true       # ушёл, не докопав: договорят вслед, без попытки газовать
+			_maybe_try()
+		if not _talk_over and not _leaving:
+			_leash()
+		if far > 26.0 and _talk_over and not _alone_said:
+			_alone_said = true
+			var pt := get_tree().root.find_child("PrologueTrail", true, false)
+			if pt != null and pt.has_method(&"on_vehicle_left"):
+				pt.on_vehicle_left()
+		if not _engine_dead and _engine != null:
+			_engine.volume_db = lerpf(-6.0, -30.0, clampf((far - 10.0) / 120.0, 0.0, 1.0))
 	if _driving:
 		# Подъезд к высадке: плавно тормозим к концу
 		var remain := _s - _drop_i
-		var v := clampf(remain / 6.0, 0.25, 1.0) * (BACK_M / DRIVE_TIME) / STEP_M
+		var v := clampf(remain / 1.5, 0.5, 1.0) * (BACK_M / DRIVE_TIME) / STEP_M   # в перемёт — с ходу
 		if _talking and remain < 5.0:
 			v *= 0.12          # разговор не закончен — у высадки ползём, а не встаём молча
 		_s = maxf(_s - v * delta, _drop_i)

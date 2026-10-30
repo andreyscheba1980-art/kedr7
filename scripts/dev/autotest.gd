@@ -40,12 +40,70 @@ func _ready() -> void:
 		_polish_test.call_deferred()
 	elif args.has("--joypad_test"):
 		_joypad_test.call_deferred()
+	elif args.has("--prologue_b"):
+		_prologue_b.call_deferred()
 	elif args.has("--prologue_review"):
 		_prologue_review.call_deferred()
 	elif args.has("--test_cabin"):
 		_test_cabin.call_deferred()
 	else:
 		_run.call_deferred()
+
+
+## Пролог «застряли на зимнике» целиком: кабина → перемёт → откопать → «дальше пешком» → просека → дом.
+## Печатает каждый субтитр и проверяет, что прозвучали все реплики старого пролога.
+func _prologue_b() -> void:
+	var args := OS.get_cmdline_user_args()
+	var lazy := args.has("lazy")     # не копать: уйти сразу, Михалыч договаривает вслед
+	# Как игрок: через «Новая игра» в меню — меню (и его музыка) уходит, сессию строит main.gd.
+	while _app.get("_menu") == null:
+		await get_tree().process_frame
+	Hud.log_subs = true
+	(_app.get("_menu") as MainMenu).new_game.emit("story")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var menu_music := 0
+	for n in get_tree().root.find_children("*", "AudioStreamPlayer", true, false):
+		var a := n as AudioStreamPlayer
+		if a.playing and a.stream != null and a.stream.resource_path.contains("menu_music"):
+			menu_music += 1
+	print("[pb] музыка меню после «Новой игры»: ", menu_music)
+	var t := 0.0
+	while not Vehicle.can_exit_cabin() and t < 120.0:
+		await _wait(0.5)
+		t += 0.5
+	print("[pb] в кабине %.0f с, выход=%s" % [t, Vehicle.can_exit_cabin()])
+	await _shot("pb_cabin_stuck")
+	Vehicle.request_exit()
+	await _wait(1.5)
+	await _shot("pb_outside")
+	print("[pb] цель: ", Game.objective_text())
+	if not lazy:
+		for n in Game.level.find_children("*", "Interactable", true, false):
+			var it := n as Interactable
+			if it.prompt_provider.is_valid() and it.prompt_provider.call() == Loc.t(&"cab.dig"):
+				_look(it.global_position + Vector3(1.6, -0.4, 1.6), it.global_position)
+				await _wait(0.4)
+				await _shot("pb_dig")
+				it.used.emit(Game.player)
+				await _wait(1.0)
+	t = 0.0
+	var pt: PrologueTrail = get_tree().root.find_child("PrologueTrail", true, false)
+	var walked := 0.0
+	while t < 220.0 and not Game.is_home():
+		await _wait(0.5)
+		t += 0.5
+		if Vehicle.talk_over() or (lazy and walked < 40.0):   # lazy: упирается в поводок, ждёт конца разговора
+			walked += 1.1           # ~2.2 м/с — шаг с рюкзаком по снегу
+			var pd: Array = PrologueTrail.point_at(walked)
+			_tp(Terrain.at(pd[0]) + Vector3(0, 0.05, 0), rad_to_deg(atan2(-(pd[1] as Vector3).x, -(pd[1] as Vector3).z)))
+			Game.flash_charge = 100.0
+			Game.player.set_flashlight(true)
+			if walked > PrologueTrail.length_m() + 2.0:
+				_tp(Vector3(13.0, 0.05, 3.5), 90.0)
+	print("[pb] дошёл за %.0f с, дома=%s, события=%s" % [t, Game.is_home(), pt._done.keys() if pt != null else "?"])
+	await _wait(9.0)
+	get_tree().quit()
 
 
 ## Обзор пролога кадрами: a — кабина и выход, b/c — просека по метрам.

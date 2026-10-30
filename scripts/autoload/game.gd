@@ -1067,6 +1067,8 @@ func _tutorial_objective() -> String:
 	if not has_flag("prologue_arrived"):
 		if has_flag("in_cabin"):
 			return Loc.t(&"obj.cabin_ride")
+		if has_flag("dig_pending"):
+			return Loc.t(&"obj.dig")
 		if not is_home():
 			return Loc.t(&"obj.reach_station")
 		return Loc.t(&"obj.sleep_arrival")

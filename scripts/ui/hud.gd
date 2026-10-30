@@ -222,8 +222,14 @@ var _last_save_toast_time := 0
 
 
 ## priority: 0 — атмосфера (шёпот, ворон), 1 — обычное, 2 — авария/правило.
+static var log_subs := false   ## автотест: печатать каждый субтитр (проверка, что реплики пролога звучат)
+
+
 func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Color.TRANSPARENT) -> void:
 	var now := Time.get_ticks_msec()
+	if log_subs:
+		print("[sub] ", text.replace("
+", " ").left(90))
 	if priority < _sub_priority and now < _sub_until:
 		return
 	_sub_priority = priority

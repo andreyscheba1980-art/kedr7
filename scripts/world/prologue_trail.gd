@@ -1,6 +1,8 @@
 class_name PrologueTrail
 extends Node3D
-## Пролог: от высадки на зимнике до крыльца станции — узкая просека в тайге, ~330 м, около трёх минут.
+## Пролог: от застрявшего ГТ-Т до крыльца станции — узкая просека в тайге, ~210 м, минуты две.
+## События идут плотно, одно за другим: дизель за спиной глохнет и в тишине зовут по имени; в стороне
+## между елей стоит человек — посветишь, его нет; кто-то перебегает просеку прямо перед тобой.
 ## Ели стеной с двух сторон (Terrain сажает их вплотную к дороге), леер по обочине, дальше 15–20 м
 ## ничего не видно. События — не надписи, а то, что видно и слышно:
 ##   треск ствола и снег с еловой лапы; брошенные нарты Семёнова с запиской; кто-то перебегает
@@ -39,6 +41,9 @@ var _follower_t := 0.0
 var _sled_read := false
 var _wall_t := 0.0
 var _deep_warned := false
+var _figure: Node3D
+var _figure_seen := 0.0
+var _prop_said_ms := -100000
 
 
 ## Маршрут пролога: от высадки по зимнику к станции, точки через ~4 м с отметками рельефа.
@@ -99,6 +104,7 @@ func _ready() -> void:
 	_build_station_light()
 	_build_porch_log()
 	_build_bare_tracks()
+	_build_figure()
 
 
 func _process(delta: float) -> void:
@@ -133,17 +139,22 @@ func _once(id: StringName) -> bool:
 
 
 func _events(pp: Vector3) -> void:
+	if not Vehicle.talk_over():
+		return      # Михалыч ещё говорит — лес ждёт, чтобы его реплики не перебило
 	_trail_props(pp)
 	# Первое — в первые секунды: игрок должен сразу понять, что лес не пустой
-	if _progress > 12.0 and _once(&"crack"):
+	if _progress > 10.0 and _once(&"crack"):
 		_event_crack()
-	if _progress > 62.0 and _once(&"call"):
+	if _progress > 40.0 and _once(&"engine_dies"):
+		_event_engine_dies()
+	if _progress > 64.0 and _once(&"call"):
 		_event_call(pp)
-	if _progress > 118.0 and _looking_ahead() and _once(&"runner"):
+	_process_figure(pp)
+	if _progress > 108.0 and _looking_ahead() and _once(&"runner"):
 		_event_runner()
-	elif _progress > 150.0 and _once(&"runner"):
+	elif _progress > 128.0 and _once(&"runner"):
 		_event_runner()
-	if _progress > 175.0 and _once(&"kung"):
+	if Vector2(pp.x - Yard.ZIMNIK.x, pp.z - Yard.ZIMNIK.z).length() < 16.0 and _once(&"kung"):
 		Game.audio.play_3d(SFX_KNOCK, Yard.ZIMNIK + Vector3(4.5, 1.2, -3.2), 2.0, 6.0)   # дверь вахтовки хлопает на ветру
 	var d_izba := Vector2(pp.x - Yard.IZBA.x, pp.z - Yard.IZBA.z).length()
 	if d_izba < 38.0 and _once(&"izba_on"):
@@ -170,11 +181,18 @@ func _events(pp: Vector3) -> void:
 
 ## Вещи на обочине (LifeDressing.TRAIL_PROPS): у каждой — свой звук и короткая мысль (без озвучки).
 func _trail_props(pp: Vector3) -> void:
+	if Time.get_ticks_msec() - _prop_said_ms < 5000:
+		return      # две вещи подряд (прошёл обе, пока Михалыч договаривал) — мысли по очереди, не внахлёст
 	for i in LifeDressing.TRAIL_PROPS.size():
 		var id: String = LifeDressing.TRAIL_PROPS[i][0]
 		var pos: Vector3 = LifeDressing.trail_prop(i)[0]
 		var d := Vector2(pp.x - pos.x, pp.z - pos.z).length()
-		if d > 11.0 or not _once(StringName("prop_" + id)):
+		var at: float = LifeDressing.TRAIL_PROPS[i][1]
+		if at < 0.0:
+			at += length_m()
+		# Прошёл мимо, пока Михалыч договаривал (события ждали) — вещь всё равно «замечена», если ещё близко
+		var passed := _progress >= at and d < 24.0
+		if (d > 11.0 and not passed) or not _once(StringName("prop_" + id)):
 			continue
 		match id:
 			"trail_cross":
@@ -188,6 +206,8 @@ func _trail_props(pp: Vector3) -> void:
 				Game.audio.play_3d("res://assets/audio/tree_creak_v3.ogg", pos + Vector3(0, 2.5, 0), -2.0, 6.0)
 		if Game.hud != null:
 			Game.hud.subtitle(Loc.t(StringName("th.prop_" + id)), 4.5)
+		_prop_said_ms = Time.get_ticks_msec()
+		return
 
 
 func _clank_later(pos: Vector3, delay: float) -> void:
@@ -251,6 +271,19 @@ func _event_crack() -> void:
 	_think(&"th.crack")
 
 
+## Дизель Михалыча за спиной глохнет сам. Тишина — и из темноты сзади, оттуда, где тягач, шёпот: «Ви-тя».
+func _event_engine_dies() -> void:
+	Vehicle.engine_die()
+	await get_tree().create_timer(3.2, false).timeout
+	if not is_inside_tree() or Game.player == null:
+		return
+	var back := Game.player.global_position + Game.player.global_basis.z.normalized() * 10.0 + Vector3(0, 1.4, 0)
+	Game.audio.play_3d("res://assets/audio/whisper.ogg", back, -2.0, 10.0)
+	Game.hud.subtitle(Loc.t(&"pro.call_name"), 3.0)
+	Director.add_tension(10.0, "пролог: тягач заглох, зовут по имени")
+	_think_later(&"th.engine", 3.2)
+
+
 ## Свист из чащи слева, два раза; на второй — уже ближе и чуть позади. Зовут по имени, если остановиться.
 func _event_call(pp: Vector3) -> void:
 	var pt: Array = point_at(_progress + 6.0)
@@ -285,14 +318,18 @@ func _event_own_voice() -> void:
 	_think(&"th.own_voice")
 
 
-## Впереди, в конце луча, кто-то перебегает просеку слева направо. Быстро, пригнувшись.
+## Впереди, в луче, кто-то перебегает просеку слева направо — близко, слышно дыхание. Быстро, пригнувшись.
 func _event_runner() -> void:
-	var pd: Array = point_at(_progress + 24.0)
+	var pd: Array = point_at(_progress + 14.0)
 	var p: Vector3 = pd[0]
 	var dir: Vector3 = pd[1]
 	var side := Vector3(-dir.z, 0, dir.x)
 	var from := Terrain.at(p - side * 8.0)
 	var to := Terrain.at(p + side * 8.0)
+	Game.audio.play_3d("res://assets/sfx/breath_close.ogg", p + Vector3(0, 1.5, 0), 0.0, 10.0)
+	Game.audio.play_3d("res://assets/sfx/snow_steps_run.ogg", p, -2.0, 12.0)
+	if Game.player != null:
+		Game.player.shake(0.03, 0.4)
 	_runner = Creatures.make_silhouette()
 	add_child(_runner)
 	_runner.global_position = from
@@ -411,7 +448,7 @@ func _think_later(key: StringName, delay: float) -> void:
 
 ## Нарты Семёнова у обочины — перевёрнуты, рядом рюкзак. Записка — под ремнём.
 func _build_sled() -> void:
-	var pd: Array = point_at(78.0)
+	var pd: Array = point_at(70.0)
 	var p: Vector3 = pd[0]
 	var dir: Vector3 = pd[1]
 	var pos := Terrain.at(p + Vector3(-dir.z, 0, dir.x) * 3.4)
@@ -444,6 +481,43 @@ func _after_note() -> void:
 	if is_inside_tree() and Game.player != null:
 		var behind := Game.player.global_position + Game.player.global_basis.z * 30.0
 		Game.audio.play_3d(SFX_GUST, behind + Vector3(0, 3, 0), -2.0, 12.0)
+
+
+## Человек между елей сбоку от просеки: стоит неподвижно на краю луча. Посветишь прямо — его нет,
+## только снег осыпается с лапы и в стороне хрустят шаги. Не посмотрел — исчезает, когда проходишь мимо.
+func _build_figure() -> void:
+	var pd: Array = point_at(86.0)
+	var p: Vector3 = pd[0]
+	var dir: Vector3 = pd[1]
+	var side := Vector3(dir.z, 0, -dir.x)
+	_figure = Creatures.make_silhouette()
+	add_child(_figure)
+	_figure.global_position = Terrain.at(p + side * 9.0 + dir * 6.0)
+	_figure.look_at(Vector3(p.x, _figure.global_position.y, p.z), Vector3.UP)
+	_figure.visible = false
+
+
+func _process_figure(pp: Vector3) -> void:
+	if _figure == null or not is_instance_valid(_figure):
+		return
+	if not _figure.visible:
+		if _progress > 72.0 and not _done.has(&"figure"):
+			_figure.visible = true
+		return
+	var fp := _figure.global_position
+	var d := Vector2(pp.x - fp.x, pp.z - fp.z).length()
+	var lit := Game.player.flashlight != null and Game.player.flashlight.visible
+	if lit and d < 30.0 and Game.player.is_looking_at(fp + Vector3(0, 1.4, 0), 9.0):
+		_figure_seen += get_process_delta_time()
+	if _figure_seen > 0.35 or _progress > 100.0:
+		_done[&"figure"] = true
+		_figure.queue_free()
+		_figure = null
+		if _figure_seen > 0.35:
+			Game.audio.play_3d(SFX_SNOW, fp + Vector3(0, 2.5, 0), -2.0, 8.0)
+			Game.audio.play_snow_steps(fp + Vector3(3, 0, -2), 3, -4.0, 8.0, 0.5)
+			Director.add_tension(8.0, "пролог: человек между елей")
+			_think_later(&"th.figure", 0.8)
 
 
 ## Свет в окне избы: зажигается издалека, гаснет, когда подходишь.

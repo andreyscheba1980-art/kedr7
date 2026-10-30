@@ -536,8 +536,16 @@ func _close_ui() -> void:
 
 
 func _open_pause() -> void:
+	if _pause != null or _ending or not is_inside_tree():
+		return
 	_pause = PauseMenu.new()
 	add_child(_pause)
+	if not _pause.is_inside_tree():
+		# Сессия как раз собирает детей (загрузка, переход фазы) — меню не встало. Без меню паузу не
+		# ставим: иначе мир замирает и снять его нечем (свернул окно → картинка встала навсегда).
+		_pause.free()
+		_pause = null
+		return
 	get_tree().paused = Net.role == ""   # в коопе мир не встаёт: у напарника ночь идёт дальше
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_pause.resume_requested.connect(_close_pause)
@@ -767,8 +775,9 @@ func _page(text: String) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if Net.role == "" and _pause == null and not _ending and not get_tree().paused and not Game.dead \
-				and Game.player != null and Game.player.mode != Player.Mode.LOCKED and not OS.get_cmdline_user_args().has("--tour"):
-			_open_pause()
+				and Game.player != null and Game.player.mode != Player.Mode.LOCKED and not OS.get_cmdline_user_args().has("--tour") \
+				and not OS.get_cmdline_user_args().has("--prologue_b"):
+			_open_pause.call_deferred()   # фокус уходит и посреди загрузки, когда add_child() нельзя
 
 
 func _exit_tree() -> void:
