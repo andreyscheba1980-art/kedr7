@@ -19,7 +19,9 @@ static var _shader: Shader
 ## height — высота в метрах (≤0 — масштаб scale). opts:
 ##   scale: float — явный масштаб; tint: Color; collide: bool; shadow: bool; grime: float (0..1);
 ##   bright: float — яркость (снег светлее, 0.5 — по умолчанию); sat: float — насыщенность (0.6; запечённым — 1.0);
-##   tilt: Vector3 — доп. поворот в градусах (x, z) для «упавших» вещей; center: bool (по умолчанию true).
+##   tilt: Vector3 — доп. поворот в градусах (x, z) для «упавших» вещей; center: bool (по умолчанию true);
+##   keep: bool — модель в своих координатах как есть, без посадки низа на pos.y (center: false низ всё равно
+##   сажает: модели «в координатах игры» с фундаментом ниже нуля или на чердаке иначе съезжают по высоте).
 static func spawn(parent: Node, id: String, pos: Vector3, yaw_deg := 0.0, height := -1.0, opts := {}) -> Node3D:
 	var ps := _scene(id)
 	if ps == null:
@@ -40,6 +42,8 @@ static func spawn(parent: Node, id: String, pos: Vector3, yaw_deg := 0.0, height
 	inst.scale = Vector3.ONE * s
 	var ctr := bb.get_center()
 	var off := Vector3(ctr.x, bb.position.y, ctr.z) if opts.get("center", true) else Vector3(0, bb.position.y, 0)
+	if opts.get("keep", false):
+		off = Vector3.ZERO
 	inst.position = -off * s
 	root.add_child(inst)
 	_restyle(inst, opts)

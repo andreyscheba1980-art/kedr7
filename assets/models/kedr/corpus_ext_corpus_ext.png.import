@@ -2,14 +2,14 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cbv0q084f4hju"
+uid="uid://d0f4oy6p820k7"
 path.s3tc="res://.godot/imported/corpus_ext_corpus_ext.png-d32fcf72530e407a398c0a00342c04fb.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "60f4c63e146007730744d0db9da7d7fe"
+"md5": "94b3616b18d0e9cdbdf087656803c0c6"
 }
 
 [deps]

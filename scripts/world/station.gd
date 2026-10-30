@@ -1547,7 +1547,7 @@ func _build_living_quarters() -> void:
 
 	# Чайник на горячей печи
 	_kettle = Props.kettle()
-	_kettle.position = Vector3(-1.5, 1.35, 1.0)
+	_kettle.position = Vector3(-1.67, 1.35, 1.15)   # на левой конфорке: по центру плиты он уходил в трубу
 	_kettle.scale = Vector3(0.85, 0.85, 0.85)
 	add_child(_kettle)
 
@@ -3444,7 +3444,7 @@ func _build_attic() -> void:
 
 	# Чердачный хлам вдоль скатов (tools/blender/house_props.py attic_junk, координаты игры): газеты, чемоданы,
 	# ковёр, бутыли, веники, лыжи, манекен под простынёй, люлька. Проход посередине свободен.
-	if Models.spawn(self, "kedr/attic_junk", Vector3.ZERO, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.4, "sat": 1.0}) != null:
+	if Models.spawn(self, "kedr/attic_junk", Vector3.ZERO, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.4, "sat": 1.0}) != null:
 		for e: Array in [[Vector3(0.7, 0.5, 0.45), Vector3(-1.6, 3.18, 5.2)], [Vector3(0.5, 1.3, 0.5), Vector3(13.6, 3.6, 4.9)],
 				[Vector3(0.55, 0.45, 0.4), Vector3(7.4, 3.15, 5.6)], [Vector3(0.5, 0.45, 0.4), Vector3(0.2, 3.15, 1.0)]]:
 			_collider(e[0], e[1])

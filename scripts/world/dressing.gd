@@ -172,7 +172,7 @@ static func _sites(st: Node3D) -> void:
 		sb.position = iz + Vector3(5.5, 0.35, 2.0)
 		sb.add_child(Geo.box_shape(Vector3(1.6, 0.6, 0.9)))
 		st.add_child(sb)
-	_m(st, "town/wheel", Yard.SHED + Vector3(-3.2, 0, -1.0), 15.0, 0.9, {"tilt": Vector3(0, 0, 14)})
+	_m(st, "town/wheel", Yard.SHED + Vector3(-4.55, 0, -2.7), 90.0, 0.9, {"tilt": Vector3(0, 0, 14)})   # прислонено к стене снаружи, не в проходе
 	_m(st, "town/planks", Yard.SHED + Vector3(-2.5, 0, 2.5), 10.0, 0.12)
 	# Дизельная: шкаф управления в углу, ящик с ЗИПом
 	var c := Vector3(14.5, 0.05, -13.5)

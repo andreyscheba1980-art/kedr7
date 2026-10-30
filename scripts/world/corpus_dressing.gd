@@ -317,8 +317,8 @@ func _draw_chart_paper(c: Control) -> void:
 
 func _build_posters() -> void:
 	var tf := UiStyle.type_font()
-	# Аппаратная: схема включения анеморумбометра (на перегородке, лицом на запад)
-	var ps := Vector3(94.705, FL + 1.65, -32.3)
+	# Аппаратная: схема включения анеморумбометра (на перегородке, лицом на запад; дверь в коридор — z −31.8…−30.9)
+	var ps := Vector3(94.705, FL + 1.65, -33.05)
 	_sheet(ps, -PI * 0.5, Vector2(1.1, 0.8), Loc.t(&"corpus.poster_scheme"))
 	var ink := _mat(Color(0.15, 0.15, 0.18))
 	for b: Array in [[Vector3(0, 0.15, 0.3), Vector3(0.006, 0.12, 0.2)], [Vector3(0, 0.15, -0.3), Vector3(0.006, 0.12, 0.2)],
@@ -326,22 +326,23 @@ func _build_posters() -> void:
 			[Vector3(0, 0.0, -0.3), Vector3(0.006, 0.18, 0.006)], [Vector3(0, -0.08, 0.0), Vector3(0.006, 0.006, 0.6)]]:
 		_box(b[1], ps + Vector3(-0.004, 0, 0) + b[0], ink)
 	# Кабинет наблюдателя: календарь (над столом, на западной стене) и карта района (на перегородке)
-	_sheet(Vector3(90.42, FL + 1.6, -24.7), PI * 0.5, Vector2(0.42, 0.55), Loc.t(&"corpus.calendar_title"), Loc.t(&"corpus.calendar_days"), tf)
+	# календарь — на простенке между перегородкой тамбура и окном (окно z −24.75…−23.65)
+	var cal_z := -25.35
+	_sheet(Vector3(90.42, FL + 1.6, cal_z), PI * 0.5, Vector2(0.42, 0.55), Loc.t(&"corpus.calendar_title"), Loc.t(&"corpus.calendar_days"), tf)
 	for d in 13:
 		var col := d % 7
 		var row := d / 7
-		_label("×", Vector3(90.426, FL + 1.53 - row * 0.042, -24.85 + col * 0.044), PI * 0.5, 34, UiStyle.plate_font(), Color(0.65, 0.1, 0.08, 0.9))
+		_label("×", Vector3(90.426, FL + 1.53 - row * 0.042, cal_z - 0.15 + col * 0.044), PI * 0.5, 34, UiStyle.plate_font(), Color(0.65, 0.1, 0.08, 0.9))
 	var map_pos := Vector3(92.6, FL + 1.55, -25.83)
 	_sheet(map_pos, 0.0, Vector2(1.2, 0.85), Loc.t(&"corpus.map_title"), "", null, Color(0.82, 0.84, 0.74))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 83
-	for k in 9:   # реки и зимники карандашом
-		_box(Vector3(rng.randf_range(0.2, 0.6), 0.006, 0.006), map_pos + Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-0.3, 0.25), 0.006), _mat(Color(0.2, 0.3, 0.5)), Vector3(0, 0, rng.randf_range(-1.0, 1.0)))
+	_draw_district_map(map_pos)
 	for k in 5:   # флажки-булавки
 		_cyl(0.008, 0.02, map_pos + Vector3(rng.randf_range(-0.4, 0.4), rng.randf_range(-0.3, 0.25), 0.012), _mat(Color(0.75, 0.08, 0.06), 0.3), Vector3(PI * 0.5, 0, 0))
 	_label(Loc.t(&"corpus.map_note"), map_pos + Vector3(0.28, -0.32, 0.008), 0.0, 22, UiStyle.hand_font(), Color(0.65, 0.1, 0.08))
 	# Коридор: плакат и доска приказов с бумагами (лицом на восток)
-	_sheet(Vector3(94.9, FL + 1.6, -22.6), PI * 0.5, Vector2(0.6, 0.82), Loc.t(&"corpus.poster_title"), Loc.t(&"corpus.poster_body"), UiStyle.plate_font(false), Color(0.85, 0.78, 0.62))
+	_sheet(Vector3(94.9, FL + 1.6, -21.6), PI * 0.5, Vector2(0.6, 0.82), Loc.t(&"corpus.poster_title"), Loc.t(&"corpus.poster_body"), UiStyle.plate_font(false), Color(0.85, 0.78, 0.62))
 	_sheet(Vector3(94.915, FL + 1.66, -29.85), PI * 0.5, Vector2(0.3, 0.36), Loc.t(&"corpus.order_title"), Loc.t(&"corpus.order_body"), tf)
 	_sheet(Vector3(94.915, FL + 1.6, -29.35), PI * 0.5, Vector2(0.28, 0.3), Loc.t(&"corpus.sched_title"), Loc.t(&"corpus.sched_body"), tf)
 	_sheet(Vector3(94.915, FL + 1.38, -29.65), PI * 0.5, Vector2(0.26, 0.16), "", "", null, Color(0.9, 0.88, 0.8))
@@ -356,7 +357,7 @@ func _build_posters() -> void:
 	_box(Vector3(0.008, 0.08, 0.004), clk + Vector3(0.022, 0.03, 0.024), _mat(Color(0.05, 0.05, 0.05)), Vector3(0, 0, -deg_to_rad(95.0)))    # 3 ч
 	_box(Vector3(0.006, 0.12, 0.004), clk + Vector3(0.03, -0.04, 0.026), _mat(Color(0.05, 0.05, 0.05)), Vector3(0, 0, -deg_to_rad(240.0)))   # 10 мин
 	# Тамбур: «Не забывай про леер»
-	_sheet(Vector3(91.0, FL + 1.75, -25.99), PI, Vector2(0.5, 0.3), Loc.t(&"corpus.leer_title"), Loc.t(&"corpus.leer_body"), UiStyle.plate_font(false), Color(0.85, 0.75, 0.5))
+	_sheet(Vector3(91.0, FL + 1.75, -26.015), PI, Vector2(0.5, 0.3), Loc.t(&"corpus.leer_title"), Loc.t(&"corpus.leer_body"), UiStyle.plate_font(false), Color(0.85, 0.75, 0.5))
 
 
 # --- Мелочи на столах ------------------------------------------------------------------------
@@ -375,13 +376,94 @@ func _build_clutter() -> void:
 		_box(Vector3(0.21, 0.002, 0.3), desk + Vector3(-0.1 + k * 0.01, 0.002 + k * 0.002, 0.15 + k * 0.012), _mat(Color(0.86, 0.84, 0.76)), Vector3(0, k * 0.12 - 0.2, 0))
 	# Буржуйка: эмалированный чайник
 	var st := MeteoCorpus.STOVE_POS
-	_cyl(0.09, 0.14, st + Vector3(0.05, 0.8, 0.0), _mat(Color(0.25, 0.4, 0.55), 0.3))
-	_box(Vector3(0.1, 0.02, 0.02), st + Vector3(0.05, 0.92, 0.0), _mat(Color(0.1, 0.1, 0.1)))
-	# Кабинет: ватник на гвозде у двери
-	_box(Vector3(0.45, 0.85, 0.14), Vector3(94.6, FL + 1.25, -21.0), _mat(Color(0.2, 0.22, 0.16)))
+	_cyl(0.09, 0.14, st + Vector3(0.17, 0.8, 0.0), _mat(Color(0.25, 0.4, 0.55), 0.3))   # с краю плиты — посередине труба
+	_box(Vector3(0.1, 0.02, 0.02), st + Vector3(0.17, 0.92, 0.0), _mat(Color(0.1, 0.1, 0.1)))
+	# Кабинет: телогрейка на колышке у двери — вплотную к перегородке (её плоскость x = 94.73)
+	_build_quilted_jacket(Vector3(94.66, FL, -21.0))
 	# Кабина башни: бинокль и журнал шаров
 	_cyl(0.025, 0.12, Vector3(95.08, CAB + 0.8, -36.6), _mat(Color(0.1, 0.1, 0.1), 0.4), Vector3(0, 0, PI * 0.5))
 	_cyl(0.025, 0.12, Vector3(95.08, CAB + 0.8, -36.55), _mat(Color(0.1, 0.1, 0.1), 0.4), Vector3(0, 0, PI * 0.5))
+
+
+## Карта района на листе (лицом на +z): сетка, река с притоком, озеро, горизонтали сопки, зимник
+## пунктиром, станция, изба, ретранслятор, стрелка севера и масштаб. Раньше — случайные чёрточки.
+func _draw_district_map(base: Vector3) -> void:
+	var grid := _mat(Color(0.55, 0.62, 0.68))
+	var water := _mat(Color(0.18, 0.32, 0.62))
+	var relief := _mat(Color(0.55, 0.36, 0.2))
+	var road := _mat(Color(0.35, 0.22, 0.12))
+	var ink := _mat(Color(0.08, 0.08, 0.1))
+	var forest := _mat(Color(0.22, 0.42, 0.24))
+	for k in 7:
+		_map_seg(base, Vector2(-0.54 + k * 0.18, -0.38), Vector2(-0.54 + k * 0.18, 0.3), 0.0025, grid)
+	for k in 4:
+		_map_seg(base, Vector2(-0.56, -0.34 + k * 0.2), Vector2(0.56, -0.34 + k * 0.2), 0.0025, grid)
+	_map_line(base, [Vector2(-0.57, -0.02), Vector2(-0.4, -0.06), Vector2(-0.24, -0.16), Vector2(-0.05, -0.13), Vector2(0.12, -0.2), Vector2(0.3, -0.17), Vector2(0.45, -0.27), Vector2(0.57, -0.3)], 0.011, water)
+	_map_line(base, [Vector2(-0.05, -0.13), Vector2(0.0, 0.0), Vector2(-0.06, 0.12), Vector2(-0.02, 0.26)], 0.006, water)
+	_cyl(0.05, 0.002, base + Vector3(-0.33, 0.13, 0.007), water, Vector3(PI * 0.5, 0, 0)).scale = Vector3(1.6, 1.0, 1.0)
+	for r: float in [0.05, 0.09, 0.13]:
+		var pts: Array = []
+		for i in 13:
+			var a2 := i * TAU / 12.0
+			pts.append(Vector2(0.3 + cos(a2) * r * 1.3, 0.1 + sin(a2) * r))
+		_map_line(base, pts, 0.003, relief)
+	var zim := [Vector2(-0.56, -0.35), Vector2(-0.38, -0.27), Vector2(-0.2, -0.3), Vector2(0.02, -0.24), Vector2(0.1, -0.05)]
+	for i in zim.size() - 1:
+		var a3: Vector2 = zim[i]
+		var b3: Vector2 = zim[i + 1]
+		for d in 4:      # пунктир
+			_map_seg(base, a3.lerp(b3, d / 4.0), a3.lerp(b3, d / 4.0 + 0.14), 0.006, road)
+	_box(Vector3(0.03, 0.03, 0.003), base + Vector3(0.1, -0.05, 0.008), _mat(Color(0.75, 0.08, 0.06)))   # станция
+	_box(Vector3(0.016, 0.016, 0.003), base + Vector3(-0.2, 0.05, 0.008), ink)                            # изба
+	_box(Vector3(0.016, 0.016, 0.003), base + Vector3(0.36, 0.22, 0.008), ink)                            # ретранслятор на сопке
+	_map_seg(base, Vector2(0.36, 0.215), Vector2(0.36, 0.26), 0.003, ink)
+	_label("Кедр-7", base + Vector3(0.1, -0.09, 0.009), 0.0, 18, UiStyle.hand_font(), Color(0.65, 0.1, 0.08))
+	_label("изба", base + Vector3(-0.2, 0.02, 0.009), 0.0, 14, UiStyle.hand_font(), Color(0.12, 0.12, 0.14))
+	_label("РТР", base + Vector3(0.36, 0.29, 0.009), 0.0, 14, UiStyle.hand_font(), Color(0.12, 0.12, 0.14))
+	var frng := RandomNumberGenerator.new()
+	frng.seed = 7
+	for k in 40:     # значки леса
+		var fp := Vector2(frng.randf_range(-0.55, 0.55), frng.randf_range(-0.36, 0.28))
+		if fp.distance_to(Vector2(0.3, 0.1)) < 0.2 or fp.distance_to(Vector2(-0.33, 0.13)) < 0.1:
+			continue
+		_map_seg(base, fp, fp + Vector2(-0.008, -0.014), 0.003, forest)
+		_map_seg(base, fp, fp + Vector2(0.008, -0.014), 0.003, forest)
+	_map_seg(base, Vector2(0.52, 0.12), Vector2(0.52, 0.24), 0.004, ink)       # север
+	_map_seg(base, Vector2(0.52, 0.24), Vector2(0.505, 0.21), 0.004, ink)
+	_map_seg(base, Vector2(0.52, 0.24), Vector2(0.535, 0.21), 0.004, ink)
+	_label("С", base + Vector3(0.52, 0.27, 0.009), 0.0, 16, UiStyle.plate_font(), Color(0.08, 0.08, 0.1))
+	_map_seg(base, Vector2(-0.54, -0.39), Vector2(-0.34, -0.39), 0.005, ink)   # масштабная линейка
+	for k in 3:
+		_map_seg(base, Vector2(-0.54 + k * 0.1, -0.385), Vector2(-0.54 + k * 0.1, -0.4), 0.003, ink)
+
+
+func _map_seg(base: Vector3, a: Vector2, b: Vector2, w: float, mat: Material) -> void:
+	var d := b - a
+	var mid := (a + b) * 0.5
+	_box(Vector3(d.length() + w * 0.5, w, 0.002), base + Vector3(mid.x, mid.y, 0.007), mat, Vector3(0, 0, atan2(d.y, d.x)))
+
+
+func _map_line(base: Vector3, pts: Array, w: float, mat: Material) -> void:
+	for i in pts.size() - 1:
+		_map_seg(base, pts[i], pts[i + 1], w, mat)
+
+
+## Телогрейка на колышке, лицом на запад: плечи, полы, рукава вдоль, стёжка поперёк, пуговицы.
+func _build_quilted_jacket(at: Vector3) -> void:
+	var cloth := _mat(Color(0.2, 0.22, 0.16))
+	var seam := _mat(Color(0.12, 0.13, 0.09))
+	_box(Vector3(0.1, 0.025, 0.025), at + Vector3(0.03, 1.84, 0.0), _mat(Color(0.3, 0.22, 0.14)))         # колышек
+	_box(Vector3(0.11, 0.1, 0.36), at + Vector3(0.0, 1.76, 0.0), cloth, Vector3(0, 0, 0))                  # плечи у колышка
+	_box(Vector3(0.13, 0.66, 0.5), at + Vector3(-0.005, 1.38, 0.0), cloth)                                 # спина и полы
+	_box(Vector3(0.12, 0.12, 0.46), at + Vector3(-0.005, 1.0, 0.0), cloth, Vector3(0.0, 0.0, 0.04))        # подол, чуть отвисший
+	for sgn: float in [-1.0, 1.0]:
+		_box(Vector3(0.1, 0.62, 0.12), at + Vector3(-0.01, 1.4, sgn * 0.3), cloth, Vector3(sgn * 0.07, 0, 0))   # рукава
+		_box(Vector3(0.105, 0.06, 0.125), at + Vector3(-0.012, 1.1, sgn * 0.32), seam, Vector3(sgn * 0.07, 0, 0))   # манжеты
+	for k in 7:   # стёжка поперёк
+		_box(Vector3(0.004, 0.006, 0.5), at + Vector3(-0.072, 1.08 + k * 0.1, 0.0), seam)
+	_box(Vector3(0.004, 0.68, 0.006), at + Vector3(-0.073, 1.38, 0.02), seam)   # борт
+	for k in 4:
+		_cyl(0.014, 0.008, at + Vector3(-0.075, 1.2 + k * 0.14, -0.02), _mat(Color(0.08, 0.08, 0.08), 0.4), Vector3(0, 0, PI * 0.5))
 
 
 ## Пыль в лучах ламп аппаратной и коридора — когда есть свет.

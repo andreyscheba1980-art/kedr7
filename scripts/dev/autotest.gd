@@ -2553,6 +2553,34 @@ func _tour(args: PackedStringArray) -> void:
 	if args.has("perfphys"):
 		await _perf_phys()
 		return
+	if args.has("revisit"):
+		await _revisit()
+		get_tree().quit()
+		return
+	if args.has("floatscan"):
+		_float_scan()
+		await _wait(1.0)
+		get_tree().quit()
+		return
+	if args.has("corpusgen"):   # дизель корпуса: завести, зайти внутрь, минуту следить, не глохнет ли
+		var mc: MeteoCorpus = Game.yard.find_children("*", "MeteoCorpus", true, false)[0]
+		var gen: Interactable = mc.find_child("CorpusGenerator", true, false)
+		_look(Vector3(100.6, 0.05, -29.0), gen.global_position)
+		var tries := 0
+		while not mc.powered and tries < 8:
+			gen.used.emit(Game.player)
+			tries += 1
+			await _wait(1.6)
+		print("[cg] завёлся=%s за %d рывков" % [mc.powered, tries])
+		_tp(Vector3(93.0, 0.5, -26.5), 90.0)
+		for k in 90:
+			await _wait(1.0)
+			if k % 10 == 0 or not mc.powered:
+				print("[cg] t=%d powered=%s engine=%s zone=%s" % [k, mc.powered, mc._engine.playing, Game.zone])
+			if not mc.powered:
+				break
+		get_tree().quit()
+		return
 	if args.has("trailprops"):
 		for ti in LifeDressing.TRAIL_PROPS.size():
 			var pr := LifeDressing.trail_prop(ti)
@@ -3234,6 +3262,143 @@ func _fv_test() -> void:
 	await _shot("fv_lured")
 	await _wait(2.0)
 	print("[fvtest] итог: умер=%s, стадия %s" % [Game.dead, Game.yrka.stage_name()])
+
+
+## Кадры с тех же мест, что F9-отчёты 1.32.0-test (позиция, поворот, наклон взгляда) — сравнить «было/стало».
+const REVISIT := [
+	["161048", Vector3(2.67, 0.05, 1.89), 177, -0.18],
+	["161059", Vector3(-1.13, 0.05, 3.36), 7, 0.29],
+	["161247", Vector3(8.139999, 0.05, 0.09), -108, -0.43],
+	["161744", Vector3(82.88, 0.0, -26.15), -84, -0.21],
+	["161755", Vector3(85.09, 0.0, -25.17), -62, -0.31],
+	["161808", Vector3(97.82999, 0.45, -25.29), 17, 0.05],
+	["161819", Vector3(96.38, 0.45, -21.7), -83, -0.91],
+	["161839", Vector3(96.03, 0.45, -22.64), 88, -0.05],
+	["161844", Vector3(92.74, 0.45, -24.88), 3, 0.04],
+	["161850", Vector3(92.56, 0.45, -25.06), 115, -0.22],
+	["161909", Vector3(93.1, 0.45, -22.03), -137, -0.15],
+	["161934", Vector3(97.00999, 0.45, -30.91), -24, -0.32],
+	["161947", Vector3(94.25, 0.45, -31.1), -12, 0.02],
+	["161951", Vector3(95.62, 0.45, -31.79), -0, 0.02],
+	["161957", Vector3(99.34, 0.45, -36.71), 164, -0.48],
+	["161959", Vector3(99.48, 0.45, -36.17), 15, -0.44],
+	["162006", Vector3(96.61, 2.42, -37.19), -179, 0.09],
+	["162010", Vector3(96.64, 2.15, -37.48), -177, -0.26],
+	["162031", Vector3(96.04, 9.75, -37.38), 8, -0.25],
+	["162036", Vector3(95.57, 9.75, -38.98), 89, -0.31],
+	["162041", Vector3(93.93999, 9.74, -39.56), -134, 0.21],
+	["162051", Vector3(98.3, 9.639999, -38.3), -46, -0.65],
+	["162110", Vector3(91.86, 0.45, -26.92), 72, -0.34],
+	["162211", Vector3(100.64, 0.0, -28.9), 5, 0.04],
+	["162214", Vector3(100.72, 0.0, -30.24), 12, -0.23],
+	["162215", Vector3(100.5, 0.0, -30.24), 12, -0.23],
+	["162626", Vector3(43.84, 0.0, 34.62), -28, -0.29],
+	["162910", Vector3(8.67, 0.05, -0.49), -41, -0.74],
+	["163756", Vector3(26.77, 0.0, -1.67), -57, -0.1],
+	["163953", Vector3(91.16, 0.45, -27.32), 98, -0.18],
+	["164113", Vector3(101.95, 0.0, -22.95), -18, -0.1],
+]
+
+
+func _revisit() -> void:
+	Game.hud.visible = false
+	if OS.get_cmdline_user_args().has("extra"):   # контрольные кадры исправлений 1.33
+		var mc: MeteoCorpus = MeteoCorpus.instance
+		for v: Array in [["des", Vector3(100.55, 0.2, -30.75), Vector3(100.2, 0.7, -32.6)], ["des_tank", Vector3(100.9, 0.2, -31.0), Vector3(99.5, 1.4, -31.3)],
+				["cab_corner", Vector3(95.6, 9.8, -37.9), Vector3(94.7, 10.6, -38.8)], ["kettle", Vector3(-1.5, 0.05, 2.6), Vector3(-1.6, 1.3, 1.1)],
+				["attic_brooms", Vector3(0.5, 2.95, 3.3), Vector3(2.6, 3.9, 3.3)], ["izba_in", Vector3(-14.2, 0.2, -29.0), Vector3(-18.5, 1.0, -31.0)],
+				["shed_door", Vector3(38.5, 0.05, 32.0), Vector3(44.5, 1.0, 34.0)], ["map", Vector3(92.6, 0.45, -24.3), Vector3(92.6, 2.0, -25.83)],
+				["balcony", Vector3(97.5, 9.8, -39.6), Vector3(95.0, 10.6, -39.4)], ["coat", Vector3(92.8, 0.45, -21.6), Vector3(94.7, 1.6, -21.0)]]:
+			if v[0] == "des" and mc != null:
+				mc.call(&"_set_power", true)
+			Game.player.set_flashlight(true)
+			_look(v[1], v[2])
+			await _wait(1.0)
+			await _shot("ex_" + String(v[0]))
+		return
+	for r: Array in REVISIT:
+		var pos: Vector3 = r[1]
+		_tp(pos, float(r[2]))
+		if Game.player.head != null:
+			Game.player.head.rotation.x = asin(clampf(float(r[3]), -1.0, 1.0))
+		Game.player.set_flashlight(true)
+		await _wait(0.9)
+		await _shot("rv_" + String(r[0]))
+
+
+## Поиск «висящих» вещей: для каждой отдельной небольшой геометрии — есть ли опора снизу (коллизия или
+## верх другой геометрии под ней), стена сбоку или потолок сверху. Цельные запечённые модели (дом, корпус)
+## одним мешем сюда не попадают — их смотрим кадрами.
+func _float_scan() -> void:
+	var space := Game.player.get_world_3d().direct_space_state
+	var metas: Array = []
+	for n in Game.level.find_children("*", "GeometryInstance3D", true, false):
+		var g := n as GeometryInstance3D
+		if not g.is_visible_in_tree() or g is GPUParticles3D or g is CPUParticles3D or g is Label3D:
+			continue
+		var bb: AABB = g.global_transform * g.get_aabb()
+		metas.append([g, bb])
+	var found := 0
+	var small := 0
+	print("[float] геометрий: ", metas.size(), " level=", Game.level)
+	for m in metas:
+		var g: GeometryInstance3D = m[0]
+		var bb: AABB = m[1]
+		var sz := bb.size
+		if sz.x > 3.5 or sz.z > 3.5 or sz.y > 4.0 or maxf(sz.x, maxf(sz.y, sz.z)) < 0.15:
+			continue
+		var bottom := bb.position.y
+		small += 1
+		if bottom < 0.12:
+			continue      # стоит на земле/полу первого этажа
+		var c := bb.get_center()
+		var probe := func(from: Vector3, to: Vector3) -> bool:
+			var q := PhysicsRayQueryParameters3D.create(from, to, Geo.LAYER_WORLD | Geo.LAYER_INTERACT)
+			return not space.intersect_ray(q).is_empty()
+		# опора снизу: луч из-под низа вниз на 10 см (с центра и четырёх углов внутрь)
+		var supported := false
+		for o: Vector3 in [Vector3.ZERO, Vector3(sz.x * 0.35, 0, sz.z * 0.35), Vector3(-sz.x * 0.35, 0, -sz.z * 0.35), Vector3(sz.x * 0.35, 0, -sz.z * 0.35), Vector3(-sz.x * 0.35, 0, sz.z * 0.35)]:
+			var p: Vector3 = Vector3(c.x, bottom + 0.04, c.z) + o
+			if probe.call(p, p - Vector3(0, 0.14, 0)):
+				supported = true
+				break
+		if not supported:
+			for m2 in metas:
+				if m2[0] == g:
+					continue
+				var b2: AABB = m2[1]
+				if b2.size.x > 3.5 or b2.size.z > 3.5:
+					continue
+				if absf(b2.end.y - bottom) < 0.08 and b2.end.y < c.y and b2.position.x < bb.end.x and b2.end.x > bb.position.x and b2.position.z < bb.end.z and b2.end.z > bb.position.z:
+					supported = true
+					break
+		if supported:
+			continue
+		# стена сбоку или потолок сверху
+		var attached: bool = probe.call(Vector3(c.x, bb.end.y - 0.04, c.z), Vector3(c.x, bb.end.y + 0.15, c.z))
+		if not attached:
+			for d: Vector3 in [Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1)]:
+				var reach: float = absf(d.x) * sz.x * 0.5 + absf(d.z) * sz.z * 0.5 + 0.15
+				if probe.call(c, c + d * reach):
+					attached = true
+					break
+		if attached:
+			continue
+		# соседняя геометрия вплотную (на стене-модели без коллизии, на столбе)
+		for m2 in metas:
+			if m2[0] == g:
+				continue
+			var b2: AABB = m2[1]
+			if b2.size.x > 3.5 or b2.size.z > 3.5 or b2.size.y > 4.0:
+				continue
+			if b2.size.length() > 0.3 and b2.grow(0.06).intersects(bb) and not bb.encloses(b2):
+				attached = true
+				break
+		if attached:
+			continue
+		found += 1
+		print("[float] %s  низ %.2f  центр (%.1f, %.1f, %.1f)  размер (%.2f, %.2f, %.2f)" % [g.get_path().get_concatenated_names().right(70), bottom, c.x, c.y, c.z, sz.x, sz.y, sz.z])
+	print("[float] небольших: ", small, ", подозрительных: ", found)
 
 
 func _look(pos: Vector3, target: Vector3) -> void:

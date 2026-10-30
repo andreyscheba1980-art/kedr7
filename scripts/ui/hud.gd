@@ -331,8 +331,15 @@ func toast(text: String, duration := 2.5) -> void:
 
 func show_note(text: String) -> void:
 	_note_label.text = text + "\n\n" + Loc.t(&"ui.close_e")
-	# Длинные страницы (журнал с дописками) — мельче, чтобы влезали в лист.
-	_note_label.add_theme_font_size_override("font_size", 17 if text.length() < 900 else 15 if text.length() < 1250 else 14)
+	# Длинные страницы (журнал с дописками) — мельче, пока не влезут в лист: панель растёт под текст,
+	# и журнал Семёнова уезжал низом за экран.
+	for fs: int in [17, 16, 15, 14, 13, 12, 11]:
+		_note_label.add_theme_font_size_override("font_size", fs)
+		if _note_label.get_line_count() * _note_label.get_line_height() <= 530:
+			break
+	_note_panel.offset_top = -290.0     # контейнер мог вырасти под прошлую страницу — вернуть лист
+	_note_panel.offset_bottom = 290.0
+	_subtitle.visible = false     # иначе субтитр лезет из-под листа обрывками
 	if _note_backdrop != null:
 		_note_backdrop.visible = true
 	_note_panel.visible = true
@@ -344,6 +351,7 @@ func hide_note() -> void:
 	if _note_backdrop != null:
 		_note_backdrop.visible = false
 	_note_panel.visible = false
+	_subtitle.visible = true
 	if Game.player != null and Game.player.mode == Player.Mode.READING and not Game.dead:
 		Game.player.mode = Player.Mode.WALK
 

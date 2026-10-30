@@ -2,14 +2,14 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://xxij1gw8qict"
+uid="uid://duixec570wdxr"
 path.s3tc="res://.godot/imported/corpus_furn_corpus_furn.png-5656b0df494bcc00dcd0e63f1cb0e434.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "f7bbda9871c5a8eaa96ddb6dcc8117ad"
+"md5": "4243cd0eaa8e1eabfbd923cd0db33529"
 }
 
 [deps]

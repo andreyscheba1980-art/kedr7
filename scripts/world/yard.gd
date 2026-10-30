@@ -125,7 +125,7 @@ func _ready() -> void:
 	paths.append(PackedVector3Array([JUNCTION, FORK, Vector3(40, 0, -14), Vector3(50, 0, -24), Vector3(58, 0, -28.5), Vector3(72, 0, -29.5), Vector3(84, 0, -27.6), CORPUS_PORCH]))
 	paths.append(PackedVector3Array([Vector3(58, 0, -28.5), Vector3(57.5, 0, -22.0), PLOT + Vector3(-5.6, 0, 0)]))   # к калитке приборной площадки
 	paths.append(PackedVector3Array([FORK, MAST_FORK, Vector3(24, 0, -36), Vector3(24, 0, -50), MAST + Vector3(0, 0, 4.0)]))
-	paths.append(PackedVector3Array([JUNCTION, Vector3(26, 0, 12), Vector3(36, 0, 24), SHED + Vector3(-3.6, 0, 0)]))
+	paths.append(PackedVector3Array([JUNCTION, Vector3(26, 0, 12), Vector3(36, 0, 24), SHED + Vector3(-4.9, 0, 0)]))   # последний столбик — у порога снаружи, не в сарае
 	paths.append(PackedVector3Array([DOOR_OUT, Vector3(16.0, 0, 14.0), Vector3(10.0, 0, 28.0), WOODPILE + Vector3(0.6, 0, -2.0)]))   # к южному боку поленницы, мимо столба и козел
 	var helipad_path := PackedVector3Array([JUNCTION, Vector3(32, 0, 4.5), HELIPAD + Vector3(-5.0, 0, 0)])
 	paths.append(helipad_path)
@@ -1807,7 +1807,7 @@ func _build_izba() -> void:
 	stove_body.collision_layer = Geo.LAYER_WORLD
 	stove_body.position = cabin_center + Vector3(-0.8, 0.0, -1.6)
 	# Изба внутри — модель (yard_props.py izba_interior): печь устьем к входу, нары, полка, шкурки, утварь
-	var interior := Models.spawn(self, "kedr/izba_interior", cabin_center, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.15, "sat": 1.0})
+	var interior := Models.spawn(self, "kedr/izba_interior", cabin_center, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.15, "sat": 1.0})
 	if interior == null:
 		stove_body.add_child(Props.russian_stove())
 	else:
@@ -3860,7 +3860,7 @@ func _build_helipad() -> void:
 		add_child(st)
 
 	# 1б. Обвязка площадки — модель (yard_props.py helipad_kit): колдун, шины, фонари, бочки с помпой
-	if Models.spawn(self, "kedr/helipad_kit", HELIPAD, 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.1, "sat": 1.0}) != null:
+	if Models.spawn(self, "kedr/helipad_kit", HELIPAD, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.1, "sat": 1.0}) != null:
 		var hp_col := StaticBody3D.new()
 		hp_col.collision_layer = Geo.LAYER_WORLD
 		hp_col.position = HELIPAD

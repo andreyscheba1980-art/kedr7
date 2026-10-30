@@ -41,6 +41,7 @@ var _stove_t := 0.0
 var _gen_tries := 0
 var _stall_t := 0.0
 var _engine: AudioStreamPlayer3D
+var _engine_in: AudioStreamPlayer        ## гул дизеля сквозь стены — внутри корпуса (3D-звук стены глушат почти в ноль)
 var _lamps: Array[Light3D] = []
 var _glows: Array[Node3D] = []
 var _stove_light: OmniLight3D
@@ -64,10 +65,10 @@ var _baro_odd := false
 func _ready() -> void:
 	instance = self
 	# Без тени от луны: на дальних белых стенах её грубый каскад штриховал корпус диагональными полосами
-	var ext := Models.spawn(self, "kedr/corpus_ext", Vector3(0, 0.0, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.0, "sat": 1.0, "shadow": false})
+	var ext := Models.spawn(self, "kedr/corpus_ext", Vector3(0, 0.0, 0), 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.0, "sat": 1.0, "shadow": false})
 	var inn := Models.spawn(self, "kedr/corpus_int", Vector3(0, 0.05, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
 	var yard := Models.spawn(self, "kedr/corpus_yard", Vector3(0, -0.008, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.0, "sat": 1.0})
-	var furn := Models.spawn(self, "kedr/corpus_furn", Vector3(0, 0.445, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
+	var furn := Models.spawn(self, "kedr/corpus_furn", Vector3.ZERO, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
 	_set_layers(ext, LAYER_OUT)
 	_set_layers(inn, LAYER_IN)
 	_set_layers(furn, LAYER_IN)
@@ -252,6 +253,17 @@ func _build_generator() -> void:
 	_engine.finished.connect(func() -> void:
 		if powered:
 			_engine.play())
+	# Внутри корпуса 3D-дизель за стеной глушится почти до тишины — казалось, что он заглох, стоит
+	# зайти. Ровный низкий гул «через пол» слышен, пока дизель работает и игрок в корпусе.
+	_engine_in = AudioStreamPlayer.new()
+	_engine_in.stream = AudioDirector.cached_stream("res://assets/audio/engine_loop.ogg")
+	_engine_in.pitch_scale = 1.1
+	_engine_in.volume_db = -80.0
+	_engine_in.bus = &"Ambient"
+	add_child(_engine_in)
+	_engine_in.finished.connect(func() -> void:
+		if powered:
+			_engine_in.play())
 
 
 func _on_generator(_p: Player) -> void:
@@ -289,6 +301,11 @@ func _set_power(on: bool) -> void:
 			_engine.play()
 		elif not on:
 			_engine.stop()
+	if _engine_in != null:
+		if on and not _engine_in.playing:
+			_engine_in.play()
+		elif not on:
+			_engine_in.stop()
 
 
 func _build_lights() -> void:
@@ -297,7 +314,7 @@ func _build_lights() -> void:
 		[Vector3(92.6, 3.4, -31.3), 6.0], [Vector3(92.6, 3.4, -27.2), 3.5], [Vector3(92.6, 3.4, -23.0), 6.0],
 		[Vector3(95.6, 3.4, -31.0), 5.0], [Vector3(95.6, 3.4, -24.0), 5.0],
 		[Vector3(97.5, 3.4, -31.8), 4.0], [Vector3(97.5, 3.4, -22.6), 4.0],
-		[Vector3(102.0, 3.4, -36.2), 6.0], [Vector3(96.7, 3.3, -36.7), 4.5], [Vector3(97.9, 6.6, -37.0), 4.5],
+		[Vector3(102.0, 3.4, -36.2), 6.0], [Vector3(98.0, 3.3, -37.0), 4.5], [Vector3(97.9, 6.6, -37.0), 4.5],
 		[Vector3(96.7, 9.6, -36.2), 4.5], [Vector3(96.7, 11.9, -36.7), 5.0], [Vector3(100.7, 2.4, -32.0), 3.5],
 	]
 	for e: Array in inner:
@@ -388,6 +405,9 @@ func _build_stove() -> void:
 
 func _process(delta: float) -> void:
 	_tick_scares(delta)
+	if _engine_in != null and _engine_in.playing:
+		var target := -24.0 if Game.zone == &"corpus" else -80.0
+		_engine_in.volume_db = lerpf(_engine_in.volume_db, target, minf(delta * 3.0, 1.0))
 	if stove_lit:
 		_stove_t -= delta
 		_stove_light.light_energy = 0.7 + 0.15 * sin(Time.get_ticks_msec() * 0.007) + randf() * 0.05

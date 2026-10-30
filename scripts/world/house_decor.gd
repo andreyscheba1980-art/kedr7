@@ -290,8 +290,10 @@ static func _clothesline(st: Station) -> void:
 		var col: Color = wool[i]
 		if i == 2:
 			# Варежки на шнурке
-			k.blob(Vector3(x - 0.07, 2.02, 1.95), Vector3(0.05, 0.08, 0.025), col, 3, 5)
-			k.blob(Vector3(x + 0.07, 2.02, 1.95), Vector3(0.05, 0.08, 0.025), col, 3, 5)
+			for sx: float in [-0.07, 0.07]:
+				k.blob(Vector3(x + sx, 2.0, 1.95), Vector3(0.045, 0.075, 0.022), col, 6, 10)
+				k.blob(Vector3(x + sx + 0.035, 2.03, 1.95), Vector3(0.016, 0.03, 0.018), col, 4, 6)   # большой палец
+				k.tube([Vector3(x + sx, 2.08, 1.95), Vector3(x + sx, 2.14, 1.95)], [0.004, 0.004], col, 4)
 		else:
 			# Шерстяной носок: голенище вниз, пятка вбок
 			k.tube([Vector3(x, 2.14, 1.95), Vector3(x, 1.94, 1.95)], [0.035, 0.032], col, 5)

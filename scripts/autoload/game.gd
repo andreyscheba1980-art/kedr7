@@ -28,6 +28,10 @@ var phase_index := 1
 var cfg: Dictionary = {}
 var base_hour := NIGHT_BASE_HOUR
 var minute_rate := 0.45
+## До последней сводки ночные часы идут медленнее: площадка и корпус в ~100 м, на две вылазки за
+## 22:00–02:00 при обычном темпе не хватало (до 00:00 было ~4.5 мин). Хозяйство (дизель, печь)
+## тратится по тем же часам — на игровой час расход прежний.
+const REPORT_CLOCK_K := 0.6
 
 var night: int = 1
 var shift_minutes := 0.0
@@ -497,7 +501,8 @@ func _process(delta: float) -> void:
 	if not clock_running or shift_over or (dead and not coop_ghost):
 		return
 	var prev_min := int(shift_minutes)
-	shift_minutes += delta * minute_rate
+	var ck := clock_k()
+	shift_minutes += delta * minute_rate * ck
 	if dead:
 		# Погибший в коопе только ждёт рассвета вместе с напарником: хозяйство и холод уже не его.
 		if is_night() and shift_minutes >= NIGHT_END_MIN and cfg.get("finale", &"") == &"":
@@ -511,8 +516,8 @@ func _process(delta: float) -> void:
 		_tick_reports()
 		if not NightMemory.tonight(&"out_after3") and after_hour(3) and is_outside() and not final_call:
 			NightMemory.mark(&"out_after3")
-	_tick_generator(delta)
-	_tick_heat(delta)
+	_tick_generator(delta * ck)
+	_tick_heat(delta * ck)
 	_tick_fatigue(delta)
 	if is_night() and shift_minutes >= NIGHT_END_MIN and cfg.get("finale", &"") == &"":
 		end_shift()
@@ -545,6 +550,16 @@ func _process(delta: float) -> void:
 						warmth = maxf(warmth - delta * 1.6, 0.0)
 						if warmth <= 0.0 and not dying:
 							_freeze_to_death()
+
+
+## Темп ночных часов: до времени последней сводки — медленнее (см. REPORT_CLOCK_K).
+func clock_k() -> float:
+	if not is_night() or is_prologue():
+		return 1.0
+	var times: Array = report_times()
+	if times.is_empty() or shift_minutes >= float(times[times.size() - 1]):
+		return 1.0
+	return REPORT_CLOCK_K
 
 
 # --- Хозяйство ---------------------------------------------------------------
