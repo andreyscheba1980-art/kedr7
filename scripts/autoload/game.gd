@@ -839,7 +839,7 @@ func tutorial_done() -> bool:
 
 func _tick_heat(delta: float) -> void:
 	if stove_wood > 0.0:
-		var burn_k := 1.0
+		var burn_k := Consequences.stove_burn_k()   # выбитое окно — печь выстывает быстрее
 		if salt_on_threshold:
 			burn_k *= 1.35
 		if spirit_treat:
@@ -893,6 +893,7 @@ func _tick_heat(delta: float) -> void:
 			if Dog.is_near_player():
 				coat *= 0.85     # Найда жмётся к ногам — теплее
 			warmth -= WARMTH_LOSS_OUTSIDE * (1.0 + storm * 1.2) * cold * coat * delta
+			Consequences.note_cold(warmth)
 			if warmth < 28.0 and Gear.thermos_ready():
 				Gear.use_thermos()
 

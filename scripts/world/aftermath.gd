@@ -45,6 +45,32 @@ func _process(delta: float) -> void:
 	_tick_morning_call(delta)
 
 
+func _exit_tree() -> void:
+	if Game.is_day() and not Game.is_prologue() and not active_chores.is_empty():
+		Consequences.carry_unrepaired(active_chores, repaired_chores)
+
+
+## Где тварь ждала на привычных тропах — круги босых следов и мысль при осмотре.
+func _spawn_waited_tracks(yard: Node3D) -> void:
+	for w: Array in Consequences.take_waited():
+		var c := Vector3(float(w[0]), 0.0, float(w[1]))
+		var ring := PackedVector3Array()
+		for i in 9:
+			var a := i * TAU / 8.0
+			var q := c + Vector3(cos(a) * 2.2, 0, sin(a) * 2.2)
+			q.y = Terrain.height(q.x, q.z) + 0.03
+			ring.append(q)
+		var node := Node3D.new()
+		node.name = "WaitedTracks"
+		yard.add_child(node)
+		Footprints.trail(node, &"bare", ring, ring[0].y, 0.5)
+		var cy := Terrain.height(c.x, c.z)
+		var it := Geo.interactable(node, Vector3(3.0, 1.2, 3.0), Vector3(c.x, cy + 0.6, c.z), null, Loc.t(&"it.footprints"), func(_p: Player) -> void:
+			Game.hud.subtitle(Loc.t(&"cons.waited"), 6.0)
+			Director.add_tension(5.0, "следы на привычной тропе"))
+		it.name = "WaitedTracksInteract"
+
+
 func _generate_aftermath() -> void:
 	var yard := Game.yard
 	var station := Game.level
@@ -53,6 +79,7 @@ func _generate_aftermath() -> void:
 
 	# 1. Босые следы на снегу от крыльца
 	_spawn_footprints(yard)
+	_spawn_waited_tracks(yard)
 
 	# 2. Пул возможных повреждений станции на это утро
 	var chore_pool: Array[StringName] = [
@@ -65,6 +92,10 @@ func _generate_aftermath() -> void:
 		&"safety_rope_snap",
 	]
 	chore_pool.shuffle()
+	# Сначала — то, что вызвала эта ночь (осада → окно, диверсия → дизель, буран → мачта)
+	for c in Consequences.caused_chores():
+		chore_pool.erase(c)
+		chore_pool.push_front(c)
 
 	# Количество повреждений: 2-3 в зависимости от дня
 	var count: int = 2 if day_index <= 2 else 3

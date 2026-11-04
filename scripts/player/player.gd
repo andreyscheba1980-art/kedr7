@@ -549,7 +549,7 @@ func _update_focus(delta: float) -> void:
 			_hold_target = found
 			_hold_t = 0.0
 			_hold_sound_t = 0.0
-		_hold_t += delta
+		_hold_t += delta * Consequences.hands_k()   # обморожение — пальцы не гнутся
 		_hold_sound_t -= delta
 		if found.hold_sound != "" and _hold_sound_t <= 0.0:
 			_hold_sound_t = 0.55
@@ -897,7 +897,7 @@ func _update_flashlight(delta: float) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.hands_busy_crank"), 2.5)
 	cranking = (mode == Mode.WALK or mode == Mode.RADIO) and Input.is_action_pressed(&"crank") and not hands_busy
 	if cranking:
-		Game.flash_charge = minf(Game.flash_charge + CRANK_RATE * delta, 100.0)
+		Game.flash_charge = minf(Game.flash_charge + CRANK_RATE * Consequences.hands_k() * delta, 100.0)
 		if Game != null and randf() < delta * 10.0:
 			Game.vibrate(0.22, 0.08, 0.09)
 	if _crank_player != null:

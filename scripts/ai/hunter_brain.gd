@@ -31,6 +31,9 @@ var _warn_t := -1.0                ## идёт предупреждение у �
 var _ambush_done: Dictionary = {}  ## точка → уже была засада этой ночью
 var _silent_t := 0.0
 var _check_t := 2.0
+var _route_cells: Array[String] = []    ## клетки привычных троп этой ночи — там тварь ждёт
+var _route_used: Dictionary = {}
+var _step_t := 2.0
 
 
 func _ready() -> void:
@@ -40,6 +43,8 @@ func _ready() -> void:
 	light_adaptation = 0
 	flare_repel_count = 0
 	generator_sabotaged = false
+	if Game.is_night() and not Game.is_prologue():
+		_route_cells = Consequences.ambush_cells()
 
 
 func _process(delta: float) -> void:
@@ -50,6 +55,7 @@ func _process(delta: float) -> void:
 		return
 	if _warn_t >= 0.0:
 		_tick_sabotage_warning(delta)
+	_track_routes(delta)
 	_check_t -= delta
 	if _check_t > 0.0:
 		return
@@ -80,6 +86,32 @@ func _update_tactic() -> void:
 
 
 ## Засада молчит (без предупреждающего свиста) только пока она идёт, не всю ночь.
+## Тварь учит привычные тропы: каждые 2 с на улице — шаг в «теплокарту»; на привычной клетке —
+## засада (раз за ночь на клетку), если напряжение уже набрано. Утром там круги следов.
+func _track_routes(delta: float) -> void:
+	if Game.player == null or not Game.is_outside():
+		return
+	if Game.weather != null and Game.weather.blizzard:
+		SaveGame.flags["night_storm"] = true
+	_step_t -= delta
+	if _step_t > 0.0:
+		return
+	_step_t = 2.0
+	var pp := Game.player.global_position
+	Consequences.record_step(pp)
+	var cell := Consequences.cell_of(pp)
+	if cell in _route_cells and not _route_used.has(cell) and Director.tension > 25.0 and Game.yrka.stage < YrkaThreat.Stage.CONTACT:
+		_route_used[cell] = true
+		var fwd := Vector2(Game.player.velocity.x, Game.player.velocity.z)
+		if fwd.length() < 0.3:
+			fwd = Vector2(-Game.player.global_basis.z.x, -Game.player.global_basis.z.z)
+		Game.yrka.virtual_pos = Vector2(pp.x, pp.z) + fwd.normalized() * 18.0
+		Game.yrka.threat = maxf(Game.yrka.threat, YrkaThreat.STALK_AT)
+		_silent_t = 40.0
+		Consequences.note_waited(Consequences.cell_center(cell))
+		Director.add_tension(6.0, "ждала на привычной тропе")
+
+
 func is_silent_now() -> bool:
 	return _silent_t > 0.0
 
@@ -139,6 +171,7 @@ func _sabotage_generator() -> void:
 		Game.level.call(&"_trigger_generator_stall")
 	else:
 		Game.set_power(false)
+	SaveGame.flags["gen_sabotaged_night"] = true
 	Director.add_tension(12.0, "диверсия на генераторе")
 	Game.hud.subtitle(Loc.t(&"sub.gen_sabotaged"), 5.0, 2)
 

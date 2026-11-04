@@ -2537,6 +2537,9 @@ func _tour(args: PackedStringArray) -> void:
 		SaveGame.flags["dog_state"] = "home"
 		SaveGame.flags["dog_health"] = 100.0
 		SaveGame.flags["dog_found"] = true
+	if args.has("routetest"):
+		SaveGame.flags["route_heat"] = {"3_-1": 14.0, "5_-4": 9.0}
+		SaveGame.flags["damage"] = {&"window_broken": true, &"mast_loose_cable": true}
 	if args.has("coldshots"):   # кадры холодного старта: он идёт внутри _begin, до прогрева тура
 		_shoot_loop("cold", 22, 2.0)
 	_app.call(&"_start_phase")
@@ -2577,6 +2580,20 @@ func _tour(args: PackedStringArray) -> void:
 		return
 	if args.has("revisit"):
 		await _revisit()
+		get_tree().quit()
+		return
+	if args.has("routetest"):   # привычная тропа: тварь ждёт там, утром круги следов; поломки ночи
+		Hud.log_subs = true
+		Game.yrka.enabled = true
+		Director.start(Game.cfg)
+		var hb: HunterBrain = Game.hunter_brain
+		print("[route] клетки засады: ", hb._route_cells, " окно=", Consequences.damaged(&"window_broken"), " печь_k=", Consequences.stove_burn_k(), " мачта_k=", Consequences.mainland_k())
+		Director.tension = 35.0
+		var c := Consequences.cell_center("3_-1")
+		_tp(Vector3(c.x, Terrain.height(c.x, c.z) + 0.05, c.z), 0.0)
+		for k in 6:
+			await _wait(0.5)
+		print("[route] угроза=%.0f стадия=%s ждала=%s тихо=%s" % [Game.yrka.threat, Game.yrka.stage_name(), SaveGame.flags.get("route_waited"), hb.is_silent_now()])
 		get_tree().quit()
 		return
 	if args.has("karattest"):   # сводка по «Карату» из корпуса

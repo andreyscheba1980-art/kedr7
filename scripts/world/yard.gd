@@ -718,6 +718,9 @@ func _near_fork(p: Vector3) -> bool:
 
 
 func _on_leer_post_used(_p: Player) -> void:
+	if Consequences.rope_broken() and not Game.leer_attached:
+		Game.hud.subtitle(Loc.t(&"cons.rope_attach"), 3.5)   # леер оборван — днём не срастил
+		return
 	Game.leer_attached = not Game.leer_attached
 	var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -6.0)
 	if lp != null:
