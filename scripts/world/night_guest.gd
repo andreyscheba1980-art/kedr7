@@ -66,7 +66,8 @@ func _process(delta: float) -> void:
 			if _knock_t <= 0.0:
 				_knock_t = _rng.randf_range(14.0, 22.0)
 				_knock()
-			if Game.level != null and Game.level.door_open:
+			# Открыл сам (стоит у двери), а не ветер распахнул
+			if Game.level != null and Game.level.door_open and Game.player != null and Game.player.global_position.distance_to(DOOR) < 3.2:
 				_opened()
 			elif _left <= 0.0:
 				_gone()
