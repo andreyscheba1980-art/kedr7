@@ -354,7 +354,7 @@ func _build_trelevochnik(base_pos: Vector3) -> void:
 	var cab_door_open := [false]
 	var door_it := Geo.interactable(self, Vector3(0.9, 1.4, 0.9), p + Vector3(-0.9, 1.8, -0.4), null, Loc.t(&"it.poi_tractor_door"), func(_pl: Player) -> void:
 		cab_door_open[0] = not cab_door_open[0]
-		AudioDirector.play_raw("res://assets/audio/door_open.ogg", -4.0)
+		AudioDirector.play_raw("res://assets/audio/door.ogg", -4.0)
 	)
 	door_it.name = "TractorCabDoor"
 

@@ -55,6 +55,9 @@ var _dark_saccades: float = 0.0
 var _time_in_dark: float = 0.0
 
 var _door_interactions: int = 0
+var _night_outside: float = 0.0      ## эта ночь: сколько был снаружи (выходы за показаниями)
+var _noise_t: float = 0.0            ## окно реакции на шум: 0.6 с после звука
+var _noise_speed: float = 0.0        ## скорость в момент звука
 var _radio_dwell_time: float = 0.0
 var _dog_carrying_time: float = 0.0
 
@@ -69,6 +72,8 @@ func _ready() -> void:
 func _load_persistent_metrics() -> void:
 	var saved_arch := int(SaveGame.flags.get("profiler_arch", Archetype.BALANCED))
 	current_archetype = clampi(saved_arch, 0, Archetype.EXPLORER) as Archetype
+	if current_archetype == Archetype.TURTLER:
+		current_archetype = Archetype.BALANCED   # «затворник» — только по этой ночи, не по прошлой
 	panic_score = float(SaveGame.flags.get("profiler_panic", 0.0))
 	shelter_bias = float(SaveGame.flags.get("profiler_shelter", 0.5))
 
@@ -81,9 +86,10 @@ func _load_persistent_metrics() -> void:
 
 
 func _on_noise_emitted(_pos: Vector3, _vol: float, _type: StringName) -> void:
-	# Акустический рефлекс: если при шуме игрок остановился или присел/замер
-	if Game.player != null and Game.player._prev_velocity_len > 1.2:
-		_freeze_reactions += 1
+	# Акустический рефлекс: шёл — и в ближайшие 0.6 с после звука замер (проверка в _process)
+	if Game.player != null:
+		_noise_t = 0.6
+		_noise_speed = Game.player._prev_velocity_len
 
 
 func _on_door_opened() -> void:
@@ -107,6 +113,8 @@ func _process(delta: float) -> void:
 		_time_inside += delta
 	else:
 		_time_outside += delta
+		if Game.is_night():
+			_night_outside += delta
 
 	# Замер бега вне открытой погони (признак неоправданной паники)
 	var is_chasing := Game.yrka != null and Game.yrka.stage == YrkaThreat.Stage.CHASE
@@ -114,7 +122,8 @@ func _process(delta: float) -> void:
 
 	if p.is_sprinting():
 		_time_walking += delta
-		if not is_chasing and not inside:
+		# Паника — бег, когда страшно, а угрозы нет. Бег к корпусу за показаниями к сроку сводки — не паника.
+		if not is_chasing and not inside and Director.tension > 35.0:
 			_time_sprinting_calm += delta
 	elif current_spd > 0.5:
 		_time_walking += delta
@@ -149,6 +158,12 @@ func _process(delta: float) -> void:
 			if move_dir.dot(to_station) > 0.5:
 				_agora_flee_events += 1
 	_last_tension = Director.tension
+
+	if _noise_t > 0.0:
+		_noise_t -= delta
+		if _noise_speed > 1.2 and current_spd < 0.3:
+			_freeze_reactions += 1
+			_noise_t = 0.0
 
 	# 3. Биометрика Фонофобии: замирание на месте при шорохах (Audio Freeze Reflex)
 	if p._prev_velocity_len > 1.8 and current_spd < 0.2:
@@ -204,7 +219,9 @@ func _recalculate_archetype() -> void:
 	panic_score = clampf(sprint_panic + jerk_panic + toggle_panic, 0.0, 100.0)
 
 	# Определение доминирующего психотипа
-	if total_time > 40.0 and shelter_bias > 0.72:
+	# Затворник — не «много сидит дома» (ночь так и устроена: рация, печь), а пропустил сводку
+	# и за ночь почти не выходил. Иначе осада включалась почти у каждого игрока.
+	if Game.is_night() and Game.reports_missed() > 0 and _night_outside < 40.0:
 		current_archetype = Archetype.TURTLER
 	elif panic_score > 38.0:
 		current_archetype = Archetype.PANICKER

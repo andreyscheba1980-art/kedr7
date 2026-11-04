@@ -1473,8 +1473,8 @@ static func make_snow(amount := -1, extents := Vector3(12.0, 0.5, 12.0), height 
 	mat.emission_enabled = true
 	mat.emission = Color(0.06, 0.07, 0.09)   # свет почти только чужой: снег «загорается» в луче и у окон, а не висит сам по себе
 	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA   # снежинка у самого лица не лепится белым диском
-	mat.distance_fade_min_distance = 1.0
-	mat.distance_fade_max_distance = 2.6
+	mat.distance_fade_min_distance = 1.8   # в пятне фонаря снежинка в 1.5–2 м вспыхивала белым шаром
+	mat.distance_fade_max_distance = 3.6
 	var g := (mat.albedo_texture as GradientTexture2D).gradient
 	g.add_point(0.45, Color(1, 1, 1, 1))
 	quad.material = mat

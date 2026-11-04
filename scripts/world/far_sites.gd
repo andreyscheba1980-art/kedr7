@@ -183,7 +183,7 @@ static func _enterable_kung(yard: Node3D, pos: Vector3, yaw: float) -> void:
 
 	var door_it := Geo.interactable(yard, Vector3(0.8, 1.9, 0.9), door_pivot.position + Vector3(0, 0.2, 0), null, Loc.t(&"it.camp_kung_door"), func(_p: Player) -> void:
 		door_open_state[0] = not door_open_state[0]
-		AudioDirector.play_raw("res://assets/audio/door_open.ogg", -4.0)
+		AudioDirector.play_raw("res://assets/audio/door.ogg", -4.0)
 		var target_ang := deg_to_rad(-85.0) if door_open_state[0] else 0.0
 		var tw := door_pivot.create_tween()
 		tw.tween_property(door_pivot, "rotation:y", yaw + target_ang, 0.4).set_trans(Tween.TRANS_CUBIC)
@@ -253,7 +253,7 @@ static func _drill_balok(yard: Node3D, c: Vector3, yaw: float) -> void:
 	var door_open := [false]
 	var door_it := Geo.interactable(yard, Vector3(0.9, 1.8, 0.9), door_pos, null, Loc.t(&"it.drill_balok_door"), func(_p: Player) -> void:
 		door_open[0] = not door_open[0]
-		AudioDirector.play_raw("res://assets/audio/door_open.ogg", -4.0)
+		AudioDirector.play_raw("res://assets/audio/door.ogg", -4.0)
 	)
 	door_it.name = "DrillBalokDoor"
 

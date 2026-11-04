@@ -12,7 +12,7 @@ extends Node
 ##      древесные отблески глаз в кронах тайги, паранойя темноты.
 
 const CLANK_SOUND := "res://assets/audio/clank.ogg"
-const SNOW_CRUNCH := "res://assets/audio/snow_crunch.ogg"
+const SNOW_CRUNCH := "res://assets/audio/step_snow_3.ogg"   # snow_crunch.ogg в игре нет — звук был немой
 const WHISPER_SOUND := "res://assets/audio/whisper.ogg"
 
 var _active_shadow: Node3D = null
@@ -52,11 +52,9 @@ func _process(delta: float) -> void:
 	if profiler.spatial_axis < -0.15 and Game.is_confined_space():
 		var claustro_k := clampf(-profiler.spatial_axis, 0.0, 1.0) * clampf(Director.tension / 45.0 + 0.45, 0.45, 1.0)
 		# Динамическое туннельное зрение: FOV сжимается на -10..-13 градусов
-		var target_fov_offset := -12.0 * claustro_k
-		p.fov_offset = lerpf(p.fov_offset, target_fov_offset, minf(delta * 2.5, 1.0))
-
-		# Удушающий расход выносливости в тесноте
-		p.stamina_drain_mult = lerpf(p.stamina_drain_mult, 1.0 + 0.35 * claustro_k, minf(delta * 3.0, 1.0))
+		# Сужение обзора и лишний расход сил убраны: игрок принимал их за лаги и баги, а не за страх.
+		# Тесноту передаёт звук — сердце громче мира.
+		_reset_player_modifiers(delta)
 
 		# Акустический вакуум: внутреннее сердцебиение громче внешнего мира
 		if Game.audio != null and is_instance_valid(Game.audio._heart):
@@ -87,7 +85,7 @@ func _process(delta: float) -> void:
 				Game.audio._drone.volume_db = maxf(Game.audio._drone.volume_db, drone_db)
 
 			# Кошмарный вязкий снег (nightmare snow drag): легкое замедление шага
-			p.speed_mult = lerpf(p.speed_mult, 1.0 - 0.12 * agora_k, minf(delta * 2.5, 1.0))
+			p.speed_mult = lerpf(p.speed_mult, 1.0, minf(delta * 3.5, 1.0))   # скрытое замедление убрано: в поле игрок и так спешит к сроку сводки
 
 			# Фланговые шаги в 35-45 метрах на краю бурана
 			_agora_step_timer -= delta
@@ -187,7 +185,7 @@ func should_door_hesitate() -> bool:
 	# Клаустрофобы или игроки с паранойей потери контроля сталкиваются с сопротивлением засова
 	var trigger_k := maxf(profiler.autonomy_axis, -profiler.spatial_axis)
 	if trigger_k > 0.35 and Director.tension > 15.0:
-		return randf() < 0.5
+		return randf() < 0.15   # раз из семи-восьми: иначе засов казался сломанным
 	return false
 
 
@@ -198,18 +196,20 @@ func _trigger_flanking_snow_step(p: Player) -> void:
 	var flank := p.global_transform.basis.x * side_sign * randf_range(30.0, 42.0)
 	var forward := p.global_transform.basis.z * randf_range(-12.0, 12.0)
 	var snd_pos := p.global_position + flank + forward + Vector3(0, 0.2, 0)
+	if not Director.request_ambient(5.0, "шаги на периферии метели"):
+		return
 	Game.audio.play_3d(SNOW_CRUNCH, snd_pos, -3.0, 12.0)
-	Director.add_tension(5.0, "шаги на периферии метели")
 
 
 func _trigger_whisper_pareidolia(p: Player, intensity: float) -> void:
 	var side_dir := p.global_transform.basis.x * (1.0 if randf() < 0.5 else -1.0) * randf_range(6.0, 12.0)
 	var pos := p.global_position + side_dir + p.global_transform.basis.z * randf_range(4.0, 10.0) + Vector3(0, 1.5, 0)
+	if not Director.request_ambient(6.0, "шёпот ветра"):
+		return
 	var vol := lerpf(-22.0, -14.0, intensity)
 	var wp := Game.audio.play_3d(WHISPER_SOUND, pos, vol, 8.0)
 	if wp != null:
 		wp.pitch_scale = randf_range(0.88, 1.06)
-	Director.add_tension(6.0, "шёпот ветра")
 
 
 func _try_spawn_peripheral_shadow(p: Player, _intensity: float) -> void:
@@ -227,8 +227,21 @@ func _try_spawn_peripheral_shadow(p: Player, _intensity: float) -> void:
 
 	# Проверка прямой видимости из головы
 	var q := PhysicsRayQueryParameters3D.create(p.head.global_position, target_pos + Vector3(0, 1.5, 0), Geo.LAYER_WORLD, [p.get_rid()])
-	var hit := p.get_world_3d().direct_space_state.intersect_ray(q)
+	var space := p.get_world_3d().direct_space_state
+	var hit := space.intersect_ray(q)
 	if not hit.is_empty():
+		return
+	# Место свободно на весь рост (раньше силуэт мог встать в шкаф или нары)
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.3
+	cap.height = 1.7
+	var sq := PhysicsShapeQueryParameters3D.new()
+	sq.shape = cap
+	sq.transform = Transform3D(Basis(), target_pos + Vector3(0, 0.95, 0))
+	sq.collision_mask = Geo.LAYER_WORLD | Geo.LAYER_INTERACT
+	if not space.intersect_shape(sq, 1).is_empty():
+		return
+	if not Director.request_ambient(7.0, "силуэт на периферии"):
 		return
 
 	var fig := Creatures.make_silhouette()
@@ -253,7 +266,6 @@ func _process_peripheral_shadow(delta: float, p: Player) -> void:
 	if p.is_looking_at(head_pos, 32.0) or _shadow_lifetime <= 0.0:
 		if p.is_looking_at(head_pos, 32.0):
 			Game.audio.play_3d("res://assets/sfx/cc0/branch_snow_drop_1.ogg", head_pos, -16.0, 5.0)
-			Director.add_tension(7.0, "силуэт на периферии")
 		_active_shadow.queue_free()
 		_active_shadow = null
 
@@ -263,26 +275,33 @@ func _try_spawn_canopy_eyeshine(p: Player) -> void:
 		return
 
 	# Ищем направление в глубь тайги
-	var dir := Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU)
-	var dist := randf_range(22.0, 36.0)
-	var height := randf_range(3.8, 6.2)
+	# Глаза — в 12–20 м, чуть в стороне от взгляда, светящиеся «катафоты» в пиксель-два
+	# (шарики 2.5 см в 22–36 м при пиксельном рендере были невидимы)
+	var fwd := -p.camera.global_transform.basis.z
+	fwd.y = 0.0
+	var dir := fwd.normalized().rotated(Vector3.UP, deg_to_rad(randf_range(-35.0, 35.0)))
+	var dist := randf_range(12.0, 20.0)
+	var height := randf_range(3.0, 5.0)
 	var eye_center := p.global_position + dir * dist + Vector3(0, height, 0)
+	if not Director.request_ambient(8.0, "блеск глаз в кроне елей"):
+		return
 
 	var node := Node3D.new()
 	node.name = "CanopyEyeshine"
 
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.albedo_color = Color(0.85, 0.72, 0.38)
+	mat.albedo_color = Color(1.0, 0.82, 0.45)
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 
 	for side in [-1, 1]:
 		var mi := MeshInstance3D.new()
-		var sm := SphereMesh.new()
-		sm.radius = 0.025
-		sm.height = 0.05
-		mi.mesh = sm
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.09, 0.06)
+		mi.mesh = qm
 		mi.material_override = mat
-		mi.position = Vector3(side * 0.05, 0, 0)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.position = Vector3(side * 0.11, 0, 0)
 		node.add_child(mi)
 
 	Game.level.add_child(node)
@@ -301,7 +320,5 @@ func _process_canopy_eyeshine(delta: float, p: Player) -> void:
 	# Если фонарь включен и направлен прямо на глаза в кроне — существо моргает и растворяется в ветвях
 	var direct_look := p.is_looking_at(eye_pos, 16.0) and p.flashlight_on()
 	if direct_look or _eyeshine_lifetime <= 0.0:
-		if direct_look:
-			Director.add_tension(8.0, "блеск глаз в кроне елей")
 		_active_eyeshine.queue_free()
 		_active_eyeshine = null

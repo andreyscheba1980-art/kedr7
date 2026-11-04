@@ -586,6 +586,6 @@ func _tick_cellar(delta: float) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.cellar_knock"), 4.0)
 		Director.add_tension(12.0, "стук снизу в подполе")
 	if _cellar_t > 14.0 and _cellar_t - delta <= 14.0:
-		Game.audio.play_3d("res://assets/audio/house_creak.ogg", CELLAR + Vector3(0, 1.0, -1.3), 2.0, 6.0)
+		Game.audio.play_3d("res://assets/audio/tree_creak_v2.ogg", CELLAR + Vector3(0, 1.0, -1.3), 2.0, 6.0)
 		Game.hud.subtitle(Loc.t(&"sub.cellar_step"), 3.5)
 		Director.add_tension(10.0, "ступенька в подполе")

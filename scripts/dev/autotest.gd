@@ -2575,6 +2575,51 @@ func _tour(args: PackedStringArray) -> void:
 		await _revisit()
 		get_tree().quit()
 		return
+	if args.has("siegetest"):   # осада: затворник дома на пике — предупреждение у ДЭС, срыв ремня; второй раз — спугнуть
+		Game.yrka.enabled = true
+		Director.start(Game.cfg)
+		Hud.log_subs = true
+		var hb: HunterBrain = Game.hunter_brain
+		var flee := args.has("flee")
+		_tp(Vector3(1.0, 0.05, 3.0), 0.0)
+		for k in 150:
+			Game.profiler.current_archetype = PlayerProfiler.Archetype.TURTLER
+			hb.current_tactic = HunterBrain.Tactic.SIEGE
+			if Director.phase == Director.Phase.BUILD:
+				Director.tension = Director.peak_threshold + 1.0
+			await _wait(1.0)
+			if flee and hb._warn_t > 0.0:
+				_tp(Vector3(16.8, 0.05, 6.0), 0.0)
+			if k % 15 == 0:
+				print("[siege] t=%d фаза=%s warn=%.1f саботаж=%s свет=%s тактика=%d" % [k, Director.phase_name(), hb._warn_t, hb.generator_sabotaged, Game.power_on, hb.current_tactic])
+		print("[siege] итог: саботаж=%s свет=%s" % [hb.generator_sabotaged, Game.power_on])
+		get_tree().quit()
+		return
+	if args.has("beamtest"):   # луч фонаря ночью: целиком, без конуса, без взвеси
+		var p := Game.player
+		p.set_flashlight(true)
+		_look(Vector3(30.0, 0.05, -8.0), Vector3(30.0, 0.0, -14.0))
+		await _wait(1.5)
+		await _shot("beam_all")
+		var bm: Node3D = p.get("_beam_mesh")
+		var fd: Node3D = p.get("_flash_dust")
+		if bm != null: bm.visible = false
+		await _wait(0.4)
+		await _shot("beam_no_cone")
+		if fd != null: fd.visible = false
+		await _wait(0.4)
+		await _shot("beam_no_cone_dust")
+		if bm != null: bm.visible = true
+		await _wait(0.4)
+		await _shot("beam_cone_only")
+		_look(Vector3(-14.2, 0.2, -29.0), Vector3(-18.5, 1.0, -31.0))
+		await _wait(0.8)
+		await _shot("beam_izba")
+		_look(Vector3(30.0, 0.05, -8.0), Vector3(22.0, 1.4, -8.5))
+		await _wait(0.8)
+		await _shot("beam_side")
+		get_tree().quit()
+		return
 	if args.has("probe_at"):   # что стоит в точке: --tour day 6 probe_at x z радиус
 		var pi := args.find("probe_at")
 		var at := Vector3(float(args[pi + 1]), 0, float(args[pi + 2]))

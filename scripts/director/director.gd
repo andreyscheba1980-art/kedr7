@@ -37,6 +37,13 @@ var _hard_count := 0
 var _peak_time := 0.0
 var _check_timer := 0.0
 var debt := 0                       ## пропущенных «замечаний» прошлой ночи: 3+ — дом беспокойнее
+## Мелкие «фоновые» пугалки других систем (шорохи, шёпот, силуэты, глаза в кронах, ложные шаги)
+## идут через request_ambient: не чаще раза в AMBIENT_GAP, не больше AMBIENT_PER_NIGHT за ночь, только
+## пока напряжение набирается — и сами до пика его не дотягивают. Иначе ночь висела на 100 %.
+const AMBIENT_GAP := 40.0
+const AMBIENT_PER_NIGHT := 14
+var _ambient_left := AMBIENT_PER_NIGHT
+var _ambient_wait := 20.0
 
 
 func _ready() -> void:
@@ -71,6 +78,8 @@ func reset() -> void:
 	_hard_count = 0
 	_peak_time = 0.0
 	_check_timer = 0.0
+	_ambient_left = AMBIENT_PER_NIGHT
+	_ambient_wait = 20.0
 
 
 func stop() -> void:
@@ -107,9 +116,39 @@ func phase_name() -> String:
 	return Phase.keys()[phase]
 
 
+## Можно ли сейчас мелкую пугалку. true — разрешено, бюджет списан, напряжение добавлено (не выше пика).
+func request_ambient(amount: float, reason: String) -> bool:
+	if not enabled or hold or Game.shift_over or phase != Phase.BUILD or _ambient_left <= 0 or _ambient_wait > 0.0:
+		return false
+	if Game.yrka != null and Game.yrka.stage == YrkaThreat.Stage.CHASE:
+		return false
+	_ambient_left -= 1
+	_ambient_wait = AMBIENT_GAP * randf_range(0.8, 1.4)
+	var room := maxf(peak_threshold - 4.0 - tension, 0.0)
+	add_tension(minf(amount, room), "фон: " + reason)
+	return true
+
+
+## Крупное событие другой системы (осада, диверсия) вместо испуга из пула: только на пике,
+## после него — передышка, как у обычного испуга.
+func take_peak(reason: String, release := 40.0, rest := 60.0) -> bool:
+	if not enabled or hold or phase != Phase.PEAK:
+		return false
+	if Game.yrka != null and Game.yrka.stage == YrkaThreat.Stage.CHASE:
+		return false
+	scares_played += 1
+	tension = maxf(tension - release, 0.0)
+	cooldown_left = rest
+	_peak_time = 0.0
+	phase = Phase.RELAX
+	_log("▶ %s (событие охотника), передышка %.0f с" % [reason, rest])
+	return true
+
+
 # --- Цикл --------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	_ambient_wait = maxf(_ambient_wait - delta, 0.0)
 	if not enabled or hold or Game.shift_over or Game.dead or Game.dying or Game.player == null:
 		return
 	# Пока Ырка гонится, директор молчит: два испуга одновременно гасят друг друга.
@@ -152,6 +191,9 @@ func _process(delta: float) -> void:
 	if _try_beats(ctx):
 		return
 	if phase == Phase.PEAK:
+		# Пик сначала предлагаем охотнику (осада дома): если он берёт момент — испуг из пула не ставим
+		if Game.hunter_brain != null and bool(Game.hunter_brain.call(&"offer_peak")):
+			return
 		_try_pool(ctx)
 
 

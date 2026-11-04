@@ -145,15 +145,70 @@ def helipad_kit():
     print("[OK] helipad_kit: %d tris" % tris)
 
 
+# Кирпич под вытертой побелкой — как у печи дома (stove.py): плоская белая печь избы смотрелась ящиком
+def brick_mat(name, wash=0.8):
+    """Кирпич под побелкой: кладка (Brick), побелка с проплешинами (шум), копоть у топки и вверху."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; b = nt.nodes["Principled BSDF"]
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    br = nt.nodes.new("ShaderNodeTexBrick")
+    br.inputs["Scale"].default_value = 4.0
+    br.inputs["Mortar Size"].default_value = 0.012
+    br.inputs["Brick Width"].default_value = 0.25
+    br.inputs["Row Height"].default_value = 0.075
+    br.inputs["Color1"].default_value = (0.42, 0.17, 0.1, 1)
+    br.inputs["Color2"].default_value = (0.5, 0.22, 0.13, 1)
+    br.inputs["Mortar"].default_value = (0.62, 0.6, 0.55, 1)
+    # кладка по двум осям: X–Z и Y–Z (иначе на боковых гранях полосы)
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ"); nt.links.new(tc.outputs["Object"], sep.inputs[0])
+    add = nt.nodes.new("ShaderNodeMath"); add.operation = "ADD"
+    nt.links.new(sep.outputs["X"], add.inputs[0]); nt.links.new(sep.outputs["Y"], add.inputs[1])
+    comb = nt.nodes.new("ShaderNodeCombineXYZ")
+    nt.links.new(add.outputs[0], comb.inputs["X"]); nt.links.new(sep.outputs["Z"], comb.inputs["Y"])
+    nt.links.new(comb.outputs[0], br.inputs["Vector"])
+    # побелка: где шум выше порога — белое, иначе видна кладка
+    nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 7; nz.inputs["Detail"].default_value = 8
+    nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = 0.62 - wash * 0.35; ramp.color_ramp.elements[0].color = (0, 0, 0, 1)
+    ramp.color_ramp.elements[1].position = 0.66 - wash * 0.35; ramp.color_ramp.elements[1].color = (1, 1, 1, 1)
+    nt.links.new(nz.outputs["Fac"], ramp.inputs["Fac"])
+    wash_col = nt.nodes.new("ShaderNodeMix"); wash_col.data_type = "RGBA"
+    nt.links.new(ramp.outputs["Color"], wash_col.inputs[0])
+    nt.links.new(br.outputs["Color"], wash_col.inputs[6])
+    wn = nt.nodes.new("ShaderNodeTexNoise"); wn.inputs["Scale"].default_value = 40
+    wr = nt.nodes.new("ShaderNodeValToRGB")
+    wr.color_ramp.elements[0].color = (0.7, 0.69, 0.64, 1); wr.color_ramp.elements[1].color = (0.82, 0.81, 0.76, 1)
+    nt.links.new(wn.outputs["Fac"], wr.inputs["Fac"])
+    nt.links.new(wr.outputs["Color"], wash_col.inputs[7])
+    # копоть: тёмное пятно над топкой (спереди, y<0) и кверху на трубе
+    soot_d = nt.nodes.new("ShaderNodeVectorMath"); soot_d.operation = "DISTANCE"
+    soot_d.inputs[1].default_value = (0.0, -0.5, 0.62)
+    nt.links.new(tc.outputs["Object"], soot_d.inputs[0])
+    sr = nt.nodes.new("ShaderNodeMapRange")
+    sr.inputs[1].default_value = 0.05; sr.inputs[2].default_value = 0.42; sr.inputs[3].default_value = 0.75; sr.inputs[4].default_value = 0.0
+    nt.links.new(soot_d.outputs["Value"], sr.inputs[0])
+    sn = nt.nodes.new("ShaderNodeTexNoise"); sn.inputs["Scale"].default_value = 14
+    smul = nt.nodes.new("ShaderNodeMath"); smul.operation = "MULTIPLY"; smul.use_clamp = True
+    nt.links.new(sr.outputs[0], smul.inputs[0]); nt.links.new(sn.outputs["Fac"], smul.inputs[1])
+    smul2 = nt.nodes.new("ShaderNodeMath"); smul2.operation = "MULTIPLY"; smul2.inputs[1].default_value = 1.6; smul2.use_clamp = True
+    nt.links.new(smul.outputs[0], smul2.inputs[0])
+    soot = nt.nodes.new("ShaderNodeMix"); soot.data_type = "RGBA"
+    nt.links.new(smul2.outputs[0], soot.inputs[0])
+    nt.links.new(wash_col.outputs[2], soot.inputs[6]); soot.inputs[7].default_value = (0.05, 0.045, 0.04, 1)
+    nt.links.new(soot.outputs[2], b.inputs["Base Color"])
+    return m
+
+
 def izba_interior():
     """Изба внутри (в осях сруба: ноль — центр, +x — к сеням, +z — к югу): русская печь устьем к входу,
     нары, полка с банками и лампой, шкурки и капканы, снегоступы, ведро, туески, чугунок с ухватом."""
     kit.reset()
     rnd = random.Random(1937)
     G = lambda x, y, z: (x, -z, y)
-    wash = mat("iz_wash", (0.7, 0.68, 0.62), rough=0.95, noise=0.35, noise_scale=18, wear=0.7, dirt=0.9, wear_col=(0.42, 0.25, 0.17))
+    wash = brick_mat("iz_wash", 0.55)
     soot = mat("iz_soot", (0.07, 0.06, 0.05), rough=0.95, noise=0.4, noise_scale=12)
-    brick = mat("iz_brick", (0.42, 0.22, 0.15), rough=0.9, noise=0.4, noise_scale=25, dirt=0.6)
+    brick = brick_mat("iz_brick", 0.2)
     iron = mat("iz_iron", (0.13, 0.12, 0.11), rough=0.6, wear=0.6, wear_col=(0.35, 0.22, 0.14))
     plank = mat("iz_plank", (0.3, 0.22, 0.15), rough=0.9, noise=0.35, noise_scale=35, wear=0.5, dirt=0.7)
     fur = mat("iz_fur", (0.32, 0.24, 0.16), rough=1.0, noise=0.5, noise_scale=60)

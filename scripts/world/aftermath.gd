@@ -7,7 +7,7 @@ extends Node
 ##     наледь на дымоходе, замерзший ворон на ступенях, следы когтей на срубе, обрыв леера);
 ##   • Утренний радиосеанс связи с Большой Землей в 14:15 (прогноз на ночь + вопросы о ночных аномалиях).
 
-const CRUNCH_SOUND := "res://assets/audio/snow_crunch.ogg"
+const CRUNCH_SOUND := "res://assets/audio/step_snow_3.ogg"   # snow_crunch.ogg в игре нет — звук был немой
 const CLANK_SOUND := "res://assets/audio/clank.ogg"
 const WOOD_SOUND := "res://assets/audio/stove_add.ogg"
 const BUZZER_SOUND := "res://assets/audio/buzzer_loop.ogg"

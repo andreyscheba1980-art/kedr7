@@ -720,6 +720,11 @@ func report_verdict() -> StringName:
 	return report_check()["verdict"]
 
 
+## Сколько сводок этой ночи пропущено (прошёл срок + 45 мин, а не передана).
+func reports_missed() -> int:
+	return _silence_marked.size()
+
+
 func report_times() -> Array:
 	return cfg.get("reports", [])
 

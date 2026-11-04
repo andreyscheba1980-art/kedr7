@@ -588,12 +588,17 @@ func _floor() -> float:
 
 # --- Предупреждения ----------------------------------------------------------
 
+## Таймер отдыха после отпугивания (HunterBrain: после второй ракеты тварь отходит ненадолго).
+func set_cooldown(sec: float) -> void:
+	_cooldown = sec
+
+
 func _play_whistle() -> void:
 	if Game.is_home() or Game.is_indoors() or Game.player == null:
 		return
 	if _whistle_cd > 0.0:
 		return
-	if Game.hunter_brain != null and int(Game.hunter_brain.get("current_tactic")) == 3: # Tactic.AMBUSH
+	if Game.hunter_brain != null and bool(Game.hunter_brain.call(&"is_silent_now")):   # идёт засада у выхода
 		return
 	_whistle_cd = Game.rng.randf_range(35.0, 60.0)
 	# Свист исходит из реального направления невидимого агента в тайге
