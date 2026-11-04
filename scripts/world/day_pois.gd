@@ -193,6 +193,8 @@ func _build_shrine(base_pos: Vector3) -> void:
 		model.rotation.y = atan2(to_lab.x, to_lab.z)
 	var shrine_it := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), p + Vector3(0, 0.8, 0), null, "", _on_shrine)
 	shrine_it.prompt_provider = func() -> String:
+		if taiga_ready():
+			return Loc.t(&"it.shrine_taiga")
 		if not Game.has_flag("shrine_amulet_taken"):
 			return Loc.t(&"it.poi_shrine")
 		if _offered_today():
@@ -208,7 +210,18 @@ func _offered_today() -> bool:
 	return (SaveGame.flags.get("shrine_offers", []) as Array).has(Game.phase_kind + str(Game.phase_index))
 
 
+## Ночь 7, после зова: нашёл лабаз и трижды приносил дары — последнее подношение — ты сам (концовка «Тайга»).
+static func taiga_ready() -> bool:
+	return Game.night == 7 and Game.is_night() and Game.final_call and Game.has_flag("labaz_found") \
+		and (SaveGame.flags.get("shrine_offers", []) as Array).size() >= 3
+
+
 func _on_shrine(_pl: Player) -> void:
+	if taiga_ready():
+		var ne := get_tree().root.find_children("*", "NightEvents", true, false)
+		if not ne.is_empty():
+			ne[0].call(&"_on_ending_chosen", &"taiga")
+			return
 	if not Game.has_flag("shrine_amulet_taken"):
 		Game.set_flag("shrine_amulet_taken", true)
 		Game.give_item(&"mansi_amulet")

@@ -677,7 +677,7 @@ func _on_report_sent(index: int) -> void:
 
 # --- Концовки ----------------------------------------------------------------
 
-const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source"]
+const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source", &"taiga"]
 const FIRE := "res://assets/audio/fire_loop.ogg"
 ## Какая находка эфира дописывает страницу к какому финалу
 const ENDING_FIND := {&"answer": &"alone", &"burn": &"bunker", &"leave": &"roll", &"silence": &"hole",

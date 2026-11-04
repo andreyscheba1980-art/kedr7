@@ -49,6 +49,8 @@ func run(id: StringName) -> void:
 			await _silence()
 		&"echo":
 			await _echo()
+		&"taiga":
+			await _taiga()
 	await _fade_to(1.0, 1.2)
 	for n in _extra:
 		if is_instance_valid(n):
@@ -284,6 +286,41 @@ func _source() -> void:
 			ml.light_energy = 0.0
 	)
 	await _wait(2.0)
+
+
+## «Тайга»: идолы в лунном свете; камера отходит — от святилища в ельник уходят две цепочки следов,
+## человечьи и собачьи, а навстречу им из темноты — третья, босая. Огонь мачты за спиной гаснет.
+func _taiga() -> void:
+	var c: Vector3 = DayPOIs.POI_TARGETS[&"poi_shrine"]["pos"]
+	c.y = Terrain.height(c.x, c.z)
+	_moon(1.8, 60.0)
+	# Лампадка-плошка у ног идолов: тёплое пятно в синей ночи
+	var lamp := Geo.omni(Game.level, c + Vector3(0.6, 0.5, 0.9), 7.0, 2.2, Color(1.0, 0.62, 0.3))
+	_extra.append(lamp)
+	var moon_hi := Geo.omni(Game.level, c + Vector3(3.0, 7.0, 4.0), 22.0, 1.6, Color(0.55, 0.64, 0.9))
+	_extra.append(moon_hi)
+	var route := PackedVector3Array()
+	for i in 12:
+		var q := c + Vector3(-1.5 - i * 2.2, 0, -0.6 - i * 1.4 + sin(i * 0.8) * 0.6)
+		q.y = Terrain.height(q.x, q.z) + 0.03
+		route.append(q)
+	var tracks := Node3D.new()
+	Game.level.add_child(tracks)
+	_extra.append(tracks)
+	Footprints.trail(tracks, &"snow", route, route[0].y, 0.55)
+	var dog_route := PackedVector3Array()
+	for q in route:
+		dog_route.append(q + Vector3(0.0, 0, 0.9))
+	Footprints.trail(tracks, &"paw", dog_route, route[0].y, 0.34, 0.04)
+	_fade_to(0.0, 2.0)
+	var dir := (Vector3(6.0, 0.0, 3.0) - c)   # со стороны станции — там тропа, а не ельник
+	dir.y = 0.0
+	dir = dir.normalized()
+	var side := Vector3(-dir.z, 0, dir.x)
+	await _dolly(c + dir * 2.2 + side * 0.5 + Vector3(0, 1.4, 0), c + dir * 3.0 + side * 0.7 + Vector3(0, 1.9, 0), c + Vector3(0, 1.0, 0), c + Vector3(0, 1.0, 0), 7.0)
+	await _dolly(c + dir * 3.0 + side * 0.7 + Vector3(0, 1.9, 0), c + dir * 3.4 + Vector3(0, 5.5, 0), c + Vector3(0, 1.0, 0), route[route.size() - 1] + Vector3(0, 0.5, 0), 9.0)
+	_caption(Loc.t(&"end.taiga.cap"))
+	await _wait(4.0)
 
 
 func _silence() -> void:

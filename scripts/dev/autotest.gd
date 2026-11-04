@@ -2607,6 +2607,21 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("taigatest"):   # концовка «Тайга»: условия, подсказка, кадр на движке
+		Game.final_call = true
+		Game.set_flag("shrine_amulet_taken", true)
+		Game.set_flag("labaz_found", true)
+		SaveGame.flags["shrine_offers"] = ["day1", "day2", "day3"]
+		var sh: Interactable = Game.yard.find_child("MansiShrine", true, false)
+		print("[taiga] готово=%s подсказка=%s святилище=%s" % [DayPOIs.taiga_ready(), sh.get_prompt(), sh.global_position])
+		var es := EndingShot.new()
+		add_child(es)
+		get_tree().create_timer(6.0, false).timeout.connect(func() -> void: _shot("taiga_a"))
+		get_tree().create_timer(14.0, false).timeout.connect(func() -> void: _shot("taiga_b"))
+		await es.run(&"taiga")
+		print("[taiga] кадр доигран")
+		get_tree().quit()
+		return
 	if args.has("guesttest"):   # гость у двери: человек и оно — спросить, глянуть, открыть / не открыть
 		Hud.log_subs = true
 		var results: PackedStringArray = []

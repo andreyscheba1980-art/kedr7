@@ -220,6 +220,12 @@ const S := {
 	&"gear.birch_map": ["берестяная карта", "birch-bark map"],
 	&"gear_found.birch_map": ["Береста с процарапанной картой — моя станция, тропы. И кресты там, где я хожу каждую ночь. На схеме [M] теперь видно, где он ждёт.", "Birch bark with a scratched map — my station, my paths. And crosses where I walk every night. The map [M] now shows where it waits."],
 	&"map.birch": ["Кресты с бересты: там он ждёт", "Crosses from the birch bark: it waits there"],
+	&"it.shrine_taiga": ["Последнее подношение — уйти к ним", "The last offering — go to them"],
+	&"end.taiga.cap": ["Тайга приняла.", "The taiga took him."],
+	&"end.taiga.1": ["Ты не стал отвечать эфиру. Ты пришёл к идолам и сел у их ног, как садятся у печи.\nНайда легла рядом. Свист в лесу стих — будто кто-то перестал звать, потому что дозвался.", "You didn't answer the air. You came to the idols and sat at their feet, the way one sits by a stove.\nNaida lay down beside you. The whistling in the forest stopped — as if someone stopped calling because he had been heard."],
+	&"end.taiga.2": ["Утром вертолёт кружил над станцией два часа. Дом был тёплый, печь — протоплена, журнал заполнен до последней строки.\nОт святилища в ельник уходили две цепочки следов: человечьи и собачьи. И третья — босая, навстречу.", "In the morning the helicopter circled the station for two hours. The house was warm, the stove stoked, the log filled to the last line.\nFrom the shrine two lines of tracks led into the spruce: a man's and a dog's. And a third — barefoot, coming to meet them."],
+	&"end.taiga.3": ["Ушминские охотники с тех пор оставляют у Кедра пайки. Говорят, по ночам там на сопке видно два огонька — низко, у самой земли.\nИ никто больше не слышал свиста.", "The Ushma hunters have left rations at Kedr ever since. They say at night two small lights can be seen on the hill there — low, close to the ground.\nAnd no one has heard the whistling again."],
+	&"end.taiga.title": ["КОНЦОВКА: ТАЙГА\n\nты остался", "ENDING: THE TAIGA\n\nyou stayed"],
 	# --- Гость у двери (NightGuest) ---
 	&"guest.it_ask": ["Спросить через дверь, кто там", "Ask through the door who's there"],
 	&"guest.it_peek": ["Глянуть в окно сеней на крыльцо", "Look out the porch window"],
