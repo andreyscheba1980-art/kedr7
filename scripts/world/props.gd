@@ -2741,6 +2741,30 @@ static func ladder(height := 2.6) -> Node3D:
 
 
 ## Деревянный экспедиционный ящик снабжения
+## Фундаментный блок ФБС 1.6×0.7×0.8: продольный паз сверху, две монтажные петли, скол ребра, снежная шапка.
+## (Раньше на точках лежали голые BoxMesh — издали чёрные кубы.) Начало — низ по центру.
+static func fbs_block() -> Node3D:
+	var key := &"fbs_block"
+	var cached := _instance_from_cache(key, "tex_concrete.png")
+	if cached != null:
+		return cached
+	var k := _kit(161, 0.07)
+	var conc := Color(0.52, 0.51, 0.48)
+	var dark := Color(0.34, 0.33, 0.31)
+	var rust := Color(0.36, 0.22, 0.14)
+	var snow := Color(0.82, 0.86, 0.92)
+	k.box(Vector3(0, 0.33, 0), Vector3(1.6, 0.66, 0.8), conc)
+	k.box(Vector3(0, 0.675, 0.27), Vector3(1.56, 0.05, 0.22), conc)     # кромки по бокам паза
+	k.box(Vector3(0, 0.675, -0.27), Vector3(1.56, 0.05, 0.22), conc)
+	k.box(Vector3(0, 0.665, 0), Vector3(1.5, 0.02, 0.3), dark)          # дно паза
+	k.box(Vector3(0.79, 0.58, 0.39), Vector3(0.06, 0.16, 0.06), dark)   # скол ребра
+	for sx: float in [-0.5, 0.5]:
+		k.tube([Vector3(sx - 0.07, 0.68, 0), Vector3(sx - 0.05, 0.78, 0), Vector3(sx + 0.05, 0.78, 0), Vector3(sx + 0.07, 0.68, 0)], [0.012, 0.012, 0.012, 0.012], rust, 4)
+	k.box(Vector3(-0.15, 0.72, -0.05), Vector3(1.1, 0.05, 0.5), snow)  # снег на блоке
+	k.box(Vector3(0.0, 0.03, 0.42), Vector3(1.5, 0.06, 0.1), snow)     # намело у основания
+	return _mi(k, key, "tex_concrete.png")
+
+
 static func crate() -> Node3D:
 	var key := &"crate"
 	var cached := _instance_from_cache(key, "tex_wood.png")

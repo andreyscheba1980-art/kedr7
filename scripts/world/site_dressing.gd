@@ -327,10 +327,12 @@ static func repeater(yard: Node3D, c: Vector3) -> void:
 static func bunker(yard: Node3D, c: Vector3) -> void:
 	wire_fence(yard, _square(c, 6.5, deg_to_rad(10.0), 3))
 	sign_board(yard, _ground(c, -7.4, 2.6), 100.0, &"sign.restricted", Color(0.82, 0.78, 0.66))
-	var conc := Palette.m(&"concrete")
 	for bl: Array in [[3.6, -3.4, 15.0], [4.6, -2.2, -10.0], [-3.8, -4.0, 40.0]]:
-		var blk := Geo.block(yard, Vector3(1.6, 0.7, 0.8), _ground(c, bl[0], bl[1]) + Vector3(0, 0.35, 0), conc, true)
+		var blk := Props.fbs_block()
+		blk.position = _ground(c, bl[0], bl[1])
 		blk.rotation.y = deg_to_rad(bl[2])
+		yard.add_child(blk)
+		_solid(yard, blk.position + Vector3(0, 0.35, 0), Vector3(1.6, 0.7, 0.8), blk.rotation.y)
 	var vent := _ground(c, 2.6, 3.4)
 	Geo.cylinder(yard, 0.18, 1.3, vent + Vector3(0, 0.65, 0), Palette.m(&"metal"), true)
 	Geo.cylinder(yard, 0.42, 0.12, vent + Vector3(0, 1.35, 0), Palette.m(&"metal"), false)

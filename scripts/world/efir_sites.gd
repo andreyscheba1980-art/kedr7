@@ -107,14 +107,15 @@ func _build_find(id: StringName, pos: Vector3, find: StringName, pool: bool) -> 
 	root.position = p
 	add_child(root)
 	# Ящик-станция защитного цвета, антенна-штырь, лампа-«жучок»
-	var box := Geo.box_mesh(Vector3(0.46, 0.3, 0.3), Palette.m(&"canister"))
-	box.position = Vector3(0, 0.15, 0)
-	box.rotation.y = randf() * TAU
-	root.add_child(box)
-	var whip := Geo.box_mesh(Vector3(0.015, 1.4, 0.015), Palette.m(&"metal"))
-	whip.position = Vector3(0.16, 0.95, 0.05)
+	# Армейский ящик-станция (модель) и штырь-антенна; раньше — голая коробка с палочкой
+	var box := Models.spawn(root, "kedr/soviet_crate", Vector3.ZERO, randf() * 360.0, 0.34, {"grime": 0.0, "bright": 1.1, "sat": 0.9})
+	if box == null:
+		var bm := Geo.box_mesh(Vector3(0.46, 0.3, 0.3), Palette.m(&"canister"))
+		bm.position = Vector3(0, 0.15, 0)
+		root.add_child(bm)
+	var whip := Geo.cylinder(root, 0.008, 1.4, Vector3(0.16, 1.0, 0.05), Palette.m(&"metal"), false)
 	whip.rotation.z = 0.12
-	root.add_child(whip)
+	Geo.cylinder(root, 0.03, 0.06, Vector3(0.1, 0.36, 0.05), Palette.m(&"dark"), false)   # гнездо антенны
 	var lamp := OmniLight3D.new()
 	lamp.position = Vector3(0, 0.36, 0)
 	lamp.light_color = Color(1.0, 0.25, 0.15)
