@@ -2607,6 +2607,25 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("numtest"):   # цифровая станция → сбивка → схрон
+		Hud.log_subs = true
+		Game.radio.set_freq(5310.0)
+		await _wait(1.0)
+		print("[num] настроено: %s" % Game.radio.locked_signal())
+		NumbersCache._on_locked(&"numbers")
+		await _wait(7.0)
+		print("[num] сбивку услышал=%s позиция схрона=%s" % [NumbersCache.known(), NumbersCache.pos()])
+		var it: Interactable = Game.yard.find_child("NumbersCacheIt", true, false)
+		var cp := NumbersCache.pos()
+		cp.y = Terrain.height(cp.x, cp.z)
+		_look(cp + Vector3(3.5, 0, 3.0), cp + Vector3(0, 0.6, 0))
+		await _wait(1.0)
+		await _shot("numcache")
+		var r0 := Supply.rations()
+		it.used.emit(Game.player)
+		print("[num] найден=%s пайки %d → %d" % [NumbersCache.found(), r0, Supply.rations()])
+		get_tree().quit()
+		return
 	if args.has("repairtest"):   # ремонт руками: ритм и порядок, колбэк починки
 		Game.hud.visible = true
 		var done := [0]

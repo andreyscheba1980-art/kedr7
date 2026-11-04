@@ -226,6 +226,22 @@ const S := {
 	&"end.taiga.2": ["Утром вертолёт кружил над станцией два часа. Дом был тёплый, печь — протоплена, журнал заполнен до последней строки.\nОт святилища в ельник уходили две цепочки следов: человечьи и собачьи. И третья — босая, навстречу.", "In the morning the helicopter circled the station for two hours. The house was warm, the stove stoked, the log filled to the last line.\nFrom the shrine two lines of tracks led into the spruce: a man's and a dog's. And a third — barefoot, coming to meet them."],
 	&"end.taiga.3": ["Ушминские охотники с тех пор оставляют у Кедра пайки. Говорят, по ночам там на сопке видно два огонька — низко, у самой земли.\nИ никто больше не слышал свиста.", "The Ushma hunters have left rations at Kedr ever since. They say at night two small lights can be seen on the hill there — low, close to the ground.\nAnd no one has heard the whistling again."],
 	&"end.taiga.title": ["КОНЦОВКА: ТАЙГА\n\nты остался", "ENDING: THE TAIGA\n\nyou stayed"],
+	# --- Схрон по цифровой станции (NumbersCache) ---
+	&"numc.heard": ["Цифры сбиваются — другой голос, мужской, сиплый: «…мачта… три-один-ноль… сто сорок… для сменщика…»", "The numbers stumble — another voice, male, hoarse: \"…the mast… three-one-zero… one-forty… for the relief…\""],
+	&"numc.think": ["Азимут 310 от мачты, сто сорок шагов? Схрон. Отметил на схеме [M].", "Bearing 310 from the mast, a hundred and forty paces? A cache. Marked it on the map [M]."],
+	&"numc.it": ["Каменная пирамидка с вешкой — разобрать", "A stone cairn with a marker pole — take it apart"],
+	&"numc.it_empty": ["Пирамидка (пусто)", "Cairn (empty)"],
+	&"numc.empty": ["Под камнями пусто.", "Nothing under the stones."],
+	&"numc.r": ["схрон Семёнова", "Semenov's cache"],
+	&"numc.note": ["Армейский ящик под камнями. Три ракеты, галеты, банка тушёнки. Записка карандашом:
+
+«Сменщику. Если слышишь цифры — значит, ещё живой. Цифры читаю я, пока могу.
+Не ходи по одной тропе две ночи. Он запоминает. Собаку держи при себе — она его чует раньше.
+Если голос в эфире назовёт тебя по имени — не отвечай. Это не я. — С.»", "An army box under the stones. Three flares, hardtack, a tin of stew. A pencil note:
+
+\"To my relief. If you hear the numbers — you're still alive. I read the numbers while I can.
+Don't walk the same path two nights running. It remembers. Keep the dog close — she smells it first.
+If a voice on the air calls you by name — don't answer. It isn't me. — S.\""],
 	# --- Ремонт руками (RepairUI) ---
 	&"rep.hint_rhythm": ["Жми [E] / [Пробел], когда стрелка в зелёном.", "Press [E] / [Space] when the needle is in the green."],
 	&"rep.hint_seq": ["Жми клавиши по порядку, слева направо.", "Press the keys in order, left to right."],

@@ -177,6 +177,8 @@ func _ready() -> void:
 	FarSites.build(self)
 	Supply.place_crate(self)
 	Supply.hook()
+	NumbersCache.hook()
+	NumbersCache.build(self)   # схрон, к которому ведёт сбивка в цифрах
 	add_child(MapEvents.new())
 	add_child(FieldJobs.new())
 	add_child(SourceSite.new())

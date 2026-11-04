@@ -122,6 +122,13 @@ func _draw() -> void:
 			var zc: Vector2 = to_map.call(zone[0])
 			draw_arc(zc, float(zone[1]) * px_per_m, 0.0, TAU, 40, Color(0.72, 0.1, 0.08), 2.0)
 			draw_string(font, zc + Vector2(-6, 6), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.62, 0.08, 0.06))
+	# Сбивка в цифрах: азимут от мачты и шаги — карандашный луч и круг поиска
+	if NumbersCache.known() and not NumbersCache.found():
+		var m0: Vector2 = to_map.call(Yard.MAST)
+		var m1: Vector2 = to_map.call(NumbersCache.pos())
+		draw_dashed_line(m0, m1, Color(0.22, 0.2, 0.2, 0.75), 1.6, 10.0)
+		draw_arc(m1, 14.0 * area.size.x / _bounds.size.x + 6.0, 0.0, TAU, 28, Color(0.72, 0.1, 0.08), 2.0)
+		draw_string(font, m1 + Vector2(10, -8), "310° / 140", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.62, 0.08, 0.06))
 	# Берестяная карта шамана: где тварь ждёт на привычных тропах — красные кресты поверх схемы
 	if Gear.has(&"birch_map"):
 		for key: String in Consequences.risky_cells():
