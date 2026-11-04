@@ -2578,6 +2578,23 @@ func _tour(args: PackedStringArray) -> void:
 	if args.has("perfphys"):
 		await _perf_phys()
 		return
+	if args.has("boxshots"):   # места, где голые коробки заменены моделями
+		var out := [["repeater", Yard.REPEATER + Vector3(-9, 0, 6), Yard.REPEATER], ["hummocks", Yard.LAKE + Vector3(-3, 0, 2), Yard.LAKE + Vector3(-10, 0, 7)],
+			["hole", Yard.HOLE + Vector3(-3.5, 0, 1.5), Yard.HOLE + Vector3(-1, 0, -1)], ["anchor", Yard.MAST + Vector3(5, 0, 6), Yard.MAST + Vector3(9, 0, 0)]]
+		for v: Array in out:
+			var p0: Vector3 = v[1]
+			var t0: Vector3 = v[2]
+			p0.y = Terrain.height(p0.x, p0.z)
+			t0.y = Terrain.height(t0.x, t0.z)
+			_look(p0, t0)
+			await _wait(1.2)
+			await _shot("box_" + v[0])
+		for v: Array in [["crates", Vector3(5.6, 0.05, -3.2), Vector3(4.2, 0.4, -5.0)], ["sv20", Vector3(6.6, 0.05, -0.3), Vector3(7.7, 0.7, -1.35)]]:
+			_look(v[1], v[2])
+			await _wait(1.2)
+			await _shot("box_" + v[0])
+		get_tree().quit()
+		return
 	if args.has("revisit"):
 		await _revisit()
 		get_tree().quit()

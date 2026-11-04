@@ -2765,6 +2765,194 @@ static func fbs_block() -> Node3D:
 	return _mi(k, key, "tex_concrete.png")
 
 
+## Валун сопки: гранёный камень (4 варианта формы), шапка снега по верхним граням.
+## Единичный размер ~1 м, масштабируется снаружи. Начало — центр, низ около y = -0.45.
+static func boulder(variant := 0) -> Node3D:
+	var v := posmod(variant, 4)
+	var key := StringName("boulder_%d" % v)
+	var cached := _instance_from_cache(key, "tex_stove.png")
+	if cached != null:
+		return cached
+	var k := _kit(300 + v, 0.10)
+	var rock := Color(0.40, 0.39, 0.37)
+	var snow := Color(0.84, 0.88, 0.93)
+	var ph := float(v) * 1.7
+	k.blob(Vector3.ZERO, Vector3(0.5, 0.45, 0.5), rock, 4, 7, Basis(), func(d: Vector3) -> float:
+		var n := 1.0 + 0.16 * sin(d.x * 5.1 + ph) * cos(d.z * 4.3 - ph) + 0.08 * sin(d.y * 7.0 + ph * 2.0)
+		if d.y < -0.4:
+			n *= 0.75   # приплюснутый низ — лежит, а не висит шаром
+		return n,
+		func(d: Vector3) -> Color: return snow if d.y > 0.62 else rock)
+	return _mi(k, key, "tex_stove.png")
+
+
+## Торос / вывороченная льдина: плоская гранёная плита, кромка светлее (2 варианта). Единичный размер.
+static func ice_slab(variant := 0) -> Node3D:
+	var v := posmod(variant, 2)
+	var key := StringName("ice_slab_%d" % v)
+	var cached := _instance_from_cache(key, "tex_snow.png")
+	if cached != null:
+		return cached
+	var k := _kit(320 + v, 0.06)
+	var ice := Color(0.55, 0.68, 0.78)
+	var rim := Color(0.80, 0.88, 0.94)
+	var ph := float(v) * 2.3
+	k.blob(Vector3.ZERO, Vector3(0.5, 0.5, 0.5), ice, 3, 6, Basis(), func(d: Vector3) -> float:
+		return 1.0 + 0.22 * sin(d.x * 6.0 + ph) * sin(d.z * 5.0 + ph),
+		func(d: Vector3) -> Color: return rim if d.y > 0.5 else ice)
+	return _mi(k, key, "tex_snow.png")
+
+
+## Рыбацкий ящик-сиденье: дощатый короб, крышка-сиденье с войлоком, ремень и ручка. 0.42×0.32×0.28, низ по центру.
+static func fishing_box() -> Node3D:
+	var key := &"fishing_box"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(331, 0.05)
+	var wood := Color(0.40, 0.33, 0.24)
+	var dark := Color(0.20, 0.17, 0.14)
+	var felt := Color(0.30, 0.27, 0.24)
+	var iron := Color(0.26, 0.27, 0.28)
+	k.box(Vector3(0, 0.14, 0), Vector3(0.42, 0.28, 0.28), wood)
+	for y: float in [0.07, 0.21]:
+		k.box(Vector3(0, y, 0.141), Vector3(0.42, 0.006, 0.004), dark)   # щели между досками
+		k.box(Vector3(0, y, -0.141), Vector3(0.42, 0.006, 0.004), dark)
+	k.box(Vector3(0, 0.295, 0), Vector3(0.44, 0.03, 0.30), wood * 0.9)   # крышка
+	k.box(Vector3(0, 0.315, 0), Vector3(0.36, 0.015, 0.24), felt)        # войлок на сиденье
+	k.box(Vector3(0.12, 0.16, 0), Vector3(0.04, 0.33, 0.29), dark)       # ремень через короб
+	k.tube([Vector3(-0.08, 0.31, 0.15), Vector3(-0.06, 0.36, 0.15), Vector3(0.06, 0.36, 0.15), Vector3(0.08, 0.31, 0.15)], [0.008], iron, 5)
+	return _mi(k, key, "tex_wood.png")
+
+
+## Бетонный якорь оттяжки: усечённый блок, вмёрзший в снег, проушина с серьгой. Начало — низ по центру.
+static func guy_anchor() -> Node3D:
+	var key := &"guy_anchor"
+	var cached := _instance_from_cache(key, "tex_concrete.png")
+	if cached != null:
+		return cached
+	var k := _kit(341, 0.07)
+	var conc := Color(0.50, 0.49, 0.46)
+	var rust := Color(0.36, 0.22, 0.14)
+	var snow := Color(0.84, 0.88, 0.93)
+	k.tube([Vector3(0, 0, 0), Vector3(0, 0.3, 0)], [0.3, 0.2], conc, 4)
+	k.tube([Vector3(0, 0.28, 0), Vector3(0, 0.36, 0)], [0.04, 0.04], rust, 5)
+	k.tube([Vector3(-0.05, 0.36, 0), Vector3(-0.04, 0.44, 0), Vector3(0.04, 0.44, 0), Vector3(0.05, 0.36, 0)], [0.012], rust, 4)
+	k.blob(Vector3(0, 0.02, 0), Vector3(0.42, 0.08, 0.42), snow, 3, 7)   # намело вокруг
+	return _mi(k, key, "tex_concrete.png")
+
+
+## Тумба под прибор: каркас из бруса, обшивка, полка внизу (под СВ-20 «Слухач»). 0.48×0.75×0.48, низ по центру.
+static func instrument_plinth() -> Node3D:
+	var key := &"instrument_plinth"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(351, 0.05)
+	var wood := Color(0.40, 0.31, 0.22)
+	var dark := Color(0.24, 0.18, 0.13)
+	var felt := Color(0.18, 0.18, 0.17)
+	for sx: float in [-0.21, 0.21]:
+		for sz: float in [-0.21, 0.21]:
+			k.box(Vector3(sx, 0.36, sz), Vector3(0.06, 0.72, 0.06), dark)
+	k.box(Vector3(0, 0.735, 0), Vector3(0.48, 0.03, 0.48), wood)          # столешница
+	k.box(Vector3(0, 0.755, 0), Vector3(0.40, 0.01, 0.34), felt)          # резиновый виброковрик
+	k.box(Vector3(0, 0.12, 0), Vector3(0.42, 0.025, 0.42), wood)          # нижняя полка
+	k.box(Vector3(0, 0.45, -0.21), Vector3(0.38, 0.5, 0.02), wood * 0.9)  # задняя стенка
+	k.box(Vector3(-0.21, 0.45, 0), Vector3(0.02, 0.5, 0.38), wood * 0.9)
+	k.box(Vector3(0.21, 0.45, 0), Vector3(0.02, 0.5, 0.38), wood * 0.9)
+	k.box(Vector3(0, 0.62, 0.215), Vector3(0.38, 0.03, 0.02), dark)       # царга спереди
+	return _mi(k, key, "tex_wood.png")
+
+
+## Кабина ГТ-Т изнутри (координаты кабины Vehicle): гофрированные борта с рёбрами и заклёпками,
+## моторный тоннель в ватном чехле, сиденья на трубчатом каркасе, торпеда с ободками шкал, капот с жалюзи.
+## Стёкла, шкалы, рычаги и свет ставит Vehicle — здесь только «железо».
+static func gtt_cab() -> Node3D:
+	var key := &"gtt_cab"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(361, 0.05)
+	var paint := Color(0.30, 0.34, 0.27)      # армейский зелёный, вытертый
+	var paint_d := Color(0.20, 0.23, 0.19)
+	var dark := Color(0.10, 0.10, 0.10)
+	var rivet := Color(0.42, 0.42, 0.40)
+	var quilt := Color(0.24, 0.22, 0.18)      # ватник-чехол на моторе
+	var seat_c := Color(0.16, 0.14, 0.12)     # дерматин
+	var tube_c := Color(0.22, 0.23, 0.24)
+	var rubber := Color(0.06, 0.06, 0.06)
+	var snow := Color(0.84, 0.88, 0.93)
+	var z0 := -1.15
+	# Пол: рифлёный лист + резиновый коврик
+	k.box(Vector3(0, 0.18, z0), Vector3(2.32, 0.06, 1.8), paint_d)
+	for i in 9:
+		k.box(Vector3(0, 0.215, z0 - 0.8 + i * 0.2), Vector3(2.2, 0.01, 0.03), rivet * 0.7)
+	k.box(Vector3(0.5, 0.222, z0 - 0.2), Vector3(0.6, 0.012, 0.7), rubber)
+	# Крыша с поперечными рёбрами
+	k.box(Vector3(0, 1.60, z0), Vector3(2.32, 0.06, 1.8), paint)
+	for i in 4:
+		k.box(Vector3(0, 1.555, z0 - 0.7 + i * 0.46), Vector3(2.28, 0.04, 0.06), paint_d)
+	# Задняя переборка и борта: панели с рёбрами, заклёпки по швам
+	k.box(Vector3(0, 0.90, -0.25), Vector3(2.32, 1.45, 0.08), paint)
+	k.box(Vector3(-1.16, 0.90, z0), Vector3(0.08, 1.45, 1.8), paint)
+	k.box(Vector3(1.16, 0.90, -0.48), Vector3(0.08, 1.45, 0.45), paint)
+	k.box(Vector3(1.16, 0.90, -1.82), Vector3(0.08, 1.45, 0.45), paint)
+	for zz: float in [-0.55, -0.95, -1.35, -1.75]:
+		k.box(Vector3(-1.11, 0.90, zz), Vector3(0.03, 1.40, 0.05), paint_d)
+	for xx: float in [-0.8, -0.3, 0.3, 0.8]:
+		k.box(Vector3(xx, 0.90, -0.30), Vector3(0.05, 1.40, 0.03), paint_d)
+	for i in 10:
+		var t := float(i) / 9.0
+		k.box(Vector3(-1.115, 0.27 + t * 1.25, -0.32), Vector3(0.02, 0.02, 0.02), rivet)
+		k.box(Vector3(-1.115, 0.27 + t * 1.25, -1.97), Vector3(0.02, 0.02, 0.02), rivet)
+		k.box(Vector3(-1.05 + t * 2.1, 1.53, -0.30), Vector3(0.02, 0.02, 0.02), rivet)
+	# Дверь: низ и верх, ручка, уплотнитель
+	k.box(Vector3(1.14, 0.55, z0), Vector3(0.06, 0.75, 0.88), paint)
+	k.box(Vector3(1.14, 1.53, z0), Vector3(0.06, 0.12, 0.88), paint)
+	k.box(Vector3(1.10, 0.55, z0), Vector3(0.02, 0.6, 0.7), paint_d)
+	k.tube([Vector3(1.09, 0.85, z0 + 0.25), Vector3(1.04, 0.85, z0 + 0.25), Vector3(1.04, 0.85, z0 + 0.05), Vector3(1.09, 0.85, z0 + 0.05)], [0.012], tube_c, 5)
+	# Моторный тоннель в ватном чехле: стёганые полосы, ремни
+	k.box(Vector3(0, 0.35, z0), Vector3(0.36, 0.34, 1.6), paint_d)
+	k.box(Vector3(0, 0.53, z0), Vector3(0.40, 0.04, 1.5), quilt)
+	for i in 6:
+		k.box(Vector3(0, 0.555, z0 - 0.62 + i * 0.25), Vector3(0.41, 0.012, 0.02), quilt * 0.7)
+	for sx: float in [-0.19, 0.19]:
+		k.box(Vector3(sx, 0.40, z0), Vector3(0.03, 0.26, 1.45), quilt)
+	k.box(Vector3(0, 0.45, z0 + 0.3), Vector3(0.44, 0.22, 0.04), rubber)   # ремень
+	# Сиденья: трубчатый каркас, подушка и спинка с рантом
+	for sx: float in [0.50, -0.52]:
+		for dx: float in [-0.2, 0.2]:
+			k.tube([Vector3(sx + dx, 0.21, -0.75), Vector3(sx + dx, 0.36, -0.75)], [0.015], tube_c, 5)
+			k.tube([Vector3(sx + dx, 0.21, -1.15), Vector3(sx + dx, 0.36, -1.15)], [0.015], tube_c, 5)
+		k.box(Vector3(sx, 0.36, -0.95), Vector3(0.48, 0.03, 0.46), tube_c)
+		k.box(Vector3(sx, 0.42, -0.95), Vector3(0.50, 0.09, 0.46), seat_c)
+		k.box(Vector3(sx, 0.47, -0.95), Vector3(0.44, 0.012, 0.40), seat_c * 1.25)
+		k.box(Vector3(sx, 0.74, -0.70), Vector3(0.48, 0.50, 0.07), seat_c)
+		k.box(Vector3(sx, 0.74, -0.74), Vector3(0.42, 0.44, 0.012), seat_c * 1.25)
+		k.tube([Vector3(sx - 0.22, 0.45, -0.66), Vector3(sx - 0.22, 1.0, -0.66), Vector3(sx + 0.22, 1.0, -0.66), Vector3(sx + 0.22, 0.45, -0.66)], [0.012], tube_c, 5)
+	# Торпеда: короб, козырёк над шкалами, ободки, рукоятки, тумблеры
+	k.box(Vector3(0, 0.72, -1.72), Vector3(2.20, 0.28, 0.40), paint)
+	k.box(Vector3(0, 0.83, -1.60), Vector3(2.16, 0.14, 0.22), dark)
+	k.box(Vector3(-0.30, 0.95, -1.58), Vector3(0.80, 0.03, 0.14), paint_d)   # козырёк от бликов
+	for d: Array in [[-0.40, 0.86, 0.06], [-0.56, 0.86, 0.05], [-0.26, 0.87, 0.035], [-0.26, 0.79, 0.035], [0.22, 0.86, 0.04]]:
+		var c := Vector3(d[0], d[1], -1.545)
+		k.tube([c + Vector3(0, 0, -0.01), c + Vector3(0, 0.0, 0.01)], [float(d[2]) + 0.012], rivet, 10)
+	k.box(Vector3(0.6, 0.86, -1.49), Vector3(0.5, 0.012, 0.012), rivet)       # поручень-полоса
+	# Стойки лобового
+	for sx: float in [-1.12, 0.0, 1.12]:
+		k.box(Vector3(sx, 1.24, -1.85), Vector3(0.07, 0.74, 0.06), paint, Basis(Vector3.RIGHT, deg_to_rad(18.0)))
+	# Капот: короб, скос, жалюзи радиатора, петли, снег
+	k.box(Vector3(0, 0.60, -2.48), Vector3(2.36, 0.38, 1.25), paint)
+	k.box(Vector3(0, 0.45, -3.25), Vector3(2.36, 0.35, 0.70), paint, Basis(Vector3.RIGHT, deg_to_rad(22.0)))
+	for i in 7:
+		k.box(Vector3(-0.6 + i * 0.2, 0.795, -2.6), Vector3(0.12, 0.012, 0.7), dark)
+	for sx: float in [-0.9, 0.9]:
+		k.box(Vector3(sx, 0.80, -1.95), Vector3(0.12, 0.03, 0.06), rivet)
+	k.box(Vector3(0, 0.81, -2.48), Vector3(2.2, 0.05, 1.1), snow)
+	return _mi(k, key, "tex_metal.png")
+
+
 static func crate() -> Node3D:
 	var key := &"crate"
 	var cached := _instance_from_cache(key, "tex_wood.png")

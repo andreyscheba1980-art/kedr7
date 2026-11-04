@@ -204,26 +204,11 @@ func _build_cabin() -> void:
 	var metal := Palette.m(&"metal")
 	var dark := Palette.m(&"dark")
 	var c := _cabin_root
-	# Короб кабины: пол, крыша, задняя переборка, борта, двери
-	Geo.block(c, Vector3(2.32, 0.06, 1.8), Vector3(0.0, 0.18, -1.15), dark, false)
-	Geo.block(c, Vector3(2.32, 1.45, 0.08), Vector3(0.0, 0.90, -0.25), metal, false)
-	Geo.block(c, Vector3(2.32, 0.06, 1.8), Vector3(0.0, 1.60, -1.15), metal, false)
-	Geo.block(c, Vector3(0.08, 1.45, 1.8), Vector3(-1.16, 0.90, -1.15), metal, false)
-	Geo.block(c, Vector3(0.08, 1.45, 0.45), Vector3(1.16, 0.90, -0.48), metal, false)
-	Geo.block(c, Vector3(0.08, 1.45, 0.45), Vector3(1.16, 0.90, -1.82), metal, false)
-	Geo.block(c, Vector3(0.06, 0.75, 0.88), Vector3(1.14, 0.55, -1.15), metal, false)   # дверь: низ
-	Geo.block(c, Vector3(0.06, 0.12, 0.88), Vector3(1.14, 1.53, -1.15), metal, false)   # дверь: верх
+	c.add_child(Props.gtt_cab())   # борта, тоннель, сиденья, торпеда, капот — одной моделью
+	# Окна двери и Михалыча — в инее
 	_frost_glass(c, Vector3(0.02, 0.62, 0.86), Vector3(1.15, 1.22, -1.15), 0.0)           # окно двери
 	_frost_glass(c, Vector3(0.02, 0.5, 0.7), Vector3(-1.16, 1.2, -1.25), 0.0)             # окно Михалыча
-	Geo.block(c, Vector3(0.36, 0.34, 1.6), Vector3(0.0, 0.35, -1.15), dark, false)       # моторный тоннель
-	# Сиденья
-	for sx: float in [0.50, -0.52]:
-		Geo.block(c, Vector3(0.48, 0.24, 0.48), Vector3(sx, 0.26, -0.95), metal, false)
-		Geo.block(c, Vector3(0.52, 0.10, 0.48), Vector3(sx, 0.41, -0.95), Palette.m(&"cloth"), false)
-		Geo.block(c, Vector3(0.52, 0.52, 0.08), Vector3(sx, 0.72, -0.69), Palette.m(&"cloth"), false)
 	# Торпеда и щиток приборов: шкалы светятся зелёным — в темноте кабины это единственный свет
-	Geo.block(c, Vector3(2.20, 0.28, 0.40), Vector3(0.0, 0.72, -1.72), metal, false)
-	Geo.block(c, Vector3(2.16, 0.14, 0.22), Vector3(0.0, 0.83, -1.60), dark, false)
 	var dial_m := StandardMaterial3D.new()
 	dial_m.albedo_color = Color(0.08, 0.14, 0.09)
 	dial_m.emission_enabled = true
@@ -254,17 +239,9 @@ func _build_cabin() -> void:
 	for sx: float in [-0.55, 0.55]:
 		var gl := _frost_glass(c, Vector3(1.0, 0.64, 0.02), Vector3(sx, 1.24, -1.86), 18.0)
 		gl.name = "Windshield"
-	for sx: float in [-1.12, 0.0, 1.12]:
-		var pil := Geo.block(c, Vector3(0.07, 0.74, 0.06), Vector3(sx, 1.24, -1.85), metal, false)
-		pil.rotation.x = deg_to_rad(18.0)
 	for sx: float in [-0.55, 0.55]:
 		var wp := Geo.block(c, Vector3(0.012, 0.5, 0.012), Vector3(sx + 0.12, 1.05, -1.82), dark, false)
 		wp.rotation = Vector3(deg_to_rad(18.0), 0.0, deg_to_rad(-62.0))
-	# Капот перед стеклом: в свете фар — снег на нём
-	Geo.block(c, Vector3(2.36, 0.38, 1.25), Vector3(0.0, 0.60, -2.48), metal, false)
-	var nose := Geo.block(c, Vector3(2.36, 0.35, 0.70), Vector3(0.0, 0.45, -3.25), metal, false)
-	nose.rotation.x = deg_to_rad(22.0)
-	Geo.block(c, Vector3(2.2, 0.05, 1.1), Vector3(0.0, 0.81, -2.48), Palette.m(&"snow"), false)
 	# Плафон под крышей: тёплый, слабый — чтобы кабина читалась
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.82, 0.6)

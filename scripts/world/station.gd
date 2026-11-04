@@ -1967,7 +1967,9 @@ func _build_radio_room() -> void:
 
 	# Грунтовый геофон и сейсмоприемник СВ-20 («Слухач») на отдельной виброизолированной тумбе
 	_collider(Vector3(0.50, 0.75, 0.50), Vector3(7.70, 0.375, -1.35))
-	Geo.block(self, Vector3(0.48, 0.75, 0.48), Vector3(7.70, 0.375, -1.35), Palette.m(&"wood"), false)
+	var plinth := Props.instrument_plinth()
+	plinth.position = Vector3(7.70, 0.0, -1.35)
+	add_child(plinth)
 	var sv20_it := Geo.interactable(self, Vector3(0.40, 0.28, 0.32), Vector3(7.70, 0.87, -1.35), null, "", func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"seismograph")
 	)
@@ -2298,10 +2300,19 @@ func _build_storage() -> void:
 	tubes.name = "StorageTubes"
 
 	# Деревянные ящики в тёмном дальнем углу чулана
-	var c1 := Geo.block(self, Vector3(0.7, 0.5, 0.6), Vector3(4.2, 0.25, -5.0), Palette.m(&"wood"))
+	# (модель ящика со стяжками вместо голых коробок; коллизия — прежними размерами)
+	_collider(Vector3(0.7, 0.5, 0.6), Vector3(4.2, 0.25, -5.0))
+	_collider(Vector3(0.55, 0.45, 0.5), Vector3(4.25, 0.72, -5.0))
+	var c1 := Props.crate()
+	c1.scale = Vector3(0.875, 0.833, 1.0)
+	c1.position = Vector3(4.2, 0.0, -5.0)
 	c1.rotation.y = deg_to_rad(8.0)
-	var c2 := Geo.block(self, Vector3(0.55, 0.45, 0.5), Vector3(4.25, 0.72, -5.0), Palette.m(&"wood"))
+	add_child(c1)
+	var c2 := Props.crate()
+	c2.scale = Vector3(0.69, 0.75, 0.833)
+	c2.position = Vector3(4.25, 0.5, -5.0)
 	c2.rotation.y = deg_to_rad(-12.0)
+	add_child(c2)
 
 	# «Зенит-Е» Семёнова на ящике: плёнка, лампы-вспышки — проявка утром
 	if not Game.has_item(&"zenit"):
@@ -2393,7 +2404,11 @@ func _build_vestibule() -> void:
 	skis_it.add_child(skis_model)
 
 	# 3. Лавка для просушки обуви и полка для рукавиц
-	Geo.block(self, Vector3(1.8, 0.42, 0.5), Vector3(12.6, 0.21, 5.8), Palette.m(&"weathered"), true)
+	_collider(Vector3(1.8, 0.42, 0.5), Vector3(12.6, 0.21, 5.8))
+	var shoe_bench := Props.izba_bench()
+	shoe_bench.position = Vector3(12.6, 0.0, 5.8)
+	shoe_bench.scale = Vector3(1.29, 1.0, 1.6)
+	add_child(shoe_bench)
 	Geo.block(self, Vector3(1.6, 0.05, 0.35), Vector3(12.6, 1.4, 5.85), Palette.m(&"weathered"), false)
 
 	# Весовой снегомер ВС-43 на стене сеней над лавкой

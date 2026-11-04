@@ -1028,7 +1028,11 @@ func _build_mast() -> void:
 		add_child(wire)
 		wire.position = (top + anchor) / 2.0
 		wire.look_at(anchor, Vector3.UP)
-		Geo.block(self, Vector3(0.4, 0.3, 0.4), anchor, Palette.m(&"dark"))
+		var anc := Props.guy_anchor()
+		anc.position = anchor - Vector3(0, 0.2, 0)
+		anc.rotation.y = a
+		add_child(anc)
+		Geo.collider(self, Vector3(0.5, 0.35, 0.5), anchor - Vector3(0, 0.03, 0))
 		# Талреп натяжения оттяжки
 		Geo.cylinder(self, 0.035, 0.35, anchor + (top - anchor).normalized() * 0.8, metal, false)
 		var ice := Props.guy_wire_ice(2.4)
@@ -2075,8 +2079,13 @@ func _build_repeater() -> void:
 		var a := rng.randf() * TAU
 		var r := rng.randf_range(3.5, 7.5)
 		var sz := Vector3(rng.randf_range(0.6, 1.8), rng.randf_range(0.3, 1.1), rng.randf_range(0.6, 1.6))
-		var rock := Geo.block(self, sz, base + Vector3(cos(a) * r, sz.y * 0.4, sin(a) * r), Palette.m(&"stove"), r > 5.0)
-		rock.rotation = Vector3(rng.randf_range(-0.3, 0.3), rng.randf() * TAU, rng.randf_range(-0.3, 0.3))
+		var rock := Props.boulder(i)
+		rock.position = base + Vector3(cos(a) * r, sz.y * 0.3, sin(a) * r)
+		rock.scale = sz
+		rock.rotation = Vector3(rng.randf_range(-0.15, 0.15), rng.randf() * TAU, rng.randf_range(-0.15, 0.15))
+		add_child(rock)
+		if r > 5.0:
+			Geo.collider(self, sz * 0.8, rock.position)
 	var cab := Geo.interactable(self, Vector3(0.9, 1.6, 0.6), base + Vector3(-1.2, 1.1, 1.75), Palette.m(&"canister"), "", _on_cabinet_used)
 	cab.prompt_provider = func() -> String:
 		return Loc.t(&"it.cabinet") if not Game.has_item(&"flare_gun") else Loc.t(&"it.cabinet_empty")
@@ -2111,12 +2120,14 @@ func _build_lake() -> void:
 	add_child(ice)
 
 	# Торосы и ледяные нагромождения вдоль берега озера
-	var ice_mat := Palette.m(&"ice")
 	var hummock_angles := [0.4, 1.2, 2.1, 3.4, 4.3, 5.2]
 	for ha: float in hummock_angles:
 		var h_pos := LAKE + Vector3(cos(ha) * (LAKE_R - 1.2), 0.0, sin(ha) * (LAKE_R - 1.2))
 		for k in range(3):
-			var shard := Geo.block(self, Vector3(1.2 + k * 0.3, 0.35 + k * 0.15, 0.6), h_pos + Vector3((k - 1) * 0.4, 0.15 + k * 0.1, (k - 1) * 0.3), ice_mat, false)
+			var shard := Props.ice_slab(k)
+			shard.scale = Vector3(1.2 + k * 0.3, 0.35 + k * 0.15, 0.6)
+			shard.position = h_pos + Vector3((k - 1) * 0.4, 0.15 + k * 0.1, (k - 1) * 0.3)
+			add_child(shard)
 			shard.rotation = Vector3(0.35 - k * 0.2, ha + k * 0.5, 0.25)
 
 	# Прорубь: чёрная вода, вокруг — вывороченные льдины, верёвка уходит в воду
@@ -2154,7 +2165,10 @@ func _build_lake() -> void:
 	for i in range(9):
 		var a := i * TAU / 9.0 + lrng.randf_range(-0.2, 0.2)
 		var r := lrng.randf_range(1.0, 1.5)
-		var chunk := Geo.block(self, Vector3(lrng.randf_range(0.3, 0.7), lrng.randf_range(0.06, 0.16), lrng.randf_range(0.2, 0.45)), HOLE + Vector3(cos(a) * r, 0.06, sin(a) * r), Palette.m(&"ice"), false)
+		var chunk := Props.ice_slab(i)
+		chunk.scale = Vector3(lrng.randf_range(0.3, 0.7), lrng.randf_range(0.06, 0.16), lrng.randf_range(0.2, 0.45))
+		chunk.position = HOLE + Vector3(cos(a) * r, 0.06, sin(a) * r)
+		add_child(chunk)
 		chunk.rotation = Vector3(lrng.randf_range(-0.35, 0.35), a + lrng.randf_range(-0.5, 0.5), lrng.randf_range(-0.3, 0.3))
 	# Старые лунки — затянуло льдом; ледобур воткнут в снег; рыбацкий ящик-сиденье
 	for e: Array in [[Vector3(2.6, 0.03, -1.4), 0.12], [Vector3(-2.2, 0.03, -2.0), 0.1]]:
@@ -2175,9 +2189,11 @@ func _build_lake() -> void:
 	Geo.block(drill, Vector3(0.035, 1.25, 0.035), Vector3(0, 0.5, 0), Palette.m(&"metal"), false)
 	Geo.block(drill, Vector3(0.5, 0.03, 0.03), Vector3(0, 1.1, 0), Palette.m(&"metal"), false)
 	Geo.block(drill, Vector3(0.03, 0.03, 0.18), Vector3(0.24, 1.1, 0.08), Palette.m(&"wood"), false)
-	var box_seat := Geo.block(self, Vector3(0.42, 0.32, 0.28), HOLE + Vector3(-1.1, 0.16, -1.0), Palette.m(&"canister"), true)
+	var box_seat := Props.fishing_box()
+	box_seat.position = HOLE + Vector3(-1.1, 0.0, -1.0)
 	box_seat.rotation.y = 0.5
-	Geo.block(box_seat, Vector3(0.44, 0.02, 0.05), Vector3(0, 0.17, 0), Palette.m(&"dark"), false)
+	add_child(box_seat)
+	Geo.collider(self, Vector3(0.42, 0.32, 0.28), HOLE + Vector3(-1.1, 0.16, -1.0))
 	# Вешка-жерлица у проруби со смоленой бечевкой, уходящей в воду
 	var ice_rig := Props.ice_hole_rig()
 	ice_rig.position = HOLE + Vector3(1.3, 0.0, 0.2)

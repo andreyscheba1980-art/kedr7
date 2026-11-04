@@ -33,6 +33,17 @@ static func block(parent: Node, size: Vector3, pos: Vector3, mat: Material, coll
 	return body
 
 
+## Только тело-коробка без меша — под модель, у которой своя форма.
+static func collider(parent: Node, size: Vector3, pos: Vector3) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.collision_layer = LAYER_WORLD
+	body.collision_mask = 0
+	body.position = pos
+	parent.add_child(body)
+	body.add_child(box_shape(size))
+	return body
+
+
 ## Блок, повёрнутый вокруг Y (для верёвок лееров и косых досок).
 static func block_rotated(parent: Node, size: Vector3, pos: Vector3, yaw: float, mat: Material) -> MeshInstance3D:
 	var mi := box_mesh(size, mat)
