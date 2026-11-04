@@ -1646,6 +1646,9 @@ func _on_mast_panel(_p: Player) -> void:
 func _on_canisters_used(p: Player) -> void:
 	if Game.canisters_left <= 0:
 		return
+	if Troubles.blocks(&"canisters_gel"):
+		Game.hud.subtitle(Loc.t(&"tr.block.canisters_gel"), 3.5)
+		return
 	if p.held != &"":
 		Game.hud.subtitle(Loc.t(&"sub.hands_full"), 2.0)
 		return
@@ -1765,6 +1768,9 @@ func _build_woodpile() -> void:
 
 func _on_woodpile_used(p: Player) -> void:
 	if p.held != &"":
+		return
+	if Troubles.blocks(&"woodpile_buried"):
+		Game.hud.subtitle(Loc.t(&"tr.block.woodpile_buried"), 3.5)
 		return
 	p.set_held(&"wood")
 	Game.audio.play_3d(WOOD_SOUND, WOODPILE + Vector3(0, 0.5, 0), -2.0)

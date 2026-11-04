@@ -260,6 +260,10 @@ func _try_start() -> void:
 	if fuel <= 0.0:
 		Game.hud.subtitle(Loc.t(&"sub.buran_empty"), 3.0)
 		return
+	if Troubles.blocks(&"buran_cold"):   # масло загустело — стартер еле крутит
+		Game.audio.play_3d(Voice.sfx_or(&"buran_fail", CLANK), global_position, -2.0)
+		Game.hud.subtitle(Loc.t(&"tr.block.buran_cold"), 3.5)
+		return
 	_start_t = 1.1
 	var chance := 0.9 if Game.is_daylight() else 0.6
 	if SaveGame.flags.get("buran_started_once", false) == false or SaveGame.flags.get("buran_plug", false) or Gear.has(&"spark_plug"):

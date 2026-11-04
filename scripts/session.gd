@@ -88,6 +88,7 @@ func _ready() -> void:
 			var aft := AftermathClass.new()
 			add_child(aft)
 			Game.aftermath = aft
+			add_child(Troubles.new())   # бытовые беды утра: проблема → инструмент
 
 	EventBus.shift_ended.connect(_on_shift_ended)
 	EventBus.player_died.connect(_on_player_died)

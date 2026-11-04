@@ -2578,6 +2578,35 @@ func _tour(args: PackedStringArray) -> void:
 	if args.has("perfphys"):
 		await _perf_phys()
 		return
+	if args.has("troubletest"):   # утренние беды: все разом, инструмент → починка
+		Hud.log_subs = true
+		var tr := Troubles.instance
+		print("[tr] есть=%s выпало=%s" % [tr != null, tr.active if tr else []])
+		for n in Game.yard.find_children("Trouble_*", "", true, false):
+			n.queue_free()
+		tr.active = Troubles.POOL.duplicate()
+		tr._fixed = {}
+		tr._build()
+		await _wait(0.5)
+		print("[tr] блок Буран=%s канистры=%s дрова=%s" % [Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried")])
+		var rations0 := Supply.rations()
+		for id: StringName in [&"buran_cold", &"canisters_gel", &"woodpile_buried", &"antenna_rime"]:
+			var it: Interactable = tr._nodes.get(id)
+			Game.player.set_held(&"")
+			print("[tr] %s без инструмента: «%s» hold=%s" % [id, it.get_prompt(), it.hold_check.call()])
+			Game.player.set_held(&"shovel" if id in [&"woodpile_buried", &"antenna_rime"] else &"blowtorch")
+			print("[tr] %s с инструментом: «%s» hold=%s" % [id, it.get_prompt(), it.hold_check.call()])
+			it.used.emit(Game.player)
+			await _wait(0.2)
+		Game.player.set_held(&"")
+		var fox: Interactable = tr._nodes.get(&"fox_raid")
+		_look(Troubles.PORCH + Vector3(1.0, 0, -1.0), fox.global_position)
+		await _wait(1.0)
+		await _shot("tr_fox_trail")
+		fox.used.emit(Game.player)
+		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
+		get_tree().quit()
+		return
 	if args.has("boxshots"):   # места, где голые коробки заменены моделями
 		var out := [["repeater", Yard.REPEATER + Vector3(-9, 0, 6), Yard.REPEATER], ["hummocks", Yard.LAKE + Vector3(-3, 0, 2), Yard.LAKE + Vector3(-10, 0, 7)],
 			["hole", Yard.HOLE + Vector3(-3.5, 0, 1.5), Yard.HOLE + Vector3(-1, 0, -1)], ["anchor", Yard.MAST + Vector3(5, 0, 6), Yard.MAST + Vector3(9, 0, 0)]]
