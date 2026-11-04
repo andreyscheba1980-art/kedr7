@@ -79,6 +79,7 @@ func _ready() -> void:
 		add_child(TutorialGuide.new())   # пролог: карточки по центру и огонёк над целью
 	if Game.is_night():
 		add_child(NightTasks.new())
+		add_child(NightGuest.new())   # стук в дверь: человек или оно
 		if not Game.is_prologue():
 			Consequences.apply_night()   # что не починил днём — ночью платишь
 	else:

@@ -2607,6 +2607,35 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("guesttest"):   # гость у двери: человек и оно — спросить, глянуть, открыть / не открыть
+		Hud.log_subs = true
+		var results: PackedStringArray = []
+		for variant: Array in [[true, true], [false, true], [true, false]]:
+			var g := NightGuest.new()
+			g.set_script(NightGuest)
+			g.state = &"idle"
+			g.real = variant[0]
+			g._t = 0.0
+			SaveGame.flags.erase("guest_night")
+			add_child(g)
+			g.real = variant[0]
+			g.state = &"idle"
+			g._t = -999.0
+			await _wait(0.3)
+			print("[guest] real=%s состояние=%s" % [g.real, g.state])
+			g._ask()
+			g._ask()
+			g._peek()
+			if variant[1]:
+				g._opened()
+			else:
+				g._gone()
+			await _wait(0.6)
+			results.append(SaveGame.flags.get("guest_result", ""))
+			print("[guest] итог: %s утро: %s" % [SaveGame.flags.get("guest_result", ""), NightGuest.morning()])
+			g.queue_free()
+		get_tree().quit()
+		return
 	if args.has("shrinetest"):   # подношения → идолы → лабаз → берестяная карта
 		Hud.log_subs = true
 		Game.set_flag("shrine_amulet_taken", true)

@@ -100,6 +100,9 @@ func _build() -> void:
 	if Game.yard == null:
 		return
 	var lines: PackedStringArray = []
+	var guest := NightGuest.morning()   # что осталось от ночного гостя
+	if guest != "":
+		lines.append(guest)
 	for id in active:
 		if _fixed.get(id, false):
 			continue
