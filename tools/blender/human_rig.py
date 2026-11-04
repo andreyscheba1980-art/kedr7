@@ -26,6 +26,15 @@ PAL = {
                    mitten=(0.035, 0.035, 0.04), face=(0.05, 0.05, 0.055), hat=(0.035, 0.035, 0.04)),
     "noon": dict(coat=(0.7, 0.69, 0.64), pants=(0.7, 0.69, 0.64), boots=(0.62, 0.6, 0.57), belt=(0.63, 0.62, 0.58),
                  mitten=(0.74, 0.72, 0.68), face=(0.56, 0.59, 0.62), hat=(0.025, 0.025, 0.03)),
+    # Эпилог «Свердловск, 1983»: люди управления и улицы
+    "officer": dict(coat=(0.2, 0.21, 0.23), pants=(0.17, 0.18, 0.2), boots=(0.06, 0.05, 0.05), belt=(0.55, 0.12, 0.1),
+                    mitten=(0.78, 0.62, 0.52), face=(0.78, 0.62, 0.52), hat=(0.2, 0.15, 0.11)),
+    "clerk": dict(coat=(0.36, 0.22, 0.28), pants=(0.62, 0.5, 0.44), boots=(0.08, 0.06, 0.06), belt=(0.82, 0.8, 0.74),
+                  mitten=(0.82, 0.66, 0.56), face=(0.82, 0.66, 0.56), hat=(0.42, 0.28, 0.16)),
+    "guard": dict(coat=(0.24, 0.29, 0.19), pants=(0.2, 0.24, 0.17), boots=(0.06, 0.05, 0.05), belt=(0.3, 0.2, 0.1),
+                  mitten=(0.76, 0.6, 0.5), face=(0.76, 0.6, 0.5), hat=(0.2, 0.25, 0.17)),
+    "civil": dict(coat=(0.22, 0.2, 0.18), pants=(0.15, 0.15, 0.17), boots=(0.08, 0.07, 0.06), belt=(0.18, 0.16, 0.14),
+                  mitten=(0.2, 0.15, 0.12), face=(0.76, 0.6, 0.5), hat=(0.16, 0.15, 0.14)),
     "zherdyai": dict(coat=(0.24, 0.25, 0.22), pants=(0.2, 0.21, 0.19), boots=(0.13, 0.12, 0.12), belt=(0.15, 0.14, 0.12),
                      mitten=(0.13, 0.12, 0.12), face=(0.13, 0.12, 0.12), hat=(0.2, 0.21, 0.19)),
 }[STYLE]
@@ -40,6 +49,7 @@ WAD = mat("wad", (0.66, 0.64, 0.56), rough=0.95)
 FROST = mat("frost", (0.7, 0.76, 0.82), rough=0.6)
 
 TALL = STYLE == "zherdyai"
+OFFICE = STYLE in ("officer", "clerk", "guard")   # без варежек и валенок: голые руки, ботинки
 K = 1.0                                   # масштаб тела по высоте
 LEG = 1.75 if TALL else 0.92              # высота тазобедренного сустава
 TORSO = 0.95 if TALL else 0.6             # от таза до плеч
@@ -108,14 +118,20 @@ def P(b, i):
 
 
 # --- Туловище ------------------------------------------------------------------
-coat_long = STYLE in ("driver", "hunter", "shadow", "noon")
+coat_long = STYLE in ("driver", "hunter", "shadow", "noon", "civil")
 m = mark()
 limb("pelvis", (0, 0, hip_z - 0.06), (0, 0, hip_z + TORSO * 0.33), 0.2 * THIN, 0.21 * THIN, M["coat"], 10)
 if coat_long:
     # Полы тулупа — колокол до колен, на тазе
     limb("skirt", (0, 0.01, hip_z + 0.02), (0, 0.02, hip_z * 0.55), 0.22, 0.29, M["coat"], 10)
     blob("belt", (0, 0, hip_z + 0.04), 0.255, M["belt"], scale=(1, 1, 0.12), segs=12, rings=4)
-else:
+elif STYLE == "clerk":
+    limb("skirt", (0, 0.01, hip_z + 0.02), (0, 0.02, hip_z * 0.5), 0.21, 0.25, M["coat"], 10)   # платье до колен
+elif OFFICE:
+    limb("jacket_hem", (0, 0.0, hip_z + 0.04), (0, 0.01, hip_z - 0.16), 0.215, 0.225, M["coat"], 10)
+    if STYLE == "guard":
+        blob("belt", (0, 0, hip_z + 0.04), 0.225, M["belt"], scale=(1, 1, 0.12), segs=12, rings=4)
+elif TALL:
     for s in (-1, 1):   # Жердяй: рваные полы ватника
         limb(f"rag{s}", (0.08 * s, 0.05, hip_z), (0.13 * s, 0.07, hip_z - 0.45), 0.07, 0.02, M["coat"], 5)
 own("hips", since(m))
@@ -132,6 +148,15 @@ if TALL:
     for i, (a, b) in enumerate([((-0.1, -0.08, sh_z - 0.2), (-0.16, -0.16, sh_z - 0.14)), ((0.12, -0.06, sh_z - 0.4), (0.19, -0.13, sh_z - 0.37))]):
         limb(f"wad{i}", a, b, 0.035, 0.005, WAD, 4)
     blob("frost_sh", (0.0, -0.02, sh_z - 0.02), 0.12, FROST, scale=(1.4, 0.8, 0.35), wobble=0.01)
+if STYLE == "officer":
+    box("shirt", (0.09, 0.02, 0.16), (0, 0.185, sh_z - 0.1), WHITE, 0.005)
+    box("tie", (0.035, 0.022, 0.2), (0, 0.195, sh_z - 0.14), M["belt"], 0.004)
+if STYLE == "clerk":
+    box("blouse", (0.12, 0.02, 0.1), (0, 0.18, sh_z - 0.07), M["belt"], 0.005)
+if STYLE == "guard":
+    limb("strap", (-0.15, 0.17, sh_z - 0.02), (0.17, 0.17, hip_z + 0.06), 0.012, 0.012, M["belt"], 4)
+    for s in (-1, 1):
+        box(f"epaulet{s}", (0.1, 0.06, 0.015), (SH * s * 0.9, 0, sh_z - 0.0), mat("red_band", (0.6, 0.1, 0.08), rough=0.7), 0.004)
 own("chest", since(m))
 m = mark()
 limb("neck_c", P("neck", 1), P("neck", 2), 0.055 * THIN, 0.05 * THIN, M["face"], 7)
@@ -163,6 +188,24 @@ elif STYLE == "noon":
     limb("strand_l", hc + Vector((-0.055, 0.11, 0.1)), hc + Vector((-0.05, 0.1, -0.42)), 0.05, 0.02, M["hat"], 5)
     limb("strand_r", hc + Vector((0.075, 0.105, 0.1)), hc + Vector((0.09, 0.095, -0.4)), 0.022, 0.012, M["hat"], 4)
     blob("one_eye", hc + Vector((0.035, 0.105, 0.015)), 0.016, VOID, segs=6, rings=4)
+elif STYLE in ("officer", "clerk", "guard", "civil"):
+    for s in (-1, 1):
+        blob(f"eye{s}", hc + Vector((0.035 * s, 0.1, 0.02)), 0.011, VOID, segs=6, rings=4)
+        box(f"brow{s}", (0.04, 0.012, 0.01), hc + Vector((0.036 * s, 0.103, 0.045)), M["hat"], 0.002)
+    blob("nose", hc + Vector((0, 0.112, -0.01)), 0.018, M["face"], scale=(0.8, 1, 1.2), segs=6, rings=4)
+    box("mouth", (0.04, 0.008, 0.006), hc + Vector((0, 0.104, -0.055)), mat("lips", (0.5, 0.28, 0.26), rough=0.7), 0.0)
+    if STYLE == "clerk":
+        blob("hair", hc + Vector((0, -0.015, 0.04)), 0.118, M["hat"], scale=(1, 1.05, 1.0), wobble=0.004)
+        blob("bun", hc + Vector((0, -0.1, 0.08)), 0.055, M["hat"])
+    elif STYLE == "guard":
+        limb("cap_band", hc + Vector((0, 0, 0.065)), hc + Vector((0, 0, 0.11)), 0.118, 0.118, mat("red_band", (0.6, 0.1, 0.08), rough=0.7), 12)
+        limb("cap_top", hc + Vector((0, -0.01, 0.11)), hc + Vector((0, -0.01, 0.14)), 0.14, 0.15, M["hat"], 12)
+        box("cap_visor", (0.16, 0.08, 0.012), hc + Vector((0, 0.12, 0.075)), mat("visor", (0.05, 0.05, 0.05), rough=0.3), 0.003)
+        box("cap_star", (0.02, 0.01, 0.02), hc + Vector((0, 0.12, 0.09)), GOLD, 0.0)
+    elif STYLE == "civil":
+        box("pirozhok", (0.22, 0.2, 0.09), hc + Vector((0, 0, 0.11)), M["hat"], 0.02)
+    else:
+        blob("hair", hc + Vector((0, -0.02, 0.05)), 0.112, M["hat"], scale=(1, 1.05, 0.85), wobble=0.003)
 elif TALL:
     for s in (-1, 1):
         blob(f"eye{s}", hc + Vector((0.032 * s, 0.085, 0.02)), 0.016, VOID, segs=6, rings=4)
@@ -178,6 +221,7 @@ for s, n in ((-1, "L"), (1, "R")):
     own(f"upper_arm.{n}", since(m))
     m = mark()
     bare = STYLE == "noon" or TALL
+    skin_hand = OFFICE
     limb(f"fore{n}", a1, a2, 0.062 * THIN if not bare else 0.035, 0.058 * THIN if not bare else 0.026, M["coat"] if not bare else M["face"], 7)
     if TALL and s < 0:
         limb("watch", a2 + Vector((0, 0, 0.05)), a2 + Vector((0, 0, 0.09)), 0.04, 0.04, METAL, 10)
@@ -193,6 +237,8 @@ for s, n in ((-1, "L"), (1, "R")):
             limb(f"f{n}{f}b", p1, p2, 0.007, 0.002, M["face"], 4)
             if TALL and s > 0 and f == 2:
                 limb("ring", p0 + Vector((0, 0, -0.04)), p0 + Vector((0, 0, -0.055)), 0.013, 0.013, GOLD, 8)
+    elif skin_hand:
+        blob(f"hand{n}", a2 + Vector((0, 0.01, -0.05)), 0.042, M["face"], scale=(0.75, 0.9, 1.3))
     else:
         blob(f"mitten{n}", a2 + Vector((0, 0.01, -0.06)), 0.05, M["mitten"], scale=(0.9, 0.85, 1.4))
     own(f"hand.{n}", since(m))
@@ -203,12 +249,16 @@ for s, n in ((-1, "L"), (1, "R")):
     m = mark()
     if TALL:
         limb(f"shin{n}", l1, l2, 0.05, 0.03, M["face"], 6)
+    elif OFFICE:
+        limb(f"shin{n}", l1, l2, 0.06 if STYLE != "clerk" else 0.045, 0.055 if STYLE != "clerk" else 0.04, M["pants"], 7)
     else:
         limb(f"shin{n}", l1, l2, 0.068, 0.07, M["boots"], 7)   # валенок до колена
     own(f"shin.{n}", since(m))
     m = mark()
     if TALL:
         limb(f"foot{n}", l2, l3 + Vector((0, 0.06, 0)), 0.03, 0.015, M["face"], 5)
+    elif OFFICE:
+        box(f"shoe{n}", (0.09, 0.24, 0.07), (l2 + l3) / 2 + Vector((0, 0.02, -0.01)), M["boots"], 0.015)
     else:
         box(f"boot{n}", (0.11, 0.26, 0.1), (l2 + l3) / 2 + Vector((0, 0.02, 0.0)), M["boots"], 0.02)
     own(f"foot.{n}", since(m))
@@ -312,6 +362,23 @@ if STYLE == "driver":
     clip("sit_talk", {1: SIT, 8: T1, 16: T2, 24: T1, 32: mix(T2, {"head": (8, -16, 0)}), 44: SIT})
     WV = mix(ARMS_DOWN, {"upper_arm.R": (10, 0, 140), "forearm.R": (0, 0, 20), "head": (0, 10, 0)})
     clip("wave", {1: WV, 8: mix(WV, {"forearm.R": (0, 0, -25)}), 16: WV, 24: mix(WV, {"forearm.R": (0, 0, -25)}), 32: WV})
+if STYLE in ("officer", "clerk", "guard", "civil"):
+    # Сидит (на стуле, скамье) — руки на коленях; печатает; курит; несёт папку
+    SIT = {"thigh.L": (88, 0, 4), "thigh.R": (88, 0, -4), "shin.L": (-88, 0, 0), "shin.R": (-88, 0, 0), "root@loc": (0, -0.05, 0.0),
+           "upper_arm.L": (30, 0, -4), "upper_arm.R": (30, 0, 4), "forearm.L": (55, 0, 0), "forearm.R": (55, 0, 0), "chest": (-3, 0, 0)}
+    clip("sit_drive", {1: SIT, 40: mix(SIT, {"head": (4, 6, 0), "chest": (-4, 0, 0)}), 80: SIT})
+    clip("sit_talk", {1: SIT, 12: mix(SIT, {"upper_arm.R": (60, 0, 14), "forearm.R": (60, 0, 0), "head": (4, -10, 0)}), 24: SIT})
+    TY = mix(SIT, {"upper_arm.L": (55, 0, -8), "upper_arm.R": (55, 0, 8), "forearm.L": (40, 0, 0), "forearm.R": (40, 0, 0), "head": (14, 0, 0), "chest": (-6, 0, 0)})
+    clip("type", {1: TY, 3: mix(TY, {"hand.L": (-14, 0, 0)}), 5: mix(TY, {"hand.R": (-14, 0, 0)}), 7: TY, 9: mix(TY, {"hand.R": (-12, 0, 0), "forearm.R": (44, 0, 0)}),
+                  11: mix(TY, {"hand.L": (-12, 0, 0)}), 13: TY, 30: mix(TY, {"head": (10, 8, 0)}), 40: TY})
+    SM = mix(ARMS_DOWN, {"upper_arm.R": (40, 0, 22), "forearm.R": (110, 0, 0), "hand.R": (0, 0, 10), "head": (-6, 0, 0)})
+    SM_IN = mix(ARMS_DOWN, {"upper_arm.R": (62, 0, 18), "forearm.R": (128, 0, 0), "head": (-2, 0, 0)})
+    clip("smoke", {1: SM, 30: SM, 45: SM_IN, 60: SM_IN, 75: SM, 120: SM})
+    WF_A = mix(WA, {"upper_arm.L": (34, 0, -10), "forearm.L": (78, 0, 0)})
+    WF_B = mix(WB, {"upper_arm.L": (34, 0, -10), "forearm.L": (78, 0, 0)})
+    WF_C = mix(mirror(WA), {"upper_arm.L": (34, 0, -10), "forearm.L": (78, 0, 0)})
+    WF_D = mix(mirror(WB), {"upper_arm.L": (34, 0, -10), "forearm.L": (78, 0, 0)})
+    clip("walk_folder", {1: WF_A, 9: WF_B, 17: WF_C, 25: WF_D, 33: WF_A})
 if TALL:
     BEND = mix(ARMS_DOWN, {"hips": (0, 0, 0), "spine": (-30, 0, 0), "chest": (-40, 0, 0), "neck": (40, 0, 0), "head": (30, 0, 6),
                            "upper_arm.L": (62, 0, -4), "upper_arm.R": (66, 0, 4), "forearm.L": (6, 0, 0), "forearm.R": (10, 0, 0)})

@@ -2746,6 +2746,13 @@ func _tour(args: PackedStringArray) -> void:
 				print("[mm] %s n=%d bb=%s mat=%s par=%s" % [mm.name, mm.multimesh.instance_count if mm.multimesh else 0, bb, mt.resource_path if mt else "-", mm.get_parent().name])
 		get_tree().quit()
 		return
+	if args.has("ovl"):   # наложения «текстура на текстуру» по зонам
+		await _wait(2.0)
+		for z: Array in [["дом", Vector3(6, 1, 1), 13.0], ["двор", Vector3(20, 0, -5), 70.0], ["корпус", Vector3(110, 0, -32), 30.0]]:
+			print("[ovl] === ", z[0])
+			OverlapAudit.run(Game.level, z[1], z[2], 50)
+		get_tree().quit()
+		return
 	if args.has("fpsprobe"):   # FPS в трёх точках (сравнить с --nolandscape и т.п.)
 		for v: Array in [["house", Station.SPAWN, 0.0], ["yard", Vector3(20, 0, -20), 0.0], ["trail", Vector3(-50.9, 0, -76.9), 45.0]]:
 			_tp(v[1], v[2])

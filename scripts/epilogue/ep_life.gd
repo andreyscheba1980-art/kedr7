@@ -27,6 +27,7 @@ func _ready() -> void:
 	_lobby(w)
 	_corridor(w)
 	_rooms(w)
+	_wing(w)
 
 
 # --- Люди ------------------------------------------------------------------------------
@@ -100,8 +101,60 @@ static func figure(o: Dictionary) -> Node3D:
 	return root
 
 
+## Стиль модели по описанию: платье — секретарь, фуражка — постовой, длинное пальто — прохожий, иначе — офицер.
+static func style_of(o: Dictionary) -> StringName:
+	if o.has("style"):
+		return o["style"]
+	if o.get("skirt", false):
+		return &"clerk"
+	if o.get("hat", &"") == &"cap":
+		return &"guard"
+	if o.get("long", false):
+		return &"civil"
+	return &"officer"
+
+
+## Скелетный человек (tools/blender/human_rig.py) с позой и оттенком; null — если модели нет.
+func rig_person(o: Dictionary) -> CreatureRig:
+	var sit: bool = o.get("sit", false)
+	var rig := Creatures.make_human(style_of(o), sit)
+	if rig == null or rig.anim == null:
+		if rig != null:
+			rig.free()
+		return null
+	rig.twitch = 0.0
+	rig.clip_walk = &"walk_folder" if o.get("arm", &"") == &"folder" else &"walk"
+	match o.get("arm", &""):
+		&"type":
+			rig.pose_override = &"type"
+		&"smoke":
+			rig.pose_override = &"smoke"
+	# Оттенок: одинаковые модели не должны выглядеть близнецами
+	var tint: Color = o.get("tint", Color(0.7, 0.7, 0.72))
+	for mi in rig.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).material_override as ShaderMaterial
+		if m != null:
+			m.set_shader_parameter(&"albedo", tint)
+	return rig
+
+
+func _make(o: Dictionary) -> Node3D:
+	var r := rig_person(o)
+	if r != null:
+		if o.get("sit", false):
+			var holder := Node3D.new()
+			holder.name = "Person"
+			holder.add_child(r)
+			r.position = Vector3(0, -0.47, 0.08)   # таз — на сиденье стула
+			holder.set_meta(&"rig", r)
+			return holder
+		r.set_meta(&"rig", r)
+		return r
+	return figure(o)
+
+
 func _add_person(w: Node3D, o: Dictionary, pos: Vector3, yaw: float, talk_key: StringName = &"") -> Node3D:
-	var p := figure(o)
+	var p := _make(o)
 	p.position = pos
 	p.rotation.y = yaw
 	w.add_child(p)
@@ -117,13 +170,14 @@ func _add_person(w: Node3D, o: Dictionary, pos: Vector3, yaw: float, talk_key: S
 			p.set_meta(&"talk_i", idx + 1)
 			ep._say(StringName("%s.%d" % [talk_key, idx + 1]), 5.5))
 		a.name = "Talk_" + String(talk_key).replace(".", "_")
-	_bobbers.append({"node": p, "base": p.position, "amp": 0.006, "f": _rng.randf_range(0.18, 0.3), "ph": _rng.randf() * TAU, "breath": true})
+	if not p.has_meta(&"rig"):
+		_bobbers.append({"node": p, "base": p.position, "amp": 0.006, "f": _rng.randf_range(0.18, 0.3), "ph": _rng.randf() * TAU, "breath": true})
 	return p
 
 
 func _walker(w: Node3D, o: Dictionary, pts: Array, spd := 1.1) -> void:
 	o["ghost"] = true
-	var p := figure(o)
+	var p := _make(o) if not o.get("vehicle", false) else figure(o)
 	p.position = pts[0]
 	w.add_child(p)
 	_walkers.append({"node": p, "pts": pts, "i": 1, "spd": spd * _rng.randf_range(0.85, 1.15), "t": _rng.randf() * 10.0, "wait": 0.0})
@@ -162,9 +216,14 @@ func _process(delta: float) -> void:
 		var n: Node3D = wk["node"]
 		if not is_instance_valid(n):
 			continue
+		var rig: CreatureRig = n.get_meta(&"rig") if n.has_meta(&"rig") else null
 		if float(wk["wait"]) > 0.0:
 			wk["wait"] = float(wk["wait"]) - delta
+			if rig != null:
+				rig.gait = 0.0
 			continue
+		if rig != null:
+			rig.gait = 0.3
 		var pts: Array = wk["pts"]
 		var target: Vector3 = pts[wk["i"]]
 		var to := target - n.position
@@ -178,7 +237,8 @@ func _process(delta: float) -> void:
 			n.position += to.normalized() * step
 			n.rotation.y = lerp_angle(n.rotation.y, atan2(-to.x, -to.z), minf(delta * 6.0, 1.0))
 		wk["t"] = float(wk["t"]) + delta
-		n.position.y = target.y + absf(sin(float(wk["t"]) * float(wk["spd"]) * 5.5)) * 0.025
+		if rig == null:
+			n.position.y = target.y + absf(sin(float(wk["t"]) * float(wk["spd"]) * 5.5)) * 0.025
 	for b: Dictionary in _bobbers:
 		var n: Node3D = b["node"]
 		if is_instance_valid(n):
@@ -202,11 +262,11 @@ func _street(w: Node3D) -> void:
 		var sx := 1.0 if i % 2 == 0 else -1.0
 		var x := sx * (EpBuild.ROAD_HALF + 2.5 + _rng.randf_range(0.0, 2.5))
 		var z0 := -10.0 - i * 24.0
-		var hat: StringName = [&"ushanka", &"pirozhok", &"", &"ushanka"][i % 4]
-		_walker(w, {"coat": coats[i % coats.size()], "long": true, "hat": hat, "skirt": i % 3 == 2, "seed": i}, [Vector3(x, 0.19, z0), Vector3(x, 0.19, z0 - 40.0)], 1.0)
+		var tint := Color(0.7, 0.7, 0.72).lerp(coats[i % coats.size()] * 2.5, 0.35)
+		_walker(w, {"style": &"civil" if i % 3 != 2 else &"clerk", "tint": tint, "coat": coats[i % coats.size()], "long": true, "seed": i}, [Vector3(x, 0.19, z0), Vector3(x, 0.19, z0 - 40.0)], 1.0)
 	# Очередь на остановке
 	for i in 3:
-		_add_person(w, {"coat": coats[(i + 2) % coats.size()], "long": true, "hat": &"ushanka", "seed": 30 + i}, Vector3(-(EpBuild.ROAD_HALF + 2.0), 0.19, -116.0 - i * 1.1), PI * 0.5)
+		_add_person(w, {"style": &"civil", "tint": Color(0.85 + i * 0.08, 0.9, 0.95 - i * 0.05), "seed": 30 + i}, Vector3(-(EpBuild.ROAD_HALF + 2.0), 0.19, -116.0 - i * 1.1), PI * 0.5)
 	# Киоск «Союзпечать»
 	var kz := -60.0
 	var kx := EpBuild.ROAD_HALF + 4.5
@@ -219,6 +279,7 @@ func _street(w: Node3D) -> void:
 	tb.position = Vector3(-3.0, 0, -260.0)
 	w.add_child(tb)
 	_walkers.append({"node": tb, "pts": [Vector3(-3.0, 0, -260.0), Vector3(-3.0, 0, 14.0)], "i": 1, "spd": 7.0, "t": 0.0, "wait": 0.0})
+	tb.position.y = 0.0
 
 
 func _trolleybus() -> Node3D:
@@ -246,39 +307,100 @@ func _trolleybus() -> Node3D:
 
 func _lobby(w: Node3D) -> void:
 	var c := EpBuild.LOBBY
-	# Гардероб: стойка, крючки с пальто и шапками, гардеробщица
-	Geo.block(w, Vector3(0.6, 1.05, 4.0), c + Vector3(6.0, 0.52, 1.5), Palette.m(&"wood"), true)
-	Geo.block(w, Vector3(0.1, 1.9, 4.2), c + Vector3(7.7, 1.6, 1.5), EpBuild.mat(Color(0.3, 0.22, 0.14)), false)
+	var lb: Dictionary = ep._lobby
+	# Проходная: постовой в будке за стеклом, второй у турникета
+	var bch := Props.chair()
+	bch.position = c + Vector3(-1.9, 0, 6.1)
+	bch.rotation.y = PI
+	w.add_child(bch)
+	_add_person(w, {"style": &"guard", "sit": true, "seed": 2}, c + Vector3(-1.9, 0.05, 6.1), PI, &"ep.npc.post")
+	_add_person(w, {"style": &"guard", "seed": 4}, c + Vector3(1.7, 0, 6.3), PI + 0.3)
+	# Дежурная часть за стеклом: стол с телефонами, дежурный, карта города, рация, сейф
+	var duty: Vector3 = lb["duty"]
+	Geo.block(w, Vector3(1.0, 0.06, 2.4), duty + Vector3(1.0, 0.76, 0), Palette.m(&"wood"), true)
+	for k in 3:
+		var ph := EpBuild.phone()
+		ph.position = duty + Vector3(1.1, 0.79, -0.8 + k * 0.5)
+		ph.rotation.y = PI * 0.5
+		w.add_child(ph)
+		(ph as MeshInstance3D).material_override = EpBuild.mat([Color(0.12, 0.12, 0.13), Color(0.75, 0.72, 0.65), Color(0.55, 0.1, 0.08)][k], 0.35)
+	var dch := Props.chair()
+	dch.position = duty + Vector3(0.2, 0, 0)
+	dch.rotation.y = -PI * 0.5
+	w.add_child(dch)
+	_add_person(w, {"style": &"officer", "sit": true, "seed": 6, "tint": Color(0.65, 0.68, 0.62)}, duty + Vector3(0.2, 0.05, 0), -PI * 0.5, &"ep.npc.duty")
+	var cmap := Geo.block(w, Vector3(0.03, 1.6, 2.4), duty + Vector3(-2.3, 1.9, 0), EpBuild.mat(Color(0.8, 0.8, 0.7)), false)
+	cmap.name = "CityMap"
+	EpBuild.label3d(w, "г. СВЕРДЛОВСК\nсхема районов", duty + Vector3(-2.27, 2.55, 0), PI * 0.5, 0.0035, Color(0.2, 0.15, 0.12))
+	for k in 7:
+		Geo.block(w, Vector3(0.01, 0.04, 0.04), duty + Vector3(-2.27, 1.4 + (k % 3) * 0.35, -0.9 + k * 0.28), EpBuild.mat(Color(0.8, 0.1, 0.08)), false)
+	var rad := Props.radio()
+	rad.position = duty + Vector3(-1.9, 0, 2.2)
+	w.add_child(rad)
+	var sf := Props.safe()
+	sf.position = duty + Vector3(-1.9, 0, -2.4)
+	w.add_child(sf)
+	var buzz := AudioStreamPlayer3D.new()
+	buzz.stream = AudioDirector.cached_stream("res://assets/audio/static_loop.ogg")
+	buzz.volume_db = -22.0
+	buzz.max_distance = 9.0
+	buzz.position = duty + Vector3(-1.9, 1.0, 2.2)
+	w.add_child(buzz)
+	buzz.play()
+	buzz.finished.connect(buzz.play)
+	# Гардероб у восточной стены: стойка, вешалки, гардеробщица
+	var ck: Vector3 = lb["cloak"]
+	Geo.block(w, Vector3(0.6, 1.05, 4.0), ck + Vector3(0, 0.52, 0), EpBuild.surf(3, Color(0.42, 0.28, 0.17), Color(0.3, 0.2, 0.12)), true)
+	Geo.block(w, Vector3(0.1, 1.9, 4.2), ck + Vector3(2.6, 1.6, 0), EpBuild.mat(Color(0.3, 0.22, 0.14)), false)
 	var coats := [Color(0.15, 0.14, 0.13), Color(0.28, 0.22, 0.16), Color(0.2, 0.22, 0.28), Color(0.12, 0.12, 0.12)]
 	for i in 9:
-		var hz := c.z - 0.3 + i * 0.42
 		var coat := EpBuild.coat()
-		coat.position = Vector3(c.x + 7.35, c.y - 0.15, hz)
+		coat.position = ck + Vector3(2.3, -0.15, -1.8 + i * 0.42)
 		coat.scale = Vector3(0.9, 0.95, 0.9)
 		w.add_child(coat)
 		(coat as MeshInstance3D).material_override = EpBuild.mat(coats[i % coats.size()])
 		if i % 2 == 0:
 			var hat := EpBuild.hat()
-			hat.position = Vector3(c.x + 7.35, c.y - 0.1, hz)
+			hat.position = ck + Vector3(2.3, -0.1, -1.8 + i * 0.42)
 			w.add_child(hat)
-	_add_person(w, {"coat": Color(0.4, 0.38, 0.5), "skirt": true, "hair": Color(0.6, 0.58, 0.55), "bun": true, "glasses": true, "seed": 3}, c + Vector3(6.7, 0, 1.5), -PI * 0.5, &"ep.npc.cloak")
-	# Второй постовой у лифта и посетитель на стуле
-	_add_person(w, {"coat": Color(0.22, 0.28, 0.2), "hat": &"cap", "seed": 4}, c + Vector3(1.8, 0, -5.0), 0.0, &"ep.npc.post")
-	var chair := Props.chair()
-	chair.position = c + Vector3(-6.5, 0, 3.0)
-	chair.rotation.y = -PI * 0.5
-	w.add_child(chair)
-	_add_person(w, {"coat": Color(0.3, 0.24, 0.18), "long": true, "sit": true, "hat": &"ushanka", "seed": 5}, c + Vector3(-6.5, 0.05, 3.0), -PI * 0.5, &"ep.npc.visitor")
-	# Стойка с газетами
-	Geo.block(w, Vector3(0.9, 1.2, 0.3), c + Vector3(-7.6, 0.6, -2.5), Palette.m(&"wood"), true)
-	for i in 3:
-		var np := Geo.block(w, Vector3(0.25, 0.35, 0.01), c + Vector3(-7.44, 0.75 + i * 0.12, -2.8 + i * 0.3), EpBuild.mat(Color(0.82, 0.8, 0.72)), false)
-		np.rotation.y = PI * 0.5
-	EpBuild.label3d(w, "ПРАВДА", c + Vector3(-7.43, 1.02, -2.2), PI * 0.5, 0.0022, Color(0.2, 0.15, 0.15))
-	# Часы и доска объявлений
+	_add_person(w, {"style": &"clerk", "tint": Color(0.7, 0.72, 0.85), "seed": 3}, ck + Vector3(1.0, 0, 0.0), -PI * 0.5, &"ep.npc.cloak")
+	EpBuild.label3d(w, "ГАРДЕРОБ", ck + Vector3(2.55, 2.8, 0), -PI * 0.5, 0.004, Color(0.9, 0.8, 0.5))
+	# Приёмная граждан: скамьи, ждущие — отец пропавшего охотника и женщина в платке
+	var rc: Vector3 = lb["reception"]
+	for k in 2:
+		Geo.block(w, Vector3(2.4, 0.06, 0.45), rc + Vector3(0, 0.45, 1.4 - k * 2.0), Palette.m(&"wood"), true)
+		Geo.block(w, Vector3(2.4, 0.5, 0.05), rc + Vector3(0, 0.72, 1.6 - k * 2.0), Palette.m(&"wood"), false)
+	_add_person(w, {"style": &"civil", "sit": true, "seed": 5, "tint": Color(0.8, 0.72, 0.65)}, rc + Vector3(-0.5, 0.05, 1.4), PI, &"ep.npc.visitor")
+	_add_person(w, {"style": &"clerk", "sit": true, "seed": 7, "tint": Color(0.55, 0.5, 0.45)}, rc + Vector3(0.6, 0.05, -0.6), PI, &"ep.npc.woman")
+	var pst := Geo.block(w, Vector3(0.8, 1.1, 0.02), rc + Vector3(-3.7, 1.6, 0), EpBuild.mat(Color(0.85, 0.78, 0.6)), false)
+	pst.rotation.y = PI * 0.5
+	EpBuild.label3d(w, "ГРАЖДАНЕ!\nБудьте бдительны.\nО подозрительном\nсообщайте\nдежурному.", rc + Vector3(-3.68, 1.6, 0), PI * 0.5, 0.0026, Color(0.55, 0.08, 0.06))
+	# Лифтовой холл: двое ждут лифт
+	_add_person(w, {"style": &"officer", "arm": &"folder", "seed": 8}, c + Vector3(7.0, 0, -11.2), PI * 0.05, &"ep.npc.liftman")
+	_add_person(w, {"style": &"clerk", "seed": 9, "tint": Color(0.75, 0.68, 0.62)}, c + Vector3(9.3, 0, -11.4), -PI * 0.1)
+	# Движение: уборщица со шваброй по залу, конвой с задержанным от лифтов к дежурке, офицеры
+	_walker(w, {"style": &"clerk", "tint": Color(0.45, 0.5, 0.62), "seed": 10}, [c + Vector3(-5.0, 0, 3.0), c + Vector3(3.0, 0, 3.0), c + Vector3(3.0, 0, 1.6), c + Vector3(-5.0, 0, 1.6)], 0.35)
+	_walker(w, {"style": &"guard", "seed": 11}, [c + Vector3(6.0, 0, -9.0), c + Vector3(3.0, 0, -3.0), c + Vector3(-5.8, 0, -1.0), c + Vector3(3.0, 0, -3.0)], 0.9)
+	_walker(w, {"style": &"civil", "seed": 12, "tint": Color(0.6, 0.6, 0.62)}, [c + Vector3(6.8, 0, -9.4), c + Vector3(3.8, 0, -3.4), c + Vector3(-5.2, 0, -1.4), c + Vector3(3.8, 0, -3.4)], 0.9)
+	_walker(w, {"style": &"officer", "arm": &"folder", "seed": 13}, [c + Vector3(2.0, 0, 4.4), c + Vector3(7.0, 0, -10.0)], 1.1)
+	# Газеты, часы, кадка с пальмой у колонн
+	Geo.block(w, Vector3(0.9, 1.2, 0.3), c + Vector3(-11.6, 0.6, 5.0), Palette.m(&"wood"), true)
+	EpBuild.label3d(w, "ПРАВДА  ·  ИЗВЕСТИЯ  ·  УРАЛЬСКИЙ РАБОЧИЙ", c + Vector3(-11.43, 1.25, 5.0), PI * 0.5, 0.0022, Color(0.2, 0.15, 0.15))
 	var clk := Props.wall_clock()
-	clk.position = c + Vector3(-3.0, 3.2, -5.8)
+	clk.position = c + Vector3(0, 3.0, 7.82)
+	clk.rotation.y = PI
 	w.add_child(clk)
+	for p: Vector3 in [Vector3(-5.2, 0, 4.5), Vector3(5.2, 0, 4.5)]:
+		_ficus(w, c + p)
+	# Гул: шаги и стук машинок вдалеке
+	var amb := AudioStreamPlayer3D.new()
+	amb.stream = AudioDirector.cached_stream("res://assets/audio/hum_loop.ogg")
+	amb.volume_db = -26.0
+	amb.max_distance = 30.0
+	amb.position = c + Vector3(0, 3, 0)
+	w.add_child(amb)
+	amb.play()
+	amb.finished.connect(amb.play)
 
 
 # --- Коридор 4-го этажа ------------------------------------------------------------------
@@ -390,7 +512,7 @@ func _rooms(w: Node3D) -> void:
 	# 415 — отдел «Т»: лаборант с лупой, сохнущие плёнки, магнитофон с бобинами
 	var r3: Dictionary = f4[&"415"]
 	var c3: Vector3 = r3["center"]
-	_add_person(w, {"coat": Color(0.85, 0.85, 0.82), "glasses": true, "arm": &"folder", "hair": Color(0.5, 0.5, 0.5), "seed": 22}, c3 + Vector3(0.8, 0, 0.4), PI * 0.8, &"ep.npc.lab")
+	_add_person(w, {"tint": Color(1.6, 1.6, 1.55), "coat": Color(0.85, 0.85, 0.82), "glasses": true, "arm": &"folder", "hair": Color(0.5, 0.5, 0.5), "seed": 22}, c3 + Vector3(0.8, 0, 0.4), PI * 0.8, &"ep.npc.lab")
 	for k in 6:
 		Geo.block(w, Vector3(0.035, 0.6, 0.002), Vector3(c3.x - 1.4 + k * 0.18, 2.5, float(r3["zout"]) - 1.2), EpBuild.mat(Color(0.12, 0.08, 0.06)), false)
 	Geo.block(w, Vector3(1.5, 0.01, 0.01), Vector3(c3.x - 0.95, 2.82, float(r3["zout"]) - 1.2), EpBuild.mat(Color(0.7, 0.7, 0.68)), false)
@@ -413,7 +535,7 @@ func _rooms(w: Node3D) -> void:
 	# 420 — начальник: полковник у окна, курит; портрет, флаг, длинный стол заседаний
 	var r5: Dictionary = f4[&"420"]
 	var c5: Vector3 = r5["center"]
-	_add_person(w, {"coat": Color(0.22, 0.28, 0.2), "arm": &"smoke", "hair": Color(0.55, 0.55, 0.55), "seed": 24}, Vector3(c5.x + 1.6, 0, float(r5["zout"]) - 0.8), 0.0 if float(r5["side"]) < 0 else PI, &"ep.npc.vetrov")
+	_add_person(w, {"style": &"guard", "tint": Color(0.75, 0.78, 0.72), "coat": Color(0.22, 0.28, 0.2), "arm": &"smoke", "hair": Color(0.55, 0.55, 0.55), "seed": 24}, Vector3(c5.x + 1.6, 0, float(r5["zout"]) - 0.8), 0.0 if float(r5["side"]) < 0 else PI, &"ep.npc.vetrov")
 	_smoke(w, Vector3(c5.x + 1.7, 1.56, float(r5["zout"]) - 1.0))
 	_portrait(w, Vector3(c5.x - 1.6, 2.1, float(r5["zout"]) - float(r5["side"]) * 0.15), float(r5["side"]))
 	_flag(w, Vector3(float(r5["x0"]) + 0.5, 0, float(r5["zout"]) - float(r5["side"]) * 0.5))
@@ -507,6 +629,56 @@ func _tape_recorder(w: Node3D, at: Vector3) -> void:
 	w.add_child(a)
 	a.play()
 	a.finished.connect(a.play)
+
+
+## Южное крыло: радиоконтроль (операторы в наушниках, запись 4170), красный уголок (телевизор, шахматы), спецхран.
+func _wing(w: Node3D) -> void:
+	var wg: Dictionary = ep._wing
+	var r1: Dictionary = wg[&"422"]
+	var c1: Vector3 = r1["center"]
+	# Стойки приёмников вдоль дальней стены, два оператора за столом
+	for k in 3:
+		var rk := Props.radio()
+		rk.position = Vector3(float(r1["x1"]) - 0.5, 0, c1.z - 1.4 + k * 1.4)
+		rk.rotation.y = -PI * 0.5
+		w.add_child(rk)
+	Geo.block(w, Vector3(0.8, 0.06, 3.4), Vector3(float(r1["x1"]) - 1.6, 0.74, c1.z), Palette.m(&"wood"), true)
+	for k in 2:
+		var chp := Props.chair()
+		chp.position = Vector3(float(r1["x1"]) - 2.3, 0, c1.z - 0.8 + k * 1.6)
+		chp.rotation.y = PI * 0.5
+		w.add_child(chp)
+		_add_person(w, {"style": &"officer", "sit": true, "seed": 40 + k}, Vector3(float(r1["x1"]) - 2.3, 0.05, c1.z - 0.8 + k * 1.6), -PI * 0.5, &"ep.npc.radio%d" % (k + 1))
+		Geo.block(w, Vector3(0.22, 0.06, 0.06), Vector3(float(r1["x1"]) - 2.3, 1.62, c1.z - 0.8 + k * 1.6), EpBuild.mat(Color(0.1, 0.1, 0.1)), false)   # наушники
+	_tape_recorder(w, Vector3(float(r1["x1"]) - 1.6, 0.77, c1.z + 1.2))
+	var lbl := EpBuild.label3d(w, "4170 кГц — «КЕДР-7» — 03:10", Vector3(float(r1["x1"]) - 0.13, 2.3, c1.z), -PI * 0.5, 0.0025, Color(0.2, 0.18, 0.15))
+	lbl.name = "IntLabel"
+	# 424 — красный уголок: телевизор с «Временем», шахматы, бюст, вымпелы
+	var r2: Dictionary = wg[&"424"]
+	var c2: Vector3 = r2["center"]
+	Geo.block(w, Vector3(0.6, 0.55, 0.5), Vector3(float(r2["x1"]) - 0.5, 0.95, c2.z), EpBuild.mat(Color(0.3, 0.2, 0.12)), true)
+	var scr := Geo.block(w, Vector3(0.02, 0.36, 0.44), Vector3(float(r2["x1"]) - 0.76, 0.98, c2.z), EpBuild.glow_mat(Color(0.55, 0.65, 0.8), 1.2), false)
+	scr.name = "TV"
+	var tvl := Geo.omni(w, Vector3(float(r2["x1"]) - 1.2, 1.0, c2.z), 3.0, 0.6, Color(0.6, 0.7, 1.0))
+	tvl.shadow_enabled = false
+	Geo.block(w, Vector3(0.6, 0.7, 0.5), Vector3(float(r2["x1"]) - 0.5, 0.35, c2.z), Palette.m(&"wood"), true)
+	Geo.block(w, Vector3(0.7, 0.05, 0.7), Vector3(c2.x - 0.5, 0.7, c2.z + 1.2), Palette.m(&"wood"), true)
+	for k in 64:
+		Geo.block(w, Vector3(0.07, 0.005, 0.07), Vector3(c2.x - 0.5 - 0.245 + (k % 8) * 0.07, 0.728, c2.z + 1.2 - 0.245 + (k / 8) * 0.07), EpBuild.mat(Color(0.85, 0.8, 0.65) if (k + k / 8) % 2 == 0 else Color(0.25, 0.18, 0.12)), false)
+	for k in 10:
+		Geo.cylinder(w, 0.012, 0.035, Vector3(c2.x - 0.5 - 0.2 + (k % 5) * 0.1, 0.75, c2.z + 1.2 - 0.2 + (k / 5) * 0.4), EpBuild.mat(Color(0.9, 0.88, 0.8) if k < 5 else Color(0.1, 0.08, 0.07)), false)
+	for k in 2:
+		var cc := Props.chair()
+		cc.position = Vector3(c2.x - 0.5, 0, c2.z + 1.2 + (0.65 if k == 0 else -0.65))
+		cc.rotation.y = 0.0 if k == 0 else PI
+		w.add_child(cc)
+		_add_person(w, {"style": &"officer", "sit": true, "tint": Color(0.75 + k * 0.1, 0.72, 0.7), "seed": 50 + k}, cc.position + Vector3(0, 0.05, 0), cc.rotation.y + PI, &"ep.npc.chess%d" % (k + 1))
+	_portrait(w, Vector3(c2.x + 1.0, 2.0, float(r2["z1"]) - 0.12), 1.0)
+	_flag(w, Vector3(float(r2["x0"]) + 0.6, 0, float(r2["z1"]) - 0.5))
+	# Спецхран — заперт; из-за двери стучат
+	ep._spot(wg["spec"], Vector3(1.2, 2.0, 0.6), "ep.p.spec", func() -> void:
+		ep._sfx("res://assets/audio/knock_v3.ogg", -6.0)
+		ep._say(&"ep.spec", 6.0))
 
 
 ## Зоя садится печатать, когда принесла дело.

@@ -46,6 +46,10 @@ var _f4: Dictionary
 var _lobby: Dictionary
 var _ring_t := -1.0
 var _life: EpLife
+var _cab: Dictionary
+var _wing: Dictionary
+var _lift_busy := false
+var _lift_floor := 1
 
 # HUD
 var _hud: CanvasLayer
@@ -72,6 +76,8 @@ func _ready() -> void:
 	EpBuild.city(_world)
 	_lobby = EpBuild.lobby(_world)
 	_f4 = EpBuild.floor4(_world)
+	_cab = EpBuild.lift_cabin(_world)
+	_wing = EpBuild.wing(_world)
 	_dress_lobby()
 	_dress_floor()
 	_build_car()
@@ -407,6 +413,7 @@ func _walk(delta: float) -> void:
 			_step_t = 0.48
 			var outdoor := _body.global_position.z < 100.0
 			_sfx(SNOW if outdoor else WOOD[randi() % WOOD.size()], -10.0 if outdoor else -14.0, randf_range(0.9, 1.1))
+	_check_lift_exit()
 	# 412: вернулся после архива — звонок
 	if stage == &"return" and _in_room(&"412"):
 		stage = &"ring"
@@ -562,16 +569,33 @@ func _dress_lobby() -> void:
 		_sfx("res://assets/audio/door.ogg", -4.0)
 		_blink(func() -> void:
 			_enter_walk(_lobby["spawn"], 0.0)
-			_set_goal(&"ep.goal.lift")
+			stage = &"drive_done"
+			_set_goal(&"ep.goal.pass")
 			_say(&"ep.lobby", 5.0)))
-	_spot(_lobby["guard"], Vector3(2.6, 1.6, 1.4), "ep.p.guard", func() -> void: _say(&"ep.guard", 5.0))
+	# Проходная: без удостоверения турникет не пустит
+	_spot(_lobby["guard"], Vector3(2.4, 1.4, 1.0), func() -> String:
+		return Loc.t(&"ep.p.guard") if not _flags.get("id_shown", false) else Loc.t(&"ep.p.talk", [Loc.t(&"ep.npc.post.name")]), func() -> void:
+		if not _flags.get("id_shown", false):
+			_flags["id_shown"] = true
+			_say(&"ep.guard", 5.0)
+			_sfx("res://assets/audio/clank.ogg", -8.0, 1.2)
+			(_lobby["gate"] as StaticBody3D).collision_layer = 0
+			var tw := create_tween()
+			tw.tween_property(_lobby["pole"] as Node3D, "rotation:z", deg_to_rad(-80.0), 0.6)
+			_set_goal(&"ep.goal.lift")
+		else:
+			_say(&"ep.npc.post.1", 5.0))
+	# Лифт: двери в холле → кабина → кнопка «4» → едем (табло, гул, тряска) → двери → коридор 4-го
 	_spot(_lobby["lift"], Vector3(2.2, 2.6, 1.0), "ep.p.lift_up", func() -> void:
-		_sfx("res://assets/audio/hum_loop.ogg", -12.0, 0.7)
+		_sfx("res://assets/audio/door.ogg", -8.0, 1.4)
 		_blink(func() -> void:
-			_enter_walk(_f4["spawn"], deg_to_rad(90.0))
-			stage = &"floor"
-			_set_goal(&"ep.goal.undress")
-			_say(&"ep.floor", 5.0), 1.6))
+			_enter_walk(_cab["spawn"], PI)
+			_lift_floor = 1
+			(_cab["indicator"] as Label3D).text = "1"
+			_set_doors(false, 0.0)
+			_set_goal(&"ep.goal.button"), 0.8))
+	_spot(_cab["panel"], Vector3(0.3, 0.7, 0.5), func() -> String:
+		return "" if _lift_busy else Loc.t(&"ep.p.button4"), _ride_up)
 
 
 func _dress_floor() -> void:
@@ -661,19 +685,21 @@ func _dress_floor() -> void:
 	# 415 — отдел «Т»: доска с фото и нитками, стол с мансийскими записями, шкаф со справкой
 	var r3: Dictionary = _f4[&"415"]
 	var c3: Vector3 = r3["center"]
-	var board := Geo.block(_world, Vector3(2.4, 1.4, 0.05), Vector3(c3.x, 1.6, float(r3["zout"]) - 0.16), EpBuild.mat(Color(0.5, 0.38, 0.24)), false)
+	# Доска с фото — на западной стене (не на окне)
+	var bxw := float(r3["x0"]) + 0.14
+	var board := Geo.block(_world, Vector3(0.05, 1.4, 2.4), Vector3(bxw, 1.6, c3.z), EpBuild.mat(Color(0.5, 0.38, 0.24)), false)
 	board.name = "PhotoBoard"
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for k in 9:
-		var ph2 := Geo.block(_world, Vector3(0.24, 0.18, 0.01), Vector3(c3.x - 0.95 + (k % 3) * 0.95 + rng.randf_range(-0.1, 0.1), 1.2 + (k / 3) * 0.4, float(r3["zout"]) - 0.19), EpBuild.mat(Color(0.82, 0.8, 0.74)), false)
-		ph2.rotation.z = rng.randf_range(-0.12, 0.12)
+		var ph2 := Geo.block(_world, Vector3(0.01, 0.18, 0.24), Vector3(bxw + 0.035, 1.2 + (k / 3) * 0.4, c3.z - 0.95 + (k % 3) * 0.95 + rng.randf_range(-0.1, 0.1)), EpBuild.mat(Color(0.82, 0.8, 0.74)), false)
+		ph2.rotation.x = rng.randf_range(-0.12, 0.12)
 	for k in 5:
-		var th := Geo.block(_world, Vector3(1.0, 0.008, 0.005), Vector3(c3.x - 0.4 + k * 0.2, 1.5 + sin(k) * 0.25, float(r3["zout"]) - 0.2), EpBuild.mat(Color(0.7, 0.08, 0.06)), false)
-		th.rotation.z = k * 0.6 - 1.0
-	_spot(Vector3(c3.x, 1.6, float(r3["zout"]) - 0.4), Vector3(2.4, 1.4, 0.6), "ep.p.board", func() -> void: _open_doc(_doc_from("ep.doc.yrka")))
+		var th := Geo.block(_world, Vector3(0.005, 0.008, 1.0), Vector3(bxw + 0.045, 1.5 + sin(k) * 0.25, c3.z - 0.4 + k * 0.2), EpBuild.mat(Color(0.7, 0.08, 0.06)), false)
+		th.rotation.x = k * 0.6 - 1.0
+	_spot(Vector3(bxw + 0.4, 1.6, c3.z), Vector3(0.6, 1.4, 2.4), "ep.p.board", func() -> void: _open_doc(_doc_from("ep.doc.yrka")))
 	var d3 := Props.desk()
-	d3.position = c3 + Vector3(-1.2, 0, -0.6)
+	d3.position = c3 + Vector3(0.6, 0, -0.9)
 	d3.rotation.y = PI * 0.5
 	_world.add_child(d3)
 	_spot(d3.position + Vector3(0, 0.9, 0), Vector3(0.9, 0.5, 1.8), "ep.p.mansi", func() -> void: _open_doc(_doc_from("ep.doc.nav")))
@@ -721,12 +747,56 @@ func _dress_floor() -> void:
 	_spot(d5.position + Vector3(0.5, 0.9, 0), Vector3(0.9, 0.5, 0.8), "ep.p.candidate", func() -> void: _open_doc(_doc_from("ep.doc.candidate")))
 
 
+func _set_doors(open: bool, dur := 0.8) -> void:
+	var dl: Node3D = _cab["door_l"]
+	var dr: Node3D = _cab["door_r"]
+	var c := EpBuild.LIFT
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(dl, "position:x", c.x - (0.82 if open else 0.28), maxf(dur, 0.01))
+	tw.tween_property(dr, "position:x", c.x + (0.82 if open else 0.28), maxf(dur, 0.01))
+	(dl as CollisionObject3D).collision_layer = 0 if open else Geo.LAYER_WORLD
+	(dr as CollisionObject3D).collision_layer = 0 if open else Geo.LAYER_WORLD
+
+
+func _ride_up() -> void:
+	if _lift_busy or _lift_floor == 4:
+		return
+	_lift_busy = true
+	_sfx("res://assets/sfx/paper_pick.wav", -10.0, 1.8)
+	var hum := _loop("res://assets/audio/hum_loop.ogg", -12.0)
+	hum.pitch_scale = 0.6
+	for f in range(2, 5):
+		await get_tree().create_timer(1.4, false).timeout
+		(_cab["indicator"] as Label3D).text = str(f)
+		_cam.position.y = 1.62 + 0.02
+		await get_tree().create_timer(0.08, false).timeout
+		_cam.position.y = 1.62
+	if hum != null:
+		hum.stop()
+		hum.queue_free()
+	_sfx("res://assets/audio/clank.ogg", -10.0, 1.5)
+	_lift_floor = 4
+	_set_doors(true)
+	await get_tree().create_timer(0.9, false).timeout
+	_lift_busy = false
+	_set_goal(&"ep.goal.exit_lift")
+
+
+func _check_lift_exit() -> void:
+	if _lift_floor == 4 and stage == &"drive_done" and _body.global_position.z < EpBuild.LIFT.z - 1.1 and _body.global_position.z > EpBuild.LIFT.z - 4.0:
+		stage = &"floor"
+		_blink(func() -> void:
+			_enter_walk(_f4["spawn"], deg_to_rad(90.0))
+			_set_goal(&"ep.goal.undress")
+			_say(&"ep.floor", 5.0), 0.5)
+
+
 func _zoya_comes() -> void:
 	var r: Dictionary = _f4[&"412"]
 	var door: Vector3 = r["door"]
 	var side: float = r["side"]
 	_sfx("res://assets/sfx/knock_door.ogg", -4.0)
-	var z := EpBuild.person(Color(0.32, 0.22, 0.28), Color(0.82, 0.66, 0.56), Color(0.45, 0.3, 0.18), true)
+	var z: Node3D = _life._make({"style": &"clerk", "arm": &"folder"}) if _life != null else EpBuild.person(Color(0.32, 0.22, 0.28), Color(0.82, 0.66, 0.56), Color(0.45, 0.3, 0.18), true)
 	z.position = door + Vector3(0.0, 0.0, side * 0.6)
 	z.rotation.y = 0.0 if side > 0 else PI
 	_world.add_child(z)

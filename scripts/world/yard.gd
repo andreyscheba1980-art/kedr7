@@ -4008,6 +4008,9 @@ func _build_helipad() -> void:
 	var cross_b := Geo.box_mesh(Vector3(1.2, 0.04, 8.0), Palette.m(&"wood"))
 	cross_b.position = HELIPAD + Vector3(0, 0.02, 0)
 	add_child(cross_b)
+	# Под сугробом креста не видно — края торчали сквозь снег и мерцали
+	cross_a.visible = Game.helipad_cleared
+	cross_b.visible = Game.helipad_cleared
 
 	# 3. Сугроб над крестом вертодрома — пологий намёт, как остальные сугробы двора (была коробка с углами)
 	if Game.helipad_cleared:
@@ -4032,6 +4035,8 @@ func _build_helipad() -> void:
 	var drift_it := Geo.interactable(self, Vector3(6.4, 0.7, 6.0), HELIPAD + Vector3(0, 0.35, 0), null, "", func(_p: Player) -> void:
 		Game.helipad_cleared = true
 		drift_mesh.visible = false
+		cross_a.visible = true
+		cross_b.visible = true
 		Game.hud.subtitle(Loc.t(&"sub.helipad_ready"), 4.0)
 		Game.audio.play_3d("res://assets/audio/snow_fall.ogg", HELIPAD, 0.0)
 		# Расчищенный сугроб больше не стена: невидимая коробка 6×6 м закрывала вертолёт и его ящик

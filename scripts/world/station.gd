@@ -2861,8 +2861,8 @@ func _build_generator_shack() -> void:
 	_barrel.hold_sound = "res://assets/audio/stove_add.ogg"
 
 	# Масляные пятна на дощатом полу под картером двигателя и у бочки
-	Geo.block(self, Vector3(0.9, 0.005, 0.7), shack_center + Vector3(-0.3, 0.103, -0.2), Palette.m(&"dark"), false)
-	Geo.block(self, Vector3(0.65, 0.005, 0.65), shack_center + Vector3(0.9, 0.103, -0.3), Palette.m(&"dark"), false)
+	Geo.block(self, Vector3(0.9, 0.005, 0.7), shack_center + Vector3(-0.3, 0.108, -0.2), Palette.m(&"dark"), false)   # пятна чуть выше рамы дизеля
+	Geo.block(self, Vector3(0.65, 0.005, 0.65), shack_center + Vector3(0.9, 0.108, -0.3), Palette.m(&"dark"), false)
 
 	# Верстак / стеллаж в будке
 	Geo.block(self, Vector3(0.4, 0.75, 1.1), shack_center + Vector3(1.25, 0.425, 0.4), Palette.m(&"wood"), true)

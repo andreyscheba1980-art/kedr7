@@ -190,7 +190,7 @@ func _build_pult() -> void:
 	var rec := Vector3(PX - 0.62, FL + 0.86, PZ + 0.12)
 	_box(Vector3(0.24, 0.12, 0.26), rec + Vector3(0, 0.06, 0), _mat(Color(0.25, 0.28, 0.26), 0.5))
 	_cyl(0.035, 0.22, rec + Vector3(0, 0.15, 0.0), _mat(Color(0.86, 0.84, 0.78)), Vector3(0, 0, PI * 0.5))
-	_box(Vector3(0.2, 0.002, 0.3), rec + Vector3(0, 0.122, 0.12), _mat(Color(0.86, 0.84, 0.78)))
+	_box(Vector3(0.2, 0.002, 0.3), rec + Vector3(0, 0.125, 0.12), _mat(Color(0.86, 0.84, 0.78)))
 	# Стопка книжек КМ-1, карандаш, термос
 	for k in 3:
 		_box(Vector3(0.15, 0.012, 0.21), Vector3(PX + 0.45, FL + 0.862 + k * 0.012, PZ + 0.18), _mat(Color(0.25, 0.3, 0.42).darkened(k * 0.1)), Vector3(0, k * 0.08, 0))
@@ -292,7 +292,7 @@ func _build_recorders() -> void:
 		_box(Vector3(0.006, 0.012, 0.006), Vector3(-0.03, 0, 0.17), _mat(Color(0.35, 0.1, 0.5)), Vector3.ZERO, pen)
 		_pens.append(pen)
 		# колпак: стекло в латунной рамке
-		_box(Vector3(0.22, 0.17, 0.36), o + Vector3(0, 0.14, 0), glass, Vector3.ZERO, holder)
+		_box(Vector3(0.22, 0.17, 0.36), o + Vector3(0, 0.144, 0), glass, Vector3.ZERO, holder)
 		for e: Array in [[Vector3(0.22, 0.008, 0.008), Vector3(0, 0.225, 0.18)], [Vector3(0.22, 0.008, 0.008), Vector3(0, 0.225, -0.18)],
 				[Vector3(0.008, 0.008, 0.36), Vector3(0.11, 0.225, 0)], [Vector3(0.008, 0.008, 0.36), Vector3(-0.11, 0.225, 0)]]:
 			_box(e[0], o + e[1], brass, Vector3.ZERO, holder)
@@ -324,7 +324,7 @@ func _build_posters() -> void:
 	for b: Array in [[Vector3(0, 0.15, 0.3), Vector3(0.006, 0.12, 0.2)], [Vector3(0, 0.15, -0.3), Vector3(0.006, 0.12, 0.2)],
 			[Vector3(0, -0.15, 0.0), Vector3(0.006, 0.16, 0.34)], [Vector3(0, 0.0, 0.3), Vector3(0.006, 0.18, 0.006)],
 			[Vector3(0, 0.0, -0.3), Vector3(0.006, 0.18, 0.006)], [Vector3(0, -0.08, 0.0), Vector3(0.006, 0.006, 0.6)]]:
-		_box(b[1], ps + Vector3(-0.004, 0, 0) + b[0], ink)
+		_box(b[1], ps + Vector3(-0.009, 0, 0) + b[0], ink)   # над листом, а не в нём (мерцало)
 	# Кабинет наблюдателя: календарь (над столом, на западной стене) и карта района (на перегородке)
 	# календарь — на простенке между перегородкой тамбура и окном (окно z −24.75…−23.65)
 	var cal_z := -25.35
@@ -373,7 +373,7 @@ func _build_clutter() -> void:
 	for k in 4:
 		_cyl(0.005, 0.04, desk + Vector3(0.2 + (k - 1.5) * 0.015, 0.025, 0.55 + (k % 2) * 0.02), _mat(Color(0.85, 0.82, 0.75)), Vector3(0, 0, PI * 0.5 + k * 0.4))
 	for k in 5:
-		_box(Vector3(0.21, 0.002, 0.3), desk + Vector3(-0.1 + k * 0.01, 0.002 + k * 0.002, 0.15 + k * 0.012), _mat(Color(0.86, 0.84, 0.76)), Vector3(0, k * 0.12 - 0.2, 0))
+		_box(Vector3(0.21, 0.002, 0.3), desk + Vector3(-0.1 + k * 0.01, 0.003 + k * 0.004, 0.15 + k * 0.012), _mat(Color(0.86, 0.84, 0.76)), Vector3(0, k * 0.12 - 0.2, 0))
 	# Буржуйка: эмалированный чайник
 	var st := MeteoCorpus.STOVE_POS
 	_cyl(0.09, 0.14, st + Vector3(0.17, 0.8, 0.0), _mat(Color(0.25, 0.4, 0.55), 0.3))   # с краю плиты — посередине труба
