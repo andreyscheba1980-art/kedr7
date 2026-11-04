@@ -739,6 +739,13 @@ func play_ending(id: StringName) -> void:
 	Game.audio.play_ending_music()
 	SaveGame.flags["ending_" + String(id)] = true
 	SaveGame.write()
+	# Одиночная игра: разбор концовки — уже в эпилоге, листами дела на столе у майора в Свердловске
+	if Net.role == "":
+		Epilogue.pages = ending_pages(id)
+		Epilogue.ending_id = id
+		Game.audio.silence(true)
+		finished.emit("epilogue")
+		return
 	for i in range(1, 4):
 		var key := StringName("end.%s.%d" % [id, i])
 		if not Loc.has_key(key):
@@ -762,6 +769,31 @@ func play_ending(id: StringName) -> void:
 
 
 ## Лист «Дело №83-М»: личный итог семи ночей из того, что игра запомнила.
+## Те же листы, что показывались после концовки, — для папки дела в эпилоге.
+func ending_pages(id: StringName) -> PackedStringArray:
+	var out: PackedStringArray = []
+	for i in range(1, 4):
+		var key := StringName("end.%s.%d" % [id, i])
+		if not Loc.has_key(key):
+			break
+		out.append(Loc.t(key))
+	var link: StringName = ENDING_FIND.get(id, &"")
+	if link != &"" and Efir.has_find(link):
+		out.append(Loc.t(StringName("efir.end." + String(id))))
+	var evidence := int(SaveGame.flags.get("evidence", 0))
+	if evidence >= 3:
+		out.append(Loc.t(&"end.evidence", [evidence]))
+	out.append(_case_file(id))
+	var found := 0
+	for e in ENDINGS:
+		if SaveGame.flags.get("ending_" + String(e), false):
+			found += 1
+	out.append("%s
+
+%s" % [Loc.t(StringName("end.%s.title" % id)), Loc.t(&"end.found", [found, ENDINGS.size()])])
+	return out
+
+
 func _case_file(id: StringName) -> String:
 	var lines := PackedStringArray([Loc.t(&"case.head"), ""])
 	var missed := NightMemory.count(&"missed")

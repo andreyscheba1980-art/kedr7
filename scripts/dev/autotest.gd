@@ -2700,6 +2700,21 @@ func _tour(args: PackedStringArray) -> void:
 		print("[bear] итог: %s усталость=%.0f" % [tr._bear["state"], Game.fatigue])
 		get_tree().quit()
 		return
+	if args.has("eptransit"):   # концовка → эпилог в Свердловске (а не текст и меню)
+		var ses := get_tree().get_first_node_in_group(&"session")
+		ses.call(&"play_ending", &"silence")
+		var t := 0.0
+		while t < 60.0 and get_tree().root.find_children("*", "Epilogue", true, false).is_empty():
+			await get_tree().create_timer(1.0).timeout
+			t += 1.0
+		var eps := get_tree().root.find_children("*", "Epilogue", true, false)
+		print("[eptr] эпилог через %.0f с: %s, листов дела=%d" % [t, not eps.is_empty(), Epilogue.pages.size()])
+		if not eps.is_empty():
+			for pg in Epilogue.pages:
+				print("[eptr] лист: ", pg.substr(0, 60).replace("
+", " "))
+		get_tree().quit()
+		return
 	if args.has("taigatest"):   # концовка «Тайга»: условия, подсказка, кадр на движке
 		Game.final_call = true
 		Game.set_flag("shrine_amulet_taken", true)

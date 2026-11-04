@@ -20,6 +20,12 @@ func _ready() -> void:
 		var art_script: GDScript = load("res://scripts/dev/art_test_taiga.gd")
 		add_child(art_script.new())
 		return
+	if all_cmd_args.has("--epilogue"):   # отладка эпилога без прохождения (+ --eptour — автопрогон со снимками)
+		Epilogue.pages = PackedStringArray(["(отладка) Лист разбора концовки."])
+		_start_epilogue.call_deferred()
+		if all_cmd_args.has("--eptour"):
+			add_child(load("res://scripts/dev/ep_tour.gd").new())
+		return
 	_show_menu()
 	Net.session_start.connect(_start_coop)
 	var args := OS.get_cmdline_user_args()
@@ -185,8 +191,26 @@ func _on_session_finished(result: String) -> void:
 		"retry":
 			SaveGame.read()
 			_start_phase()
+		"epilogue":
+			_start_epilogue()
 		_:
 			_show_menu()
+
+
+## Эпилог «Свердловск, 1983» после концовки: своя сцена, по выходу — меню.
+var _epilogue: Epilogue
+
+
+func _start_epilogue() -> void:
+	_clear()
+	Director.reset()
+	_epilogue = Epilogue.new()
+	add_child(_epilogue)
+	_epilogue.finished.connect(func() -> void:
+		if _epilogue != null and is_instance_valid(_epilogue):
+			_epilogue.queue_free()
+		_epilogue = null
+		_show_menu.call_deferred(), CONNECT_DEFERRED)
 
 
 ## Убирает текущую сцену сразу (а не в конце кадра), чтобы старые узлы не успели сработать.
