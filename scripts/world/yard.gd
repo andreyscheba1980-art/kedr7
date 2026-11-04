@@ -549,6 +549,7 @@ func _build_ground() -> void:
 	# Земля всей карты (1 км): двор ровный, дальше сопки, зимники и площадки (Terrain).
 	# Сетка 4 м — один огромный квад «плыл» бы под камерой из-за PS1-снапа вершин.
 	Terrain.build(self, 150.0 if Game.is_daylight() else 95.0)
+	Landscape.build(self)   # хребет на горизонте, лёд ручья, мосток, останцы
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
 	var drift := SphereMesh.new()

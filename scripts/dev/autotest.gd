@@ -2607,6 +2607,24 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("landshots"):   # рельеф: горизонт со двора, распадок с мостком, ЛЭП, лог
+		for q: Vector2 in [Vector2(0, 208), Vector2(0, 230), Vector2(0, 250), Vector2(49, 222), Vector2(-262, -70), Vector2(-262, -92), Vector2(-262, -112)]:
+			print("[land] h(%s)=%.1f" % [q, Terrain.height(q.x, q.y)])
+		print("[land] мостков: ", Game.yard.find_children("LogBridge", "", true, false).size())
+		for v: Array in [["horizon_n", Vector3(20, 0, -60), Vector3(20, 25, -900)], ["horizon_w", Vector3(-30, 0, 20), Vector3(-900, 40, 20)],
+				["ravine", Vector3(46, 0, 212), Vector3(110, -8, 228)], ["bridge", Vector3(43, 0, 200), Vector3(49, 0, 222)],
+				["powerline", Vector3(-84, 0, -112), Vector3(-138, 4, -182)], ["log", Vector3(-214, 0, -66), Vector3(-262, -10, -92)]]:
+			var p0: Vector3 = v[1]
+			var t0: Vector3 = v[2]
+			p0.y = Terrain.height(p0.x, p0.z)
+			t0.y += Terrain.height(t0.x, t0.z) if absf(t0.x) < 600 and absf(t0.z) < 600 else 0.0
+			_look(p0, t0)
+			await _wait(1.5)
+			for r in Landscape._rings:
+				print("[land] ", r.name, " in_tree=", r.is_inside_tree(), " vis=", r.is_visible_in_tree(), " pos=", r.global_position, " sc=", r.scale, " aabb=", r.get_aabb(), " fade=", Landscape._mats[0].get_shader_parameter(&"fade"), " haze=", Landscape._mats[0].get_shader_parameter(&"haze"))
+			await _shot("land_" + v[0])
+		get_tree().quit()
+		return
 	if args.has("boxshots"):   # места, где голые коробки заменены моделями
 		var out := [["repeater", Yard.REPEATER + Vector3(-9, 0, 6), Yard.REPEATER], ["hummocks", Yard.LAKE + Vector3(-3, 0, 2), Yard.LAKE + Vector3(-10, 0, 7)],
 			["hole", Yard.HOLE + Vector3(-3.5, 0, 1.5), Yard.HOLE + Vector3(-1, 0, -1)], ["anchor", Yard.MAST + Vector3(5, 0, 6), Yard.MAST + Vector3(9, 0, 0)]]

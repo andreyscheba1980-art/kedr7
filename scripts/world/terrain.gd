@@ -28,6 +28,12 @@ const ROADS := {
 	&"camp": [Vector2(-36, 20), Vector2(-62, 14), Vector2(-100, 4), Vector2(-146, -2), Vector2(-198, 4), Vector2(-256, 14), Vector2(-312, 12), Vector2(-350, 10)],
 	&"drill": [Vector2(4, 44), Vector2(8, 84), Vector2(18, 130), Vector2(34, 180), Vector2(52, 230), Vector2(70, 282), Vector2(78, 312)],
 }
+## Овраги и распадки: ломаная по дну, глубина, полуширина, есть ли ручей подо льдом.
+## «Распадок» пересекает дорогу к буровой — там насыпь с бревенчатым мостком (Landscape).
+const RAVINES := [
+	{"pts": [Vector2(-90, 236), Vector2(-40, 226), Vector2(0, 230), Vector2(49, 222), Vector2(90, 232), Vector2(140, 226), Vector2(200, 238), Vector2(260, 230)], "depth": 11.0, "half": 17.0, "river": true},
+	{"pts": [Vector2(-176, -64), Vector2(-214, -84), Vector2(-262, -92), Vector2(-318, -120), Vector2(-372, -150)], "depth": 14.0, "half": 15.0, "river": false},
+]
 ## Площадки: центр, радиус. Высота — отметка рельефа в центре.
 const PADS := {
 	&"tower": [Vector2(300, -322), 22.0],
@@ -83,6 +89,12 @@ static func ensure() -> void:
 		_stamp_road(road)
 	for pad: StringName in PADS:
 		_stamp_pad(PADS[pad][0], PADS[pad][1])
+	for j in N:
+		for i in N:
+			var p := Vector2(CENTER.x - HALF + i * STEP, CENTER.y - HALF + j * STEP)
+			for rv: Dictionary in RAVINES:
+				if rv["river"] and ravine_dist(rv, p) < 4.0:
+					_clear[j * N + i] = 1   # русло подо льдом — ели не ставим
 	print("[terrain] сетка %d×%d за %d мс" % [N, N, Time.get_ticks_msec() - t0])
 
 
@@ -92,10 +104,38 @@ static func _base(x: float, z: float, detail: FastNoiseLite) -> float:
 	var w := smoothstep(FLAT_R, FLAT_R + BLEND, d)
 	if w <= 0.0:
 		return 0.0
-	var hills := (_noise.get_noise_2d(x, z) * 0.5 + 0.5) * 24.0 + detail.get_noise_2d(x, z) * 1.4
+	var n := _noise.get_noise_2d(x, z)
+	var hills := (n * 0.5 + 0.5) * 30.0 + detail.get_noise_2d(x, z) * 1.6
+	# Гребни сопок: острый перегиб там, где шум переходит через ноль — каменистые увалы, а не блин
+	hills += pow(1.0 - absf(_noise.get_noise_2d(z * 0.7 + 400.0, x * 0.7)), 4.0) * 12.0
+	hills -= _ravine_cut(x, z)
 	var edge := maxf(absf(x - CENTER.x), absf(z - CENTER.y))
 	var ridge := smoothstep(400.0, 505.0, edge) * 46.0
 	return (hills + ridge) * w
+
+
+## Насколько опустить рельеф оврагом в точке: гладкий профиль «корыта» с крутыми бортами.
+static func _ravine_cut(x: float, z: float) -> float:
+	var cut := 0.0
+	for rv: Dictionary in RAVINES:
+		var d := ravine_dist(rv, Vector2(x, z))
+		var half: float = rv["half"]
+		if d < half:
+			var t := d / half
+			cut = maxf(cut, float(rv["depth"]) * pow(1.0 - t * t, 1.6))
+	return cut
+
+
+static func ravine_dist(rv: Dictionary, p: Vector2) -> float:
+	var pts: Array = rv["pts"]
+	var best := INF
+	for k in range(pts.size() - 1):
+		var a: Vector2 = pts[k]
+		var b: Vector2 = pts[k + 1]
+		var ab := b - a
+		var t := clampf((p - a).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		best = minf(best, p.distance_to(a + ab * t))
+	return best
 
 
 static func _idx(i: int, j: int) -> int:
