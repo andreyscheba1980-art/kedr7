@@ -3360,6 +3360,8 @@ func _stove_prompt() -> String:
 
 
 func _on_stove_used(p: Player) -> void:
+	if Game.stove_wood > 0.0:
+		Gear.refill_thermos()   # чай в термос — с горячей плиты
 	# Забит дымоход — печь можно залить из чайника: угар прекратится, но дом начнёт остывать.
 	if p.held != &"wood" and Game.chimney_iced and Game.stove_wood > 0.0:
 		Game.stove_wood = 0.0

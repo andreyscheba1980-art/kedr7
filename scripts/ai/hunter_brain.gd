@@ -22,6 +22,9 @@ const GEN_POS := Vector3(14.2, 0.45, -13.65)
 const HOME_XZ := Vector2(6.0, 3.5)
 const SABOTAGE_WARN := 25.0        ## сколько секунд слышно возню у ДЭС, прежде чем сорвут ремень
 const AMBUSH_SILENT := 70.0        ## сколько молчит засада (без свиста) — дальше снова как обычно
+## Как в Alien: Isolation — «учится» не сразу: поведение открывается по ночам. Первые ночи учат правила
+## (свет отгоняет, леер спасает), дальше тварь начинает их обходить.
+const FROM_NIGHT := {&"poi_ambush": 2, &"siege": 2, &"route": 3, &"light_adapt": 3}
 
 var current_tactic: Tactic = Tactic.STALK
 var light_adaptation: int = 0      ## за эту ночь: 0 — слепнет; 1 — закрывает лицо лапой; 2+ — уходит из луча
@@ -100,12 +103,14 @@ func _track_routes(delta: float) -> void:
 	var pp := Game.player.global_position
 	Consequences.record_step(pp)
 	var cell := Consequences.cell_of(pp)
-	if cell in _route_cells and not _route_used.has(cell) and Director.tension > 25.0 and Game.yrka.stage < YrkaThreat.Stage.CONTACT:
+	if unlocked(&"route") and cell in _route_cells and not _route_used.has(cell) and Director.tension > 25.0 and Game.yrka.stage < YrkaThreat.Stage.CONTACT:
 		_route_used[cell] = true
 		var fwd := Vector2(Game.player.velocity.x, Game.player.velocity.z)
 		if fwd.length() < 0.3:
 			fwd = Vector2(-Game.player.global_basis.z.x, -Game.player.global_basis.z.z)
 		Game.yrka.virtual_pos = Vector2(pp.x, pp.z) + fwd.normalized() * 18.0
+		if Dog.instance != null and Dog.is_near_player():   # Найда чует засаду раньше тебя
+			Dog.instance.warn_toward(Vector3(Game.yrka.virtual_pos.x, pp.y, Game.yrka.virtual_pos.y))
 		Game.yrka.threat = maxf(Game.yrka.threat, YrkaThreat.STALK_AT)
 		_silent_t = 40.0
 		Consequences.note_waited(Consequences.cell_center(cell))
@@ -123,7 +128,13 @@ func _process_siege() -> void:
 		return
 	# Скрежет в окно — мелкая пугалка, через бюджет
 	if Game.level != null and not Game.level.window_spots.is_empty() and Game.rng.randf() < 0.08:
-		if Director.request_ambient(8.0, "скрежет в окно"):
+		if Game.knife_in_lintel and not Rituals.worked_tonight(&"knife"):
+			# Нож в притолоке: раз за ночь звякнул — и скрежет у окна оборвался
+			if Director.request_ambient(3.0, "нож в притолоке отвёл скрежет"):
+				Rituals.worked(&"knife")
+				Game.audio.play_2d("res://assets/audio/clank.ogg", -12.0)
+				Game.hud.subtitle(Loc.t(&"sub.knife_rang"), 3.5)
+		elif Director.request_ambient(8.0, "скрежет в окно"):
 			_harass_window()
 
 
@@ -137,6 +148,9 @@ func offer_peak() -> bool:
 	if not Director.take_peak("возня у ДЭС", 20.0, SABOTAGE_WARN + 50.0):
 		return false
 	_warn_t = SABOTAGE_WARN
+	if Game.salt_on_threshold:   # соль на пороге: тварь мнётся у дома дольше — больше времени выйти
+		_warn_t = SABOTAGE_WARN + 20.0
+		Rituals.worked(&"salt")
 	Game.audio.play_3d(SNOW_CRUNCH, GEN_POS + Vector3(-1.5, 0, 1.2), 2.0, 16.0)
 	Game.audio.play_3d(CLANK_SOUND, GEN_POS, -2.0, 16.0)
 	Game.hud.subtitle(Loc.t(&"sub.gen_shack_steps"), 4.5, 2)
@@ -219,7 +233,13 @@ func _far_points() -> Dictionary:
 	return pts
 
 
+static func unlocked(what: StringName) -> bool:
+	return Game.night >= int(FROM_NIGHT.get(what, 1))
+
+
 func _check_far_point_ambush() -> void:
+	if not unlocked(&"poi_ambush"):
+		return
 	if Game.player == null or Game.yrka == null or not Game.is_outside() and not Game.is_indoors():
 		return
 	var pp := Game.player.global_position
@@ -247,6 +267,8 @@ func _check_far_point_ambush() -> void:
 # --- Обучение и реакция на приёмы дежурного -----------------------------------
 
 func record_light_repel() -> void:
+	if not unlocked(&"light_adapt"):
+		return
 	light_adaptation = clampi(light_adaptation + 1, 0, 3)
 	if light_adaptation == 1:
 		Game.hud.subtitle(Loc.t(&"sub.yrka_shields"), 4.5)

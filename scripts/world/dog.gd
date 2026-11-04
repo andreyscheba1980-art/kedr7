@@ -602,6 +602,18 @@ func _bowl_hide() -> void:
 	pass
 
 
+## Охотник ставит засаду на привычной тропе — Найда замирает и рычит туда (раньше, чем ты услышишь).
+func warn_toward(at: Vector3) -> void:
+	if _on_buran:
+		return
+	_face(at)
+	_play(&"growl", 0.1)
+	_busy_t = 3.0
+	_growl_t = 8.0
+	Game.audio.play_3d(Voice.sfx_or(&"dog_growl", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.4, 0), 0.0, 6.0)
+	Game.hud.subtitle(Loc.t(&"dog.warns"), 3.5)
+
+
 # --- Компаньон: свист, «рядом», «сидеть», «домой» ---------------------------------------
 
 static func can_follow() -> bool:

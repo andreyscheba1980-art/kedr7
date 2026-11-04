@@ -41,12 +41,20 @@ static func grant(id: StringName) -> void:
 
 # --- Термос: на морозе сам выручает раз за выход (заливается дома у печки) ---------------
 
+## Заливаешь у горячей печи (дома или в корпусе) — тепло дома питает вылазку.
 static func thermos_ready() -> bool:
-	return has(&"thermos") and SaveGame.flags.get("thermos_used", "") != Dog.phase_key()
+	return has(&"thermos") and SaveGame.flags.get("thermos_full", true)
+
+
+static func refill_thermos() -> void:
+	if has(&"thermos") and not SaveGame.flags.get("thermos_full", true):
+		SaveGame.flags["thermos_full"] = true
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.t(&"sub.thermos_refill"), 3.0)
 
 
 static func use_thermos() -> void:
-	SaveGame.flags["thermos_used"] = Dog.phase_key()
+	SaveGame.flags["thermos_full"] = false
 	Game.warmth = minf(Game.warmth + 35.0, 100.0)
 	Game.add_fatigue(-6.0)
 	if Game.hud != null:

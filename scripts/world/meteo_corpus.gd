@@ -562,6 +562,8 @@ func _climb(at: Vector3, to: Vector3, prompt_key: StringName, sub_key: StringNam
 
 func _build_stove() -> void:
 	var it := Geo.interactable(self, Vector3(0.6, 0.9, 0.6), STOVE_POS + Vector3(0, 0.45, 0), null, "", func(_p: Player) -> void:
+		if stove_lit:
+			Gear.refill_thermos()
 		stove_lit = true
 		_stove_t = 420.0
 		Game.audio.play_3d("res://assets/audio/stove_add.ogg", STOVE_POS + Vector3(0, 0.5, 0), -3.0)
