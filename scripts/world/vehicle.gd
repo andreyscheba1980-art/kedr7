@@ -22,6 +22,11 @@ var _body: Node3D                 ## точка на дороге (позици�
 var _tracked: Node3D              ## модель ГТ-Т с поворотом и наклоном
 var _exterior_mesh: Node3D
 var _cabin_root: Node3D
+var _wipers: Array[Node3D] = []
+var _frost_tex: Array[GradientTexture2D] = []
+var _bump_t := 3.0
+var _jolt := 0.0
+var _cab_snow: CPUParticles3D
 var _driver_cabin: CreatureRig
 var _engine: AudioStreamPlayer3D
 var _cabin_radio: AudioStreamPlayer3D
@@ -242,9 +247,63 @@ func _build_cabin() -> void:
 	for sx: float in [-0.55, 0.55]:
 		var gl := _frost_glass(c, Vector3(1.0, 0.64, 0.02), Vector3(sx, 1.24, -1.86), 18.0)
 		gl.name = "Windshield"
+	# Дворники на осях у нижней кромки стекла — ходят, пока едем и метёт
 	for sx: float in [-0.55, 0.55]:
-		var wp := Geo.block(c, Vector3(0.012, 0.5, 0.012), Vector3(sx + 0.12, 1.05, -1.82), dark, false)
-		wp.rotation = Vector3(deg_to_rad(18.0), 0.0, deg_to_rad(-62.0))
+		var piv := Node3D.new()
+		piv.position = Vector3(sx + 0.3, 0.95, -1.8)
+		piv.rotation.x = deg_to_rad(18.0)
+		c.add_child(piv)
+		var wp := Geo.block(piv, Vector3(0.012, 0.52, 0.012), Vector3(0, 0.26, 0), dark, false)
+		Geo.block(piv, Vector3(0.02, 0.42, 0.018), Vector3(-0.01, 0.3, 0.012), Palette.m(&"dark"), false)
+		wp.name = "Wiper"
+		piv.rotation.z = deg_to_rad(62.0)
+		_wipers.append(piv)
+	# Снег летит в стекло в свете фар
+	_cab_snow = CPUParticles3D.new()
+	_cab_snow.amount = 90
+	_cab_snow.lifetime = 0.7
+	_cab_snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_cab_snow.emission_box_extents = Vector3(1.2, 0.5, 0.2)
+	_cab_snow.direction = Vector3(0, -0.1, 1)
+	_cab_snow.spread = 12.0
+	_cab_snow.initial_velocity_min = 3.0
+	_cab_snow.initial_velocity_max = 4.5
+	_cab_snow.gravity = Vector3.ZERO
+	var sq := QuadMesh.new()
+	sq.size = Vector2(0.018, 0.018)
+	var smt := StandardMaterial3D.new()
+	smt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smt.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	smt.albedo_color = Color(0.85, 0.9, 1.0)
+	sq.material = smt
+	_cab_snow.mesh = sq
+	_cab_snow.position = Vector3(0, 1.25, -3.6)
+	c.add_child(_cab_snow)
+	# Михалыч курит: огонёк у губ, дым тянется к щели двери
+	var cig := CABIN_DRIVER_LOCAL + Vector3(0.12, 1.02, -0.32)
+	var ember := Geo.block(c, Vector3(0.008, 0.008, 0.03), cig, Palette.glow(&"amber"), false)
+	ember.name = "Cigarette"
+	var smoke := CPUParticles3D.new()
+	smoke.amount = 16
+	smoke.lifetime = 2.6
+	smoke.direction = Vector3(0.3, 1, 0.2)
+	smoke.spread = 18.0
+	smoke.initial_velocity_min = 0.08
+	smoke.initial_velocity_max = 0.18
+	smoke.gravity = Vector3(0.05, 0.04, 0.03)
+	smoke.scale_amount_min = 0.6
+	smoke.scale_amount_max = 2.4
+	var smq := QuadMesh.new()
+	smq.size = Vector2(0.05, 0.05)
+	var smm := StandardMaterial3D.new()
+	smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	smm.albedo_color = Color(0.7, 0.7, 0.72, 0.22)
+	smq.material = smm
+	smoke.mesh = smq
+	smoke.position = cig + Vector3(0, 0.02, 0)
+	c.add_child(smoke)
 	# Плафон под крышей: тёплый, слабый — чтобы кабина читалась
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.82, 0.6)
@@ -275,6 +334,36 @@ func _build_cabin() -> void:
 
 
 ## Стекло с инеем по краям: прозрачная середина, белёсые углы (радиальный градиент).
+## Кабина живёт: дворники ходят, пока едем; ухабы встряхивают кабину и звякает термос;
+## встали — снег перестаёт лететь, иней ползёт по стеклу от краёв.
+func _cabin_life(delta: float) -> void:
+	var t := Time.get_ticks_msec() * 0.001
+	for k in _wipers.size():
+		var w := _wipers[k]
+		if _driving:
+			w.rotation.z = deg_to_rad(62.0) - (0.5 - 0.5 * cos(t * 2.6)) * deg_to_rad(100.0)
+		else:
+			w.rotation.z = lerp_angle(w.rotation.z, deg_to_rad(62.0), minf(delta * 2.0, 1.0))
+	if _cab_snow != null:
+		_cab_snow.emitting = _driving
+	if _driving:
+		_bump_t -= delta
+		if _bump_t <= 0.0:
+			_bump_t = randf_range(2.5, 6.0)
+			_jolt = randf_range(0.025, 0.05)
+			var ck := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
+			if ck != null:
+				ck.pitch_scale = randf_range(1.6, 2.2)
+	_jolt = move_toward(_jolt, 0.0, delta * 0.12)
+	Game.player.head.position.y += sin(t * 40.0) * _jolt
+	if _cabin_root != null:
+		_cabin_root.rotation.x = sin(t * 33.0) * _jolt * 0.15
+	# Иней: встали — тянется от краёв к середине
+	for tx in _frost_tex:
+		var want := 0.82 if not _driving else 1.05
+		tx.fill_to = tx.fill_to.lerp(Vector2(want, want), minf(delta * 0.02, 1.0))
+
+
 func _frost_glass(parent: Node3D, size: Vector3, pos: Vector3, tilt_deg: float) -> MeshInstance3D:
 	var grad := Gradient.new()
 	grad.set_color(0, Color(0.36, 0.40, 0.46, 0.0))
@@ -285,6 +374,7 @@ func _frost_glass(parent: Node3D, size: Vector3, pos: Vector3, tilt_deg: float) 
 	tex.fill = GradientTexture2D.FILL_RADIAL
 	tex.fill_from = Vector2(0.5, 0.5)
 	tex.fill_to = Vector2(1.05, 1.05)
+	_frost_tex.append(tex)
 	var m := StandardMaterial3D.new()
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_texture = tex
@@ -602,6 +692,7 @@ func _process(delta: float) -> void:
 		Game.player.velocity = Vector3.ZERO
 		var vib := sin(Time.get_ticks_msec() * 0.035) * (0.005 if _driving else 0.002)
 		Game.player.head.position.y = 0.90 + vib
+		_cabin_life(delta)
 		if _lever_l != null:
 			_lever_l.rotation.x = sin(Time.get_ticks_msec() * 0.052) * 0.008 + _lever_pull
 			_lever_r.rotation.x = sin(Time.get_ticks_msec() * 0.052 + 1.2) * 0.008 + _lever_pull

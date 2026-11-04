@@ -81,6 +81,7 @@ func _ready() -> void:
 		add_child(NightTasks.new())
 		add_child(NightGuest.new())   # стук в дверь: человек или оно
 		add_child(Wildlife.new())     # волки: не всё, что ходит ночью, — тварь
+		add_child(MineStory.new())    # ночь 4: «Логово» — провал в штольню, стелс, погоня
 		if not Game.is_prologue():
 			Consequences.apply_night()   # что не починил днём — ночью платишь
 	else:

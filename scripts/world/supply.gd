@@ -125,12 +125,94 @@ static func place_crate(yard: Node3D) -> void:
 		it.used.connect(func(_p: Player) -> void: SaveGame.flags.erase("supply_crate_pos"))
 	if SaveGame.flags.get("supply_fresh", false) and Game.hud != null:
 		SaveGame.flags["supply_fresh"] = false
+		# Катсцена: Ми-8 проходит над тайгой, груз спускается на парашюте (через несколько секунд утра)
+		root.visible = false
+		yard.get_tree().create_timer(7.0, false).timeout.connect(func() -> void: flyover(root))
 		if drifted:
 			var az_deg := float((cp as Array)[2])
 			var sector := int(round(fposmod(az_deg, 360.0) / 45.0)) % 8
 			Game.hud.subtitle(Loc.t(&"sup.crate_drifted", [Loc.t(StringName("dir8.%d" % sector)), int(round(float((cp as Array)[3]) / 10.0)) * 10]), 8.0)
 		else:
 			Game.hud.subtitle(Loc.t(&"sup.crate_arrived"), 5.0)
+
+
+## Пролёт Ми-8 со сбросом: вертолёт идёт низко над лесом, над точкой сброса от него отделяется ящик
+## под оранжевым куполом и, покачиваясь, опускается. Потом настоящий ящик становится видимым.
+static func flyover(crate_root: Node3D) -> void:
+	if not is_instance_valid(crate_root) or Game.player == null or Cutscene.active or not Game.is_day():
+		if is_instance_valid(crate_root):
+			crate_root.visible = true
+		return
+	var drop := crate_root.global_position
+	var dir := Vector3(1, 0, 0.35).normalized()
+	var start := drop - dir * 150.0 + Vector3(0, 30, 0)
+	var stop := drop + dir * 150.0 + Vector3(0, 32, 0)
+	var heli := Node3D.new()
+	heli.name = "Mi8Flyover"
+	Game.yard.add_child(heli)
+	var m := Props.mi8_helicopter()
+	if m != null:
+		heli.add_child(m)
+	heli.global_position = start
+	heli.look_at(stop, Vector3.UP)
+	var snd := AudioStreamPlayer3D.new()
+	snd.stream = AudioDirector.cached_stream("res://assets/audio/engine_loop.ogg")
+	snd.pitch_scale = 0.55
+	snd.volume_db = 6.0
+	snd.unit_size = 20.0
+	snd.max_distance = 260.0
+	heli.add_child(snd)
+	snd.play()
+	snd.finished.connect(snd.play)
+	var fly := heli.create_tween()
+	fly.tween_property(heli, "global_position", stop, 12.0)
+	fly.tween_callback(heli.queue_free)
+	# Падающий ящик под куполом
+	var fall := Node3D.new()
+	fall.name = "SupplyFalling"
+	Game.yard.add_child(fall)
+	var cr := Props.stacked_crates()
+	cr.scale = Vector3.ONE * 0.7
+	fall.add_child(cr)
+	var chute := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 1.6
+	sm.height = 1.4
+	sm.is_hemisphere = true
+	chute.mesh = sm
+	var cm := StandardMaterial3D.new()
+	cm.albedo_color = Color(0.85, 0.35, 0.12)
+	cm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	chute.material_override = cm
+	chute.position = Vector3(0, 4.2, 0)
+	fall.add_child(chute)
+	for k in 4:
+		var a := k * TAU / 4.0
+		var line := Geo.cylinder(fall, 0.008, 3.6, Vector3(cos(a) * 0.7, 2.4, sin(a) * 0.7), Palette.m(&"dark"), false)
+		line.rotation = Vector3(sin(a) * 0.35, 0, -cos(a) * 0.35)
+	fall.visible = false
+	var pp := Game.player.global_position
+	var eye := pp + Vector3(0, 1.6, 0)
+	await Cutscene.play([
+		{"cam": [eye, start]},
+		{"say": "sup.cut.1", "t": 4.0},
+		{"move": [eye, drop + Vector3(0, 26, 0)], "t": 5.4},
+		{"call": func() -> void:
+			fall.visible = true
+			fall.global_position = drop + Vector3(0, 24, 0)
+			var tw := fall.create_tween().set_parallel(true)
+			tw.tween_property(fall, "global_position:y", drop.y, 6.0).set_ease(Tween.EASE_OUT)
+			var sway := fall.create_tween().set_loops(3)
+			sway.tween_property(fall, "rotation:z", 0.12, 1.0)
+			sway.tween_property(fall, "rotation:z", -0.12, 1.0)},
+		{"move": [eye.lerp(drop, 0.35) + Vector3(0, 1.0, 0), drop + Vector3(0, 6, 0)], "t": 3.5},
+		{"move": [eye.lerp(drop, 0.45) + Vector3(0, 1.2, 0), drop + Vector3(0, 0.6, 0)], "t": 2.6},
+		{"say": "sup.cut.2", "t": 4.0},
+		{"call": func() -> void:
+			fall.queue_free()
+			crate_root.visible = true},
+		{"wait": 1.0},
+	])
 
 
 static func open_crate(p: Player, at: Vector3) -> void:

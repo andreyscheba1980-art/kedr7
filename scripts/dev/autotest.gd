@@ -2658,6 +2658,61 @@ func _tour(args: PackedStringArray) -> void:
 		print("[num] найден=%s пайки %d → %d" % [NumbersCache.found(), r0, Supply.rations()])
 		get_tree().quit()
 		return
+	if args.has("cuttest"):
+		var pp := Game.player.global_position
+		get_tree().create_timer(1.5).timeout.connect(func() -> void: _shot("cut_a"))
+		await Cutscene.play([{"cam": [pp + Vector3(4, 3, 4), pp]}, {"wait": 3.0}])
+		await _shot("cut_after")
+		get_tree().quit()
+		return
+	if args.has("minestory"):   # ночь 4: приказ → провал → логово → стелс → погоня → выход
+		Hud.log_subs = true
+		var ms := MineStory.instance
+		print("[ms] есть=%s" % [ms != null])
+		ms._t = 0.0
+		await _wait(18.0)
+		print("[ms] этап=%s цель=%s" % [ms.stage, Game.objective_text()])
+		var bc: Node3D = Game.yard.find_child("DubovBeacon", true, false)
+		_tp(bc.global_position + Vector3(0, 0.05, 1.6), 0.0)
+		await _wait(1.0)
+		await _shot("ms_beacon")
+		ms._fall()
+		await _wait(2.0)
+		await _shot("ms_fall")
+		await _wait(13.0)
+		print("[ms] после провала: этап=%s зона=%s поз=%s" % [ms.stage, Game.zone, (Game.player.global_position - MineStory.ROOT).snapped(Vector3.ONE * 0.1)])
+		await _shot("ms_wake")
+		await _wait(6.0)
+		print("[ms] этап=%s оно=%s" % [ms.stage, ms._lurker != null])
+		var fl := Game.player.flashlight
+		print("[ms] фонарь vis=%s e=%.2f mask=%d заряд=%.0f" % [fl.visible, fl.light_energy, fl.light_cull_mask, Game.flash_charge])
+		var L := MineStory.ROOT
+		_look(L + Vector3(0, 0.05, -24.0), ms._lurker.global_position + Vector3(0, 1.4, 0))
+		Game.player.set_flashlight(true)
+		await _wait(0.3)
+		await _shot("ms_lurker")
+		var t := 0.0
+		while not ms._chase and t < 8.0:
+			await _wait(0.25)
+			t += 0.25
+		print("[ms] заметило=%s через %.1f с" % [ms._chase, t])
+		await _wait(4.0)
+		print("[ms] после поимки: этап=%s поз=%s" % [ms.stage, (Game.player.global_position - L).snapped(Vector3.ONE * 0.1)])
+		_tp(L + Vector3(0, 0.05, -7.0), 180.0)
+		await _wait(0.5)
+		print("[ms] бег: этап=%s" % ms.stage)
+		_look(L + Vector3(0, 0.05, -6.0), ms._lurker.global_position + Vector3(0, 1.4, 0))
+		await _wait(1.5)
+		await _shot("ms_run")
+		_tp(L + Vector3(0, 0.05, 1.2), 0.0)
+		ms.climb(Game.player)
+		await _wait(3.0)
+		await _shot("ms_climb")
+		await _wait(10.0)
+		await _shot("ms_out")
+		print("[ms] конец: этап=%s флаг=%s зона=%s" % [ms.stage, Game.has_flag("mine_story_done"), Game.zone])
+		get_tree().quit()
+		return
 	if args.has("notetest"):   # записки игры — крупным листом DocView
 		Game.hud.visible = true
 		for key: StringName in [&"note.bunker", &"note.mine_semenov"]:
@@ -2876,6 +2931,19 @@ func _tour(args: PackedStringArray) -> void:
 		_look(cr.global_position + fwd.normalized() * 9.0, cr.global_position + Vector3(0, 0.5, 0))
 		await _wait(1.2)
 		await _shot("drop_crate")
+		SaveGame.flags["supply_pending"] = ["tea"]
+		SaveGame.flags.erase("supply_crate_pos")
+		Game.synoptic.wind_aloft_speed = 5.0
+		for n in Game.yard.find_children("SupplyCrate", "", true, false):
+			n.queue_free()
+		await _wait(0.2)
+		Supply.place_crate(Game.yard)
+		await _wait(10.0)
+		await _shot("drop_heli")
+		await _wait(6.0)
+		await _shot("drop_chute")
+		await _wait(8.0)
+		print("[drop] катсцена=%s ящик виден=%s" % [Cutscene.active, Game.yard.find_child("SupplyCrate", true, false).visible])
 		get_tree().quit()
 		return
 	if args.has("freespots"):   # пустые места двора: 9 м до любой геометрии, 5 м до троп

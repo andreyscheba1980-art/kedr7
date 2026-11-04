@@ -28,6 +28,7 @@ func _ready() -> void:
 	_corridor(w)
 	_rooms(w)
 	_wing(w)
+	_atmos(w)
 
 
 # --- Люди ------------------------------------------------------------------------------
@@ -512,7 +513,7 @@ func _rooms(w: Node3D) -> void:
 	# 415 — отдел «Т»: лаборант с лупой, сохнущие плёнки, магнитофон с бобинами
 	var r3: Dictionary = f4[&"415"]
 	var c3: Vector3 = r3["center"]
-	_add_person(w, {"tint": Color(1.6, 1.6, 1.55), "coat": Color(0.85, 0.85, 0.82), "glasses": true, "arm": &"folder", "hair": Color(0.5, 0.5, 0.5), "seed": 22}, c3 + Vector3(0.8, 0, 0.4), PI * 0.8, &"ep.npc.lab")
+	_add_person(w, {"tint": Color(1.2, 1.2, 1.16), "coat": Color(0.85, 0.85, 0.82), "glasses": true, "arm": &"folder", "hair": Color(0.5, 0.5, 0.5), "seed": 22}, c3 + Vector3(0.8, 0, 0.4), PI * 0.8, &"ep.npc.lab")
 	for k in 6:
 		Geo.block(w, Vector3(0.035, 0.6, 0.002), Vector3(c3.x - 1.4 + k * 0.18, 2.5, float(r3["zout"]) - 1.2), EpBuild.mat(Color(0.12, 0.08, 0.06)), false)
 	Geo.block(w, Vector3(1.5, 0.01, 0.01), Vector3(c3.x - 0.95, 2.82, float(r3["zout"]) - 1.2), EpBuild.mat(Color(0.7, 0.7, 0.68)), false)
@@ -679,6 +680,171 @@ func _wing(w: Node3D) -> void:
 	ep._spot(wg["spec"], Vector3(1.2, 2.0, 0.6), "ep.p.spec", func() -> void:
 		ep._sfx("res://assets/audio/knock_v3.ogg", -6.0)
 		ep._say(&"ep.spec", 6.0))
+
+
+# --- Воздух и износ: без них всё как макет ---------------------------------------------
+
+static var _grime_tex: GradientTexture2D
+
+
+static func _grime_mat(alpha := 0.35) -> StandardMaterial3D:
+	if _grime_tex == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(0.08, 0.06, 0.05, 1.0))
+		g.set_color(1, Color(0.08, 0.06, 0.05, 0.0))
+		_grime_tex = GradientTexture2D.new()
+		_grime_tex.gradient = g
+		_grime_tex.fill_from = Vector2(0.5, 1.0)
+		_grime_tex.fill_to = Vector2(0.5, 0.0)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = _grime_tex
+	m.albedo_color = Color(1, 1, 1, alpha)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return m
+
+
+## Полоса грязи над плинтусом: снизу темно, кверху сходит на нет.
+func _grime_strip(w: Node3D, a: Vector3, b: Vector3, normal: Vector3, h := 0.7, alpha := 0.5) -> void:
+	var q := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(a.distance_to(b), h)
+	q.mesh = qm
+	q.material_override = _grime_mat(alpha)
+	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	w.add_child(q)
+	q.global_position = (a + b) * 0.5 + Vector3(0, 0.13 + h * 0.5, 0) + normal * 0.012
+	q.look_at(q.global_position + normal, Vector3.UP)
+	q.rotate_object_local(Vector3.UP, PI)
+
+
+func _dust(w: Node3D, center: Vector3, ext: Vector3, n := 50) -> void:
+	var d := CPUParticles3D.new()
+	d.amount = n
+	d.lifetime = 9.0
+	d.preprocess = 9.0
+	d.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	d.emission_box_extents = ext
+	d.direction = Vector3(0.2, 0.3, 0.1)
+	d.spread = 180.0
+	d.initial_velocity_min = 0.01
+	d.initial_velocity_max = 0.05
+	d.gravity = Vector3(0, -0.003, 0)
+	var q := QuadMesh.new()
+	q.size = Vector2(0.012, 0.012)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(1.0, 0.95, 0.85, 0.45)
+	q.material = m
+	d.mesh = q
+	d.position = center
+	w.add_child(d)
+
+
+func _haze(w: Node3D, center: Vector3, size: Vector2, alpha := 0.06) -> void:
+	for k in 3:
+		var q := MeshInstance3D.new()
+		var qm := PlaneMesh.new()
+		qm.size = size * (1.0 - k * 0.15)
+		q.mesh = qm
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.albedo_color = Color(0.75, 0.74, 0.72, alpha)
+		q.material_override = m
+		q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		q.position = center + Vector3(0, -k * 0.18, 0)
+		w.add_child(q)
+
+
+func _atmos(w: Node3D) -> void:
+	var c := EpBuild.FLOOR4
+	var zn := c.z + EpBuild.CORR_HALF
+	var zs := c.z - EpBuild.CORR_HALF
+	# Коридор: грязь над плинтусами, затёртые места у дверей, пыль, дымка у курилки, мигающая лампа
+	_grime_strip(w, Vector3(-16, 0, zn - 0.1), Vector3(16, 0, zn - 0.1), Vector3(0, 0, -1))
+	_grime_strip(w, Vector3(-16, 0, zs + 0.1), Vector3(16, 0, zs + 0.1), Vector3(0, 0, 1))
+	for id: StringName in EpBuild.ROOMS:
+		var r: Array = EpBuild.ROOMS[id]
+		var dx := (float(r[0]) + float(r[1])) * 0.5
+		var side: float = r[2]
+		var z := c.z + side * (EpBuild.CORR_HALF - 0.11)
+		# захватанное место у ручки и косяка
+		var q := MeshInstance3D.new()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.35, 0.9)
+		q.mesh = qm
+		q.material_override = _grime_mat(0.18)
+		w.add_child(q)
+		q.global_position = Vector3(dx + 0.75, 1.0, z)
+		q.rotation.y = 0.0 if side < 0 else PI
+		# комната: грязь у стен, пыль в свете, дымка под потолком
+		var zin := c.z + side * EpBuild.CORR_HALF
+		var zout := zin + side * EpBuild.ROOM_D
+		_grime_strip(w, Vector3(float(r[0]) + 0.12, 0, zout - side * 0.15), Vector3(float(r[1]) - 0.12, 0, zout - side * 0.15), Vector3(0, 0, -side), 0.4, 0.25)
+		_dust(w, Vector3(dx, 1.7, (zin + zout) * 0.5), Vector3(2.4, 1.0, 2.0), 40)
+		if id in [&"412", &"420", &"415"]:
+			_haze(w, Vector3(dx, EpBuild.WALL_H - 0.25, (zin + zout) * 0.5), Vector2(float(r[1]) - float(r[0]) - 0.4, EpBuild.ROOM_D - 0.4), 0.05)
+		# холодный свет из окна против тёплой лампы
+		var win := SpotLight3D.new()
+		win.light_color = Color(0.55, 0.65, 0.95)
+		win.light_energy = 0.9
+		win.spot_range = 6.0
+		win.spot_angle = 50.0
+		win.shadow_enabled = false
+		w.add_child(win)
+		win.global_position = Vector3(dx, 2.3, zout - side * 0.3)
+		win.look_at(Vector3(dx, 0.0, zout - side * 3.0), Vector3.UP)
+		# потёртости паркета у стола и двери — тёмные пятна
+		for k in 2:
+			var sc := MeshInstance3D.new()
+			var pm := PlaneMesh.new()
+			pm.size = Vector2(0.9, 0.6)
+			sc.mesh = pm
+			sc.material_override = _grime_mat(0.12)
+			w.add_child(sc)
+			sc.global_position = Vector3(dx + (k - 0.5) * 1.2, 0.008, zin + side * (0.9 + k * 1.6))
+	_dust(w, c + Vector3(0, 1.8, 0), Vector3(15.0, 1.0, 1.2), 140)
+	_haze(w, c + Vector3(-13.5, EpBuild.WALL_H - 0.3, 0), Vector2(5.0, 2.6), 0.08)
+	# одна лампа в коридоре мигает (как дроссель у ЛДС)
+	for n in w.get_children():
+		if n is OmniLight3D and (n as OmniLight3D).global_position.distance_to(c + Vector3(-4.0, EpBuild.WALL_H - 0.3, 0)) < 0.5:
+			var l := n as OmniLight3D
+			var tw := l.create_tween().set_loops()
+			tw.tween_property(l, "light_energy", 0.25, 0.05).set_delay(2.6)
+			tw.tween_property(l, "light_energy", 0.9, 0.04)
+			tw.tween_property(l, "light_energy", 0.35, 0.05)
+			tw.tween_property(l, "light_energy", 0.9, 0.06)
+			var hum := AudioStreamPlayer3D.new()
+			hum.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/elec_buzz_loop.ogg")
+			hum.volume_db = -22.0
+			hum.max_distance = 7.0
+			hum.position = l.position
+			w.add_child(hum)
+			hum.play()
+			hum.finished.connect(hum.play)
+			break
+	# Вестибюль: пыль в свете люстр, грязь у входа (снег с сапог)
+	var lb := EpBuild.LOBBY
+	_dust(w, lb + Vector3(0, 2.5, 1.0), Vector3(10.0, 2.0, 6.0), 160)
+	for k in 6:
+		var pud := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(0.5, 0.35)
+		pud.mesh = pm
+		var pmat := StandardMaterial3D.new()
+		pmat.albedo_color = Color(0.25, 0.28, 0.3, 0.35)
+		pmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		pmat.roughness = 0.05
+		pmat.metallic_specular = 1.0
+		pud.material_override = pmat
+		w.add_child(pud)
+		pud.global_position = lb + Vector3(randf_range(-1.2, 1.2), 0.006, 10.5 - k * 1.1)
+		pud.rotation.y = randf() * TAU
 
 
 ## Зоя садится печатать, когда принесла дело.

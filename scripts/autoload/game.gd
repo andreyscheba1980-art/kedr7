@@ -76,6 +76,7 @@ var stove_damper := false               ## поддувало прикрыто
 var stove_flue := false                 ## вьюшка закрыта (с огнём — угар; без огня — жар держится дольше)
 var house_switch_off := false           ## рубильник у двери: свет в доме погашен, дизель на холостом
 var warmth := 100.0
+var story_goal := ""            ## сюжетная цель (вылазка в шахту и т. п.) — поверх обычных
 var flash_charge := 100.0
 var fatigue := 0.0                  ## скрытая усталость: ложные звуки и галлюцинации
 var synoptic: Synoptic
@@ -1062,6 +1063,8 @@ func objective_text() -> String:
 		return _tutorial_objective()
 	if warmth < 30.0:
 		return Loc.t(&"obj.cold")
+	if story_goal != "":
+		return story_goal
 	if is_day():
 		return _day_objective()
 	if final_call:

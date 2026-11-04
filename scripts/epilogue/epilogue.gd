@@ -131,6 +131,12 @@ func _build_env() -> void:
 	_env.fog_light_color = Color(0.12, 0.14, 0.22)
 	_env.fog_density = 0.018
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.glow_enabled = Settings.quality >= 1   # ореол у ламп и окон
+	_env.glow_intensity = 0.5
+	_env.glow_hdr_threshold = 0.8
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.12
+	_env.adjustment_saturation = 0.88
 	we.environment = _env
 	_world.add_child(we)
 	var moon := DirectionalLight3D.new()

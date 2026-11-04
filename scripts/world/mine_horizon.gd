@@ -126,6 +126,9 @@ func _on_entry(p: Player) -> void:
 
 func _build_inside() -> void:
 	var up := Geo.interactable(self, Vector3(0.8, 2.4, 0.4), ROOT + Vector3(0.0, 1.3, 1.7), null, Loc.t(&"it.mine_climb"), func(p: Player) -> void:
+		if MineStory.is_active():   # сюжетная вылазка: выход — катсценой
+			MineStory.instance.climb(p)
+			return
 		await Game.hud.blink(0.6)
 		var out := _surface + ENTRY + Vector3(1.4, 0, -1.0)
 		out.y = Terrain.height(out.x, out.z) + 0.05
@@ -157,6 +160,24 @@ func _build_inside() -> void:
 	var marks := Geo.interactable(self, Vector3(0.3, 0.8, 0.5), ROOT + Vector3(-1.85, 1.15, -40.0), null, Loc.t(&"it.mine_marks"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.mine_marks"), 6.0))
 	marks.name = "MineMarks"
+	# Старые шахтёрские фонари ФАС на стойках крепи: тусклые, тёплые, где-то мигают, один разбит.
+	# Без них в штреке видно одно пятно фонаря у руки (он гасится у близкой стены).
+	var spots := [Vector3(0.85, 1.6, -4.0), Vector3(-0.85, 1.6, -13.0), Vector3(0.85, 1.6, -21.0), Vector3(-0.85, 1.6, -30.0), Vector3(15.0, 1.6, -15.8), Vector3(-6.0, 1.6, -26.3)]
+	for k in spots.size():
+		var at: Vector3 = ROOT + spots[k]
+		var lamp := Props.fas4_lantern()
+		if lamp != null:
+			lamp.position = at - Vector3(0, 0.25, 0)
+			lamp.scale = Vector3.ONE * 0.8
+			add_child(lamp)
+		if k == 3:
+			continue   # разбит — темнота у тупика
+		var l := Geo.omni(self, at, 8.0, 1.6, Color(1.0, 0.72, 0.42))
+		l.shadow_enabled = false
+		if k % 2 == 1:
+			var tw := l.create_tween().set_loops()
+			tw.tween_property(l, "light_energy", 0.3, 0.06).set_delay(randf_range(1.5, 4.0))
+			tw.tween_property(l, "light_energy", 1.6, 0.08)
 
 
 func _on_cache(_p: Player) -> void:
