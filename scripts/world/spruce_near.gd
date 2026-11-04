@@ -14,6 +14,8 @@ static var _grid: Dictionary = {}     ## Vector2i → [PackedFloat32Array × 3 �
 
 var _mmi: Array[MultiMeshInstance3D] = []
 var _last := Vector3(1e9, 0.0, 1e9)
+var _near_pos: PackedVector3Array = []   ## корни ближних елей (для комьев снега с лап)
+var _drop_t := 6.0
 
 
 static func clear_registry() -> void:
@@ -66,11 +68,12 @@ func _apply_quality() -> void:
 		_last = Vector3(1e9, 0.0, 1e9)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
 	var p := cam.global_position
+	_snow_drops(p, delta)
 	if Vector2(p.x - _last.x, p.z - _last.z).length() < MOVE:
 		return
 	_last = p
@@ -97,6 +100,13 @@ func _rebuild(p: Vector3) -> void:
 				var b: PackedFloat32Array = bufs[v]
 				b.append_array((cell as Array)[v])
 				bufs[v] = b
+	_near_pos.clear()
+	for v in 3:
+		var bb: PackedFloat32Array = bufs[v]
+		for k in range(0, mini(bb.size(), MAX_PER_VARIANT * 12), 12):
+			var o := Vector3(bb[k + 3], bb[k + 7], bb[k + 11])
+			if Vector2(o.x - p.x, o.z - p.z).length() < 24.0:
+				_near_pos.append(o)
 	for v in 3:
 		var b: PackedFloat32Array = bufs[v]
 		var n := mini(b.size() / 12, MAX_PER_VARIANT)
@@ -106,3 +116,49 @@ func _rebuild(p: Vector3) -> void:
 		mm.instance_count = n
 		if n > 0:
 			mm.buffer = b
+
+
+## С ели рядом срывается пласт снега: шорох, белое облачко, сыплется с лапы на лапу. Чаще в ветер.
+func _snow_drops(p: Vector3, delta: float) -> void:
+	_drop_t -= delta
+	if _drop_t > 0.0 or _near_pos.is_empty() or Game.is_indoors():
+		return
+	var w: float = float(Game.weather.get("_wind")) if Game.weather != null else 0.3
+	_drop_t = randf_range(4.0, 11.0) / (0.5 + w)
+	var o: Vector3 = _near_pos[randi() % _near_pos.size()]
+	var d := Vector2(o.x - p.x, o.z - p.z).length()
+	if d < 4.0 or d > 20.0:
+		return
+	var a := randf() * TAU
+	var at := o + Vector3(cos(a) * randf_range(0.6, 1.4), randf_range(1.6, 4.2), sin(a) * randf_range(0.6, 1.4))
+	var burst := CPUParticles3D.new()
+	burst.one_shot = true
+	burst.amount = 46
+	burst.lifetime = 2.4
+	burst.explosiveness = 0.55
+	burst.direction = Vector3(cos(a), -0.6, sin(a))
+	burst.spread = 40.0
+	burst.initial_velocity_min = 0.3
+	burst.initial_velocity_max = 1.2
+	burst.gravity = Vector3(0.3 * w, -3.2, 0)
+	burst.damping_min = 0.6
+	burst.damping_max = 1.4
+	burst.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	burst.emission_sphere_radius = 0.45
+	burst.scale_amount_min = 0.4
+	burst.scale_amount_max = 1.6
+	var q := QuadMesh.new()
+	q.size = Vector2(0.09, 0.09)
+	burst.mesh = q
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_color = Color(0.85, 0.9, 0.98, 0.7)
+	burst.material_override = m
+	add_child(burst)
+	burst.global_position = at
+	burst.emitting = true
+	get_tree().create_timer(3.5, false).timeout.connect(burst.queue_free)
+	if Game.audio != null:
+		Game.audio.play_3d("res://assets/sfx/cc0/branch_snow_drop_%d.ogg" % (1 + randi() % 3), at, -10.0 + (6.0 if d < 10.0 else 0.0), 6.0)

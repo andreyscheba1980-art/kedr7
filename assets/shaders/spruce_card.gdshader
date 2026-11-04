@@ -9,6 +9,9 @@ uniform sampler2D atlas : source_color, filter_linear_mipmap, repeat_disable;
 uniform float lod_far = 0.0;   // > 0: дальше этого ель рисует гранёный двойник (SpruceMesh.mesh)
 
 varying float tipk;
+varying float snowk;      // 1 — снежная шапка (клетка атласа справа сверху), 0 — хвоя
+varying vec3 spark_n;
+varying float spark;
 
 void vertex() {
 	vec3 root_w = MODEL_MATRIX[3].xyz;
@@ -33,6 +36,10 @@ void vertex() {
 	POSITION = clip;
 }
 
+float hash2(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
 void fragment() {
 	vec4 t = texture(atlas, UV);
 	ALBEDO = t.rgb * COLOR.rgb;
@@ -41,4 +48,21 @@ void fragment() {
 	ROUGHNESS = 1.0;
 	// изнанка лапы темнее — снизу под ель свет почти не попадает
 	if (!FRONT_FACING) { ALBEDO *= 0.6; }
+	snowk = step(0.5, UV.x) * step(UV.y, 0.5);
+	// искры наста на шапках: редкие клетки со своей микронормалью
+	vec2 cell = floor(UV * 420.0);
+	spark = step(0.985, hash2(cell)) * snowk;
+	spark_n = normalize((VIEW_MATRIX * vec4(normalize(vec3(hash2(cell + 7.0) - 0.5, 1.4, hash2(cell + 19.0) - 0.5)), 0.0)).xyz);
+}
+
+void light() {
+	float nl = dot(NORMAL, LIGHT);
+	// мягкое «обёрнутое» освещение: лапа — не плоскость, свет заходит и с краёв
+	DIFFUSE_LIGHT += clamp(nl * 0.7 + 0.3, 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI;
+	// хвоя на просвет: против солнца/фонаря края лап светятся зеленовато-золотым
+	float back = pow(clamp(dot(VIEW, -LIGHT), 0.0, 1.0), 4.0) * (1.0 - snowk);
+	DIFFUSE_LIGHT += back * vec3(0.55, 0.75, 0.35) * 0.55 * ATTENUATION * LIGHT_COLOR / PI;
+	if (spark > 0.5) {
+		SPECULAR_LIGHT += pow(max(dot(reflect(-LIGHT, spark_n), VIEW), 0.0), 120.0) * 4.0 * ATTENUATION * LIGHT_COLOR;
+	}
 }

@@ -125,7 +125,7 @@ static func near(variant: int) -> ArrayMesh:
 	while y < top - 0.25:
 		var f := (y - y0) / (top - y0)                  # 0 — низ, 1 — макушка
 		var rad := r0 * pow(1.0 - f, 0.92) + 0.18
-		var n := per if f < 0.75 else maxi(per - 2, 4)
+		var n := per + 1 if f < 0.75 else maxi(per - 1, 4)
 		turn += 0.55
 		var tone := lerpf(0.85, 1.2, f) * rng.randf_range(0.9, 1.08)
 		for i in n:
@@ -135,7 +135,7 @@ static func near(variant: int) -> ArrayMesh:
 			var lift := ln * lerpf(0.0, 0.22, f)          # у макушки лапы смотрят вверх
 			var light := rng.randf() < 0.3
 			_branch(st, rng, Vector3(0, y + rng.randf_range(-0.05, 0.05), 0), ang, ln, droop - lift, tone, light,
-				rng.randf() < lerpf(0.98, 0.8, f))
+				rng.randf() < lerpf(0.98, 0.8, f), f < 0.55)
 		y += dy * rng.randf_range(0.85, 1.15)
 	# Макушка: торчащий побег и снежный колпачок
 	_branch(st, rng, Vector3(0, top - 0.5, 0), PI * 0.5, 0.55, -0.5, 1.05, false, true)
@@ -209,13 +209,20 @@ static func _cv(st: SurfaceTool, p: Vector3, uv: Vector2, n: Vector3, c: Color) 
 
 ## Лапа: изогнутая карточка хвои (3 сегмента вдоль, 2 поперёк, с килем по стеблю) и снежная шапка сверху.
 static func _branch(st: SurfaceTool, rng: RandomNumberGenerator, base: Vector3, ang: float, ln: float, droop: float,
-		tone: float, light: bool, snowy: bool) -> void:
+		tone: float, light: bool, snowy: bool, heavy := false, sub := false) -> void:
 	var dir := Vector3(cos(ang), 0, sin(ang))
 	var side := Vector3(-dir.z, 0, dir.x)
-	var w := ln * 0.86
+	var w := ln * (0.86 if not sub else 0.95)
 	var u_off := 0.5 if light else 0.0
 	var v_off := 0.5 if light else 0.0
-	var segs := 2
+	var segs := 3 if not sub else 2
+	# Подлапки: от середины лапы вбок и вниз — ярус пушистый, слоями, а не плоская юбка
+	if not sub and ln > 0.9:   # только у крупных нижних лап: вершин вдвое не раздуваем
+		for sgn: float in [-1.0, 1.0]:
+			var tb := rng.randf_range(0.35, 0.55)
+			var b2 := base + dir * (0.12 + ln * tb) + Vector3(0, -droop * tb * tb + ln * 0.06 * tb - ln * 0.05, 0)
+			_branch(st, rng, b2, ang + sgn * rng.randf_range(0.55, 0.85), ln * rng.randf_range(0.42, 0.55),
+				ln * 0.2, tone * 0.85, rng.randf() < 0.25, false, false, true)
 	var pts: Array[Vector3] = []
 	for k in segs + 1:
 		var t := float(k) / segs
@@ -260,7 +267,7 @@ static func _branch(st: SurfaceTool, rng: RandomNumberGenerator, base: Vector3, 
 		var su0 := 0.5 + t0 / reach * 0.5
 		var su1 := 0.5 + t1 / reach * 0.5
 		# Подушка снега: середина выше краёв, края свисают; второй слой — уже и выше
-		for layer in 1:
+		for layer in (2 if heavy else 1):
 			var wk := 1.0 if layer == 0 else 0.55
 			var up := Vector3(0, ln * (0.0 if layer == 0 else 0.045), 0)
 			var mound := Vector3(0, ln * 0.05 * wk, 0)
