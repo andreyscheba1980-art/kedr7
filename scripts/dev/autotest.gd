@@ -101,6 +101,8 @@ func _prologue_b() -> void:
 			Game.player.set_flashlight(true)
 			if walked > PrologueTrail.length_m() + 2.0:
 				_tp(Vector3(13.0, 0.05, 3.5), 90.0)
+			if args.has("trailshots") and fmod(walked, 17.6) < 1.1 and walked > 1.0:
+				await _shot("trail_%03d" % int(walked))
 	print("[pb] дошёл за %.0f с, дома=%s, события=%s" % [t, Game.is_home(), pt._done.keys() if pt != null else "?"])
 	await _wait(9.0)
 	get_tree().quit()
@@ -214,6 +216,25 @@ func _prologue_review() -> void:
 		Game.player.set_flashlight(true)
 		await _wait(1.2)
 		await _shot("m%03d" % int(m))
+		if args.has("probe60") and int(m) == 60:
+			Game.player.set_flashlight(false)
+			await _wait(0.5)
+			await _shot("m060_nolight")
+			Game.player.set_flashlight(true)
+			Game.player.rotation.y += PI * 0.5
+			await _wait(0.5)
+			await _shot("m060_side")
+			Game.player.rotation.y += PI * 0.5
+			await _wait(0.5)
+			await _shot("m060_back")
+			var cam := Game.player.camera
+			var q := PhysicsRayQueryParameters3D.create(cam.global_position, cam.global_position - cam.global_transform.basis.z * 60.0)
+			print("[p60] вперёд луч: ", cam.get_world_3d().direct_space_state.intersect_ray(q))
+		if args.has("lights"):
+			for n in get_tree().root.find_children("*", "Light3D", true, false):
+				var l := n as Light3D
+				if l.is_visible_in_tree() and l.light_energy > 0.0 and (l is DirectionalLight3D or l.global_position.distance_to(p) < 70.0):
+					print("[lt] %s %s e=%.2f pos=%s par=%s" % [l.get_class(), l.name, l.light_energy, l.global_position.snapped(Vector3.ONE), l.get_parent().name])
 		print("[rev] %.0f м: %s, Y %.1f" % [m, p, Game.player.global_position.y])
 	get_tree().quit()
 
@@ -2698,6 +2719,31 @@ func _tour(args: PackedStringArray) -> void:
 		_tp(q, 0.0)
 		await _wait(9.5)
 		print("[bear] итог: %s усталость=%.0f" % [tr._bear["state"], Game.fatigue])
+		get_tree().quit()
+		return
+	if args.has("shot_at"):   # кадр из точки: --tour night 3 shot_at x z yaw
+		var si := args.find("shot_at")
+		_tp(Vector3(float(args[si + 1]), 0, float(args[si + 2])), float(args[si + 3]))
+		Game.player.set_flashlight(true)
+		await _wait(2.0)
+		await _shot("at_%s_%s" % [args[si + 1], args[si + 2]])
+		for n in get_tree().root.find_children("*", "MultiMeshInstance3D", true, false):
+			var mm := n as MultiMeshInstance3D
+			var bb: AABB = mm.global_transform * mm.get_aabb()
+			if bb.grow(2.0).has_point(Game.player.global_position + Vector3(0, 1, 0)) or (bb.get_center() - Game.player.global_position).length() < 30.0:
+				var mt: Material = mm.material_override if mm.material_override != null else (mm.multimesh.mesh.surface_get_material(0) if mm.multimesh and mm.multimesh.mesh else null)
+				print("[mm] %s n=%d bb=%s mat=%s par=%s" % [mm.name, mm.multimesh.instance_count if mm.multimesh else 0, bb, mt.resource_path if mt else "-", mm.get_parent().name])
+		get_tree().quit()
+		return
+	if args.has("fpsprobe"):   # FPS в трёх точках (сравнить с --nolandscape и т.п.)
+		for v: Array in [["house", Station.SPAWN, 0.0], ["yard", Vector3(20, 0, -20), 0.0], ["trail", Vector3(-50.9, 0, -76.9), 45.0]]:
+			_tp(v[1], v[2])
+			await _wait(4.0)
+			var f0 := Engine.get_frames_drawn()
+			var t0 := Time.get_ticks_msec()
+			await _wait(3.0)
+			var fps := float(Engine.get_frames_drawn() - f0) / (float(Time.get_ticks_msec() - t0) / 1000.0)
+			print("[fps] %s: %.0f  draw=%d prims=%d" % [v[0], fps, RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME), RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
 		get_tree().quit()
 		return
 	if args.has("eptransit"):   # концовка → эпилог в Свердловске (а не текст и меню)

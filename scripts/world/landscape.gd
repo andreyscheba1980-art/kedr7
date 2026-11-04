@@ -32,6 +32,8 @@ static var _rings: Array[MeshInstance3D] = []
 
 
 static func build(parent: Node3D) -> void:
+	if OS.get_cmdline_user_args().has("--nolandscape"):
+		return
 	_mats.clear()
 	_rings.clear()
 	_mountains(parent, 900.0, 115.0, 0.7, 11)

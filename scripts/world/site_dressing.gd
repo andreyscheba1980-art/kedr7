@@ -3,7 +3,7 @@ extends RefCounted
 ## Обстановка дальних точек (лесосека, буровая, вышка): намёты у построек, пни и хлысты, следы
 ## полозьев, рабочий хлам, костровая бочка. Без неё точки — несколько коробок на пустом снегу.
 
-static var _drift_mesh: SphereMesh
+static var _drift_mesh: Mesh
 static var _track_mat: StandardMaterial3D
 static var _dust_mat: StandardMaterial3D
 static var _soot_mat: StandardMaterial3D
@@ -25,11 +25,7 @@ static func _put(yard: Node3D, n: Node3D, c: Vector3, dx: float, dz: float, yaw_
 ## Сугроб-намёт: сплюснутый эллипсоид, вытянутый по yaw.
 static func drift(yard: Node3D, pos: Vector3, len: float, height: float, wid: float, yaw_deg := 0.0) -> void:
 	if _drift_mesh == null:
-		_drift_mesh = SphereMesh.new()
-		_drift_mesh.radius = 1.0
-		_drift_mesh.height = 2.0
-		_drift_mesh.radial_segments = 10
-		_drift_mesh.rings = 5
+		_drift_mesh = Props.snow_mound_mesh(0)
 	var mi := MeshInstance3D.new()
 	mi.mesh = _drift_mesh
 	mi.material_override = Palette.m(&"drift")

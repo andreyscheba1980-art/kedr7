@@ -83,6 +83,7 @@ const FOG_NIGHT_COL := Color(0.032, 0.052, 0.08)   ## лунная дымка: �
 ## Ночь: без фонаря видно только силуэты на фоне неба, окна и огни; снег под ногами — еле-еле.
 const NIGHT_AMB_COL := Color(0.03, 0.06, 0.11)
 const NIGHT_AMB := 0.06
+const PROLOGUE_FOG := Color(0.085, 0.115, 0.16)
 const NIGHT_MOON := 0.05
 var _swinging_bulb: Node3D
 var _porch_bulb: Node3D
@@ -846,7 +847,7 @@ func _build_environment() -> void:
 	env.fog_sky_affect = 0.12
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.7) if day else NIGHT_AMB_COL
-	env.ambient_light_energy = 0.75 if day else (0.06 if Game.is_prologue_trail() else NIGHT_AMB)
+	env.ambient_light_energy = 0.75 if day else (0.1 if Game.is_prologue_trail() else NIGHT_AMB)   # пролог: темно, но силуэты елей и снег читаются
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.58, 0.61, 0.68) if day else FOG_NIGHT_COL
 	env.fog_density = Weather.FOG_INDOOR
@@ -855,6 +856,8 @@ func _build_environment() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0
 	_apply_sky_tint(0.0 if day else 1.0)
+	if Game.is_prologue_trail():
+		env.fog_light_color = PROLOGUE_FOG   # дымка светлее леса: ели встают силуэтами, а не тонут в черноте
 	env.adjustment_enabled = true
 	env.adjustment_saturation = 0.85   # бирюза ночи и оранжевый свет окон должны оставаться цветом, а не серостью
 	env.adjustment_contrast = 1.18
@@ -872,7 +875,7 @@ func _build_environment() -> void:
 
 	_sky_light = DirectionalLight3D.new()
 	_sky_light.light_color = Color(0.85, 0.85, 0.9) if day else Color(0.58, 0.72, 0.92)
-	_sky_light.light_energy = 0.45 if day else (0.05 if Game.is_prologue_trail() else NIGHT_MOON)
+	_sky_light.light_energy = 0.45 if day else (0.12 if Game.is_prologue_trail() else NIGHT_MOON)
 	_sky_light.rotation_degrees = Vector3(-25.0, 40.0, 0.0) if day else Vector3(-32.0, -135.0, 0.0)   # луна на северо-западе, над лесом за домом
 	# Тени луны ночью почти не видны (свет 0.08 против фонаря и окон), а стоят ещё 2 прохода всей сцены.
 	# Ночью — только на высоком пресете; днём солнце даёт заметные тени — со среднего.

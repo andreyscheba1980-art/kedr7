@@ -55,6 +55,7 @@ func _put(id: String, pos: Vector3, yaw: float, opts := {}) -> Node3D:
 # --- Просека ------------------------------------------------------------------------
 
 func _trail() -> void:
+	_trail_small()
 	for i in TRAIL_PROPS.size():
 		var pr := trail_prop(i)
 		var n := _put(TRAIL_PROPS[i][0], pr[0], pr[1])
@@ -69,6 +70,82 @@ func _trail() -> void:
 			body.rotation.y = pr[1]
 			var sz := Vector3(2.0, 3.6, 2.0) if TRAIL_PROPS[i][0] == "labaz" else Vector3(0.3, 2.4, 0.3)
 			body.add_child(Geo.box_shape(sz, Vector3(0, sz.y / 2.0, 0)))
+
+
+## Мелочи вдоль просеки пролога: [что, метров от высадки, вбок (+ вправо), поворот]. Без звука и мыслей —
+## просто живая обочина: столбик, бочка, палки, варежка, бревно, пень с топором, указатель, ворона.
+const TRAIL_SMALL := [
+	["km", 7.0, 3.3, 0.0], ["barrel", 24.0, -3.8, 30.0], ["poles", 48.0, 3.4, 0.0], ["mitten", 66.0, -3.1, 0.0],
+	["log", 82.0, 4.6, 70.0], ["bucket", 104.0, -3.5, 0.0], ["axe", 122.0, 4.2, 0.0], ["sign", -40.0, 3.2, 0.0],
+	["crow", -22.0, -2.9, 40.0],
+]
+
+
+func _trail_small() -> void:
+	for e: Array in TRAIL_SMALL:
+		var s: float = e[1]
+		if s < 0.0:
+			s = PrologueTrail.length_m() + s
+		var pd: Array = PrologueTrail.point_at(s)
+		var p: Vector3 = pd[0]
+		var dir: Vector3 = pd[1]
+		var right := Vector3(-dir.z, 0, dir.x)
+		var q := p + right * float(e[2])
+		q.y = Terrain.height(q.x, q.z)
+		var face := atan2(p.x - q.x, p.z - q.z) + deg_to_rad(float(e[3]))
+		var n: Node3D = null
+		match String(e[0]):
+			"km": n = Props.km_post()
+			"barrel": n = Props.frozen_barrel()
+			"poles": n = Props.ski_poles()
+			"mitten": n = Props.mitten_stake()
+			"axe": n = Props.axe_stump()
+			"sign": n = Props.arrow_sign(Loc.t(&"trail.sign"))
+			"crow": n = Props.frozen_crow()
+			"log":
+				n = Models.spawn(self, "nature/log_large", q, rad_to_deg(face), 0.55, {"collide": true, "tint": Color(0.75, 0.72, 0.7)})
+				if n != null:
+					var cap := MeshInstance3D.new()
+					cap.mesh = Props.snow_mound_mesh(1)
+					cap.material_override = Palette.m(&"drift")
+					cap.scale = Vector3(1.6, 0.14, 0.32)
+					cap.position = q + Vector3(0, 0.42, 0)
+					cap.rotation.y = face + PI * 0.5
+					add_child(cap)
+				continue
+			"bucket":
+				n = Models.spawn(self, "survival/bucket", q, rad_to_deg(face), 0.32, {"tilt": Vector3(80, 0, 0)})
+				continue
+		if n == null:
+			continue
+		add_child(n)
+		n.global_position = q
+		n.rotation.y = face
+	# Намёты по обочинам и подрост — обочина не ровная, как стол
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2140
+	var s2 := 5.0
+	while s2 < PrologueTrail.length_m() - 8.0:
+		var pd: Array = PrologueTrail.point_at(s2)
+		var p: Vector3 = pd[0]
+		var dir: Vector3 = pd[1]
+		var right := Vector3(-dir.z, 0, dir.x)
+		for side: float in [-1.0, 1.0]:
+			var q := p + right * side * rng.randf_range(3.6, 4.8)
+			q.y = Terrain.height(q.x, q.z)
+			var m := MeshInstance3D.new()
+			m.mesh = Props.snow_mound_mesh(rng.randi())
+			m.material_override = Palette.m(&"drift")
+			m.scale = Vector3(rng.randf_range(0.8, 1.6), rng.randf_range(0.25, 0.5), rng.randf_range(1.4, 2.6))
+			m.position = q
+			m.rotation.y = atan2(dir.x, dir.z) + rng.randf_range(-0.3, 0.3)
+			m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(m)
+			if rng.randf() < 0.35:
+				var sap := Props.faceted_spruce(rng.randf_range(0.18, 0.32), rng.randi() % 50)
+				sap.position = q + right * side * 0.8
+				add_child(sap)
+		s2 += rng.randf_range(9.0, 14.0)
 
 
 # --- Двор ------------------------------------------------------------------------------

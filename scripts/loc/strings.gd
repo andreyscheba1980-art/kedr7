@@ -226,6 +226,7 @@ const S := {
 	&"end.taiga.2": ["Утром вертолёт кружил над станцией два часа. Дом был тёплый, печь — протоплена, журнал заполнен до последней строки.\nОт святилища в ельник уходили две цепочки следов: человечьи и собачьи. И третья — босая, навстречу.", "In the morning the helicopter circled the station for two hours. The house was warm, the stove stoked, the log filled to the last line.\nFrom the shrine two lines of tracks led into the spruce: a man's and a dog's. And a third — barefoot, coming to meet them."],
 	&"end.taiga.3": ["Ушминские охотники с тех пор оставляют у Кедра пайки. Говорят, по ночам там на сопке видно два огонька — низко, у самой земли.\nИ никто больше не слышал свиста.", "The Ushma hunters have left rations at Kedr ever since. They say at night two small lights can be seen on the hill there — low, close to the ground.\nAnd no one has heard the whistling again."],
 	&"end.taiga.title": ["КОНЦОВКА: ТАЙГА\n\nты остался", "ENDING: THE TAIGA\n\nyou stayed"],
+	&"trail.sign": ["КЕДР-7  200 м", "KEDR-7  200 m"],
 	# --- Эпилог «Свердловск, 1983» (Epilogue) ---
 	&"ep.intro": ["Свердловск. 16 ноября 1983 г., 7:40.\nМайор Ковалёв, 7-й отдел. Вчера ночью «Кедр-7» перестал выходить на связь.", "Sverdlovsk. November 16, 1983, 7:40 a.m.\nMajor Kovalyov, 7th Department. Last night Kedr-7 stopped reporting."],
 	&"ep.skip": ["[Esc] ещё раз — пропустить эпилог", "[Esc] again — skip the epilogue"],

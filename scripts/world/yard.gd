@@ -521,11 +521,7 @@ func _build_wall_drifts() -> void:
 	]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 41
-	var blob := SphereMesh.new()
-	blob.radius = 1.0
-	blob.height = 2.0
-	blob.radial_segments = 10
-	blob.rings = 5
+	var blob := Props.snow_mound_mesh(0)
 	for r: Array in runs:
 		var a: Vector3 = r[0]
 		var b: Vector3 = r[1]
@@ -554,11 +550,7 @@ func _build_ground() -> void:
 	Landscape.build(self)   # хребет на горизонте, лёд ручья, мосток, останцы
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
-	var drift := SphereMesh.new()
-	drift.radius = 1.0
-	drift.height = 2.0
-	drift.radial_segments = 16    # 8×4 давали гранёные «мятые» сугробы
-	drift.rings = 8
+	var drift := Props.snow_mound_mesh(2)
 	for i in range(140):
 		var p := HOUSE_CENTER + Vector3(rng.randf_range(-65, 85), 0, rng.randf_range(-75, 65))
 		# Исключаем дом станции со всеми комнатами (включая жилую комн., радиорубку, сени) с запасом на радиус сугроба
@@ -821,11 +813,7 @@ func _build_meteo() -> void:
 	# Задание «откопать будку»: сугроб закрывает термометры, пока не разгребёшь лопатой.
 	_drift = Geo.interactable(self, Vector3(1.3, 1.75, 1.2), booth_pos + Vector3(0, 0.95, 0), null, "", _on_drift_dug)
 	# Округлый естественный перемет вокруг будки вместо серого монолитного ящика
-	var d_blob := SphereMesh.new()
-	d_blob.radius = 0.95
-	d_blob.height = 1.9
-	d_blob.radial_segments = 14
-	d_blob.rings = 6
+	var d_blob := Props.snow_mound_mesh(1)
 	for part: Array in [
 		[Vector3(0.0, -0.2, 0.0), Vector3(1.15, 1.05, 1.15)],
 		[Vector3(-0.25, -0.45, 0.35), Vector3(1.0, 0.75, 1.2)],
@@ -1282,11 +1270,7 @@ func _build_shed() -> void:
 	var drift_needed: bool = (Game.night >= 2 or not Game.is_prologue()) and not drift_cleared
 	_shed_drift = Geo.interactable(self, Vector3(1.4, 1.35, 2.3), shed_drift_pos + Vector3(0, 0.65, 0), null, "", _on_shed_drift_dug)
 	# Намёт у ворот — округлый сугроб с языком, а не куб
-	var d_blob := SphereMesh.new()
-	d_blob.radius = 1.0
-	d_blob.height = 2.0
-	d_blob.radial_segments = 12
-	d_blob.rings = 6
+	var d_blob := Props.snow_mound_mesh(0)
 	for part: Array in [[Vector3(0.05, -0.65, 0.0), Vector3(0.95, 1.3, 1.45)], [Vector3(-0.55, -0.65, 0.5), Vector3(0.9, 0.75, 1.0)],
 			[Vector3(0.3, -0.65, -0.75), Vector3(0.7, 0.95, 0.8)]]:
 		var dm := MeshInstance3D.new()
@@ -4021,11 +4005,7 @@ func _build_helipad() -> void:
 	if Game.helipad_cleared:
 		_build_helipad_heli()
 		return
-	var mound := SphereMesh.new()
-	mound.radius = 1.0
-	mound.height = 2.0
-	mound.radial_segments = 28
-	mound.rings = 10
+	var mound := Props.snow_mound_mesh(2)
 	var drift_mesh := MeshInstance3D.new()
 	drift_mesh.mesh = mound
 	drift_mesh.material_override = Palette.m(&"drift")

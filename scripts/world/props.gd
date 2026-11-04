@@ -2953,6 +2953,129 @@ static func gtt_cab() -> Node3D:
 	return _mi(k, key, "tex_metal.png")
 
 
+static var _mound_cache: Dictionary = {}
+
+
+## Сугроб-намёт вместо гладкой сферы: неровный верх, плоский низ, пологий язык по ветру (+Z)
+## и надув-карниз с подветренной стороны. Единичный «радиус», как у SphereMesh (r=1, h=2) — подставляется
+## вместо неё без правки масштабов. 3 варианта формы, кэш.
+static func snow_mound_mesh(variant := 0) -> Mesh:
+	var v := posmod(variant, 3)
+	if _mound_cache.has(v):
+		return _mound_cache[v]
+	var k := MeshKit.new(500 + v)
+	k.mottle = 0.03
+	var ph := float(v) * 2.1
+	k.blob(Vector3.ZERO, Vector3.ONE, Color(0.9, 0.93, 0.98), 7, 14, Basis(), func(d: Vector3) -> float:
+		var n := 1.0 + 0.09 * sin(d.x * 4.0 + ph) * cos(d.z * 3.0 - ph) + 0.05 * sin(d.x * 9.0 + d.z * 7.0 + ph)
+		if d.z > 0.0:
+			n *= 1.0 + d.z * 0.28 * (1.0 - absf(d.y))     # язык по ветру
+		if d.z < -0.3 and d.y > 0.2:
+			n *= 1.08                                      # карниз-надув
+		if d.y < 0.0:
+			n *= lerpf(1.0, 0.3, minf(-d.y * 1.6, 1.0))    # сидит на земле, а не шаром
+		return n)
+	var mesh := k.commit()
+	_mound_cache[v] = mesh
+	return mesh
+
+
+## Километровый столбик зимника: бетонный, полосатый, с жестяной табличкой «214» и шапкой снега. Низ по центру.
+static func km_post() -> Node3D:
+	var key := &"km_post"
+	var cached := _instance_from_cache(key, "tex_concrete.png")
+	if cached != null:
+		return cached
+	var k := _kit(371, 0.05)
+	var white := Color(0.8, 0.8, 0.77)
+	var black := Color(0.1, 0.1, 0.1)
+	var tin := Color(0.85, 0.82, 0.7)
+	for i in 5:
+		k.box(Vector3(0, 0.12 + i * 0.24, 0), Vector3(0.16, 0.24, 0.16), white if i % 2 == 0 else black)
+	k.box(Vector3(0, 1.0, 0.085), Vector3(0.22, 0.16, 0.012), tin)
+	for d in 3:
+		k.box(Vector3(-0.06 + d * 0.06, 1.0, 0.092), Vector3(0.035, 0.1, 0.004), black)   # «214»
+	k.box(Vector3(0, 1.235, 0), Vector3(0.19, 0.05, 0.19), Color(0.88, 0.91, 0.96))
+	k.blob(Vector3(0, 0.03, 0), Vector3(0.35, 0.1, 0.3), Color(0.88, 0.91, 0.96), 3, 8)
+	return _mi(k, key, "tex_concrete.png")
+
+
+## Лыжные палки, воткнутые крест-накрест, с кольцами и ремешками. Низ по центру.
+static func ski_poles() -> Node3D:
+	var key := &"ski_poles"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(381, 0.04)
+	var bamboo := Color(0.62, 0.5, 0.3)
+	var leather := Color(0.25, 0.15, 0.1)
+	for sx: float in [-1.0, 1.0]:
+		var a := Vector3(sx * 0.12, -0.1, 0)
+		var b := Vector3(-sx * 0.16, 1.25, 0.05)
+		k.tube([a, b], [0.013, 0.011], bamboo, 5)
+		var ring := a.lerp(b, 0.12)
+		for i in 8:
+			var t0 := TAU * i / 8.0
+			var t1 := TAU * (i + 1) / 8.0
+			k.tube([ring + Vector3(cos(t0), 0, sin(t0)) * 0.07, ring + Vector3(cos(t1), 0, sin(t1)) * 0.07], [0.006], leather, 4)
+		k.tube([b, b + Vector3(0, -0.12, 0.04), b + Vector3(0.03, -0.18, 0.02)], [0.008], leather, 4)
+	return _mi(k, key, "tex_wood.png")
+
+
+## Колышек геологов с красной варежкой, надетой сверху — кто-то оставил знак. Низ по центру.
+static func mitten_stake() -> Node3D:
+	var key := &"mitten_stake"
+	var cached := _instance_from_cache(key, "tex_cloth.png")
+	if cached != null:
+		return cached
+	var k := _kit(391, 0.05)
+	k.tube([Vector3(0, 0, 0), Vector3(0.02, 1.15, 0)], [0.03, 0.025], Color(0.45, 0.35, 0.24), 6)
+	k.blob(Vector3(0.02, 1.2, 0), Vector3(0.07, 0.11, 0.045), Color(0.62, 0.1, 0.08), 4, 8)
+	k.blob(Vector3(0.075, 1.17, 0), Vector3(0.025, 0.04, 0.025), Color(0.62, 0.1, 0.08), 3, 6)   # большой палец
+	k.tube([Vector3(0.02, 1.1, 0), Vector3(0.02, 1.13, 0)], [0.06], Color(0.85, 0.82, 0.75), 8)    # белая опушка
+	k.blob(Vector3(0.02, 1.3, 0), Vector3(0.06, 0.025, 0.05), Color(0.88, 0.91, 0.96), 3, 6)       # снег на ней
+	return _mi(k, key, "tex_cloth.png")
+
+
+## Самодельный указатель на столбе: доска-стрелка, надпись краской. Начало — низ столба.
+static func arrow_sign(text: String) -> Node3D:
+	var root := Node3D.new()
+	var k := _kit(401, 0.06)
+	var wood := Color(0.42, 0.32, 0.22)
+	k.tube([Vector3(0, -0.2, 0), Vector3(0, 1.9, 0)], [0.06, 0.05], wood * 0.8, 6)
+	k.box(Vector3(0.45, 1.6, 0.06), Vector3(1.0, 0.24, 0.04), wood)
+	k.tube([Vector3(0.95, 1.6, 0.06), Vector3(1.08, 1.6, 0.06)], [0.12, 0.002], wood, 3)
+	k.box(Vector3(0.5, 1.735, 0.06), Vector3(1.05, 0.04, 0.08), Color(0.88, 0.91, 0.96))
+	root.add_child(_mi(k, &"arrow_sign", "tex_wood.png"))
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = 40
+	l.pixel_size = 0.004
+	l.modulate = Color(0.85, 0.82, 0.75)
+	l.position = Vector3(0.42, 1.6, 0.085)
+	l.shaded = true
+	root.add_child(l)
+	return root
+
+
+## Ржавая бочка, вмёрзшая набок, с шапкой снега. Начало — центр низа.
+static func frozen_barrel() -> Node3D:
+	var key := &"frozen_barrel"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(411, 0.1)
+	var rust := Color(0.38, 0.2, 0.12)
+	var paint := Color(0.22, 0.3, 0.2)
+	k.tube([Vector3(-0.45, 0.25, 0), Vector3(0.45, 0.25, 0)], [0.29, 0.29], paint, 12)
+	for x: float in [-0.25, 0.25]:
+		k.tube([Vector3(x - 0.02, 0.25, 0), Vector3(x + 0.02, 0.25, 0)], [0.305], rust, 12)
+	k.tube([Vector3(0.45, 0.25, 0), Vector3(0.47, 0.25, 0)], [0.27], rust, 12)
+	k.blob(Vector3(0.0, 0.5, 0), Vector3(0.45, 0.1, 0.24), Color(0.88, 0.91, 0.96), 3, 8)
+	k.blob(Vector3(0.1, 0.05, 0.1), Vector3(0.7, 0.18, 0.5), Color(0.88, 0.91, 0.96), 3, 8)
+	return _mi(k, key, "tex_metal.png")
+
+
 static func crate() -> Node3D:
 	var key := &"crate"
 	var cached := _instance_from_cache(key, "tex_wood.png")

@@ -401,11 +401,7 @@ func _on_exit_cabin() -> void:
 
 ## Перемёт под передними катками: два сугроба, их надо откопать лопатой (удерживать [E]).
 func _build_dig_spots() -> void:
-	var mound := SphereMesh.new()
-	mound.radius = 1.0
-	mound.height = 2.0
-	mound.radial_segments = 18
-	mound.rings = 8
+	var mound := Props.snow_mound_mesh(1)   # намёт с языком, а не снежок
 	for i in DIG_SPOTS.size():
 		var local: Vector3 = DIG_SPOTS[i]
 		var at := _tracked.to_global(local)

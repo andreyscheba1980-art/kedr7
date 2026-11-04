@@ -227,11 +227,7 @@ func _build_woodpile() -> void:
 	root.name = "WoodpileDrift"
 	Game.yard.add_child(root)
 	root.position = Vector3(at.x, Terrain.height(at.x, at.z), at.z)
-	var blob := SphereMesh.new()
-	blob.radius = 1.0
-	blob.height = 2.0
-	blob.radial_segments = 12
-	blob.rings = 6
+	var blob := Props.snow_mound_mesh(2)
 	for part: Array in [[Vector3(0, 0.2, 0.9), Vector3(2.4, 0.9, 0.9)], [Vector3(-1.2, 0.1, 0.5), Vector3(1.0, 0.7, 1.1)], [Vector3(1.3, 0.1, 0.6), Vector3(1.1, 0.8, 0.9)]]:
 		var m := MeshInstance3D.new()
 		m.mesh = blob
