@@ -167,9 +167,8 @@ func _fall() -> void:
 		var tremble := pow(t / 2.8, 2.0) * 0.012
 		p.head.rotation.x = look_pitch + randf_range(-1, 1) * tremble
 		p.rotation.y = yaw + randf_range(-1, 1) * tremble
-		for c: Node3D in cracks:
-			var grow: float = c.get_meta(&"grow")
-			c.scale = Vector3.ONE * clampf((t - grow) / 1.3, 0.0, 1.0)
+		for c: MeshInstance3D in cracks:
+			(c.material_override as ShaderMaterial).set_shader_parameter(&"grow", pow(clampf(t / 2.7, 0.0, 1.0), 1.4))
 		if hi < hits.size() and t >= hits[hi]:
 			Game.audio.play_3d(crack_snd[hi], feet + Vector3(0, 0.1, 0), -6.0 + hi * 2.0, 6.0)
 			hi += 1
@@ -390,41 +389,23 @@ func _flash(fx: Dictionary, a: float) -> void:
 	tw.tween_property(red, "color:a", 0.0, 0.7)
 
 
-## Трещины по наледи: тёмные штрихи лучами от ног, растут по очереди.
+## Трещины по наледи: сетка трещин (ice_cracks.png) расползается от ног — лучи, ветки, кольца.
 func _cracks(feet: Vector3) -> Array:
-	var out := []
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.55, 0.66, 0.78)
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 41
-	for k in 11:
-		var piv := Node3D.new()
-		Game.yard.add_child(piv)
-		var a := k * TAU / 11.0 + rng.randf_range(-0.2, 0.2)
-		var h := Terrain.height(feet.x, feet.z) if Terrain.ready() else feet.y
-		piv.global_position = Vector3(feet.x, h + 0.025, feet.z)
-		piv.rotation.y = a
-		var seg := 0.0
-		var off := Vector3.ZERO
-		var ang := 0.0
-		for j in 3:
-			var l := rng.randf_range(0.3, 0.6)
-			var b := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.012 + (2 - j) * 0.006, 0.004, l)
-			b.mesh = bm
-			b.material_override = m
-			piv.add_child(b)
-			b.position = off + Vector3(sin(ang), 0, -cos(ang)) * (l * 0.5)
-			b.rotation.y = -ang
-			off += Vector3(sin(ang), 0, -cos(ang)) * l
-			ang += rng.randf_range(-0.5, 0.5)
-			seg += l
-		piv.set_meta(&"grow", rng.randf_range(0.0, 1.2))
-		piv.scale = Vector3.ZERO
-		out.append(piv)
-	return out
+	var q := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(4.2, 4.2)
+	q.mesh = pm
+	var m := ShaderMaterial.new()
+	m.shader = load("res://assets/shaders/ice_cracks.gdshader") as Shader
+	m.set_shader_parameter(&"tex", load("res://assets/textures/ice_cracks.png"))
+	m.set_shader_parameter(&"grow", 0.0)
+	q.material_override = m
+	q.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	Game.yard.add_child(q)
+	var h := Terrain.height(feet.x, feet.z) if Terrain.ready() else feet.y
+	q.global_position = Vector3(feet.x, h + 0.03, feet.z)
+	q.rotation.y = randf() * TAU
+	return [q]
 
 
 ## Старый ствол над забоем: порода, венцы крепи, обломки лестницы, сверху — дыра с лунным светом.

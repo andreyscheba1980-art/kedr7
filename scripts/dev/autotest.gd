@@ -3053,6 +3053,14 @@ func _tour(args: PackedStringArray) -> void:
 			_look(p0, t0)
 			await _wait(1.6)
 			await _shot("vista_" + v[0])
+		# Против светила: сквозь ели — лучи
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		var ld: Vector3 = st._sky_light.global_basis.z
+		for q: Vector3 in [Vector3(-22, 0, -40), Vector3(30, 0, 10)]:
+			q.y = Terrain.height(q.x, q.z)
+			_look(q, q + Vector3(0, 1.6, 0) + Vector3(ld.x, maxf(ld.y, 0.12), ld.z).normalized() * 30.0)
+			await _wait(1.2)
+			await _shot("vista_sun")
 		get_tree().quit()
 		return
 	if args.has("landshots"):   # рельеф: горизонт со двора, распадок с мостком, ЛЭП, лог

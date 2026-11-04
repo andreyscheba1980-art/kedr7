@@ -680,7 +680,7 @@ func _hook_knock() -> void:
 	for mi in _hand.find_children("*", "MeshInstance3D", true, false):
 		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
 		if m != null:
-			slide.tween_property(m, "albedo_color:a", 0.0, 1.4)
+			slide.tween_property(m, "albedo_color:a", 0.0, 1.6)
 	await get_tree().create_timer(1.0, false).timeout
 	if not _in_cabin:
 		return
@@ -690,24 +690,15 @@ func _hook_knock() -> void:
 	await get_tree().create_timer(0.6, false).timeout
 
 
-## Ладонь — бледная, расплывчатая за инеем: ладонь и пять пальцев, прижата снаружи к стеклу двери.
+## Ладонь — бледная, расплывчатая за инеем: прижата снаружи к стеклу двери, пальцы длинные.
 func _build_hand() -> Node3D:
 	var h := Node3D.new()
 	h.name = "HandOnGlass"
 	_cabin_root.add_child(h)
-	h.position = Vector3(1.2, 1.18, -1.1)
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.44, 0.5, 0.56, 0.72)   # бледная, обмороженная — проступает сквозь иней
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	Geo.block(h, Vector3(0.006, 0.1, 0.085), Vector3.ZERO, m, false)
-	for f in 4:
-		var fz := -0.03 + f * 0.02
-		var fl := 0.1 + (0.018 if f in [1, 2] else 0.0)     # длинные, тонкие — не совсем человеческие
-		var fing := Geo.block(h, Vector3(0.006, fl, 0.012), Vector3(0, 0.05 + fl * 0.5, fz * 1.15), m, false)
-		fing.rotation.x = (f - 1.5) * 0.12
-	var th := Geo.block(h, Vector3(0.006, 0.055, 0.018), Vector3(0, 0.0, 0.055), m, false)
-	th.rotation.x = -0.8
+	h.position = Vector3(1.2, 1.2, -1.1)
+	var d := Props.hand_decal(&"glass", 0.34)
+	d.rotation.y = -PI * 0.5        # лицом в кабину (−X)
+	h.add_child(d)
 	h.visible = false
 	return h
 
@@ -727,18 +718,12 @@ func _build_evidence() -> void:
 	for k in pts.size():
 		pts[k] = Terrain.at(pts[k])
 	Footprints.trail(self, &"bare", pts, 0.0, 0.66)
-	# Отпечаток на стекле снаружи: тёмное пятно оттаявшего инея
-	var pr := Node3D.new()
+	# Отпечаток на стекле снаружи: оттаявшая в инее пятерня, подтёки вниз
+	var pr := Props.hand_decal(&"thaw", 0.36)
 	pr.name = "HandPrint"
 	_tracked.add_child(pr)
-	pr.position = Vector3(1.24, 1.12, -1.1)
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.12, 0.14, 0.17, 0.75)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	Geo.block(pr, Vector3(0.006, 0.1, 0.085), Vector3.ZERO, m, false)
-	for f in 4:
-		Geo.block(pr, Vector3(0.006, 0.08, 0.016), Vector3(0, 0.09, -0.03 + f * 0.02), m, false)
-	Geo.block(pr, Vector3(0.006, 0.28, 0.07), Vector3(0, -0.14, 0.0), m, false)   # сползла вниз
+	pr.position = Vector3(1.235, 1.1, -1.1)
+	pr.rotation.y = PI * 0.5        # лицом наружу (+X)
 
 
 ## Пока Виктор копает — Михалыч из кабины: про Свердловск, про Семёнова, про ырку и три гудка.

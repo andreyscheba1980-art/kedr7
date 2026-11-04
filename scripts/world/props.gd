@@ -850,28 +850,37 @@ static func claw_scratches() -> Node3D:
 	return _mi(k, &"claw_scratches")
 
 
-## Отпечаток неестественно длиннопалой ладони на морозном стекле.
+## Отпечаток неестественно длиннопалой ладони на морозном стекле (оттаял в инее, подтёки вниз).
 static func frost_handprint() -> Node3D:
 	var root := Node3D.new()
 	root.name = "FrostHandprint"
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.9, 0.95, 1.0, 0.45)
-
-	var palm := Geo.box_mesh(Vector3(0.09, 0.11, 0.004), mat)
-	root.add_child(palm)
-
-	var angles := [-28.0, -14.0, 0.0, 16.0, 32.0]
-	var lengths := [0.12, 0.16, 0.18, 0.15, 0.11]
-	for idx in range(5):
-		var ang: float = deg_to_rad(angles[idx])
-		var flen: float = lengths[idx]
-		var f := Geo.box_mesh(Vector3(0.014, flen, 0.004), mat)
-		f.position = Vector3(sin(ang) * (flen * 0.5 + 0.05), cos(ang) * (flen * 0.5 + 0.04), 0.0)
-		f.rotation.z = -ang
-		root.add_child(f)
+	root.add_child(hand_decal(&"thaw", 0.36))
 	return root
+
+
+static var _hand_mats: Dictionary = {}
+
+## Ладонь-наклейка (tools/textures/make_prints.py): &"glass" — прижата к стеклу снаружи, видна сквозь иней;
+## &"thaw" — оттаявший отпечаток в инее; &"dirt" — грязная смазанная пятерня. Квадрат size×size в плоскости XY
+## (лицом к +Z); ладонь занимает середину. Материал у каждого свой — его можно гасить твином.
+static func hand_decal(kind: StringName, size := 0.3) -> MeshInstance3D:
+	if not _hand_mats.has(kind):
+		var m := StandardMaterial3D.new()
+		m.albedo_texture = load("res://assets/textures/hand_%s.png" % kind) as Texture2D
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		m.disable_receive_shadows = true
+		_hand_mats[kind] = m
+	var mi := MeshInstance3D.new()
+	mi.name = "Hand_%s" % kind
+	var q := QuadMesh.new()
+	q.size = Vector2(size, size)
+	mi.mesh = q
+	mi.material_override = (_hand_mats[kind] as StandardMaterial3D).duplicate()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
 
 
 ## Лаз на чердак: массивная дощатая крышка с петлями и свисающей верёвкой с узлом.

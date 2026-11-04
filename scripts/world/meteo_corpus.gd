@@ -786,17 +786,9 @@ func _show_cabin_figure() -> void:
 
 
 func _palm_print() -> void:
-	# Ладонь снаружи на стекле: тёмная пятерня на инее
-	var k := MeshKit.new(77)
-	var c := Color(0.06, 0.06, 0.07)
-	k.box(Vector3.ZERO, Vector3(0.11, 0.12, 0.004), c)
-	for i in 4:
-		k.box(Vector3(-0.04 + i * 0.027, 0.1 + (0.02 if i in [1, 2] else 0.0), 0.0), Vector3(0.018, 0.09, 0.004), c)
-	k.box(Vector3(0.075, 0.0, 0.0), Vector3(0.05, 0.02, 0.004), c)
-	var mi := MeshInstance3D.new()
-	mi.mesh = k.commit()
-	mi.material_override = Creatures._mat(&"palm_print", Color.WHITE, "", 0.0)
-	mi.position = Vector3(96.4, CAB + 1.55, -34.42)
+	# Ладонь снаружи на стекле: тёмная смазанная пятерня (пальцы сползли вниз)
+	var mi := Props.hand_decal(&"dirt", 0.34)
+	mi.position = Vector3(96.4, CAB + 1.6, -34.42)
 	mi.layers = LAYER_IN | LAYER_OUT
 	add_child(mi)
 	Game.hud.subtitle(Loc.t(&"sub.corpus_palm"), 5.0)

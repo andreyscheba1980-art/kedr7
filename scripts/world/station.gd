@@ -61,6 +61,7 @@ var _baro_warn_timer := 0.0
 var _baro_dead_said := false
 var _sky_light: DirectionalLight3D
 var _sky_mat: ShaderMaterial
+var _post: ShaderMaterial         ## постобработка кадра (лучи от солнца и луны сквозь ели)
 
 var _front_door_slit: MeshInstance3D
 var _front_door_slit_mat: StandardMaterial3D
@@ -443,6 +444,8 @@ func _process(delta: float) -> void:
 		_sky_light.light_energy = lerpf(lerpf(0.45, 2.1, clear), NIGHT_MOON, t_dusk)
 		# Зимнее солнце низко: к вечеру садится к хребтам — тени через весь двор
 		_sky_light.rotation_degrees = Vector3(lerpf(-25.0, lerpf(-21.0, -6.0, t_dusk), clear), lerpf(40.0, 60.0, t_dusk), 0.0)
+
+	_update_rays()
 
 	# Медленное покачивание лунного света на ветру (±1–2°): тени вековых елей и построек тягуче ползут по снегу
 	if not Game.is_daylight() and _sky_light != null:
@@ -913,6 +916,41 @@ func _build_environment() -> void:
 	var weather := Weather.new()
 	add_child(weather)
 	weather.setup(env)
+
+
+## Лучи сквозь ели: где на экране светило, насколько ясно и смотрим ли в его сторону. В доме — нет.
+func _update_rays() -> void:
+	if _post == null:
+		var c := get_viewport().get_parent() as CanvasItem if get_viewport() != null else null
+		if c == null or not (c.material is ShaderMaterial):
+			return
+		_post = c.material as ShaderMaterial
+	var cam := get_viewport().get_camera_3d()
+	if cam == null or _sky_light == null or Game.is_indoors() or Game.is_prologue_trail():
+		_post.set_shader_parameter(&"ray_amount", 0.0)
+		_post.set_shader_parameter(&"warm", 0.0)
+		return
+	var dir := _sky_light.global_basis.z
+	var face := (-cam.global_basis.z).dot(dir)
+	var far := cam.global_position + dir * 400.0
+	var amount := 0.0
+	var clear: float = Game.weather.clearness() if Game.weather != null else 0.0
+	if not cam.is_position_behind(far) and face > 0.1:
+		var uv := cam.unproject_position(far) / get_viewport().get_visible_rect().size
+		_post.set_shader_parameter(&"ray_uv", uv)
+		var day := Game.is_daylight()
+		var t_dusk := clampf((Game.shift_minutes - 120.0) / 100.0, 0.0, 1.0) if day else 1.0
+		if day:
+			amount = clear * 0.9 * (1.0 - smoothstep(0.7, 1.0, t_dusk))
+			_post.set_shader_parameter(&"ray_thresh", 0.74)
+			_post.set_shader_parameter(&"ray_color", Color(1.0, 0.82, 0.58).lerp(Color(1.0, 0.55, 0.32), t_dusk))
+		else:
+			amount = clear * _moon_gap * 0.55
+			_post.set_shader_parameter(&"ray_thresh", 0.2)
+			_post.set_shader_parameter(&"ray_color", Color(0.55, 0.68, 1.0))
+		amount *= smoothstep(0.1, 0.75, face)
+	_post.set_shader_parameter(&"ray_amount", amount)
+	_post.set_shader_parameter(&"warm", clear * 0.6 if Game.is_daylight() else 0.0)
 
 
 func _apply_sky_tint(t: float, clear := 0.0) -> void:
