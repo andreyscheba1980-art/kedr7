@@ -5,6 +5,8 @@ extends Node3D
 ## Пока сигнал в эфире, у передатчика слышно несущую и мигает лампочка: в квадрате ищешь по звуку.
 
 const NOTE_SFX := "res://assets/audio/whisper.ogg"
+## Ключевая находка → снаряжение в схроне рядом
+const FIND_GEAR := {&"beacon": &"lamp_kuzbass", &"repeater": &"field_radio"}
 
 ## Где стоит находка — на земле, чуть в стороне от центра (у построек — внутри или у входа)
 var _spots: Array[Dictionary] = []      ## [{"id": сигнал, "node": Node3D, "audio": AudioStreamPlayer3D, "lamp": OmniLight3D}]
@@ -143,16 +145,30 @@ func _on_find(id: StringName, find: StringName, pool: bool) -> void:
 		Game.hud.show_note(Loc.t(StringName("efir.pool_note.%d" % int(d["msg"]))) + "\n\n" + Loc.t(&"efir.pool_tag", [int(d["freq"])]))
 		if not Game.has_flag("pf_" + String(id)):
 			Game.set_flag("pf_" + String(id), true)
+			_pool_bonus()
 			SaveGame.flags["pool_found"] = Efir.pool_found() + 1
 			Game.add_intercept(id)
 			SaveGame.write()
 			Director.add_tension(6.0, "находка в квадрате: " + msg.left(24))
 		return
 	Game.hud.show_note(Loc.t(StringName("efir.find." + String(find))))
+	# Схрон рядом с передатчиком: за ключевые находки — снаряжение (загадка на приборах окупается)
+	if FIND_GEAR.has(find):
+		Gear.grant.call_deferred(FIND_GEAR[find])
 	if Efir.mark_find(find):
 		Game.audio.play_2d(NOTE_SFX, -8.0)
 		Director.add_tension(10.0, "ключевая находка: " + String(find))
 		Game.hud.toast(Loc.t(&"efir.find_toast", [Efir.find_count(), Efir.FINDS.size()]), 4.0)
+
+
+## Случайная находка по эфиру — расходник: батарея «Сатурн» (фонарь до полного) или ракета.
+func _pool_bonus() -> void:
+	if Game.has_item(&"flare_gun") and randf() < 0.5:
+		Game.add_spare_flares(1)
+		Game.hud.toast(Loc.t(&"efir.bonus_flare"), 3.5)
+	else:
+		Game.flash_charge = 100.0
+		Game.hud.toast(Loc.t(&"efir.bonus_battery"), 3.5)
 
 
 func _process(delta: float) -> void:

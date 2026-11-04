@@ -489,6 +489,16 @@ func start_recording() -> void:
 		recording_t = 0.0
 
 
+## Сводка по портативной «Карату» (снаряжение): из корпуса, без настройки частоты Р-250 в доме.
+var _field := false
+
+
+func field_transmit() -> void:
+	_field = true
+	transmit()
+	_field = false
+
+
 func transmit() -> void:
 	if Game.final_call and strength_of(&"mainland") >= 0.75 and not _busy:
 		EventBus.ending_chosen.emit(&"answer")   # ночь 7: отвечаем на зов даже поверх голоса в эфире
@@ -497,18 +507,18 @@ func transmit() -> void:
 		if is_voice_busy():
 			Game.hud.subtitle(Loc.t(&"radio.wait_voice"), 1.5)
 		return
-	if Game.antenna_iced and absf(freq - float(Signals.get_def(&"mainland").get("freq", 6880.0))) < 20.0:
+	if not _field and Game.antenna_iced and absf(freq - float(Signals.get_def(&"mainland").get("freq", 6880.0))) < 20.0:
 		Game.hud.subtitle(Loc.t(&"radio.iced"), 3.5)
 		return
-	if strength_of(&"mainland") < 0.75:
+	if not _field and strength_of(&"mainland") < 0.75:
 		Game.hud.subtitle(Loc.t(&"radio.wrong_freq"), 3.0)
 		return
-	if Game.final_call:
+	if Game.final_call and not _field:
 		EventBus.ending_chosen.emit(&"answer")   # ночь 7: ответить на зов
 		return
-	if Game.events != null and Game.events.orders != null and Game.events.orders.try_transmit():
+	if not _field and Game.events != null and Game.events.orders != null and Game.events.orders.try_transmit():
 		return
-	if Game.tasks != null and Game.tasks.try_transmit():
+	if not _field and Game.tasks != null and Game.tasks.try_transmit():
 		return
 	var prologue := Game.is_prologue()
 	if prologue and Game.tutorial.get(&"test_report", false):

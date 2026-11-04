@@ -2579,6 +2579,22 @@ func _tour(args: PackedStringArray) -> void:
 		await _revisit()
 		get_tree().quit()
 		return
+	if args.has("karattest"):   # сводка по «Карату» из корпуса
+		Hud.log_subs = true
+		Game.give_item(&"field_radio")
+		Game.shift_minutes = 232.0
+		for k: StringName in Game.READING_KEYS:
+			Game.readings[k] = true
+		_tp(Vector3(92.8, 0.45, -32.6), 0.0)
+		await _wait(0.5)
+		var it: Interactable = MeteoCorpus.instance.find_child("KaratReport", true, false)
+		print("[karat] подсказка: ", it.get_prompt())
+		it.used.emit(Game.player)
+		for k in 30:
+			await _wait(0.5)
+		print("[karat] сводок передано: %d" % Game.reports_sent)
+		get_tree().quit()
+		return
 	if args.has("geartest"):   # снаряжение: термос на морозе, оберег против погони, спиртовка в избе, строка в блокноте
 		Hud.log_subs = true
 		for g: StringName in [&"thermos", &"mansi_amulet", &"spirit_stove", &"snowshoes", &"spark_plug", &"quartz_core"]:

@@ -942,7 +942,7 @@ func _update_flashlight(delta: float) -> void:
 
 	if not flashlight.visible:
 		return
-	Game.flash_charge = maxf(Game.flash_charge - FLASH_DRAIN * delta, 0.0)
+	Game.flash_charge = maxf(Game.flash_charge - FLASH_DRAIN * (0.5 if Gear.has(&"lamp_kuzbass") else 1.0) * delta, 0.0)   # «Кузбасс»: аккумулятор вдвое дольше
 	var c := Game.flash_charge
 	if c <= 0.0:
 		flashlight.visible = false

@@ -615,7 +615,18 @@ func _process(delta: float) -> void:
 
 # --- Приборы и вещи -------------------------------------------------------------------
 
+## «Карат» (снаряжение с ретранслятора): у пульта ветра — передать сводку прямо отсюда, не бегая в дом.
+func _build_karat() -> void:
+	var it := Geo.interactable(self, Vector3(0.5, 0.4, 0.4), PULT_POS + Vector3(0.9, 1.05, 0.25), null, "", func(_p: Player) -> void:
+		if Game.radio != null:
+			Game.radio.field_transmit())
+	it.prompt_provider = func() -> String:
+		return Loc.t(&"it.karat_report") if Gear.has(&"field_radio") and Game.is_night() else ""
+	it.name = "KaratReport"
+
+
 func _build_things() -> void:
+	_build_karat()
 	var baro := Geo.interactable(self, Vector3(0.6, 0.4, 1.4), BARO_POS + Vector3(0, 0.95, 0), null, Loc.t(&"it.corpus_baro"), func(_p: Player) -> void:
 		EventBus.ui_requested.emit(&"barograph")
 		# Самописец рисует не то: с третьей ночи на ленте — ровный зубец в минуту стука
