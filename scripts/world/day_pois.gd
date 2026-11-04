@@ -137,6 +137,8 @@ func _build_trap(base_pos: Vector3) -> void:
 		AudioDirector.play_raw("res://assets/audio/clank.ogg", -4.0)
 		Game.hud.subtitle(Loc.t(&"sub.poi_trap_clamped"), 5.0)
 		Director.add_tension(4.0, "охотничий капкан с ватой")
+		if not Gear.has(&"snowshoes"):   # снегоступы охотника — на сучке у капкана
+			Gear.grant.call_deferred(&"snowshoes")
 	)
 	trap_it.name = "HuntingTrap"
 
@@ -155,6 +157,8 @@ func _build_tent(base_pos: Vector3) -> void:
 	# Планшет экспедиции с полевым дневником
 	var case_it := Geo.interactable(self, Vector3(0.9, 0.6, 0.9), p + Vector3(0.4, 0.4, -0.6), null, Loc.t(&"it.poi_tent_case"), func(_pl: Player) -> void:
 		Game.hud.show_note(Loc.t(&"note.tent_geologists"))
+		if not Gear.has(&"thermos"):   # в планшете — термос в войлочном чехле
+			Gear.grant(&"thermos")
 	)
 	case_it.name = "TentFieldCase"
 
@@ -228,6 +232,8 @@ func _build_tower(base_pos: Vector3) -> void:
 			Game.flares = minf(Game.flares + 2, 8)
 			AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
 			Game.hud.subtitle(Loc.t(&"sub.tower_flares_found"), 4.5)
+			if not Gear.has(&"spirit_stove"):   # в ящике геодезистов — спиртовка с флягой
+				Gear.grant.call_deferred(&"spirit_stove")
 		else:
 			Game.hud.subtitle(Loc.t(&"sub.tower_flares_empty"), 2.0)
 	)

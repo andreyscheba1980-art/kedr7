@@ -262,7 +262,7 @@ func _try_start() -> void:
 		return
 	_start_t = 1.1
 	var chance := 0.9 if Game.is_daylight() else 0.6
-	if SaveGame.flags.get("buran_started_once", false) == false or SaveGame.flags.get("buran_plug", false):
+	if SaveGame.flags.get("buran_started_once", false) == false or SaveGame.flags.get("buran_plug", false) or Gear.has(&"spark_plug"):
 		chance = 1.0
 	if randf() < chance:
 		Game.set_flag("buran_started_once", true)

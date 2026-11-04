@@ -263,7 +263,7 @@ func strength_at(id: StringName, f: float, tower := false) -> float:
 		return 0.0
 	var s := Signals.get_def(id)
 	var center: float = _freq_over.get(id, float(s["freq"]))
-	var d := absf(f - center) / float(s["width"])
+	var d := absf(f - center) / (float(s["width"]) * (1.6 if Gear.has(&"quartz_core") else 1.0))
 	return smoothstep(0.0, 1.0, clampf(1.0 - d, 0.0, 1.0))
 
 
@@ -449,7 +449,7 @@ func strength_of(id: StringName) -> float:
 		return 0.0
 	var s := Signals.get_def(id)
 	var center: float = _freq_over.get(id, float(s["freq"]))
-	var d := absf(freq - center) / float(s["width"])
+	var d := absf(freq - center) / (float(s["width"]) * (1.6 if Gear.has(&"quartz_core") else 1.0))   # кварц: ловит шире
 	var st := smoothstep(0.0, 1.0, clampf(1.0 - d, 0.0, 1.0))
 	if id == &"mainland" and Game.antenna_iced:
 		st *= ICED_FACTOR   # обледеневшая антенна почти не тянет Большую Землю

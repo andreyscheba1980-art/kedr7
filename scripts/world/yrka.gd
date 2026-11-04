@@ -686,6 +686,13 @@ func _clear_glimpse() -> void:
 # --- Погоня ------------------------------------------------------------------
 
 func _start_chase() -> void:
+	# Оберег манси: раз за ночь трескается — и тварь отступает, не начав погоню
+	if Gear.amulet_ready():
+		Gear.use_amulet()
+		_clear_glimpse()
+		threat = maxf(STALK_AT - 6.0, 0.0)
+		set_cooldown(70.0)
+		return
 	_clear_glimpse()
 	stage = Stage.CHASE
 	_chase_t = 0.0

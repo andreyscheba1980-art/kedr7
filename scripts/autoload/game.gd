@@ -881,7 +881,10 @@ func _tick_heat(delta: float) -> void:
 			var lit := MeteoCorpus.instance != null and MeteoCorpus.instance.stove_lit
 			warmth += (1.6 if lit else -0.12) * delta
 		&"shed", &"izba", &"gen_shack", &"lake_shack", &"corpus_gen", &"hangar":
-			warmth -= WARMTH_LOSS_OUTSIDE * 0.5 * cold * delta
+			if Gear.has(&"spirit_stove"):
+				warmth = minf(warmth + 0.6 * delta, 100.0)   # спиртовка: в холодном укрытии отогреваешься
+			else:
+				warmth -= WARMTH_LOSS_OUTSIDE * 0.5 * cold * delta
 		_:
 			# Тулуп из снабжения — на четверть медленнее; овчинный тулуп геолога с лесосеки — ещё на 35%
 			var coat := 0.75 if has_flag("upg_tulup") else 1.0
@@ -890,6 +893,8 @@ func _tick_heat(delta: float) -> void:
 			if Dog.is_near_player():
 				coat *= 0.85     # Найда жмётся к ногам — теплее
 			warmth -= WARMTH_LOSS_OUTSIDE * (1.0 + storm * 1.2) * cold * coat * delta
+			if warmth < 28.0 and Gear.thermos_ready():
+				Gear.use_thermos()
 
 	var door_open: bool = level != null and level.get(&"door_open") == true
 	if door_open:
@@ -1227,6 +1232,9 @@ func tasks_text() -> String:
 	if is_night():
 		lines.append(Loc.t(&"tasks.ice") if antenna_iced else Loc.t(&"tasks.antenna_ok"))
 	lines.append("")
+	var gear_line := Gear.tasks_line()
+	if gear_line != "":
+		lines.append(gear_line)
 	lines.append(Loc.t(&"tasks.intercepts", [SaveGame.intercepts.size(), SaveGame.tapes.size()]))
 	lines.append(Loc.t(&"tasks.icp_hint"))
 	lines.append("")

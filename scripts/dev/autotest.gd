@@ -2579,6 +2579,28 @@ func _tour(args: PackedStringArray) -> void:
 		await _revisit()
 		get_tree().quit()
 		return
+	if args.has("geartest"):   # снаряжение: термос на морозе, оберег против погони, спиртовка в избе, строка в блокноте
+		Hud.log_subs = true
+		for g: StringName in [&"thermos", &"mansi_amulet", &"spirit_stove", &"snowshoes", &"spark_plug", &"quartz_core"]:
+			Game.give_item(g)
+		print("[gear] ", Gear.tasks_line())
+		_tp(Vector3(30.0, Terrain.height(30.0, -8.0) + 0.05, -8.0), 0.0)
+		Game.warmth = 30.0
+		for k in 12:
+			await _wait(0.5)
+		print("[gear] тепло на улице после термоса: %.0f, готов ещё=%s" % [Game.warmth, Gear.thermos_ready()])
+		if Game.is_night():
+			Game.yrka.enabled = true
+			Game.yrka.call(&"_start_chase")
+			await _wait(0.3)
+			print("[gear] погоня после оберега: стадия=%s" % Game.yrka.stage_name())
+		_tp(Vector3(-14.2, 0.2, -29.0), 0.0)
+		Game.warmth = 50.0
+		for k in 10:
+			await _wait(0.5)
+		print("[gear] тепло в избе со спиртовкой: %.0f (зона %s)" % [Game.warmth, Game.zone])
+		get_tree().quit()
+		return
 	if args.has("dogtest"):
 		Hud.log_subs = true
 		var d: Dog = Dog.instance

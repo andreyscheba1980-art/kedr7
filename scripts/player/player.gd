@@ -392,10 +392,11 @@ func _physics_process(delta: float) -> void:
 		else:
 			_cached_off_path = 0.0
 	# На лыжах глубокий наст держит вес — целина не замедляет!
+	var shoes := Gear.has(&"snowshoes") and Game.is_outside()   # снегоступы: целина не так держит
 	if Game.has_flag("in_deep_snow"):
-		speed *= 0.55
+		speed *= 0.72 if shoes else 0.55
 	elif not Game.skis_equipped and _cached_off_path > 6.0:
-		speed *= 0.75
+		speed *= 0.9 if shoes else 0.75
 	speed *= speed_mult
 
 	var target := dir * speed
@@ -627,6 +628,8 @@ func _update_stamina(delta: float) -> void:
 		if Game.has_flag("in_deep_snow"):
 			drain *= 1.5
 		drain *= stamina_drain_mult
+		if Gear.has(&"snowshoes") and Game.is_outside() and (Game.has_flag("in_deep_snow") or _cached_off_path > 6.0):
+			drain *= 0.75
 		stamina = maxf(stamina - drain * delta, 0.0)
 	else:
 		stamina = minf(stamina + STAMINA_REGEN * delta, 100.0)

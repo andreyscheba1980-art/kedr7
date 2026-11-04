@@ -436,6 +436,8 @@ func _on_generator(_p: Player) -> void:
 	var need := 2 if Game.is_day() else 3
 	if Game.is_story():
 		need -= 1
+	if Gear.has(&"spark_plug"):
+		need = 1     # новая свеча — дизель берёт с первого рывка
 	if _gen_tries < need and randf() < 0.85:
 		Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", GEN_POS, -2.0, 6.0)
 		Game.hud.subtitle(Loc.t(&"sub.corpus_gen_fail"), 2.5)
