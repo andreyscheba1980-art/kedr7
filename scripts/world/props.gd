@@ -3076,6 +3076,69 @@ static func frozen_barrel() -> Node3D:
 	return _mi(k, key, "tex_metal.png")
 
 
+## Обжитая кабина ГТ-Т: что возит Михалыч. Координаты — как у gtt_cab (пассажир справа, нос к −Z).
+static func gtt_cab_props() -> Node3D:
+	var key := &"gtt_cab_props"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(421, 0.05)
+	var steel := Color(0.45, 0.47, 0.5)
+	var enamel := Color(0.85, 0.85, 0.8)
+	var red := Color(0.62, 0.1, 0.07)
+	var gold := Color(0.78, 0.62, 0.25)
+	var paper := Color(0.82, 0.78, 0.66)
+	var wood := Color(0.36, 0.24, 0.14)
+	var dark := Color(0.08, 0.08, 0.08)
+	var canvas := Color(0.32, 0.34, 0.24)
+	# Термос «Китайский» с крышкой-кружкой и эмалированная кружка на торпеде
+	k.tube([Vector3(0.82, 0.86, -1.64), Vector3(0.82, 1.1, -1.64)], [0.045, 0.045], Color(0.25, 0.45, 0.4), 10)
+	k.tube([Vector3(0.82, 1.1, -1.64), Vector3(0.82, 1.15, -1.64)], [0.048, 0.048], steel, 10)
+	k.tube([Vector3(0.6, 0.86, -1.6), Vector3(0.6, 0.95, -1.6)], [0.038, 0.036], enamel, 10)
+	k.tube([Vector3(0.6, 0.951, -1.6), Vector3(0.6, 0.953, -1.6)], [0.039], Color(0.15, 0.2, 0.45), 10)
+	k.tube([Vector3(0.64, 0.93, -1.6), Vector3(0.665, 0.92, -1.6), Vector3(0.665, 0.885, -1.6), Vector3(0.64, 0.875, -1.6)], [0.006], enamel, 4)
+	# Карта под прищепкой и пачка «Беломора»
+	k.box(Vector3(0.18, 0.865, -1.62), Vector3(0.3, 0.008, 0.22), paper, Basis(Vector3.UP, 0.2))
+	k.box(Vector3(0.12, 0.87, -1.57), Vector3(0.02, 0.012, 0.06), steel)
+	k.box(Vector3(-0.05, 0.875, -1.6), Vector3(0.09, 0.022, 0.06), Color(0.75, 0.82, 0.88))
+	k.box(Vector3(-0.05, 0.887, -1.6), Vector3(0.085, 0.003, 0.03), Color(0.2, 0.3, 0.55))
+	# Вымпел «Победителю соцсоревнования» на шнурке под верхней рамой лобового, над тоннелем
+	k.tube([Vector3(-0.24, 1.56, -1.8), Vector3(-0.2, 1.47, -1.79)], [0.003], gold, 3)
+	k.tube([Vector3(-0.16, 1.56, -1.8), Vector3(-0.2, 1.47, -1.79)], [0.003], gold, 3)
+	k.box(Vector3(-0.2, 1.41, -1.79), Vector3(0.1, 0.1, 0.005), red)
+	k.box(Vector3(-0.2, 1.35, -1.79), Vector3(0.065, 0.04, 0.005), red)
+	k.box(Vector3(-0.2, 1.327, -1.79), Vector3(0.07, 0.008, 0.006), gold)
+	k.box(Vector3(-0.2, 1.415, -1.786), Vector3(0.032, 0.032, 0.004), gold)
+	# Фотокарточка за рамой стекла (у Михалыча)
+	k.box(Vector3(-1.02, 1.3, -1.8), Vector3(0.07, 0.1, 0.006), paper, Basis(Vector3.FORWARD, 0.15))
+	# Рация под торпедой: короб, шкала, ручки, тангента на витом шнуре
+	k.box(Vector3(0.72, 0.62, -1.52), Vector3(0.38, 0.16, 0.24), Color(0.22, 0.26, 0.22))
+	for xx: float in [0.6, 0.84]:
+		k.tube([Vector3(xx, 0.62, -1.4), Vector3(xx, 0.62, -1.385)], [0.018], dark, 8)
+	k.box(Vector3(0.48, 0.58, -1.42), Vector3(0.05, 0.08, 0.03), dark)
+	# Задняя стенка: огнетушитель ОУ на хомуте, ружьё на крючьях, лопата за сиденьем
+	k.tube([Vector3(1.02, 0.3, -0.34), Vector3(1.02, 0.78, -0.34)], [0.07, 0.07], red, 10)
+	k.tube([Vector3(1.02, 0.78, -0.34), Vector3(1.02, 0.86, -0.34)], [0.025], dark, 6)
+	k.tube([Vector3(1.02, 0.84, -0.34), Vector3(0.94, 0.9, -0.36)], [0.012], dark, 4)
+	k.box(Vector3(1.02, 0.62, -0.3), Vector3(0.16, 0.03, 0.03), steel)
+	k.tube([Vector3(-0.75, 1.25, -0.31), Vector3(0.25, 1.25, -0.31)], [0.012], dark, 6)          # ствол
+	k.box(Vector3(-0.85, 1.22, -0.31), Vector3(0.32, 0.07, 0.04), wood, Basis(Vector3.BACK, 0.12))  # приклад
+	for xx: float in [-0.55, 0.1]:
+		k.box(Vector3(xx, 1.21, -0.31), Vector3(0.03, 0.06, 0.03), steel)
+	k.tube([Vector3(0.28, 0.25, -0.38), Vector3(0.34, 1.05, -0.36)], [0.018, 0.016], wood, 6)       # черенок
+	k.box(Vector3(0.27, 0.32, -0.38), Vector3(0.22, 0.28, 0.02), steel, Basis(Vector3.FORWARD, 0.07))   # лоток
+	# Вещмешок на кожухе мотора и рукавицы
+	k.blob(Vector3(0.0, 0.68, -0.7), Vector3(0.17, 0.13, 0.15), canvas, 4, 8)
+	k.tube([Vector3(-0.1, 0.78, -0.7), Vector3(0.1, 0.78, -0.7)], [0.012], Color(0.2, 0.15, 0.1), 4)
+	k.blob(Vector3(0.05, 0.585, -1.2), Vector3(0.09, 0.03, 0.06), Color(0.3, 0.22, 0.15), 3, 6)
+	# Плафон под потолком в проволочной клетке
+	k.tube([Vector3(0, 1.56, -1.0), Vector3(0, 1.5, -1.0)], [0.06, 0.07], dark, 8)
+	for i in 4:
+		var a := TAU * i / 4.0
+		k.tube([Vector3(cos(a) * 0.07, 1.5, -1.0 + sin(a) * 0.07), Vector3(0, 1.44, -1.0)], [0.004], steel, 3)
+	return _mi(k, key, "tex_metal.png")
+
+
 static func crate() -> Node3D:
 	var key := &"crate"
 	var cached := _instance_from_cache(key, "tex_wood.png")

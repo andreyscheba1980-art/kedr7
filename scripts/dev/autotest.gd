@@ -74,6 +74,17 @@ func _prologue_b() -> void:
 		t += 0.5
 	print("[pb] в кабине %.0f с, выход=%s" % [t, Vehicle.can_exit_cabin()])
 	await _shot("pb_cabin_stuck")
+	if args.has("cabshots"):
+		var y0 := Game.player.rotation.y
+		for v: Array in [[-1.1, -0.15], [-0.55, -0.35], [0.0, -0.45], [0.5, -0.2], [1.0, -0.1], [0.0, 0.25]]:
+			Game.player.rotation.y = y0 + float(v[0])
+			Game.player.head.rotation.x = float(v[1])
+			await _wait(0.4)
+			await _shot("cab_%+.1f_%+.2f" % [v[0], v[1]])
+		Game.player.rotation.y = y0
+		if args.has("cabonly"):
+			get_tree().quit()
+			return
 	Vehicle.request_exit()
 	await _wait(1.5)
 	await _shot("pb_outside")

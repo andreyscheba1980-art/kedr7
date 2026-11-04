@@ -165,7 +165,15 @@ func _ready() -> void:
 	# Трос натянут вдоль каждой открытой тропы — карта, бонус «у троса» и сам трос совпадают.
 	for p in paths:
 		_build_trail(p)
-		_build_rope_line(p, route_of(p))
+		var rl := p
+		if Game.is_prologue() and p == PrologueTrail.route():
+			# Леер просеки начинается у вездехода, а не внутри кабины (трос шёл сквозь голову Михалыча)
+			var drop := Vehicle.drop_pos()
+			var k0 := 0
+			while k0 < rl.size() - 2 and Vector2(rl[k0].x - drop.x, rl[k0].z - drop.z).length() < 6.5:
+				k0 += 1
+			rl = rl.slice(k0)
+		_build_rope_line(rl, route_of(p))
 	# Щиты-указатели горели в метель, как вывески. Дорогу теперь читают по цвету флажков на леере
 	# и по схеме [M]; маленькие таблички остались только в сюжетном режиме — он и так ведёт за руку.
 	if Game.is_story():

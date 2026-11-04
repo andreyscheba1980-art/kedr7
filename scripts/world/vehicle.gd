@@ -205,6 +205,9 @@ func _build_cabin() -> void:
 	var dark := Palette.m(&"dark")
 	var c := _cabin_root
 	c.add_child(Props.gtt_cab())   # борта, тоннель, сиденья, торпеда, капот — одной моделью
+	c.add_child(Props.gtt_cab_props())   # термос, кружка, вымпел, рация, ружьё, лопата за сиденьем
+	var dial_glow := Geo.block(c, Vector3(0.12, 0.03, 0.005), Vector3(0.72, 0.67, -1.398), Palette.glow(&"amber"), false)   # шкала рации
+	dial_glow.name = "RadioDial"
 	# Окна двери и Михалыча — в инее
 	_frost_glass(c, Vector3(0.02, 0.62, 0.86), Vector3(1.15, 1.22, -1.15), 0.0)           # окно двери
 	_frost_glass(c, Vector3(0.02, 0.5, 0.7), Vector3(-1.16, 1.2, -1.25), 0.0)             # окно Михалыча
@@ -221,9 +224,9 @@ func _build_cabin() -> void:
 		Geo.cylinder(c, 0.005, 0.03, Vector3(-0.12 + k * 0.035, 0.83, -1.54), metal, false)
 	var grab := Geo.cylinder(c, 0.014, 0.36, Vector3(0.50, 0.92, -1.55), metal, false)
 	grab.rotation.z = deg_to_rad(90.0)
-	var dial_light := Geo.omni(c, Vector3(-0.4, 0.92, -1.45), 1.2, 0.35, Color(0.3, 0.95, 0.5))
+	var dial_light := Geo.omni(c, Vector3(-0.4, 0.92, -1.45), 0.9, 0.2, Color(0.3, 0.95, 0.5))   # зелень шкал — только на торпеде
 	dial_light.shadow_enabled = false
-	var roof_lamp := Geo.omni(c, Vector3(0.0, 1.5, -1.0), 2.4, 0.18, Color(1.0, 0.8, 0.55))
+	var roof_lamp := Geo.omni(c, Vector3(0.0, 1.45, -1.0), 2.6, 0.34, Color(1.0, 0.78, 0.5))
 	roof_lamp.shadow_enabled = false
 	# Рычаги поворота — дрожат в такт дизелю
 	_lever_l = Node3D.new()
