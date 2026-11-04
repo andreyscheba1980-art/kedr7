@@ -5,8 +5,11 @@ extends Node3D
 ## слабая (дрожит у печки) → поправляется (спит, сидит) → здорова (ходит за тобой по комнате, радуется, лает).
 ## Чует Ырку раньше тебя: рычит на окно и дверь. На голос из леса не реагирует — это тоже подсказка.
 ## Умереть не может: голод только отнимает силы.
+## Здоровая (75+) — компаньон: свист [H] коротко — «Ко мне / Рядом» ↔ «Сидеть»; держать — «Домой».
+## Рядом с ней на морозе остываешь медленнее, напряжение копится медленнее, погладить — легче.
+## Едет на «Буране» сзади. Ночью рычит в сторону твари; в погоне может сорваться в лес — ищи по следам.
 
-enum Where { CAMP, HELD, GROUND, HOME, LOST }
+enum Where { CAMP, HELD, GROUND, HOME, LOST, FOLLOW, STAY }
 
 const STOVE_SPOT := Vector3(-0.9, 0.0, 2.15)
 const BED_SPOT := Vector3(-0.35, 0.0, 5.3)
@@ -15,6 +18,10 @@ const ROOM_MIN := Vector2(-2.3, 0.2)
 const ROOM_MAX := Vector2(3.3, 6.4)
 const WALK := 1.1
 const RUN := 2.4
+const RUN_FAR := 5.2           ## догоняет игрока, отставшего на десяток метров
+const FOLLOW_MIN := 75.0       ## с какого здоровья ходит с тобой
+const NEAR_M := 3.5            ## «рядом»: греет и успокаивает
+const WHISTLE_HOLD := 0.55
 
 static var instance: Dog
 
@@ -33,6 +40,11 @@ var _yaw := 0.0
 var _fleeing := false
 var _flee_t := 0.0
 var _trail: Node3D
+var _whistle_t := -1.0         ## сколько держат свист
+var _lost_sight_t := 0.0
+var _pet_cd := 0.0
+var _on_buran := false
+var _bolted_tonight := false
 
 
 static func health() -> float:
@@ -49,7 +61,9 @@ static func is_home() -> bool:
 
 ## Двор вызывает при постройке: щенок на лесосеке или дома у печки.
 static func ensure(yard: Node3D) -> void:
-	if instance != null and is_instance_valid(instance):
+	# Старая Найда из прошлой сцены (фон меню) ещё не удалена — queue_free отложен. Раньше из-за неё
+	# новая не создавалась, и в игре, начатой из меню, Найды не было вовсе.
+	if instance != null and is_instance_valid(instance) and not instance.is_queued_for_deletion() 			and instance.is_inside_tree() and yard.is_ancestor_of(instance) or (instance != null and is_instance_valid(instance) and Game.level != null and Game.level.is_ancestor_of(instance) and not instance.is_queued_for_deletion()):
 		return
 	var state: String = SaveGame.flags.get("dog_state", "")
 	var d := Dog.new()
@@ -180,7 +194,11 @@ func _prompt() -> String:
 		Where.HOME:
 			if health() < 40.0:
 				return Loc.t(&"dog.stroke_weak")
+			if can_follow():
+				return Loc.t(&"dog.pet_cmd")
 			return Loc.t(&"dog.pet")
+		Where.FOLLOW, Where.STAY:
+			return Loc.t(&"dog.pet_cmd")
 	return ""
 
 
@@ -191,7 +209,7 @@ func _on_use(p: Player) -> void:
 				Game.hud.subtitle(Loc.t(&"dog.hands_full"), 2.0)
 				return
 			_pick_up(p)
-		Where.HOME:
+		Where.HOME, Where.FOLLOW, Where.STAY:
 			_pet()
 
 
@@ -259,7 +277,13 @@ func _pet() -> void:
 		Game.hud.subtitle(Loc.t(&"dog.petted_%d" % (randi() % 3)), 3.0)
 		Game.audio.play_3d(Voice.sfx_or(&"dog_whine", "res://assets/audio/whisper.ogg"), global_position + Vector3(0, 0.4, 0), -10.0)
 	Game.add_fatigue(-4.0)
-	Director.add_tension(-4.0, "погладил Найду")
+	# Погладить в тайге — сильнее, чем дома у печки (но не чаще раза в полминуты)
+	if Game.is_outside() and _pet_cd <= 0.0:
+		_pet_cd = 30.0
+		Director.add_tension(-10.0, "погладил Найду в тайге")
+		Game.warmth = minf(Game.warmth + 4.0, 100.0)
+	else:
+		Director.add_tension(-4.0, "погладил Найду")
 
 
 # --- Миска -------------------------------------------------------------------------
@@ -353,9 +377,17 @@ func _update_hunger() -> void:
 # --- Поведение ---------------------------------------------------------------------
 
 func _process(delta: float) -> void:
+	_pet_cd = maxf(_pet_cd - delta, 0.0)
+	_read_whistle(delta)
 	if where == Where.HELD:
 		return
 	_busy_t = maxf(_busy_t - delta, 0.0)
+	if where == Where.FOLLOW:
+		_follow(delta)
+		return
+	if where == Where.STAY:
+		_stay(delta)
+		return
 	_whine_t -= delta
 	if where == Where.LOST:
 		_play(&"lie_shiver")
@@ -568,3 +600,233 @@ func _lay_trail() -> void:
 
 func _bowl_hide() -> void:
 	pass
+
+
+# --- Компаньон: свист, «рядом», «сидеть», «домой» ---------------------------------------
+
+static func can_follow() -> bool:
+	return health() >= FOLLOW_MIN
+
+
+## Рядом ли Найда с игроком (для тепла и Режиссёра)
+static func is_near_player() -> bool:
+	var d := instance
+	if d == null or not is_instance_valid(d) or Game.player == null:
+		return false
+	if d._on_buran:
+		return true
+	if d.where != Where.FOLLOW and d.where != Where.STAY and d.where != Where.HOME:
+		return false
+	return d.is_inside_tree() and d.visible and d.global_position.distance_to(Game.player.global_position) < NEAR_M
+
+
+func _read_whistle(delta: float) -> void:
+	if Game.player == null or Game.dead or not InputMap.has_action(&"whistle"):
+		return
+	if Game.player.mode != Player.Mode.WALK and not Game.has_flag("riding"):
+		return
+	if Input.is_action_just_pressed(&"whistle"):
+		_whistle_t = 0.0
+	elif _whistle_t >= 0.0 and Input.is_action_pressed(&"whistle"):
+		_whistle_t += delta
+		if _whistle_t >= WHISTLE_HOLD:
+			_whistle_t = -1.0
+			whistle(true)
+	elif _whistle_t >= 0.0:
+		_whistle_t = -1.0
+		whistle(false)
+
+
+## Свист: коротко — «ко мне / рядом» или «сидеть»; long — «домой».
+func whistle(long: bool) -> void:
+	var p := Game.player
+	Game.audio.play_3d("res://assets/audio/whistle_v2.ogg", p.global_position + Vector3(0, 1.6, 0), -6.0 if long else -10.0, 30.0)
+	if where == Where.HELD or where == Where.CAMP or where == Where.GROUND:
+		return
+	var dist := global_position.distance_to(p.global_position) if is_inside_tree() else 999.0
+	if where == Where.LOST:
+		# Потерялась — отзывается лаем, если рядом: по звуку и следам её и ищут
+		if dist < 90.0:
+			Game.audio.play_3d(Voice.sfx_or(&"dog_bark", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.3, 0), 4.0, 14.0)
+		return
+	if not can_follow():
+		if where == Where.HOME and Game.is_home():
+			Game.hud.subtitle(Loc.t(&"dog.too_weak"), 3.0)
+		return
+	if long:
+		_command_home()
+		return
+	match where:
+		Where.FOLLOW:
+			_command_stay()
+		Where.STAY, Where.HOME:
+			if dist < 70.0 or (where == Where.HOME and Game.is_home()):
+				_command_follow()
+			else:
+				Game.hud.subtitle(Loc.t(&"dog.too_far"), 3.0)
+
+
+func _command_follow() -> void:
+	where = Where.FOLLOW
+	SaveGame.flags["dog_state"] = "home"      # между фазами она дома: смена начинается у печки
+	if get_parent() != Game.level:
+		reparent(Game.level, true)
+	_target = Vector3.INF
+	_busy_t = 0.0
+	_play(&"happy", 0.15)
+	Game.hud.subtitle(Loc.t(&"dog.cmd_follow"), 2.5)
+
+
+func _command_stay() -> void:
+	where = Where.STAY
+	_target = Vector3.INF
+	_play(&"sit", 0.2)
+	Game.hud.subtitle(Loc.t(&"dog.cmd_stay"), 2.5)
+
+
+func _command_home() -> void:
+	if where == Where.HOME:
+		return
+	Game.hud.subtitle(Loc.t(&"dog.cmd_home"), 3.0)
+	_go_home()
+
+
+func _go_home() -> void:
+	where = Where.HOME
+	_on_buran = false
+	visible = true
+	_it.collision_layer = Geo.LAYER_INTERACT
+	SaveGame.flags["dog_state"] = "home"
+	if get_parent() != Game.level:
+		reparent(Game.level, false)
+	position = STOVE_SPOT
+	rotation = Vector3.ZERO
+	_target = Vector3.INF
+	_make_bowl()
+
+
+func _ground_y(at: Vector3) -> float:
+	if Game.level != null and Game.level.has_method("is_pos_inside_house") and Game.level.is_pos_inside_house(at + Vector3(0, 0.3, 0)):
+		return 0.0 if at.y < 2.5 else 2.95
+	if Terrain.ready():
+		return Terrain.height(at.x, at.z)
+	return at.y
+
+
+func _follow(delta: float) -> void:
+	var p := Game.player
+	if p == null:
+		return
+	# На «Буране» — едет сзади на сиденье
+	if Game.has_flag("riding") and Snowmobile.instance != null:
+		if not _on_buran:
+			_on_buran = true
+			_it.collision_layer = 0
+			reparent(Snowmobile.instance, false)
+			position = Vector3(0.0, 0.62, 0.95)
+			rotation = Vector3.ZERO
+			_play(&"sit", 0.2)
+		_follow_alert(delta)
+		return
+	if _on_buran:
+		_on_buran = false
+		_it.collision_layer = Geo.LAYER_INTERACT
+		var off := Snowmobile.instance.global_basis.x * -1.2 if Snowmobile.instance != null else Vector3(1, 0, 0)
+		var at := global_position + off
+		reparent(Game.level, true)
+		at.y = _ground_y(at)
+		global_position = at
+		rotation = Vector3.ZERO
+		Game.hud.subtitle(Loc.t(&"dog.off_buran"), 2.5)
+	var pp := p.global_position
+	var d := Vector2(pp.x - global_position.x, pp.z - global_position.z).length()
+	# Потеряла из виду (стены, дверь, отстала на 25+ м) — догоняет «из-за угла», за спиной игрока
+	var q := PhysicsRayQueryParameters3D.create(global_position + Vector3(0, 0.4, 0), p.head.global_position, Geo.LAYER_WORLD, [p.get_rid()])
+	var blocked := not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+	_lost_sight_t = (_lost_sight_t + delta) if (blocked or d > 25.0) else 0.0
+	if _lost_sight_t > 2.5 or d > 45.0:
+		_lost_sight_t = 0.0
+		var at2 := pp + p.global_basis.z * 1.6 + p.global_basis.x * 0.6
+		at2.y = _ground_y(at2)
+		global_position = at2
+		return
+	_follow_alert(delta)
+	if _busy_t > 0.0:
+		_busy_t = maxf(_busy_t - delta, 0.0)
+		return
+	if d > 2.2:
+		var side := p.global_basis.x * (0.8 if int(Time.get_ticks_msec() / 9000) % 2 == 0 else -0.8)
+		_target = pp + p.global_basis.z * 1.2 + side
+		var speed := RUN_FAR if d > 9.0 else RUN if d > 4.0 else WALK * 1.3
+		_walk(delta, speed)
+		global_position.y = _ground_y(global_position)
+	else:
+		_target = Vector3.INF
+		_think_t -= delta
+		if _think_t <= 0.0:
+			_think_t = randf_range(3.0, 7.0)
+			var r := randf()
+			_play(&"sniff" if r < 0.45 else &"sit" if r < 0.8 else &"stand")
+			_face(pp)
+
+
+func _stay(delta: float) -> void:
+	_play(&"sit")
+	_whine_t -= delta
+	if Game.is_night() and _whine_t <= 0.0 and Game.player != null and Game.player.global_position.distance_to(global_position) < 40.0:
+		_whine_t = randf_range(10.0, 18.0)
+		Game.audio.play_3d(Voice.sfx_or(&"dog_whine", "res://assets/audio/whisper.ogg"), global_position + Vector3(0, 0.3, 0), -4.0, 6.0)
+	_follow_alert(delta)
+
+
+## На улице ночью: замирает и рычит в сторону твари; в погоне может сорваться в лес.
+func _follow_alert(delta: float) -> void:
+	var y := Game.yrka
+	if y == null or not Game.is_night():
+		return
+	_growl_t -= delta
+	var to_y := Vector3(y.virtual_pos.x, global_position.y, y.virtual_pos.y)
+	if y.stage == YrkaThreat.Stage.CHASE and where == Where.FOLLOW and not _on_buran and not _bolted_tonight:
+		_bolted_tonight = true
+		if randf() < 0.5:
+			_bolt()
+			return
+	if y.stage >= YrkaThreat.Stage.PRESSURE and _growl_t <= 0.0:
+		_growl_t = randf_range(6.0, 11.0)
+		if not _on_buran:
+			_face(to_y)
+		_play(&"growl", 0.2)
+		_busy_t = 2.5
+		Game.audio.play_3d(Voice.sfx_or(&"dog_growl", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.4, 0), -2.0, 5.0)
+
+
+## Сорвалась в погоне: убегает в сторону, лежит там и скулит. Свистни — отзовётся лаем; по следам — найти.
+func _bolt() -> void:
+	where = Where.LOST
+	SaveGame.flags["dog_state"] = "lost"
+	_play(&"run", 0.1)
+	Game.audio.play_3d(Voice.sfx_or(&"dog_bark", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.4, 0), 4.0, 8.0)
+	Game.hud.subtitle(Loc.t(&"dog.bolted"), 5.0, 2)
+	var from := global_position
+	var ang := randf() * TAU
+	var spot := from + Vector3(cos(ang), 0, sin(ang)) * randf_range(35.0, 60.0)
+	spot.y = Terrain.height(spot.x, spot.z)
+	SaveGame.flags["dog_ground"] = [spot.x, spot.y, spot.z]
+	if Game.yard != null:
+		reparent(Game.yard, false)
+	global_position = spot
+	_lay_trail_from(from)
+	Director.add_tension(15.0, "Найда сорвалась в лес")
+	SaveGame.write()
+
+
+func _lay_trail_from(start: Vector3) -> void:
+	if Game.yard == null:
+		return
+	var seg := PackedVector3Array([start, global_position])
+	_trail = Node3D.new()
+	_trail.name = "NaidaTrail"
+	Game.yard.add_child(_trail)
+	var part := Footprints.trail(_trail, &"paw", seg, (start.y + global_position.y) * 0.5, 0.36, 0.06)
+	for fp: Node in part.get_children():
+		(fp as Node3D).scale *= 1.8

@@ -207,6 +207,8 @@ func _compute_rate() -> float:
 		m *= 1.3
 	if Game.after_hour(3):
 		m *= 1.3
+	if Dog.is_near_player():
+		m *= 0.8      # Найда рядом — не так страшно
 	return base_rate * m
 
 

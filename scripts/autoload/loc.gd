@@ -37,7 +37,7 @@ func t(key: StringName, args: Array = []) -> String:
 ## Трогаем только переназначенные действия и только внутри квадратных скобок.
 const _KEY_TOKENS := {"E": &"interact", "F": &"flashlight", "Q": &"crank", "G": &"drop", "Tab": &"tasks", "M": &"map",
 	"B": &"codebook", "R": &"transmit", "T": &"record", "V": &"flare", "J": &"intercepts", "C": &"coop_talk",
-	"Space": &"hold_breath", "Пробел": &"hold_breath", "Shift": &"sprint"}
+	"Space": &"hold_breath", "Пробел": &"hold_breath", "Shift": &"sprint", "H": &"whistle"}
 var _key_re: RegEx
 
 

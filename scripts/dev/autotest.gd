@@ -2533,6 +2533,10 @@ func _tour(args: PackedStringArray) -> void:
 	if args.has("tutg"):      # пролог после приезда: игрок уже у станции
 		Game.set_flag("left_cabin", true)
 		Game.set_flag("prologue_arrived", true)
+	if args.has("dogtest"):
+		SaveGame.flags["dog_state"] = "home"
+		SaveGame.flags["dog_health"] = 100.0
+		SaveGame.flags["dog_found"] = true
 	if args.has("coldshots"):   # кадры холодного старта: он идёт внутри _begin, до прогрева тура
 		_shoot_loop("cold", 22, 2.0)
 	_app.call(&"_start_phase")
@@ -2573,6 +2577,38 @@ func _tour(args: PackedStringArray) -> void:
 		return
 	if args.has("revisit"):
 		await _revisit()
+		get_tree().quit()
+		return
+	if args.has("dogtest"):
+		Hud.log_subs = true
+		var d: Dog = Dog.instance
+		print("[dog] есть=%s где=%s здоровье=%.0f state=%s узлов=%d" % [d != null, d.where if d else -1, Dog.health(), SaveGame.flags.get("dog_state"), get_tree().root.find_children("Naida", "", true, false).size()])
+		_tp(Vector3(-0.5, 0.05, 3.0), 0.0)
+		await _wait(0.5)
+		d.whistle(false)
+		await _wait(0.5)
+		print("[dog] после свиста: где=%s" % d.where)
+		var path := [Vector3(3.0, 0.05, 4.4), Vector3(12.0, 0.05, 4.4), Vector3(18.0, 0.05, 4.0), Vector3(24.0, 0.05, 0.0), Vector3(30.0, 0.05, -6.0)]
+		for pt: Vector3 in path:
+			for k in 8:
+				var pp: Vector3 = Game.player.global_position.lerp(pt, 0.25)
+				pp.y = Terrain.height(pp.x, pp.z) + 0.05 if pt.x > 15.0 else 0.05
+				_tp(pp, 90.0)
+				await _wait(0.35)
+			print("[dog] игрок %s собака %s до неё %.1f рядом=%s" % [Game.player.global_position.snapped(Vector3.ONE * 0.1), d.global_position.snapped(Vector3.ONE * 0.1), d.global_position.distance_to(Game.player.global_position), Dog.is_near_player()])
+		await _shot("dog_follow")
+		d.whistle(false)
+		await _wait(0.5)
+		print("[dog] сидеть: где=%s" % d.where)
+		_tp(Vector3(40.0, Terrain.height(40.0, -6.0) + 0.05, -6.0), 90.0)
+		await _wait(1.0)
+		d.whistle(false)
+		for k in 10:
+			await _wait(0.5)
+		print("[dog] ко мне: где=%s до неё %.1f" % [d.where, d.global_position.distance_to(Game.player.global_position)])
+		d.whistle(true)
+		await _wait(0.5)
+		print("[dog] домой: где=%s поз %s" % [d.where, d.global_position])
 		get_tree().quit()
 		return
 	if args.has("siegetest"):   # осада: затворник дома на пике — предупреждение у ДЭС, срыв ремня; второй раз — спугнуть
