@@ -323,6 +323,10 @@ func _build_ice_mine(base_pos: Vector3) -> void:
 		add_child(model)
 
 	_solid(p + Vector3(0, 1.8, 0), Vector3(3.6, 3.2, 3.6), deg_to_rad(45.0))
+	# Скрытый горизонт под устьем: вход — заваленный ходок слева (знаешь о нём с кассеты Дубова)
+	var mh := MineHorizon.new()
+	mh.setup(p)
+	add_child(mh)
 
 	# Вагонетка в забое: инфракрасная пленка «Свема И-840»
 	var cart_it := Geo.interactable(self, Vector3(1.4, 0.9, 1.4), p + Vector3(0.9, 0.5, 0.8), null, Loc.t(&"it.poi_mine_cart"), func(_pl: Player) -> void:

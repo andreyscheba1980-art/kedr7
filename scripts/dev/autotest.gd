@@ -2582,6 +2582,41 @@ func _tour(args: PackedStringArray) -> void:
 		await _revisit()
 		get_tree().quit()
 		return
+	if args.has("minetest"):   # Горизонт-40: завал, спуск, штрек, схрон, забой — кадры и находки
+		Hud.log_subs = true
+		Game.set_flag("mine_adit_known", true)
+		var mh: MineHorizon = MineHorizon.instance
+		print("[mine] есть=%s" % [mh != null])
+		var entry: Interactable = mh.find_child("MineAditEntry", true, false)
+		print("[mine] вход: ", entry.get_prompt())
+		entry.used.emit(Game.player)
+		await _wait(0.5)
+		print("[mine] после разбора: ", entry.get_prompt())
+		entry.used.emit(Game.player)
+		await _wait(1.5)
+		print("[mine] внизу: зона=%s поз=%s" % [Game.zone, Game.player.global_position.snapped(Vector3.ONE * 0.1)])
+		Game.player.set_flashlight(true)
+		var R := MineHorizon.ROOT
+		for v: Array in [["yard", Vector3(0, 0.05, 1.0), Vector3(0, 1.4, -8.0)], ["drift", Vector3(0, 0.05, -8.0), Vector3(0, 1.3, -20.0)],
+				["east", Vector3(4.0, 0.05, -14.0), Vector3(15.0, 1.2, -14.0)], ["cache", Vector3(16.5, 0.05, -14.0), Vector3(19.0, 0.6, -15.8)],
+				["west", Vector3(-2.0, 0.05, -26.0), Vector3(-8.0, 0.6, -26.0)], ["rubble", Vector3(0, 0.05, -33.0), Vector3(0, 0.8, -37.0)],
+				["face", Vector3(0, 0.05, -39.2), Vector3(0.6, 0.3, -42.6)]]:
+			_look(R + v[1], R + v[2])
+			await _wait(0.8)
+			await _shot("mine_" + String(v[0]))
+		_tp(R + Vector3(17.0, 0.05, -14.5), 0.0)
+		await _wait(0.4)
+		(mh.find_child("MineCache", true, false) as Interactable).used.emit(Game.player)
+		await _wait(0.5)
+		print("[mine] после схрона: ракетница=%s кузбасс=%s" % [Game.has_item(&"flare_gun"), Gear.has(&"lamp_kuzbass")])
+		# проход через лаз: идём к забою своими ногами
+		_tp(R + Vector3(0, 0.05, -34.5), 180.0)
+		for k in 20:
+			Game.player.velocity = Vector3(0, 0, -2.0)
+			await _wait(0.2)
+		print("[mine] после лаза z=%.1f" % (Game.player.global_position.z - R.z))
+		get_tree().quit()
+		return
 	if args.has("routetest"):   # привычная тропа: тварь ждёт там, утром круги следов; поломки ночи
 		Hud.log_subs = true
 		Game.yrka.enabled = true

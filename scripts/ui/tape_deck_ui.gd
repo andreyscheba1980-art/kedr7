@@ -333,6 +333,10 @@ func _reveal(hidden: Dictionary) -> void:
 	_hidden_label.text = Loc.t(text) if text != &"" else ""
 	_info.text = _hidden_label.text
 	Director.add_tension(10.0, "плёнка: проступило скрытое")
+	if _selected == &"tape_field" and not Game.has_flag("mine_adit_known"):
+		Game.set_flag("mine_adit_known", true)   # Дубов: ходок Горизонта-40 за завалом в устье
+		Game.hud.subtitle(Loc.t(&"sub.mine_known"), 6.0)
+		SaveGame.write()
 	if _selected == &"rec0310":
 		FieldJobs.record_bearing("lake")      # распадок на спектрограмме — пеленг от проруби
 		SaveGame.write()

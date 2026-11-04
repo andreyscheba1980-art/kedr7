@@ -407,8 +407,8 @@ func _physics_process(delta: float) -> void:
 	_prev_velocity_len = Vector2(velocity.x, velocity.z).length()
 
 	# Страховка от провала в пропасть (если игрок выпал из геометрии)
-	var in_bunker_zone := Game.zone == &"bunker" or (global_position.x > 50.0 and global_position.z > 5.0 and global_position.z < 20.0 and global_position.y < -20.0) 		or StationLore.zone_at(global_position) != &""   # подпол Брагина и тоннель к «Отзвуку» — тоже под землёй
-	if (global_position.y < -8.0 and not in_bunker_zone) or global_position.y < -45.0:
+	var in_bunker_zone := Game.zone == &"bunker" or (global_position.x > 50.0 and global_position.z > 5.0 and global_position.z < 20.0 and global_position.y < -20.0) 		or StationLore.zone_at(global_position) != &"" or MineHorizon.zone_has(global_position)   # подпол Брагина, тоннель к «Отзвуку», Горизонт-40 — тоже под землёй
+	if (global_position.y < -8.0 and not in_bunker_zone) or global_position.y < -55.0:
 		global_position = Station.SPAWN
 		velocity = Vector3.ZERO
 

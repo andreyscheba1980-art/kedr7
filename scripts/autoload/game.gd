@@ -872,7 +872,7 @@ func _tick_heat(delta: float) -> void:
 			warmth += 0.2 * delta   # под землёй тепло от аппаратуры
 		&"cellar":
 			warmth += 0.3 * delta   # земля в подполе Брагина тёплая — и это неправильно
-		&"tunnel":
+		&"tunnel", &"mine":
 			warmth -= 0.05 * delta
 		&"walled":
 			warmth -= 0.35 * delta   # кабинет Голубева выстужен до инея
@@ -1000,7 +1000,7 @@ func is_home() -> bool:
 ## Под крышей (дом, сарай, изба, рыбацкий домик, бункер): снега и тумана нет, Ырка не войдёт.
 func is_indoors() -> bool:
 	return is_home() or zone == &"shed" or zone == &"izba" or zone == &"bunker" or zone == &"lake_shack" or zone == &"gen_shack" \
-		or zone == &"corpus" or zone == &"corpus_gen" or zone == &"hangar" or zone == &"cellar" or zone == &"tunnel" or zone == &"walled"
+		or zone == &"corpus" or zone == &"corpus_gen" or zone == &"hangar" or zone == &"cellar" or zone == &"tunnel" or zone == &"walled" or zone == &"mine"
 
 
 
@@ -1009,7 +1009,7 @@ func is_outside() -> bool:
 
 
 func is_confined_space() -> bool:
-	return zone in [&"storage", &"vestibule", &"attic", &"cellar", &"tunnel", &"gen_shack", &"lake_shack", &"shed", &"walled"]
+	return zone in [&"storage", &"vestibule", &"attic", &"cellar", &"tunnel", &"mine", &"gen_shack", &"lake_shack", &"shed", &"walled"]
 
 
 func is_dark() -> bool:

@@ -294,6 +294,8 @@ func zone_at(pos: Vector3) -> StringName:
 	var lz := StationLore.zone_at(pos)   # подпол, тоннель, кабинет Голубева
 	if lz != &"":
 		return lz
+	if MineHorizon.zone_has(pos):
+		return &"mine"
 	if pos.y < -10.0:
 		return &"bunker"
 	if (pos.x >= -41.5 and pos.x <= -31.0) and (pos.z >= 16.0 and pos.z <= 29.5):
