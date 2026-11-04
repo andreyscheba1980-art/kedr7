@@ -5,7 +5,7 @@ extends RefCounted
 
 ## id предмета → ключ строки с названием и пользой (gear.<id>)
 const ITEMS: Array[StringName] = [&"thermos", &"snowshoes", &"spirit_stove", &"spark_plug", &"mansi_amulet",
-	&"quartz_core", &"belt_variator", &"sheepskin_coat", &"lamp_kuzbass", &"field_radio", &"film_infra"]
+	&"quartz_core", &"belt_variator", &"sheepskin_coat", &"lamp_kuzbass", &"field_radio", &"film_infra", &"birch_map"]
 
 
 static func has(id: StringName) -> bool:

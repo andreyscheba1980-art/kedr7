@@ -46,6 +46,7 @@ const PADS := {
 	&"ams3": [Vector2(45, 176), 8.0],
 	&"ams4": [Vector2(-101, -158), 8.0],
 	&"source": [Vector2(-95, 70), 13.0],     ## капище-источник (SourceSite)
+	&"labaz": [Vector2(-200, -40), 8.0],      ## шаманский лабаз (DayPOIs) — поляна в ельнике
 }
 
 static var _h := PackedFloat32Array()

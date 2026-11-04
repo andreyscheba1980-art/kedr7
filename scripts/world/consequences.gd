@@ -147,6 +147,26 @@ static func ambush_cells() -> Array[String]:
 	return out
 
 
+## Где тварь будет ждать — без «остывания» (для берестяной карты на схеме).
+static func risky_cells() -> Array[String]:
+	if Game.is_night() and Game.hunter_brain != null and "_route_cells" in Game.hunter_brain:
+		var rc: Array = Game.hunter_brain.get("_route_cells")
+		var o: Array[String] = []
+		for c in rc:
+			o.append(String(c))
+		return o
+	var h := _heat()
+	var keys: Array = h.keys()
+	keys.sort_custom(func(a: String, b: String) -> bool: return float(h[a]) > float(h[b]))
+	var out: Array[String] = []
+	for k: String in keys:
+		if float(h[k]) * ROUTE_DECAY >= 6.0:
+			out.append(k)
+		if out.size() >= 2:
+			break
+	return out
+
+
 static func note_waited(p: Vector3) -> void:
 	var w: Variant = SaveGame.flags.get("route_waited", [])
 	if not (w is Array):

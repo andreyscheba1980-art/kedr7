@@ -71,6 +71,7 @@ func _build_all_pois() -> void:
 	_build_trelevochnik(POI_TARGETS[&"poi_trelevochnik"]["pos"])
 	_build_radar_dome(POI_TARGETS[&"poi_radar_dome"]["pos"])
 	_build_deep_borehole(POI_TARGETS[&"poi_deep_borehole"]["pos"])
+	_build_labaz()
 
 
 func _place_ground_y(pos: Vector3) -> Vector3:
@@ -186,16 +187,97 @@ func _build_shrine(base_pos: Vector3) -> void:
 
 	_solid(p + Vector3(0, 0.8, 0), Vector3(1.6, 1.5, 1.2), deg_to_rad(-65.0))
 
-	var shrine_it := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), p + Vector3(0, 0.8, 0), null, Loc.t(&"it.poi_shrine"), func(_pl: Player) -> void:
+	# Идолы смотрят туда, куда зовут: после двух подношений — на шаманский лабаз за Чёрным логом
+	if model != null and Game.has_flag("labaz_revealed"):
+		var to_lab := LABAZ - p
+		model.rotation.y = atan2(to_lab.x, to_lab.z)
+	var shrine_it := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), p + Vector3(0, 0.8, 0), null, "", _on_shrine)
+	shrine_it.prompt_provider = func() -> String:
 		if not Game.has_flag("shrine_amulet_taken"):
-			Game.set_flag("shrine_amulet_taken", true)
-			Game.give_item(&"mansi_amulet")
-			Director.add_tension(-12.0, "мансийский оберег")
-			Game.hud.subtitle(Loc.t(&"sub.shrine_amulet_taken"), 5.5)
-		else:
-			Game.hud.subtitle(Loc.t(&"sub.shrine_prayed"), 3.0)
-	)
+			return Loc.t(&"it.poi_shrine")
+		if _offered_today():
+			return Loc.t(&"it.shrine_look")
+		return Loc.t(&"it.shrine_offer") if Supply.rations() > 0 else Loc.t(&"it.shrine_no_offer")
 	shrine_it.name = "MansiShrine"
+
+
+const LABAZ := Vector3(-200.0, 0.0, -40.0)   ## шаманский лабаз на сваях — в лесу за Чёрным логом
+
+
+func _offered_today() -> bool:
+	return (SaveGame.flags.get("shrine_offers", []) as Array).has(Game.phase_kind + str(Game.phase_index))
+
+
+func _on_shrine(_pl: Player) -> void:
+	if not Game.has_flag("shrine_amulet_taken"):
+		Game.set_flag("shrine_amulet_taken", true)
+		Game.give_item(&"mansi_amulet")
+		Director.add_tension(-12.0, "мансийский оберег")
+		Game.hud.subtitle(Loc.t(&"sub.shrine_amulet_taken"), 5.5)
+		return
+	if _offered_today() or Supply.rations() <= 0:
+		var key := &"sub.shrine_points" if Game.has_flag("labaz_revealed") and not Game.has_flag("labaz_found") else &"sub.shrine_prayed"
+		Game.hud.subtitle(Loc.t(key), 5.0)
+		return
+	# Подношение: паёк духам. Не сразу — духи отвечают к следующему приходу
+	SaveGame.flags["rations"] = Supply.rations() - 1
+	var offers: Array = (SaveGame.flags.get("shrine_offers", []) as Array).duplicate()
+	offers.append(Game.phase_kind + str(Game.phase_index))
+	SaveGame.flags["shrine_offers"] = offers
+	Game.audio.play_3d("res://assets/audio/whisper.ogg", POI_TARGETS[&"poi_shrine"]["pos"] + Vector3(0, 1.0, 0), -8.0, 6.0)
+	Director.add_tension(-6.0, "подношение духам")
+	if offers.size() >= 2 and not Game.has_flag("labaz_revealed"):
+		Game.set_flag("labaz_revealed", true)
+		Game.hud.subtitle(Loc.t(&"sub.shrine_answer"), 7.0)
+	else:
+		Game.hud.subtitle(Loc.t(&"sub.shrine_offered"), 5.0)
+	SaveGame.write()
+
+
+## Шаманский лабаз: срубик на четырёх сваях, лестница-бревно с зарубками, ленты и бубенцы.
+## Внутри — берестяная карта (Gear.birch_map): на схеме видно, где тварь ждёт на тропах.
+func _build_labaz() -> void:
+	var p := _place_ground_y(LABAZ)
+	var root := Node3D.new()
+	root.name = "ShamanLabaz"
+	root.position = p
+	root.rotation.y = deg_to_rad(20.0)
+	add_child(root)
+	var log_m := Palette.m(&"log")
+	var wood := Palette.m(&"wood")
+	var snow := Palette.m(&"snow")
+	for sx: float in [-0.8, 0.8]:
+		for sz: float in [-0.7, 0.7]:
+			Geo.cylinder(root, 0.13, 2.4, Vector3(sx, 1.2, sz), log_m, false)
+	for i in 5:
+		Geo.block(root, Vector3(2.0, 0.18, 0.18), Vector3(0, 2.5 + i * 0.19, -0.75), log_m, false)
+		Geo.block(root, Vector3(2.0, 0.18, 0.18), Vector3(0, 2.5 + i * 0.19, 0.75), log_m, false)
+		Geo.block(root, Vector3(0.18, 0.18, 1.5), Vector3(-0.95, 2.5 + i * 0.19, 0), log_m, false)
+		Geo.block(root, Vector3(0.18, 0.18, 1.5), Vector3(0.95, 2.5 + i * 0.19, 0), log_m, false)
+	for sx: float in [-1.0, 1.0]:
+		var slope := Geo.block(root, Vector3(1.2, 0.06, 1.9), Vector3(sx * 0.5, 3.62, 0), wood, false)
+		slope.rotation.z = sx * -0.5
+		var cap := Geo.block(root, Vector3(1.2, 0.12, 1.95), Vector3(sx * 0.52, 3.72, 0), snow, false)
+		cap.rotation.z = sx * -0.5
+	var ladder := Geo.cylinder(root, 0.12, 3.0, Vector3(0, 1.25, 1.35), log_m, false)
+	ladder.rotation.x = deg_to_rad(-25.0)
+	# Ленты и бубенцы на свае
+	var rag := Palette.m(&"red")
+	for k in 4:
+		var r := Geo.block(root, Vector3(0.04, 0.5, 0.06), Vector3(0.82, 1.6 - k * 0.12, 0.72 + k * 0.03), rag if k % 2 == 0 else Palette.m(&"white"), false)
+		r.rotation.z = 0.15 * k
+	_solid(p + Vector3(0, 1.4, 0), Vector3(2.0, 2.8, 1.8), deg_to_rad(20.0))
+	var it := Geo.interactable(self, Vector3(1.4, 1.6, 1.4), p + Vector3(0, 1.2, 1.2).rotated(Vector3.UP, deg_to_rad(20.0)), null, "", func(_pl: Player) -> void:
+		if Game.has_flag("labaz_found"):
+			Game.hud.subtitle(Loc.t(&"sub.labaz_empty"), 3.5)
+			return
+		Game.set_flag("labaz_found", true)
+		Gear.grant(&"birch_map")
+		Director.add_tension(10.0, "шаманский лабаз")
+		Game.audio.play_3d("res://assets/audio/whisper.ogg", p + Vector3(0, 2.5, 0), -2.0, 8.0))
+	it.name = "ShamanLabazIt"
+	it.prompt_provider = func() -> String:
+		return Loc.t(&"it.labaz_empty") if Game.has_flag("labaz_found") else Loc.t(&"it.labaz")
 
 
 # 5. «Чёртов Палец» (базальтовый останец с репером ГУГК СССР)

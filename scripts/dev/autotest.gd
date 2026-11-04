@@ -2607,6 +2607,26 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("shrinetest"):   # подношения → идолы → лабаз → берестяная карта
+		Hud.log_subs = true
+		Game.set_flag("shrine_amulet_taken", true)
+		SaveGame.flags["rations"] = 3
+		SaveGame.flags["shrine_offers"] = ["day1"]
+		var sh: Interactable = Game.yard.find_child("MansiShrine", true, false)
+		print("[shrine] подсказка: ", sh.get_prompt())
+		sh.used.emit(Game.player)
+		print("[shrine] лабаз открыт=%s пайки=%d подсказка после: %s" % [Game.has_flag("labaz_revealed"), Supply.rations(), sh.get_prompt()])
+		var lab: Interactable = Game.yard.find_child("ShamanLabazIt", true, false)
+		var lp := DayPOIs.LABAZ
+		lp.y = Terrain.height(lp.x, lp.z)
+		_look(lp + Vector3(4, 0, 5), lp + Vector3(0, 2.0, 0))
+		await _wait(1.2)
+		await _shot("labaz")
+		lab.used.emit(Game.player)
+		SaveGame.flags["route_heat"] = {"2_3": 12.0, "5_-4": 9.0}
+		print("[shrine] береста=%s кресты=%s" % [Gear.has(&"birch_map"), Consequences.risky_cells()])
+		get_tree().quit()
+		return
 	if args.has("droptest"):   # сброс снабжения при сильном ветре: снесло ли, где маяк
 		Hud.log_subs = true
 		for n in Game.yard.find_children("SupplyCrate", "", true, false):

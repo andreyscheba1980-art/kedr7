@@ -122,6 +122,15 @@ func _draw() -> void:
 			var zc: Vector2 = to_map.call(zone[0])
 			draw_arc(zc, float(zone[1]) * px_per_m, 0.0, TAU, 40, Color(0.72, 0.1, 0.08), 2.0)
 			draw_string(font, zc + Vector2(-6, 6), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(0.62, 0.08, 0.06))
+	# Берестяная карта шамана: где тварь ждёт на привычных тропах — красные кресты поверх схемы
+	if Gear.has(&"birch_map"):
+		for key: String in Consequences.risky_cells():
+			var cc: Vector2 = to_map.call(Consequences.cell_center(key))
+			var red := Color(0.68, 0.1, 0.06, 0.9)
+			draw_line(cc + Vector2(-8, -8), cc + Vector2(8, 8), red, 3.0)
+			draw_line(cc + Vector2(8, -8), cc + Vector2(-8, 8), red, 3.0)
+			draw_arc(cc, 14.0, 0.0, TAU, 20, Color(red, 0.5), 1.5)
+		draw_string(font, sheet.position + Vector2(30, 92), Loc.t(&"map.birch"), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.62, 0.08, 0.06))
 	for site: Dictionary in Game.yard.map_sites():
 		if region and not site.get("far", false) and site["label"] != &"map.house":
 			continue
