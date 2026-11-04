@@ -80,6 +80,7 @@ func _ready() -> void:
 	if Game.is_night():
 		add_child(NightTasks.new())
 		add_child(NightGuest.new())   # стук в дверь: человек или оно
+		add_child(Wildlife.new())     # волки: не всё, что ходит ночью, — тварь
 		if not Game.is_prologue():
 			Consequences.apply_night()   # что не починил днём — ночью платишь
 	else:

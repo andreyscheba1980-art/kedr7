@@ -6,11 +6,13 @@ extends Node
 ##   • солярка в канистрах — кисель: отогреть паяльной лампой, иначе канистру не взять;
 ##   • поленницу завалило: откопать лопатой, иначе без дров;
 ##   • изморозь на антенне: обстучать оттяжки черенком лопаты, иначе ночью Большую Землю хуже слышно;
-##   • лиса разорила ящик с пайками у крыльца: паёк пропал — иди по лисьим следам, найдёшь пакет.
+##   • лиса разорила ящик с пайками у крыльца: паёк пропал — иди по лисьим следам, найдёшь пакет;
+##   • шатун (с 3-го утра): ночью ломился в сарай, распорол мешок — днём бродит у одной из дальних точек.
+##     Подойдёшь — рёв из ельника; не отошёл за 8 с — удар лапой. Ракета отгоняет.
 ## Инструменты в доме: паяльная лампа — в кладовой, лопата — в сенях, чайник — на печи.
 ## Кипяток из чайника заменяет паяльную лампу (но остывает на морозе — неси бегом).
 
-const POOL: Array[StringName] = [&"buran_cold", &"canisters_gel", &"woodpile_buried", &"antenna_rime", &"fox_raid"]
+const POOL: Array[StringName] = [&"buran_cold", &"canisters_gel", &"woodpile_buried", &"antenna_rime", &"fox_raid", &"bear"]
 const TORCH_SOUND := "res://assets/audio/stove_add.ogg"
 const SHOVEL_SOUND := "res://assets/audio/step_snow_2.ogg"
 const CLANK := "res://assets/audio/clank.ogg"
@@ -22,6 +24,7 @@ var active: Array[StringName] = []
 var _fixed := {}
 var _nodes := {}
 var _rng := RandomNumberGenerator.new()
+var _bear := {}
 
 
 ## Мешает ли сейчас беда (неисправлено и выпала этим утром).
@@ -63,6 +66,7 @@ func _roll() -> void:
 	var t := Game.synoptic.temp_dry if Game.synoptic != null else -25.0
 	for id in POOL:
 		weights[id] = 1.0
+	weights[&"bear"] = 0.0 if Game.phase_index < 3 else 0.6
 	if t <= -30.0:
 		weights[&"buran_cold"] = 2.5
 		weights[&"canisters_gel"] = 2.2
@@ -117,6 +121,8 @@ func _build() -> void:
 				_build_antenna()
 			&"fox_raid":
 				_build_fox()
+			&"bear":
+				_build_bear()
 		lines.append(Loc.t(StringName("tr.morning." + String(id))))
 	if not lines.is_empty() and Game.hud != null:
 		get_tree().create_timer(9.0, false).timeout.connect(func() -> void:
@@ -271,3 +277,76 @@ func _build_fox() -> void:
 	var box_it := Geo.interactable(node, Vector3(0.8, 0.8, 0.8), PORCH + Vector3(1.2, 0.4, 0.6), null, Loc.t(&"tr.look.fox_raid"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"tr.hint.fox_raid"), 5.0))
 	box_it.name = "FoxBox"
+
+
+# --- Шатун ---------------------------------------------------------------------
+
+func _build_bear() -> void:
+	if not _fixed.has(&"bear_taken"):
+		_fixed[&"bear_taken"] = true
+		SaveGame.flags["rations"] = maxi(Supply.rations() - 1, 0)
+		_save_fixed()
+	# Следы вокруг сарая — широкие, косолапые, с когтями
+	var route := PackedVector3Array()
+	for i in 14:
+		var a := i * 0.45
+		var q := Yard.SHED + Vector3(cos(a) * (6.5 + i * 0.6), 0, sin(a) * (5.0 + i * 0.5))
+		q.y = Terrain.height(q.x, q.z) + 0.03
+		route.append(q)
+	var node := Node3D.new()
+	node.name = "BearTracks"
+	Game.yard.add_child(node)
+	Footprints.trail(node, &"paw", route, route[0].y, 0.9, 0.22)
+	var look := Geo.interactable(node, Vector3(1.6, 1.0, 1.6), route[3] + Vector3(0, 0.5, 0), null, Loc.t(&"tr.look.bear"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"tr.hint.bear"), 6.0))
+	look.name = "BearTracksLook"
+	# Где бродит днём: одна из дальних точек
+	var far: Array = []
+	for id: StringName in DayPOIs.POI_TARGETS:
+		var pp: Vector3 = DayPOIs.POI_TARGETS[id]["pos"]
+		if Vector2(pp.x - 8.0, pp.z - 2.0).length() > 55.0:
+			far.append(pp)
+	if not far.is_empty():
+		_bear = {"pos": far[_rng.randi() % far.size()], "state": &"wait", "t": 0.0}
+
+
+func _process(delta: float) -> void:
+	if _bear.is_empty() or Game.player == null:
+		return
+	var pp := Game.player.global_position
+	var bp: Vector3 = _bear["pos"]
+	var d := Vector2(pp.x - bp.x, pp.z - bp.z).length()
+	match _bear["state"]:
+		&"wait":
+			if d < 28.0:
+				_bear["state"] = &"roar"
+				_bear["t"] = 8.0
+				var at := bp + Vector3(0, 1.5, 0)
+				at.y = Terrain.height(bp.x, bp.z) + 1.5
+				Game.audio.play_3d("res://assets/audio/growl_v4.ogg", at, 8.0, 30.0, 0.0)
+				Game.player.shake(0.06, 1.2)
+				Game.hud.subtitle(Loc.t(&"bear.roar"), 6.0)
+				Director.add_tension(18.0, "шатун в ельнике")
+		&"roar":
+			_bear["t"] = float(_bear["t"]) - delta
+			if not get_tree().root.find_children("*", "Flare", true, false).is_empty():
+				_bear_end(&"bear.flare")
+			elif d > 26.0:
+				_bear_end(&"bear.gone")
+			elif float(_bear["t"]) <= 0.0:
+				if d < 16.0:
+					Game.hud.flash_red(0.9, 0.8)
+					Game.player.shake(0.16, 0.8)
+					Game.add_fatigue(30.0)
+					Game.warmth = maxf(Game.warmth - 6.0, 0.0)
+					Director.add_tension(25.0, "удар шатуна")
+					_bear_end(&"bear.swipe")
+				else:
+					_bear_end(&"bear.gone")
+
+
+func _bear_end(key: StringName) -> void:
+	_bear["state"] = &"done"
+	_fixed[&"bear"] = true
+	_save_fixed()
+	Game.hud.subtitle(Loc.t(key), 6.0)

@@ -2607,6 +2607,52 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("wolftest"):   # волки: глаза, фонарь, укус, бегство от твари
+		Hud.log_subs = true
+		var wl := Wildlife.instance
+		var at := Vector3(-70, 0, 10)
+		at.y = Terrain.height(at.x, at.z)
+		_tp(at, 0.0)
+		Game.yrka.virtual_pos = Vector2(300, 300)
+		await _wait(0.5)
+		wl.start()
+		await _wait(5.5)
+		print("[wolf] состояние=%s пар=%d" % [wl.state, wl._pairs.size()])
+		Game.player.set_flashlight(true)
+		var first: Node3D = wl._pairs[0]["node"]
+		_look(at, first.global_position)
+		await _wait(0.4)
+		await _shot("wolf_eyes")
+		var alive := 0
+		for w: Dictionary in wl._pairs:
+			alive += 1 if w["alive"] else 0
+		print("[wolf] после луча живых пар=%d" % alive)
+		Game.player.set_flashlight(false)
+		await _wait(27.0)
+		print("[wolf] стоял 27 с: состояние=%s усталость=%.0f" % [wl.state, Game.fatigue])
+		await _wait(3.0)
+		wl._cool = 0.0
+		wl._left = 1
+		wl.start()
+		await _wait(5.5)
+		Game.yrka.virtual_pos = Vector2(at.x + 20, at.z)
+		await _wait(0.5)
+		print("[wolf] тварь рядом: состояние=%s" % wl.state)
+		get_tree().quit()
+		return
+	if args.has("beartest"):   # шатун: следы у сарая, рёв у дальней точки, удар
+		Hud.log_subs = true
+		var tr := Troubles.instance
+		tr._build_bear()
+		var bp: Vector3 = tr._bear["pos"]
+		print("[bear] бродит у %s, пайки=%d" % [bp, Supply.rations()])
+		var q := bp + Vector3(10, 0, 0)
+		q.y = Terrain.height(q.x, q.z)
+		_tp(q, 0.0)
+		await _wait(9.5)
+		print("[bear] итог: %s усталость=%.0f" % [tr._bear["state"], Game.fatigue])
+		get_tree().quit()
+		return
 	if args.has("taigatest"):   # концовка «Тайга»: условия, подсказка, кадр на движке
 		Game.final_call = true
 		Game.set_flag("shrine_amulet_taken", true)
