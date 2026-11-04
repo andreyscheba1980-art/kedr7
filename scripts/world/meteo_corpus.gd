@@ -42,6 +42,7 @@ var _gen_tries := 0
 var _stall_t := 0.0
 var _engine: AudioStreamPlayer3D
 var _engine_in: AudioStreamPlayer        ## гул дизеля сквозь стены — внутри корпуса (3D-звук стены глушат почти в ноль)
+var _stove_audio: AudioStreamPlayer3D
 var _lamps: Array[Light3D] = []
 var _glows: Array[Node3D] = []
 var _stove_light: OmniLight3D
@@ -66,7 +67,7 @@ func _ready() -> void:
 	instance = self
 	# Без тени от луны: на дальних белых стенах её грубый каскад штриховал корпус диагональными полосами
 	var ext := Models.spawn(self, "kedr/corpus_ext", Vector3(0, 0.0, 0), 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.0, "sat": 1.0, "shadow": false})
-	var inn := Models.spawn(self, "kedr/corpus_int", Vector3(0, 0.05, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
+	var inn := Models.spawn(self, "kedr/corpus_int", Vector3.ZERO, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
 	var yard := Models.spawn(self, "kedr/corpus_yard", Vector3(0, -0.008, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.0, "sat": 1.0})
 	var furn := Models.spawn(self, "kedr/corpus_furn", Vector3.ZERO, 0.0, -1.0, {"keep": true, "center": false, "grime": 0.0, "bright": 1.6, "sat": 1.0})
 	_set_layers(ext, LAYER_OUT)
@@ -83,11 +84,29 @@ func _ready() -> void:
 	_build_ladders()
 	_build_stove()
 	_build_things()
+	_build_tower_glass()
+	_seal_walls_and_fix_geometry()
+	_build_balcony_wind()
 	add_child(CorpusDressing.new())   # пульт со шкалами, самописцы под стеклом, плакаты, мелочи
 	_set_power(false)
 	_next_ring = randf_range(90.0, 200.0)
 	_roof_t = randf_range(70.0, 200.0)
 	_knock_t = randf_range(150.0, 320.0)
+
+
+func _seal_walls_and_fix_geometry() -> void:
+	# 1. Сплошная южная стена шахты башни над лестницей (от верха коридора y = 3.45 до пола кабины CAB = 9.75):
+	# В 3D-модели отсутствовала внутренняя плоскость выше 3.45 м — при подъёме открывалась открытая пустота.
+	var wall_mat := Palette.m(&"white")
+	var south_wall := Geo.block(self, Vector3(4.35, 6.35, 0.35), Vector3(96.75, 6.6, -34.6), wall_mat, true)
+	if south_wall != null:
+		_set_layers(south_wall, LAYER_IN | LAYER_OUT)
+
+	# 2. Потолочное перекрытие стыка крыла корпуса и шахты башни на y = 3.6:
+	var ceil_mat := Palette.m(&"ceiling")
+	var ceil_cap := Geo.block(self, Vector3(4.35, 0.25, 1.2), Vector3(96.75, 3.65, -34.3), ceil_mat, true)
+	if ceil_cap != null:
+		_set_layers(ceil_cap, LAYER_IN | LAYER_OUT)
 
 
 func _set_layers(root: Node, layer: int) -> void:
@@ -119,7 +138,7 @@ func _build_collision(boxes: Array) -> void:
 static func zone_at(p: Vector3) -> StringName:
 	if p.x > 90.3 and p.x < 98.7 and p.z > -34.2 and p.z < -20.3 and p.y < 4.0:
 		return &"corpus"
-	if p.x > 94.8 and p.x < 98.7 and p.z > -38.7 and p.z < -34.2 and p.y < 12.4:
+	if p.x > 94.6 and p.x < 98.9 and p.z > -38.98 and p.z < -34.4 and p.y < 12.5:
 		return &"corpus"
 	if p.x > 99.3 and p.x < 104.7 and p.z > -38.7 and p.z < -33.8 and p.y < 4.0:
 		return &"corpus"
@@ -143,6 +162,8 @@ func _build_doors() -> void:
 	_door(Vector3(100.1, 0.15, -30.5), PI * 0.5, 0.9, 2.0, -100.0, &"it.gen_door")
 	# Калитка в западном фронтоне ангара
 	_door(Vector3(116.0, 0.1, -34.8), 0.0, 0.9, 2.0, 100.0, &"it.hangar_wicket")
+	# Балконная дверь на башне: застеклённая советская дверь, распахивается наружу на балкон
+	_build_balcony_door()
 	# Ворота газогенераторной заперты изнутри: снаружи — коллизия и табличка
 	var lock := Geo.interactable(self, Vector3(0.2, 2.3, 1.2), Vector3(105.08, FL + 1.15, -36.25), null, Loc.t(&"it.corpus_gas_locked"), func(_p: Player) -> void:
 		Game.audio.play_3d("res://assets/sfx/door_handle.ogg", Vector3(105.1, FL + 1.1, -36.25), -6.0)
@@ -185,6 +206,145 @@ func _door(hinge: Vector3, yaw0: float, w: float, h: float, open_deg: float, pro
 		tw.tween_property(pivot, "rotation:y", yaw0 + (deg_to_rad(open_deg) if state["open"] else 0.0), 0.45).set_trans(Tween.TRANS_SINE)
 		tw.finished.connect(func() -> void: state["busy"] = false))
 	pivot.add_child(d)
+
+
+var _tower_glass_mat: StandardMaterial3D
+
+
+func _glass_mat() -> StandardMaterial3D:
+	if _tower_glass_mat != null:
+		return _tower_glass_mat
+	_tower_glass_mat = StandardMaterial3D.new()
+	_tower_glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_tower_glass_mat.albedo_color = Color(0.70, 0.82, 0.94, 0.20)
+	_tower_glass_mat.roughness = 0.12
+	_tower_glass_mat.metallic_specular = 0.85
+	_tower_glass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _tower_glass_mat
+
+
+func _build_balcony_door() -> void:
+	var hinge := Vector3(95.05, CAB, -39.0)
+	var yaw0 := -PI * 0.5
+	var w := 0.9
+	var h := 2.05
+	var open_deg := -95.0
+
+	var pivot := Node3D.new()
+	pivot.position = hinge
+	pivot.rotation.y = yaw0
+	add_child(pivot)
+
+	var d := Interactable.new()
+	d.collision_layer = Geo.LAYER_WORLD
+	d.position = Vector3(0, h / 2, w / 2)
+
+	# Деревянная застекленная дверь: бруски обвязки, филенка снизу, стекло сверху, ручки с обеих сторон
+	var k := MeshKit.new(35)
+	k.mottle = 0.08
+	var wood_col := Color(0.22, 0.17, 0.12)
+	k.box(Vector3(0, 0, -w / 2 + 0.04), Vector3(0.05, h - 0.02, 0.08), wood_col)
+	k.box(Vector3(0, 0, w / 2 - 0.04), Vector3(0.05, h - 0.02, 0.08), wood_col)
+	k.box(Vector3(0, -h / 2 + 0.07, 0), Vector3(0.05, 0.14, w - 0.04), wood_col)
+	k.box(Vector3(0, h / 2 - 0.05, 0), Vector3(0.05, 0.10, w - 0.04), wood_col)
+	var mid_y := -h / 2 + 0.95
+	k.box(Vector3(0, mid_y, 0), Vector3(0.05, 0.10, w - 0.04), wood_col)
+	var panel_h := mid_y - (-h / 2 + 0.14)
+	k.box(Vector3(0, -h / 2 + 0.14 + panel_h / 2, 0), Vector3(0.025, panel_h - 0.02, w - 0.18), wood_col.darkened(0.15))
+	var handle_y := mid_y + 0.05
+	var handle_z := w * 0.38
+	k.box(Vector3(0.045, handle_y, handle_z), Vector3(0.03, 0.14, 0.03), Color(0.12, 0.12, 0.13))
+	k.box(Vector3(-0.045, handle_y, handle_z), Vector3(0.03, 0.14, 0.03), Color(0.12, 0.12, 0.13))
+	k.box(Vector3(0.065, handle_y, handle_z - 0.04), Vector3(0.07, 0.025, 0.09), Color(0.12, 0.12, 0.13))
+	k.box(Vector3(-0.065, handle_y, handle_z - 0.04), Vector3(0.07, 0.025, 0.09), Color(0.12, 0.12, 0.13))
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = k.commit()
+	mi.material_override = Creatures._mat(&"prop_balcony_door", Color.WHITE, "tex_wood.png", 0.0)
+	mi.layers = LAYER_IN | LAYER_OUT
+	d.add_child(mi)
+
+	# Стекло в верхней половине двери
+	var glass_h := (h / 2 - 0.10) - (mid_y + 0.05)
+	var glass_quad := QuadMesh.new()
+	glass_quad.size = Vector2(w - 0.18, glass_h)
+	var gmi := MeshInstance3D.new()
+	gmi.mesh = glass_quad
+	gmi.material_override = _glass_mat()
+	gmi.position = Vector3(0, mid_y + 0.05 + glass_h / 2, 0)
+	gmi.rotation.y = PI * 0.5
+	gmi.layers = LAYER_IN | LAYER_OUT
+	gmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	d.add_child(gmi)
+
+	d.add_child(Geo.box_shape(Vector3(0.06, h, w)))
+
+	var state := {"open": false, "busy": false}
+	d.prompt_provider = func() -> String: return Loc.t(&"it.door_close") if state["open"] else Loc.t(&"it.corpus_balcony_door")
+	d.used.connect(func(_p: Player) -> void:
+		if state["busy"]:
+			return
+		state["busy"] = true
+		state["open"] = not state["open"]
+		Game.audio.play_3d("res://assets/sfx/door_handle.ogg", pivot.global_position + Vector3(0, 1.0, 0), -4.0)
+		Game.audio.play_3d("res://assets/audio/door.ogg", pivot.global_position + Vector3(0, 1.0, 0), -6.0)
+		var tw := create_tween()
+		tw.tween_property(pivot, "rotation:y", yaw0 + (deg_to_rad(open_deg) if state["open"] else 0.0), 0.45).set_trans(Tween.TRANS_SINE)
+		tw.finished.connect(func() -> void: state["busy"] = false))
+	pivot.add_child(d)
+
+
+func _build_tower_glass() -> void:
+	var gmat := _glass_mat()
+	# Панорамное остекление кабины и лестничные бойницы башни
+	var panes := [
+		# Кабина: Южное остекление (с видом на тайгу и корпус)
+		[Vector3(96.75, 11.4, -34.55), Vector3(0, 0, 1), Vector2(4.35, 1.48)],
+		# Кабина: Западное остекление (с видом на тропу и жилой дом)
+		[Vector3(94.55, 11.4, -36.75), Vector3(1, 0, 0), Vector2(4.35, 1.48)],
+		# Кабина: Восточное остекление (с видом на метеоплощадку и ангар)
+		[Vector3(98.95, 11.4, -36.75), Vector3(1, 0, 0), Vector2(4.35, 1.48)],
+		# Кабина: Северное остекление (слева от двери)
+		[Vector3(94.775, 11.4, -38.95), Vector3(0, 0, 1), Vector2(0.53, 1.48)],
+		# Кабина: Северное остекление (справа от двери)
+		[Vector3(97.475, 11.4, -38.95), Vector3(0, 0, 1), Vector2(3.03, 1.48)],
+		# Кабина: Северная фрамуга над дверью (11.80 .. 12.15)
+		[Vector3(95.5, 11.975, -38.95), Vector3(0, 0, 1), Vector2(0.88, 0.33)],
+		# Башня: Окна-бойницы лестничных пролетов (1, 2, 3 этажи)
+		[Vector3(94.55, 2.4, -37.8), Vector3(1, 0, 0), Vector2(0.38, 0.98)],
+		[Vector3(94.55, 5.7, -37.8), Vector3(1, 0, 0), Vector2(0.38, 0.98)],
+		[Vector3(96.0, 4.0, -38.95), Vector3(0, 0, 1), Vector2(0.38, 0.98)],
+		[Vector3(96.0, 7.3, -38.95), Vector3(0, 0, 1), Vector2(0.38, 0.98)],
+	]
+	for p: Array in panes:
+		var q := QuadMesh.new()
+		var sz: Vector2 = p[2]
+		q.size = sz
+		var mi := MeshInstance3D.new()
+		mi.mesh = q
+		mi.material_override = gmat
+		mi.position = p[0]
+		var norm: Vector3 = p[1]
+		mi.rotation.y = atan2(norm.x, norm.z)
+		mi.layers = LAYER_IN | LAYER_OUT
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+
+
+func _build_balcony_wind() -> void:
+	var wind := AudioStreamPlayer3D.new()
+	var ws := load("res://assets/sfx/cc0/wind_whistle_loop.ogg") as AudioStream
+	if ws is AudioStreamOggVorbis:
+		ws = ws.duplicate()
+		(ws as AudioStreamOggVorbis).loop = true
+	wind.stream = ws
+	wind.volume_db = -8.0
+	wind.unit_size = 6.0
+	wind.max_distance = 25.0
+	wind.bus = &"Ambience"
+	wind.position = Vector3(96.75, CAB + 1.2, -40.0)
+	add_child(wind)
+	wind.play()
 
 
 func _build_hangar_gates() -> void:
@@ -246,7 +406,7 @@ func _build_generator() -> void:
 	_engine.volume_db = -6.0
 	_engine.unit_size = 4.0
 	_engine.max_distance = 60.0
-	_engine.pitch_scale = 1.35
+	_engine.pitch_scale = 1.04
 	_engine.bus = &"SFX"
 	_engine.position = GEN_POS + Vector3(0, 0.6, 0)
 	add_child(_engine)
@@ -257,7 +417,7 @@ func _build_generator() -> void:
 	# зайти. Ровный низкий гул «через пол» слышен, пока дизель работает и игрок в корпусе.
 	_engine_in = AudioStreamPlayer.new()
 	_engine_in.stream = AudioDirector.cached_stream("res://assets/audio/engine_loop.ogg")
-	_engine_in.pitch_scale = 1.1
+	_engine_in.pitch_scale = 0.98
 	_engine_in.volume_db = -80.0
 	_engine_in.bus = &"Ambient"
 	add_child(_engine_in)
@@ -342,10 +502,15 @@ func _build_lights() -> void:
 	]
 	for wdef: Array in wins:
 		_glows.append(_window_glow(wdef[0], wdef[1], wdef[2]))
-	# Кабина: светится всё остекление
-	for wdef: Array in [[Vector3(96.75, 11.4, -39.08), Vector3(0, 0, -1)], [Vector3(96.75, 11.4, -34.42), Vector3(0, 0, 1)],
-			[Vector3(94.42, 11.4, -36.75), Vector3(-1, 0, 0)], [Vector3(99.08, 11.4, -36.75), Vector3(1, 0, 0)]]:
-		_glows.append(_window_glow(wdef[0], wdef[1], Vector2(4.3, 1.4)))
+	# Кабина: светится остекление (северная грань разбита в обход дверного проема на балкон)
+	for wdef: Array in [
+			[Vector3(96.75, 11.4, -34.42), Vector3(0, 0, 1), Vector2(4.3, 1.4)],
+			[Vector3(94.42, 11.4, -36.75), Vector3(-1, 0, 0), Vector2(4.3, 1.4)],
+			[Vector3(99.08, 11.4, -36.75), Vector3(1, 0, 0), Vector2(4.3, 1.4)],
+			[Vector3(94.775, 11.4, -39.08), Vector3(0, 0, -1), Vector2(0.53, 1.4)],
+			[Vector3(97.475, 11.4, -39.08), Vector3(0, 0, -1), Vector2(3.03, 1.4)],
+			[Vector3(95.5, 11.975, -39.08), Vector3(0, 0, -1), Vector2(0.88, 0.33)]]:
+		_glows.append(_window_glow(wdef[0], wdef[1], wdef[2]))
 
 
 func _window_glow(pos: Vector3, out: Vector3, size: Vector2) -> Node3D:
@@ -380,8 +545,11 @@ func _climb(at: Vector3, to: Vector3, prompt_key: StringName, sub_key: StringNam
 	var it := Geo.interactable(self, Vector3(0.9, 2.2, 0.6), at, null, Loc.t(prompt_key), func(_p: Player) -> void:
 		if Game.player == null:
 			return
-		Game.player.global_position = to
-		Game.audio.play_2d("res://assets/audio/clank.ogg", -6.0)
+		Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0)
+		if Game.hud != null:
+			await Game.hud.blink(0.35)
+		if Game.player != null:
+			Game.player.global_position = to
 		if sub_key != &"":
 			Game.hud.subtitle(Loc.t(sub_key), 3.5))
 	it.hold_time = 0.8
@@ -402,12 +570,29 @@ func _build_stove() -> void:
 	_stove_light = Geo.omni(self, STOVE_POS + Vector3(0.3, 0.4, 0), 3.0, 0.0, Color(1.0, 0.5, 0.2))
 	_stove_light.light_cull_mask = 1 | LAYER_IN
 
+	_stove_audio = AudioStreamPlayer3D.new()
+	var cs := load("res://assets/sfx/cc0/stove_crackle_loop.ogg") as AudioStream
+	if cs is AudioStreamOggVorbis:
+		cs = cs.duplicate()
+		(cs as AudioStreamOggVorbis).loop = true
+	_stove_audio.stream = cs
+	_stove_audio.unit_size = 3.2
+	_stove_audio.max_distance = 12.0
+	_stove_audio.volume_db = -80.0
+	_stove_audio.bus = &"SFX"
+	_stove_audio.position = STOVE_POS + Vector3(0, 0.45, 0)
+	add_child(_stove_audio)
+	_stove_audio.play()
+
 
 func _process(delta: float) -> void:
 	_tick_scares(delta)
 	if _engine_in != null and _engine_in.playing:
 		var target := -24.0 if Game.zone == &"corpus" else -80.0
 		_engine_in.volume_db = lerpf(_engine_in.volume_db, target, minf(delta * 3.0, 1.0))
+	if _stove_audio != null:
+		var target_s := -10.0 if stove_lit else -80.0
+		_stove_audio.volume_db = lerpf(_stove_audio.volume_db, target_s, minf(delta * 2.5, 1.0))
 	if stove_lit:
 		_stove_t -= delta
 		_stove_light.light_energy = 0.7 + 0.15 * sin(Time.get_ticks_msec() * 0.007) + randf() * 0.05
@@ -536,6 +721,10 @@ func _tick_scares(delta: float) -> void:
 	if _done.has("cabin_fig") and not _done.has("palm") and p.y > CAB - 0.2 and Game.zone == &"corpus":
 		_done["palm"] = true
 		_palm_print()
+	# Ледяной ветер при выходе на открытый балкон
+	if p.y > CAB - 0.2 and p.z < -39.1 and not _done.has("balcony_wind_msg"):
+		_done["balcony_wind_msg"] = true
+		Game.hud.subtitle(Loc.t(&"sub.corpus_balcony_wind"), 4.0)
 
 
 func _roof_steps(p: Vector3) -> void:

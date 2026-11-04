@@ -62,20 +62,30 @@ var _baro_dead_said := false
 var _sky_light: DirectionalLight3D
 var _sky_mat: ShaderMaterial
 
+var _front_door_slit: MeshInstance3D
+var _front_door_slit_mat: StandardMaterial3D
+var _living_door_hinge: Node3D
+var living_door_open := false
+var _living_door_busy := false
+var _living_door_slit: MeshInstance3D
+var _living_door_slit_mat: StandardMaterial3D
+var _shack_light_slits: Array = []
+
 ## Палитра неба и тумана: 0 — пасмурный день, 1 — лунная ночь (между ними — сумерки).
 const SKY_DAY := {"top_color": Color(0.42, 0.47, 0.55), "horizon_color": Color(0.63, 0.67, 0.73),
 	"below_color": Color(0.5, 0.53, 0.58), "far_ridge": Color(0.52, 0.57, 0.64), "near_ridge": Color(0.38, 0.42, 0.48),
 	"moon_color": Color(0.25, 0.25, 0.25)}
-const SKY_NIGHT := {"top_color": Color(0.012, 0.02, 0.036), "horizon_color": Color(0.12, 0.16, 0.2),
-	"below_color": Color(0.045, 0.065, 0.085), "far_ridge": Color(0.07, 0.1, 0.13), "near_ridge": Color(0.035, 0.05, 0.066),
+const SKY_NIGHT := {"top_color": Color(0.008, 0.015, 0.03), "horizon_color": Color(0.075, 0.115, 0.17),
+	"below_color": Color(0.02, 0.03, 0.04), "far_ridge": Color(0.038, 0.06, 0.085), "near_ridge": Color(0.02, 0.032, 0.048),
 	"moon_color": Color(0.85, 0.92, 1.0)}
 const FOG_DAY_COL := Color(0.58, 0.61, 0.68)
-const FOG_NIGHT_COL := Color(0.07, 0.1, 0.135)   ## лунная дымка: дальний лес — слоями силуэтов, а не чёрной стеной
+const FOG_NIGHT_COL := Color(0.032, 0.052, 0.08)   ## лунная дымка: дальний лес — слоями силуэтов, а не светлой стеной
 ## Ночь: без фонаря видно только силуэты на фоне неба, окна и огни; снег под ногами — еле-еле.
-const NIGHT_AMB_COL := Color(0.04, 0.085, 0.16)
-const NIGHT_AMB := 0.11
-const NIGHT_MOON := 0.11
+const NIGHT_AMB_COL := Color(0.03, 0.06, 0.11)
+const NIGHT_AMB := 0.06
+const NIGHT_MOON := 0.05
 var _swinging_bulb: Node3D
+var _porch_bulb: Node3D
 var _storm_beacon: OmniLight3D
 var _beacon_prop: Node3D
 var _beacon_blackout_active := false
@@ -84,8 +94,11 @@ var _woodbox_node: Node3D
 var _woodbox_it: Interactable
 var _kettle_cd := 0.0
 var _stove_fire_player: AudioStreamPlayer3D
+var _stove_crackle_player: AudioStreamPlayer3D
 var _clock_player: AudioStreamPlayer3D
 var _gen_sputter_player: AudioStreamPlayer3D
+var _gen_engine_player: AudioStreamPlayer3D
+var _underfloor_hum_player: AudioStreamPlayer
 var _gen_stall_timer := 140.0
 var _gen_stalled := false
 var _gen_smoke: CPUParticles3D
@@ -116,6 +129,10 @@ var _living_trunk: Node3D
 var _damper_door: Node3D
 var _flue_handle: Node3D
 var _switch_lever: Node3D
+var _stove_haze: Node3D
+var _stove_haze_mat: ShaderMaterial
+var _moon_windows: Array[Dictionary] = []
+static var _window_cross_tex: ImageTexture
 
 
 
@@ -141,6 +158,8 @@ func _ready() -> void:
 	Perf.mark("station _build_vestibule()")
 	_build_front_door()
 	Perf.mark("station _build_front_door()")
+	_build_living_door()
+	Perf.mark("station _build_living_door()")
 	_build_curtains()
 	Perf.mark("station _build_curtains()")
 	_build_attic()
@@ -239,14 +258,106 @@ func _process(delta: float) -> void:
 		var strength := clampf(Game.stove_wood / 40.0, 0.25, 1.0)
 		if Game.stove_damper or Game.stove_flue:
 			strength *= 0.45   # прикрыто — огонь тлеет, топка светит тускло
-		_fire.light_energy = (0.55 + sin(_t * 7.3) * 0.06 + randf() * 0.05) * strength
+		var flick := sin(_t * 7.3) * 0.18 + sin(_t * 14.9) * 0.10 + sin(_t * 23.1) * 0.06 + (randf() - 0.5) * 0.08
+		_fire.light_energy = clampf((0.72 + flick) * strength, 0.12, 1.35)
+		_fire.omni_range = (3.4 + sin(_t * 4.7) * 0.45) * clampf(strength, 0.7, 1.15)
+		_fire.light_color = Color(1.0, 0.46 + sin(_t * 3.8) * 0.07, 0.14)
+		if _fire_glow != null and _fire_glow.get_child_count() > 0:
+			var mi := _fire_glow.get_child(0) as MeshInstance3D
+			if mi != null and mi.material_override != null and mi.material_override is StandardMaterial3D:
+				(mi.material_override as StandardMaterial3D).emission_energy_multiplier = 0.85 + flick * 0.5
+	var target_fire_vol := -80.0
+	var target_crackle_vol := -80.0
+	if burning:
+		var fuel_k := clampf(Game.stove_wood / 50.0, 0.0, 1.0)
+		var draft_k := 0.45 if Game.stove_damper else 1.0
+		if Game.stove_flue:
+			draft_k = 0.2
+		target_fire_vol = lerpf(-24.0, -9.0, fuel_k * draft_k)
+		target_crackle_vol = lerpf(-20.0, -7.5, fuel_k * (0.75 + draft_k * 0.25))
 	if _stove_fire_player != null:
-		var target_fire_vol := -80.0
-		if burning:
-			target_fire_vol = lerpf(-18.0, -5.0, clampf(Game.stove_wood / 50.0, 0.0, 1.0))
 		_stove_fire_player.volume_db = lerpf(_stove_fire_player.volume_db, target_fire_vol, minf(delta * 2.5, 1.0))
+		_stove_fire_player.pitch_scale = 0.95 + (0.08 if not Game.stove_damper else -0.05)
+	if _stove_crackle_player != null:
+		_stove_crackle_player.volume_db = lerpf(_stove_crackle_player.volume_db, target_crackle_vol, minf(delta * 2.5, 1.0))
+	if _stove_haze != null:
+		_stove_haze.visible = burning
+		if burning and _stove_haze_mat != null:
+			var haze_k := clampf(Game.stove_wood / 30.0, 0.35, 1.0)
+			_stove_haze_mat.set_shader_parameter(&"distortion_strength", 0.009 * haze_k)
+
+	# Лунный свет через окна: серебристо-голубые проекции рам на полу в тёмных комнатах
+	var is_night_time := not Game.is_daylight()
+	var house_dark := not lights_lit()
+	var base_moon_a := (0.36 if house_dark else 0.06) if is_night_time else 0.0
+	var moon_flicker := 1.0 + sin(_t * 0.75) * 0.05
+	for mw: Dictionary in _moon_windows:
+		var mp: MeshInstance3D = mw["proj"]
+		var ms: MeshInstance3D = mw["shaft"]
+		var mat_p: StandardMaterial3D = mw["mat_proj"]
+		var mat_s: ShaderMaterial = mw["mat_shaft"]
+		var cur_a: float = mat_p.albedo_color.a
+		var target_a: float = base_moon_a * moon_flicker
+		var new_a: float = move_toward(cur_a, target_a, delta * 1.2)
+		mat_p.albedo_color.a = new_a
+		if mat_s != null:
+			mat_s.set_shader_parameter(&"color", Color(0.20, 0.36, 0.62, new_a * 0.55))
+		mp.visible = new_a > 0.01
+		ms.visible = new_a > 0.01
+
+	# Тёплые полоски света из-под дверей (щели под входной дверью и дверью в жилую)
+	var house_has_light := lights_lit() or burning
+	if _front_door_slit != null and _front_door_slit_mat != null:
+		var show_front := not door_open and house_has_light and not Game.is_daylight()
+		_front_door_slit.visible = show_front
+		if show_front:
+			var flick := 1.0 + (sin(_t * 7.3) * 0.08 if burning and not lights_lit() else 0.0)
+			_front_door_slit_mat.albedo_color.a = clampf(0.82 * flick, 0.0, 1.0)
+
+	if _living_door_slit != null and _living_door_slit_mat != null:
+		var show_living := not living_door_open and house_has_light
+		_living_door_slit.visible = show_living
+		if show_living:
+			var flick := 1.0 + (sin(_t * 7.3) * 0.08 if burning and not lights_lit() else 0.0)
+			_living_door_slit_mat.albedo_color.a = clampf(0.85 * flick, 0.0, 1.0)
+
+	# Мерцающий свет в сарае/будке генератора сквозь щели стен
+	var gen_running := Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0
+	for sd: Dictionary in _shack_light_slits:
+		var mi: MeshInstance3D = sd["mesh"]
+		var smat: StandardMaterial3D = sd["mat"]
+		var base_a: float = sd["base_a"]
+		mi.visible = gen_running
+		if gen_running:
+			var gflick := clampf(0.78 + sin(_t * 31.0) * 0.16 + sin(_t * 67.0) * 0.08 + (randf() - 0.5) * 0.08, 0.2, 1.15)
+			smat.albedo_color.a = clampf(base_a * gflick, 0.0, 1.0)
+
+	if _gen_engine_player != null:
+		var target_eng_vol := -80.0
+		if gen_running:
+			target_eng_vol = -5.5
+			if not shack_door_open:
+				target_eng_vol -= 5.0
+			if Game.generator_fuel < 15.0:
+				target_eng_vol += sin(_t * 14.0) * 1.5
+				_gen_engine_player.pitch_scale = 1.02 + sin(_t * 11.0) * 0.05
+			else:
+				_gen_engine_player.pitch_scale = 1.02
+		_gen_engine_player.volume_db = lerpf(_gen_engine_player.volume_db, target_eng_vol, minf(delta * 4.0, 1.0))
+
+	if _underfloor_hum_player != null:
+		var target_uf_vol := -80.0
+		if gen_running and Game.is_home():
+			target_uf_vol = -24.0
+		_underfloor_hum_player.volume_db = lerpf(_underfloor_hum_player.volume_db, target_uf_vol, minf(delta * 2.0, 1.0))
+
 	if _swinging_bulb != null:
-		_swinging_bulb.rotation.z = sin(_t * 1.4) * 0.08 + sin(_t * 2.1) * 0.03
+		_swinging_bulb.rotation.z = sin(_t * 1.35) * 0.16 + sin(_t * 2.1) * 0.05
+		_swinging_bulb.rotation.x = cos(_t * 1.1) * 0.12 + sin(_t * 1.7) * 0.04
+	if _porch_bulb != null:
+		var w_str: float = 0.6 + (Game.weather.intensity * 1.4 if Game.weather != null else 0.0)
+		_porch_bulb.rotation.z = (sin(_t * 2.3) * 0.18 + sin(_t * 4.1) * 0.06) * w_str
+		_porch_bulb.rotation.x = (cos(_t * 1.7) * 0.14 + sin(_t * 3.3) * 0.05) * w_str
 	_process_lamp_sag(delta)
 	if _clock_pendulum != null:
 		_clock_pendulum.rotation.z = sin(Time.get_ticks_msec() * 0.00314159) * deg_to_rad(14.0)
@@ -321,6 +432,14 @@ func _process(delta: float) -> void:
 		_apply_sky_tint(t_dusk)
 		_sky_light.light_color = Color(0.85, 0.85, 0.9).lerp(Color(0.58, 0.72, 0.92), t_dusk)
 		_sky_light.light_energy = lerpf(0.45, NIGHT_MOON, t_dusk)
+
+	# Медленное покачивание лунного света на ветру (±1–2°): тени вековых елей и построек тягуче ползут по снегу
+	if not Game.is_daylight() and _sky_light != null:
+		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.0
+		var w_scale := 1.0 + w_intensity * 0.85
+		var sway_y := (sin(_t * 0.32) * 1.5 + sin(_t * 0.68) * 0.65) * w_scale
+		var sway_x := (cos(_t * 0.24) * 0.8 + sin(_t * 0.53) * 0.35) * w_scale
+		_sky_light.rotation_degrees = Vector3(-32.0 + sway_x, -135.0 + sway_y, 0.0)
 
 	if _tape_deck != null:
 		var has_deck := Game.has_item(&"tape_recorder")   # стоит на столе только когда его нашли
@@ -724,12 +843,12 @@ func _build_environment() -> void:
 	env.sky = sky
 	env.background_mode = Environment.BG_SKY
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
-	env.fog_sky_affect = 0.18
+	env.fog_sky_affect = 0.12
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.55, 0.6, 0.7) if day else NIGHT_AMB_COL
-	env.ambient_light_energy = 0.75 if day else (0.16 if Game.is_prologue_trail() else NIGHT_AMB)
+	env.ambient_light_energy = 0.75 if day else (0.06 if Game.is_prologue_trail() else NIGHT_AMB)
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.58, 0.61, 0.68) if day else Color(0.055, 0.145, 0.220)
+	env.fog_light_color = Color(0.58, 0.61, 0.68) if day else FOG_NIGHT_COL
 	env.fog_density = Weather.FOG_INDOOR
 
 	# Кинематографичный тонемаппинг Filmic и выверенная палитра (-35% насыщенности)
@@ -753,7 +872,7 @@ func _build_environment() -> void:
 
 	_sky_light = DirectionalLight3D.new()
 	_sky_light.light_color = Color(0.85, 0.85, 0.9) if day else Color(0.58, 0.72, 0.92)
-	_sky_light.light_energy = 0.45 if day else (0.18 if Game.is_prologue_trail() else NIGHT_MOON)
+	_sky_light.light_energy = 0.45 if day else (0.05 if Game.is_prologue_trail() else NIGHT_MOON)
 	_sky_light.rotation_degrees = Vector3(-25.0, 40.0, 0.0) if day else Vector3(-32.0, -135.0, 0.0)   # луна на северо-западе, над лесом за домом
 	# Тени луны ночью почти не видны (свет 0.08 против фонаря и окон), а стоят ещё 2 прохода всей сцены.
 	# Ночью — только на высоком пресете; днём солнце даёт заметные тени — со среднего.
@@ -784,10 +903,10 @@ func _apply_sky_tint(t: float) -> void:
 
 func set_day_lighting(day: bool) -> void:
 	if env != null:
-		env.background_color = Color(0.4, 0.43, 0.5) if day else Color(0.055, 0.155, 0.235)
+		env.background_color = Color(0.4, 0.43, 0.5) if day else Color(0.02, 0.04, 0.07)
 		env.ambient_light_color = Color(0.55, 0.6, 0.7) if day else NIGHT_AMB_COL
 		env.ambient_light_energy = 0.75 if day else NIGHT_AMB
-		env.fog_light_color = Color(0.58, 0.61, 0.68) if day else Color(0.055, 0.145, 0.220)
+		env.fog_light_color = Color(0.58, 0.61, 0.68) if day else FOG_NIGHT_COL
 	if _sky_light != null:
 		_sky_light.light_color = Color(0.85, 0.85, 0.9) if day else Color(0.58, 0.72, 0.92)
 		_sky_light.light_energy = 0.45 if day else NIGHT_MOON
@@ -1153,8 +1272,8 @@ func _build_exterior() -> void:
 			[Vector3(5.25, 1.7, -5.5 - o), Vector3(3.9, 3.4, 0.3)], [Vector3(3.5 - o, 1.7, -2.85), Vector3(0.3, 3.4, 5.8)]]:
 		# Дверной проём востока не перекрываем: коллизию восточной стены режем на два куска.
 		if (w[0] as Vector3).x > 14.0:
-			for part: Array in [[Vector3(14.5 + o, 1.7, 1.0), Vector3(0.3, 3.4, 3.1)], [Vector3(14.5 + o, 1.7, 5.25), Vector3(0.3, 3.4, 3.2)],
-					[Vector3(14.5 + o, 2.8, 3.1), Vector3(0.3, 1.2, 1.1)]]:
+			for part: Array in [[Vector3(14.72, 1.7, 1.0), Vector3(0.44, 3.4, 3.1)], [Vector3(14.72, 1.7, 5.25), Vector3(0.44, 3.4, 3.2)],
+					[Vector3(14.72, 2.8, 3.1), Vector3(0.44, 1.2, 1.1)]]:
 				var cs2 := CollisionShape3D.new()
 				var sh2 := BoxShape3D.new()
 				sh2.size = part[1]
@@ -1364,6 +1483,58 @@ func _window(glass_pos: Vector3, size: Vector3, inward: Vector3, wname: String) 
 	window_spots.append({"name": wname, "glass": glass_pos, "feet": feet, "inward": inward})
 	_window_glow(glass_pos, size, -inward)
 
+	# Лунный свет через окно: проекция переплёта рамы на пол и наклонный объёмный луч
+	var w_span := maxf(size.x, size.z)
+	var floor_pos := glass_pos + inward * 2.2
+	floor_pos.y = 0.055
+	var proj_quad := QuadMesh.new()
+	proj_quad.size = Vector2(w_span * 1.35, 1.85)
+	var proj_mat := StandardMaterial3D.new()
+	proj_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	proj_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	proj_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	proj_mat.albedo_color = Color(0.25, 0.42, 0.68, 0.0)
+	proj_mat.albedo_texture = _make_window_cross_texture()
+	proj_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+
+	var proj_mi := MeshInstance3D.new()
+	proj_mi.mesh = proj_quad
+	proj_mi.material_override = proj_mat
+	proj_mi.position = floor_pos
+	proj_mi.rotation_degrees = Vector3(-90.0, 0.0, 0.0) if along_x else Vector3(-90.0, 90.0, 0.0)
+	proj_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	proj_mi.visible = false
+	add_child(proj_mi)
+
+	var shaft_mesh := CylinderMesh.new()
+	shaft_mesh.radial_segments = 4
+	shaft_mesh.rings = 1
+	shaft_mesh.cap_top = false
+	shaft_mesh.cap_bottom = false
+	var shaft_len := glass_pos.distance_to(floor_pos)
+	shaft_mesh.height = shaft_len
+	shaft_mesh.top_radius = w_span * 0.42
+	shaft_mesh.bottom_radius = w_span * 0.88
+	var shaft_mat := Atmosphere.beam_material(Color(0.20, 0.36, 0.62, 0.0))
+
+	var shaft_mi := MeshInstance3D.new()
+	shaft_mi.mesh = shaft_mesh
+	shaft_mi.material_override = shaft_mat
+	shaft_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	shaft_mi.position = (glass_pos + floor_pos) * 0.5
+	var shaft_dir := (floor_pos - glass_pos).normalized()
+	shaft_mi.basis = Basis(Quaternion(Vector3.DOWN, shaft_dir))
+	shaft_mi.visible = false
+	add_child(shaft_mi)
+
+	_moon_windows.append({
+		"proj": proj_mi,
+		"mat_proj": proj_mat,
+		"shaft": shaft_mi,
+		"mat_shaft": shaft_mat,
+		"wname": wname
+	})
+
 	if wname == "north":
 		_frost_hand = Props.frost_handprint()
 		_frost_hand.position = glass_pos - Vector3(0.08, 0.05, 0.02)
@@ -1456,6 +1627,28 @@ func _window_glow(glass_pos: Vector3, size: Vector3, outward: Vector3) -> void:
 	Atmosphere.add_window_shaft(light, glass_pos, size, outward)
 
 
+static func _make_window_cross_texture() -> ImageTexture:
+	if _window_cross_tex != null:
+		return _window_cross_tex
+	var w := 64
+	var img := Image.create(w, w, false, Image.FORMAT_RGBA8)
+	for y in w:
+		for x in w:
+			var u := float(x) / float(w - 1)
+			var v := float(y) / float(w - 1)
+			var edge_x := minf(u, 1.0 - u)
+			var edge_y := minf(v, 1.0 - v)
+			var edge_fade := clampf(minf(edge_x, edge_y) / 0.12, 0.0, 1.0)
+			var bar_x := absf(u - 0.5)
+			var bar_y := absf(v - 0.45)
+			var bar_cross := minf(clampf((bar_x - 0.05) / 0.045, 0.0, 1.0), clampf((bar_y - 0.05) / 0.045, 0.0, 1.0))
+			var alpha := edge_fade * bar_cross
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, alpha))
+	img.generate_mipmaps()
+	_window_cross_tex = ImageTexture.create_from_image(img)
+	return _window_cross_tex
+
+
 func _build_living_quarters() -> void:
 	# 1. Русская печь (x: -1.5, z: 1.0)
 	var stove := Geo.interactable(self, Vector3(1.1, 1.4, 1.1), Vector3(-1.5, 0.65, 1.0), null, "", _on_stove_used)
@@ -1470,18 +1663,38 @@ func _build_living_quarters() -> void:
 		_fire_glow = Geo.block(self, Vector3(0.4, 0.25, 0.02), Vector3(-1.5, 0.35, 1.58), Palette.glow(&"amber"), false)
 	_fire = Geo.omni(self, Vector3(-1.5, 0.4, 1.2), 3.4, 0.65, Color(1.0, 0.5, 0.15))
 	_build_stove_controls()
-	_fire.shadow_enabled = false
+	_fire.shadow_enabled = Settings.quality >= 1
+	_fire.shadow_bias = 0.15
+	_fire.shadow_normal_bias = 2.0
 
-	# Звук горения и треска дров в печи
+	# Тепловое марево (конвективное преломление горячего воздуха над плитой печи)
+	_stove_haze = _build_stove_haze(Vector3(-1.5, 1.25, 1.1))
+	add_child(_stove_haze)
+
+	# Звук горения пламени и уютного потрескивания дров в печи
 	_stove_fire_player = AudioStreamPlayer3D.new()
 	_stove_fire_player.stream = AudioDirector.cached_stream("res://assets/audio/fire_loop.ogg")
-	_stove_fire_player.unit_size = 4.5
+	_stove_fire_player.unit_size = 4.0
 	_stove_fire_player.max_distance = 12.0
-	_stove_fire_player.volume_db = -8.0
+	_stove_fire_player.volume_db = -80.0
 	_stove_fire_player.bus = &"SFX"
 	_stove_fire_player.autoplay = true
 	stove.add_child(_stove_fire_player)
 	_stove_fire_player.play()
+
+	_stove_crackle_player = AudioStreamPlayer3D.new()
+	var crackle_stream := load("res://assets/sfx/cc0/stove_crackle_loop.ogg") as AudioStream
+	if crackle_stream is AudioStreamOggVorbis:
+		crackle_stream = crackle_stream.duplicate()
+		(crackle_stream as AudioStreamOggVorbis).loop = true
+	_stove_crackle_player.stream = crackle_stream
+	_stove_crackle_player.unit_size = 3.8
+	_stove_crackle_player.max_distance = 11.0
+	_stove_crackle_player.volume_db = -80.0
+	_stove_crackle_player.bus = &"SFX"
+	_stove_crackle_player.autoplay = true
+	stove.add_child(_stove_crackle_player)
+	_stove_crackle_player.play()
 
 	# Дровница у печи с запасом дров (0..3 полена)
 	_woodbox_count = 2
@@ -1667,6 +1880,25 @@ func _build_living_quarters() -> void:
 	register_lamp(ceiling)
 
 
+func _build_stove_haze(at: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.name = "StoveHeatHaze"
+	root.position = at
+	var q := QuadMesh.new()
+	q.size = Vector2(0.85, 0.55)
+	_stove_haze_mat = ShaderMaterial.new()
+	_stove_haze_mat.shader = load("res://assets/shaders/heat_haze.gdshader")
+	for rot_y in [0.0, PI * 0.5]:
+		var mi := MeshInstance3D.new()
+		mi.mesh = q
+		mi.material_override = _stove_haze_mat
+		mi.rotation.y = rot_y
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(mi)
+	root.visible = false
+	return root
+
+
 func _build_radio_room() -> void:
 	# 1. Широкий операторский стол под северным окном на площадку
 	_collider(Vector3(2.4, 0.75, 1.0), Vector3(9.2, 0.375, -1.3))
@@ -1675,6 +1907,10 @@ func _build_radio_room() -> void:
 	# Радиостанция Р-250 «Кит»
 	var radio_set := Geo.interactable(self, Vector3(0.9, 0.45, 0.4), Vector3(9.2, 0.96, -1.5), null, Loc.t(&"it.radio"), _on_radio_used)
 	radio_set.name = "RadioSet"
+	radio_set.prompt_provider = func() -> String:
+		if Game.is_day() and Game.aftermath != null and Game.aftermath.is_call_ringing():
+			return Loc.t(&"it.answer_call")
+		return Loc.t(&"it.radio")
 	# Модель из Блендера (tools/blender/r250.py): запечённые цвет + AO, свой износ — без триплан-грязи
 	if Models.spawn(radio_set, "kedr/r250", Vector3(0, -0.21, 0), 0.0, 0.42, {"grime": 0.0, "bright": 1.25, "sat": 0.85}) == null:
 		radio_set.add_child(Props.radio())
@@ -1745,6 +1981,7 @@ func _build_radio_room() -> void:
 
 	if not is_backdrop:
 		var radio := Radio.new()
+		radio.name = "Radio"
 		radio.position = Vector3(9.2, 1.0, -1.4)
 		add_child(radio)
 
@@ -2024,10 +2261,13 @@ func _build_corridor() -> void:
 	_swinging_bulb = Node3D.new()
 	_swinging_bulb.position = Vector3(7.5, ROOM_H, 4.4)
 	add_child(_swinging_bulb)
-	Geo.cylinder(_swinging_bulb, 0.008, 0.35, Vector3(0.0, -0.175, 0.0), Palette.m(&"dark"), false)
-	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.4, 0.0), 6.5, 0.8, Color(1.0, 0.85, 0.65))
-	bulb_omni.shadow_enabled = Settings.quality >= 2   # качающаяся лампочка гоняет тени по коридору (высокий пресет)
-	Geo.bulb(bulb_omni, &"bulb", 0.06)
+	Geo.cylinder(_swinging_bulb, 0.007, 0.58, Vector3(0.0, -0.29, 0.0), Palette.m(&"dark"), false)
+	var socket := Geo.cylinder(_swinging_bulb, 0.022, 0.06, Vector3(0.0, -0.58, 0.0), Palette.m(&"metal"), false)
+	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.64, 0.0), 7.5, 0.9, Color(1.0, 0.86, 0.68))
+	bulb_omni.shadow_enabled = Settings.quality >= 1   # скользящие тени по коридору на среднем и высоком пресетах
+	bulb_omni.shadow_bias = 0.12
+	bulb_omni.shadow_normal_bias = 2.0
+	Geo.bulb(bulb_omni, &"bulb", 0.065)
 	register_lamp(bulb_omni)
 
 	# 3. Вешалка с тёплыми ватниками на южной стене коридора
@@ -2044,14 +2284,15 @@ func _build_storage() -> void:
 	battery.position = Vector3(3.9, 0.0, -3.8)
 	add_child(battery)
 
-	# Стеллаж с запасами и метеоприборами
-	_collider(Vector3(1.5, 1.7, 0.5), Vector3(6.6, 0.85, -3.8))
+	# Стеллаж с запасами и метеоприборами вдоль восточной стены
+	_collider(Vector3(0.5, 1.7, 1.5), Vector3(6.75, 0.85, -3.8))
 	var shelves := Props.storage_shelves()
-	shelves.position = Vector3(6.6, 0.0, -3.8)
+	shelves.position = Vector3(6.75, 0.0, -3.8)
+	shelves.rotation.y = deg_to_rad(90.0)
 	add_child(shelves)
 
 	# Запасные радиолампы на полке (интерактивный осмотр)
-	var tubes := Geo.interactable(self, Vector3(0.6, 0.35, 0.35), Vector3(6.5, 1.34, -3.8), null, Loc.t(&"it.storage_tubes"), func(_p: Player) -> void:
+	var tubes := Geo.interactable(self, Vector3(0.35, 0.35, 0.6), Vector3(6.65, 1.34, -3.8), null, Loc.t(&"it.storage_tubes"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.storage_tubes"), 4.0)
 	)
 	tubes.name = "StorageTubes"
@@ -2086,6 +2327,28 @@ func _build_storage() -> void:
 		lens.rotation = Vector3(deg_to_rad(90.0), deg_to_rad(20.0), 0)
 		lens.position = Vector3(sin(deg_to_rad(20.0)) * 0.06, -0.05, cos(deg_to_rad(20.0)) * 0.06)
 		cam_it.add_child(lens)
+
+	# Бензиновая паяльная лампа на полке кладовой
+	var torch := Props.blowtorch()
+	torch.position = Vector3(6.65, 0.82, -3.4)
+	torch.rotation.y = deg_to_rad(-90.0)
+	add_child(torch)
+	var torch_it := Geo.interactable(self, Vector3(0.35, 0.35, 0.35), Vector3(6.65, 0.95, -3.4), null, Loc.t(&"it.blowtorch"), func(p: Player) -> void:
+		if p != null:
+			p.set_held(&"blowtorch")
+			Game.hud.subtitle(Loc.t(&"sub.got_blowtorch"), 4.0)
+	)
+	torch_it.name = "BlowtorchProp"
+
+	# Стол фотолаборатории с увеличителем «Ленинград-4» и кюветами
+	var dr_set := Props.darkroom_set()
+	dr_set.position = Vector3(5.7, 0.0, -5.2)
+	add_child(dr_set)
+	_collider(Vector3(1.3, 1.2, 0.7), Vector3(5.7, 0.6, -5.2))
+	var dr_it := Geo.interactable(self, Vector3(1.1, 0.9, 0.7), Vector3(5.7, 0.85, -5.2), null, Loc.t(&"it.darkroom"), func(_p: Player) -> void:
+		_open_darkroom()
+	)
+	dr_it.name = "DarkroomTable"
 
 	# Влажные тающие следы босых ног на дощатом полу кладовой
 	_build_storage_footprints()
@@ -2238,7 +2501,7 @@ func _build_front_door() -> void:
 	door.collision_layer = Geo.LAYER_WORLD
 	door.position = Vector3(0.0, 1.0, 0.5)
 	door.prompt_provider = func() -> String: return Loc.t(&"it.door_close") if door_open else Loc.t(&"it.door_open")
-	door.add_child(Geo.box_shape(Vector3(0.08, 2.0, 1.0)))
+	door.add_child(Geo.box_shape(Vector3(0.24, 2.0, 1.0), Vector3(0.08, 0, 0)))
 	# Дверь из Блендера (tools/blender/front_door.py): снаружи дерматин с гвоздями, внутри доски и засов
 	var door_model := Props._kedr_model("front_door", {"center": false})
 	if door_model != null:
@@ -2276,15 +2539,104 @@ func _build_front_door() -> void:
 		EventBus.ui_requested.emit(&"peephole"))
 	door.add_child(_peephole)
 
-	# Фонарь над входной дверью на улице
-	var porch := Geo.omni(self, DOOR_LAMP, 9.5, 1.8, Color(1.0, 0.58, 0.26))   # тёплое пятно у двери — «костёр» ночного кадра
+	# Фонарь на подвесе под козырьком крыльца (качается на ветру)
+	_porch_bulb = Node3D.new()
+	_porch_bulb.position = DOOR_LAMP + Vector3(0.0, 0.28, 0.0)
+	add_child(_porch_bulb)
+	Geo.cylinder(_porch_bulb, 0.007, 0.28, Vector3(0.0, -0.14, 0.0), Palette.m(&"dark"), false)
+	var porch := Geo.omni(_porch_bulb, Vector3(0.0, -0.28, 0.0), 9.5, 1.8, Color(1.0, 0.58, 0.26))
 	Atmosphere.add_halo(porch, 1.3)
-	Atmosphere.add_halo(porch, 4.2, Color(1.0, 0.68, 0.42, 0.13))   # ледяной туман вокруг фонаря — мягкий большой ореол
-	# Тени от лееров и перил на снегу под фонарём крыльца (на средних и высоких настройках)
-	# Тень от фонаря крыльца — шесть проходов сцены (куб): только на высоком пресете
-	porch.shadow_enabled = Settings.quality >= 2 and not is_backdrop
+	Atmosphere.add_halo(porch, 4.0, Color(1.0, 0.68, 0.42, 0.13))
+	porch.shadow_enabled = Settings.quality >= 1 and not is_backdrop   # живые тени от перил и лееров на среднем и высоком пресетах
+	porch.shadow_bias = 0.14
+	porch.shadow_normal_bias = 2.0
 	Geo.bulb(porch, &"bulb", 0.07)
 	register_lamp(porch)
+
+	# Тёплая полоска света из-под закрытой входной двери на крыльцо
+	var slit_mesh := QuadMesh.new()
+	slit_mesh.size = Vector2(0.96, 0.22)
+	_front_door_slit = MeshInstance3D.new()
+	_front_door_slit.mesh = slit_mesh
+	_front_door_slit.position = Vector3(14.65, 0.052, 3.1)
+	_front_door_slit.rotation = Vector3(-PI * 0.5, 0.0, -PI * 0.5)
+	_front_door_slit_mat = StandardMaterial3D.new()
+	_front_door_slit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_front_door_slit_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_front_door_slit_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_front_door_slit_mat.albedo_color = Color(1.0, 0.65, 0.25, 0.82)
+	_front_door_slit_mat.albedo_texture = _make_door_slit_texture()
+	_front_door_slit.material_override = _front_door_slit_mat
+	add_child(_front_door_slit)
+
+
+func _build_living_door() -> void:
+	_living_door_hinge = Node3D.new()
+	_living_door_hinge.position = Vector3(3.5, 0.0, 2.62)
+	add_child(_living_door_hinge)
+
+	var l_door := Interactable.new()
+	l_door.collision_layer = Geo.LAYER_INTERACT
+	l_door.position = Vector3(0.0, 1.0, 0.5)
+	l_door.prompt_provider = func() -> String: return Loc.t(&"it.door_close") if living_door_open else Loc.t(&"it.door_open")
+	l_door.add_child(Geo.box_shape(Vector3(0.08, 2.0, 1.0)))
+
+	# Дверное полотно из сосновых досок с филёнками и латунной ручкой
+	var door_mesh := Geo.box_mesh(Vector3(0.045, 1.96, 0.96), Palette.m(&"wood"))
+	l_door.add_child(door_mesh)
+	var p_top := Geo.box_mesh(Vector3(0.052, 0.72, 0.38), Palette.m(&"wood"))
+	p_top.position = Vector3(0.0, 0.42, 0.0)
+	l_door.add_child(p_top)
+	var p_bot := Geo.box_mesh(Vector3(0.052, 0.62, 0.38), Palette.m(&"wood"))
+	p_bot.position = Vector3(0.0, -0.42, 0.0)
+	l_door.add_child(p_bot)
+	var handle := Geo.box_mesh(Vector3(0.12, 0.035, 0.12), Palette.m(&"metal"))
+	handle.position = Vector3(0.0, 0.0, 0.38)
+	l_door.add_child(handle)
+
+	l_door.used.connect(_on_living_door_used)
+	_living_door_hinge.add_child(l_door)
+
+	# Полоска тёплого света из-под двери в жилую на пол коридора
+	var slit_mesh := QuadMesh.new()
+	slit_mesh.size = Vector2(0.96, 0.26)
+	_living_door_slit = MeshInstance3D.new()
+	_living_door_slit.mesh = slit_mesh
+	_living_door_slit.position = Vector3(3.64, 0.052, 3.12)
+	_living_door_slit.rotation = Vector3(-PI * 0.5, 0.0, -PI * 0.5)
+	_living_door_slit_mat = StandardMaterial3D.new()
+	_living_door_slit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_living_door_slit_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	_living_door_slit_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_living_door_slit_mat.albedo_color = Color(1.0, 0.62, 0.22, 0.85)
+	_living_door_slit_mat.albedo_texture = _make_door_slit_texture()
+	_living_door_slit.material_override = _living_door_slit_mat
+	add_child(_living_door_slit)
+
+
+func _on_living_door_used(_p: Player) -> void:
+	if _living_door_busy:
+		return
+	_living_door_busy = true
+	living_door_open = not living_door_open
+	Game.audio.play_3d(DOOR_SOUND, _living_door_hinge.global_position, -6.0)
+	var target_y := deg_to_rad(-75.0) if living_door_open else 0.0
+	var tw := create_tween()
+	tw.tween_property(_living_door_hinge, "rotation:y", target_y, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: _living_door_busy = false)
+
+
+static func _make_door_slit_texture() -> ImageTexture:
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		var vy := (float(y) / 31.0) * 2.0 - 1.0
+		var side_fade := clampf((1.0 - absf(vy)) * 2.2, 0.0, 1.0)
+		for x in 32:
+			var ux := float(x) / 31.0
+			var depth_fade := exp(-ux * 2.8)
+			var a := side_fade * depth_fade
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	return ImageTexture.create_from_image(img)
 
 
 ## Отдельная дизельная будка на заднем дворе станции (перенесена за дом)
@@ -2453,6 +2805,34 @@ func _build_generator_shack() -> void:
 	_gen_sputter_player.bus = &"SFX"
 	gen.add_child(_gen_sputter_player)
 
+	# Постоянный 3D-гул работающего 4-тактного дизеля АБ-4
+	_gen_engine_player = AudioStreamPlayer3D.new()
+	var eng_s := load("res://assets/audio/engine_loop.ogg") as AudioStream
+	if eng_s is AudioStreamOggVorbis:
+		eng_s = eng_s.duplicate()
+		(eng_s as AudioStreamOggVorbis).loop = true
+	_gen_engine_player.stream = eng_s
+	_gen_engine_player.unit_size = 4.5
+	_gen_engine_player.max_distance = 45.0
+	_gen_engine_player.volume_db = -80.0
+	_gen_engine_player.bus = &"SFX"
+	_gen_engine_player.autoplay = true
+	gen.add_child(_gen_engine_player)
+	_gen_engine_player.play()
+
+	# Гул и вибрация пола в избе от работающего генератора (через мёрзлый грунт)
+	_underfloor_hum_player = AudioStreamPlayer.new()
+	var uf_s := load("res://assets/sfx/underfloor_hum.ogg") as AudioStream
+	if uf_s is AudioStreamOggVorbis:
+		uf_s = uf_s.duplicate()
+		(uf_s as AudioStreamOggVorbis).loop = true
+	_underfloor_hum_player.stream = uf_s
+	_underfloor_hum_player.volume_db = -80.0
+	_underfloor_hum_player.bus = &"Ambient"
+	_underfloor_hum_player.autoplay = true
+	add_child(_underfloor_hum_player)
+	_underfloor_hum_player.play()
+
 	# Бочка солярки рядом с генератором
 	_barrel = Geo.interactable(self, Vector3(0.55, 0.9, 0.55), shack_center + Vector3(0.9, 0.50, -0.3), null, "", _on_barrel_used)
 	var barrel_mesh := Props.barrel()
@@ -2497,6 +2877,59 @@ func _build_generator_shack() -> void:
 	Atmosphere.add_halo(l_shack, 0.75)
 	Geo.bulb(l_shack, &"bulb", 0.06)
 	register_lamp(l_shack)
+
+	# Мигающие щели света в дощатых стенах будки генератора при работающем дизеле
+	_build_shack_light_slits(shack_center)
+
+
+func _build_shack_light_slits(c: Vector3) -> void:
+	var slits_def: Array = [
+		[c + Vector3(1.18, 1.25, 1.41), Vector2(0.04, 1.35), Vector3.ZERO, 0.88],
+		[c + Vector3(-1.61, 1.15, 0.35), Vector2(0.04, 1.40), Vector3(0.0, -PI * 0.5, 0.0), 0.92],
+		[c + Vector3(-1.61, 1.35, -0.65), Vector2(0.035, 1.10), Vector3(0.0, -PI * 0.5, 0.0), 0.85],
+		[c + Vector3(0.0, 0.052, 1.42), Vector2(0.92, 0.18), Vector3(-PI * 0.5, 0.0, 0.0), 0.78],
+	]
+	var slit_tex := _make_shack_slit_texture()
+	for s_info: Array in slits_def:
+		var pos: Vector3 = s_info[0]
+		var sz: Vector2 = s_info[1]
+		var rot: Vector3 = s_info[2]
+		var b_a: float = s_info[3]
+
+		var q := QuadMesh.new()
+		q.size = sz
+		var mi := MeshInstance3D.new()
+		mi.mesh = q
+		mi.position = pos
+		mi.rotation = rot
+
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(1.0, 0.68, 0.28, b_a)
+		mat.albedo_texture = slit_tex
+		mi.material_override = mat
+		add_child(mi)
+
+		_shack_light_slits.append({
+			"mesh": mi,
+			"mat": mat,
+			"base_a": b_a
+		})
+
+
+static func _make_shack_slit_texture() -> ImageTexture:
+	var img := Image.create(16, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		var vy := (float(y) / 63.0) * 2.0 - 1.0
+		var y_fade := clampf((1.0 - absf(vy)) * 3.0, 0.0, 1.0)
+		for x in 16:
+			var ux := (float(x) / 15.0) * 2.0 - 1.0
+			var x_fade := clampf(1.0 - absf(ux), 0.0, 1.0)
+			var a := x_fade * y_fade
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	return ImageTexture.create_from_image(img)
 
 
 const SHACK_SLOPE := 0.3 / 2.8    ## уклон крыши будки: спереди (юг) 2.4 м, сзади 2.1 м
@@ -2718,6 +3151,11 @@ func set_door_open(open: bool) -> void:
 	if open == door_open or _door_busy:
 		return
 	_door_busy = true
+	if Game.psychosomatic != null and Game.psychosomatic.has_method(&"should_door_hesitate") and bool(Game.psychosomatic.call(&"should_door_hesitate")):
+		Game.audio.play_3d(CLANK_SOUND, _door_hinge.global_position, -2.0)
+		if Game.hud != null and randf() < 0.4:
+			Game.hud.subtitle(Loc.t(&"sub.phobia_door_hesitate"), 3.0)
+		await get_tree().create_timer(0.32, false).timeout
 	door_open = open
 	if open:
 		EventBus.door_opened.emit()
@@ -2821,6 +3259,9 @@ func _flash_window_face() -> void:
 
 
 func _on_radio_used(_p: Player) -> void:
+	if Game.is_day() and Game.aftermath != null and Game.aftermath.is_call_ringing():
+		Game.aftermath.answer_morning_call()
+		return
 	Game.radio.enter()
 
 
@@ -2994,7 +3435,25 @@ func _update_woodbox_visual() -> void:
 	add_child(_woodbox_node)
 
 
-func _on_kettle_used(_p: Player) -> void:
+func _open_darkroom() -> void:
+	if Game.hud == null:
+		return
+	var dr := DarkroomUI.new()
+	Game.hud.open_modal(dr)
+	await dr.closed
+	Game.hud.close_modal()
+
+
+func _on_kettle_used(p: Player) -> void:
+	if p != null and p.held == &"kettle":
+		p.set_held(&"")
+		Game.hud.subtitle(Loc.t(&"it.kettle_return"), 3.0)
+		return
+	if p != null and p.held == &"" and (Input.is_physical_key_pressed(KEY_F) or Input.is_physical_key_pressed(KEY_SHIFT)):
+		p.set_held(&"kettle")
+		p.kettle_heat_timer = 90.0
+		Game.hud.subtitle(Loc.t(&"sub.kettle_taken"), 4.0)
+		return
 	if prop_changed("teapot"):
 		Game.hud.subtitle(Loc.t(&"sub.kettle_table"), 3.0)
 		return
@@ -3505,14 +3964,19 @@ func _tick_creak(delta: float) -> void:
 	_creak_t -= delta
 	if _creak_t > 0.0:
 		return
-	_creak_t = Game.rng.randf_range(45.0, 95.0) if Game.is_night() else Game.rng.randf_range(100.0, 200.0)
+	var storm_k := Game.weather.intensity if Game.weather != null else 0.0
+	# В сильный ветер и буран брёвна и стропила дома стонут чаще от ветрового напора
+	_creak_t = Game.rng.randf_range(25.0, 55.0) / (1.0 + storm_k * 0.8) if Game.is_night() else Game.rng.randf_range(70.0, 140.0)
 	var snd := Voice.sfx(&"house_creak")
 	if snd == "" or Game.player == null or not Game.is_home() or Director.hold:
 		return
 	var a := Game.rng.randf() * TAU
-	var pos := Game.player.global_position + Vector3(cos(a), 0.0, sin(a)) * Game.rng.randf_range(2.0, 4.0)
-	pos.y = 2.5
-	Game.audio.play_3d(snd, pos, -6.0, 3.0)
+	var pos := Game.player.global_position + Vector3(cos(a), 0.0, sin(a)) * Game.rng.randf_range(2.0, 4.5)
+	pos.y = Game.rng.randf_range(2.2, 3.2) # скрип в углах сруба, стропилах и потолочных балках
+	var vol := -12.0 + storm_k * 2.0
+	var p := Game.audio.play_3d(snd, pos, vol, 3.5)
+	if p != null:
+		p.pitch_scale = Game.rng.randf_range(0.92, 1.08)
 
 
 func _process_susedko(delta: float) -> void:

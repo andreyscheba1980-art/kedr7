@@ -389,8 +389,8 @@ static func ams(yard: Node3D, c: Vector3, yaw: float, id: StringName) -> void:
 ## Приборная площадка у корпуса: осадкомер, гелиограф, почвенные термометры, колья, намёты у ограды.
 ## Только вид — показания снимают с будки и рейки (Yard).
 static func meteo_plot_decor(yard: Node3D, c: Vector3, half: float) -> void:
-	_put(yard, Props.precip_gauge(), c, 2.6, -2.6)
-	_put(yard, Props.heliograph(), c, -0.6, -3.3)
+	_put(yard, Props.precip_gauge(), c, 1.8, -1.8)
+	_put(yard, Props.heliograph(), c, 0.2, -2.2)
 	_put(yard, Props.soil_thermometers(), c, 2.9, 2.4, 10.0)
 	for p: Array in [[3.6, 3.6], [-3.4, 3.7]]:
 		_put(yard, Props.survey_stake(), c, p[0], p[1])

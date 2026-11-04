@@ -13,6 +13,7 @@ const FRAMES := 12
 const BULBS := 4
 const SHUTTER := "res://assets/audio/clank.ogg"
 const PRINT_SIZE := Vector2i(384, 216)
+const DayPOIsClass = preload("res://scripts/world/day_pois.gd")
 
 var frames_left := FRAMES
 var bulbs_left := BULBS
@@ -149,6 +150,10 @@ func snap() -> void:
 			if _sees(cam, an.pos_of(id), _range_for(id)):
 				tags.append(id)
 				an.photographed(id)
+	var poi_id: StringName = DayPOIsClass.check_poi_in_frame(cam)
+	if poi_id != &"":
+		tags.append(poi_id)
+		SaveGame.flags["poi_photo_" + String(poi_id)] = true
 	var fv := Game.forest_voice
 	var voice := fv != null and fv.in_frame(cam)
 

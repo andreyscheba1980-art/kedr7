@@ -123,9 +123,9 @@ func _show_main() -> void:
 
 
 func grab_initial_focus() -> void:
-	if _box != null:
+	if _box != null and is_inside_tree():
 		for c in _box.get_children():
-			if c is Button and c.visible:
+			if c is Button and c.visible and c.is_inside_tree():
 				c.grab_focus()
 				return
 

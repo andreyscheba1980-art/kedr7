@@ -860,6 +860,24 @@ func _polish_test() -> void:
 	assert(outhouse_node != null and outhouse_node.get_child_count() > 0, "Props.outhouse() missing meshes!")
 	outhouse_node.free()
 
+	var mine_node: Node3D = Props.mine_portal()
+	assert(mine_node != null and mine_node.get_child_count() > 0, "Props.mine_portal() missing meshes!")
+	mine_node.free()
+
+	var tdt_node: Node3D = Props.crawler_tractor_tdt55()
+	assert(tdt_node != null and tdt_node.get_child_count() > 0, "Props.crawler_tractor_tdt55() missing meshes!")
+	tdt_node.free()
+
+	var dome_node: Node3D = Props.radar_dome()
+	assert(dome_node != null and dome_node.get_child_count() > 0, "Props.radar_dome() missing meshes!")
+	dome_node.free()
+
+	var borehole_node: Node3D = Props.borehole_sg4()
+	assert(borehole_node != null and borehole_node.get_child_count() > 0, "Props.borehole_sg4() missing meshes!")
+	borehole_node.free()
+
+	assert(DayPOIs.POI_TARGETS.size() >= 14, "Expected at least 14 Day POIs!")
+
 	# Проверка 3D-планшета и физического рундука в руках игрока
 	var hands := FPHands.new()
 	hands._ready()
@@ -2555,6 +2573,25 @@ func _tour(args: PackedStringArray) -> void:
 		return
 	if args.has("revisit"):
 		await _revisit()
+		get_tree().quit()
+		return
+	if args.has("probe_at"):   # что стоит в точке: --tour day 6 probe_at x z радиус
+		var pi := args.find("probe_at")
+		var at := Vector3(float(args[pi + 1]), 0, float(args[pi + 2]))
+		var rr := float(args[pi + 3])
+		for n in Game.level.find_children("*", "GeometryInstance3D", true, false):
+			var g := n as GeometryInstance3D
+			var bb: AABB = g.global_transform * g.get_aabb()
+			var cc := bb.get_center()
+			if Vector2(cc.x - at.x, cc.z - at.z).length() < rr and bb.size.length() < 20.0:
+				var mi := g as MeshInstance3D
+				var info := ""
+				if mi != null and mi.mesh != null:
+					info = mi.mesh.get_class() + " " + str(mi.mesh.get("size")) + " mat=" + str(mi.material_override.resource_name if mi.material_override else "") + " meta=" + str(g.get_parent().get_meta_list())
+					var pm := mi.material_override as StandardMaterial3D
+					if pm != null:
+						info += " col=" + str(pm.albedo_color)
+				print("[at] %s | %s | c=%s s=%s %s" % [g.name, g.get_parent().name + "/" + g.get_parent().get_parent().name, cc, bb.size, info])
 		get_tree().quit()
 		return
 	if args.has("floatscan"):

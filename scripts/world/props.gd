@@ -1241,6 +1241,9 @@ static func axe_stump() -> Node3D:
 
 ## Заброшенная полуразрушенная метеобудка 1961 года.
 static func old_meteo_screen() -> Node3D:
+	var glb := _kedr_model("old_meteo_screen", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"old_meteo_screen", "tex_wood.png")
 	if cached != null:
 		return cached
@@ -1287,6 +1290,9 @@ static func old_meteo_screen() -> Node3D:
 
 ## Флюгер Вильда с вращающейся пластиной и указателями сторон света.
 static func wild_vane() -> Node3D:
+	var glb := _kedr_model("wild_vane", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"wild_vane", "tex_metal.png")
 	if cached != null:
 		return cached
@@ -1572,7 +1578,15 @@ static func valenki() -> Node3D:
 
 
 ## Деревянная снеговая лопата (широкий фанерный совок на черенке).
-static func snow_shovel(_is_held := false) -> Node3D:
+static func snow_shovel(is_held := false) -> Node3D:
+	if is_held:
+		var root := Node3D.new()
+		var m := snow_shovel(false)
+		m.position = Vector3(0.24, -0.58, -0.65)
+		m.rotation_degrees = Vector3(-65.0, 25.0, -15.0)
+		m.scale = Vector3(0.72, 0.72, 0.72)
+		root.add_child(m)
+		return root
 	var cached := _instance_from_cache(&"snow_shovel", "tex_wood.png")
 	if cached != null:
 		return cached
@@ -1913,6 +1927,9 @@ static func chimney_ice() -> Node3D:
 
 ## Советская жалюзийная психрометрическая метеобудка Селянинова
 static func meteo_screen() -> Node3D:
+	var glb := _kedr_model("meteo_screen", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"meteo_screen", "tex_planks.png")
 	if cached != null:
 		return cached
@@ -2494,8 +2511,8 @@ static func curtains(width := 1.2, height := 1.35) -> Node3D:
 			fold.position = Vector3(fx, -height * 0.5, 0.008 if s % 2 == 0 else -0.008)
 			panel.add_child(fold)
 
-		# Подхват шторы (тесьма)
-		var tie := Geo.box_mesh(Vector3(half_w * 1.05, 0.04, 0.05), Palette.m(&"paper"))
+		# Подхват шторы (тесьма из той же тёмной ткани)
+		var tie := Geo.box_mesh(Vector3(half_w * 1.02, 0.03, 0.03), dark_cloth)
 		tie.position = Vector3(0, -height * 0.65, 0)
 		panel.add_child(tie)
 
@@ -3355,6 +3372,9 @@ static func survey_stake() -> Node3D:
 
 ## Геодезическая триангуляционная вышка на сопке (День 2)
 static func triangulation_tower() -> Node3D:
+	var glb := _kedr_model("triangulation_tower", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
 	var key := &"triangulation_tower"
 	var cached := _instance_from_cache(key, "tex_wood.png")
 	if cached != null:
@@ -3898,6 +3918,9 @@ static func fuel_tank() -> Node3D:
 
 ## Осадкомер Третьякова: столб, ведро-приёмник и ветровая защита из 16 отогнутых пластин.
 static func precip_gauge() -> Node3D:
+	var glb := _kedr_model("precip_gauge", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var key := &"precip_gauge_v1"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -3920,6 +3943,9 @@ static func precip_gauge() -> Node3D:
 
 ## Гелиограф Кэмпбелла: стеклянный шар на чугунной подставке, на столбе.
 static func heliograph() -> Node3D:
+	var glb := _kedr_model("heliograph", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var key := &"heliograph_v1"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -3936,6 +3962,9 @@ static func heliograph() -> Node3D:
 
 ## Почвенно-глубинные термометры Савинова: дощатая рама и четыре коленчатые трубки.
 static func soil_thermometers() -> Node3D:
+	var glb := _kedr_model("soil_thermometers", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
 	var key := &"soil_thermo_v1"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -3952,3 +3981,332 @@ static func soil_thermometers() -> Node3D:
 		k.tube([Vector3(x, 0.0, 0.1), Vector3(x, 0.25, 0.1), Vector3(x, 0.28 + i * 0.06, -0.15)], [0.018], glass, 5)
 		k.box(Vector3(x, 0.30 + i * 0.06, -0.18), Vector3(0.04, 0.04, 0.04), Color(0.55, 0.12, 0.10))
 	return _mi(k, key, "tex_metal.png")
+
+
+## Леерный столб со стальным кольцом, тросом и красным флажком.
+static func leers_post() -> Node3D:
+	return _kedr_model("leers_post", {"bright": 1.1, "sat": 0.95})
+
+
+## Охотничьи деревянные лыжи «Тайга» с бамбуковой палкой.
+static func taiga_skis() -> Node3D:
+	return _kedr_model("taiga_skis", {"bright": 1.1, "sat": 0.95})
+
+
+## Контрольная снегомерная рейка М-103 и снегоотборник ВС-43.
+static func snow_stake() -> Node3D:
+	return _kedr_model("snow_stake", {"bright": 1.1, "sat": 0.95})
+
+
+## Советская бензиновая паяльная лампа.
+static func blowtorch() -> Node3D:
+	return _kedr_model("blowtorch", {"scale": 1.0, "bright": 1.15})
+
+
+## Обледеневший амбарный замок с куржаком.
+static func frozen_padlock() -> Node3D:
+	return _kedr_model("frozen_padlock", {"scale": 1.0, "bright": 1.1})
+
+
+## Стол советской фотолаборатории с увеличителем «Ленинград-4» и кюветами.
+static func darkroom_set() -> Node3D:
+	return _kedr_model("darkroom_set", {"bright": 1.05, "sat": 0.95})
+
+
+## Снегоход «Буран» Семёнова в овраге.
+static func soviet_snowmobile() -> Node3D:
+	return _kedr_model("soviet_snowmobile", {"bright": 1.1, "sat": 0.95})
+
+
+## Кустарный волчий капкан №5 с зажатой веткой и серой ватой.
+static func hunting_trap() -> Node3D:
+	return _kedr_model("hunting_trap", {"bright": 1.1, "sat": 0.95})
+
+
+## Заснеженная брезентовая палатка геологов 1974 года.
+static func expedition_tent() -> Node3D:
+	return _kedr_model("expedition_tent", {"bright": 1.1, "sat": 0.95})
+
+
+## Мансийская оленья кормушка с резными тамгами и подвешенными оберегами.
+static func mansi_shrine() -> Node3D:
+	return _kedr_model("mansi_shrine", {"bright": 1.1, "sat": 0.95})
+
+
+## Базальтовый останец «Чёртов палец» с репером ГУГК СССР.
+static func chertov_finger() -> Node3D:
+	return _kedr_model("chertov_finger", {"bright": 1.1, "sat": 0.9})
+
+
+## Заброшенный геологический шурф №7 с крепью.
+static func geology_shaft() -> Node3D:
+	return _kedr_model("geology_shaft", {"bright": 1.1, "sat": 0.95})
+
+
+## Аварийный радиомаяк Р-855 «Комар» на ветвях кедра.
+static func beacon_komar() -> Node3D:
+	return _kedr_model("beacon_komar", {"bright": 1.1, "sat": 0.95})
+
+
+## Занесенные снегом охотничьи нарты с оленьими рогами.
+static func siberian_sledge() -> Node3D:
+	return _kedr_model("siberian_sledge", {"bright": 1.1, "sat": 0.95})
+
+
+## Сейсмо-пост №12 с защитным коробом и маятником сейсмографа ВЭГИК.
+static func seismo_post() -> Node3D:
+	return _kedr_model("seismo_post", {"bright": 1.1, "sat": 0.9})
+
+
+## Фанерная заплатка с гвоздями для окна сеней.
+static func broken_window_plank() -> Node3D:
+	return _kedr_model("broken_window_plank", {"bright": 1.15, "sat": 0.95})
+
+
+## Замерзший ворон на ступенях крыльца.
+static func frozen_crow() -> Node3D:
+	return _kedr_model("frozen_crow", {"bright": 1.1, "sat": 0.9})
+
+
+## Заброшенная ледяная штольня («Шурф Времени» / Горизонт-40):
+## портал из лиственничной крепи, рельсовый путь, сошедшая с рельсов вагонетка, сосульки и мерзлота.
+static func mine_portal() -> Node3D:
+	var glb := _kedr_model("mine_portal", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
+	var key := &"mine_portal_v1"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(301, 0.08)
+	var timber := Color(0.26, 0.19, 0.12)
+	var timber_dark := Color(0.18, 0.13, 0.09)
+	var rock := Color(0.25, 0.26, 0.27)
+	var steel := Color(0.35, 0.36, 0.38)
+	var ice := Color(0.72, 0.84, 0.92)
+	var dark_pit := Color(0.02, 0.02, 0.03)
+
+	# 1. Скальный портал и чернеющий вход в штольню
+	k.box(Vector3(0, 1.8, -1.0), Vector3(3.6, 3.6, 2.0), rock)
+	k.box(Vector3(0, 1.4, -0.6), Vector3(2.0, 2.6, 1.5), dark_pit)
+
+	# 2. Лиственничные окладные венцы крепи (3 арки вглубь)
+	for i in range(3):
+		var z := float(i) * -1.2
+		# Стойки
+		k.box(Vector3(-1.15, 1.35, z), Vector3(0.24, 2.7, 0.24), timber)
+		k.box(Vector3(1.15, 1.35, z), Vector3(0.24, 2.7, 0.24), timber)
+		# Верхняк (матица)
+		k.box(Vector3(0, 2.6, z), Vector3(2.54, 0.26, 0.26), timber_dark)
+		# Подкосы
+		k.tube([Vector3(-1.0, 2.3, z), Vector3(-0.7, 2.5, z)], [0.08, 0.08], timber_dark, 4)
+		k.tube([Vector3(1.0, 2.3, z), Vector3(0.7, 2.5, z)], [0.08, 0.08], timber_dark, 4)
+		# Затяжка кровли
+		k.box(Vector3(0, 2.76, z - 0.5), Vector3(2.2, 0.08, 1.1), timber_dark)
+
+	# 3. Узкоколейные рельсы и деревянные шпалы наружу
+	for i in range(8):
+		var z := 1.2 - float(i) * 0.7
+		k.box(Vector3(0, 0.04, z), Vector3(1.4, 0.08, 0.16), timber_dark)
+	for sx in [-0.42, 0.42]:
+		k.box(Vector3(sx, 0.11, -1.8), Vector3(0.06, 0.07, 6.2), steel)
+
+	# 4. Сошедшая с рельсов опрокинутая вагонетка
+	var cart_pos := Vector3(0.9, 0.45, 0.8)
+	var cart_b := Basis(Vector3.FORWARD, deg_to_rad(35.0)) * Basis(Vector3.UP, deg_to_rad(20.0))
+	k.box(cart_pos, Vector3(1.1, 0.65, 1.4), steel, cart_b)
+	k.box(cart_pos + Vector3(0, 0.2, 0), Vector3(0.95, 0.5, 1.25), dark_pit, cart_b)
+	# Колесные пары
+	for sz in [-0.45, 0.45]:
+		k.tube([cart_pos + cart_b * Vector3(-0.4, -0.35, sz), cart_pos + cart_b * Vector3(0.4, -0.35, sz)], [0.035, 0.035], steel, 6)
+
+	# 5. Ледяные натёки и сосульки на верхняке
+	for i in range(7):
+		var x := -0.9 + float(i) * 0.3
+		k.tube([Vector3(x, 2.47, 0.1), Vector3(x, 2.1 - (i % 3) * 0.15, 0.1)], [0.035, 0.005], ice, 5)
+
+	return _mi(k, key, "tex_wood.png")
+
+
+## Вмерзший в наст советский гусеничный трелёвочник ТДТ-55 в Чёртовой пади:
+## гусеницы, катки, бронированная кабина, лебёдочный щит, козырек и выхлопная труба.
+static func crawler_tractor_tdt55() -> Node3D:
+	var glb := _kedr_model("crawler_tractor_tdt55", {"bright": 1.1, "sat": 0.9})
+	if glb != null:
+		return glb
+	var key := &"tdt55_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(302, 0.06)
+	var cab_orange := Color(0.46, 0.24, 0.14)
+	var chassis_grey := Color(0.18, 0.19, 0.20)
+	var track_steel := Color(0.14, 0.14, 0.15)
+	var glass := Color(0.68, 0.78, 0.85)
+	var rust := Color(0.32, 0.18, 0.12)
+	var snow := Color(0.85, 0.89, 0.94)
+
+	# 1. Гусеничные тележки (левая и правая)
+	for sx in [-1.15, 1.15]:
+		# Гусеничная лента
+		k.box(Vector3(sx, 0.10, 0), Vector3(0.42, 0.14, 4.2), track_steel)
+		k.box(Vector3(sx, 0.75, 0), Vector3(0.42, 0.08, 3.8), track_steel)
+		k.box(Vector3(sx, 0.42, 2.05), Vector3(0.42, 0.65, 0.14), track_steel, Basis(Vector3.RIGHT, deg_to_rad(-40.0)))
+		k.box(Vector3(sx, 0.42, -2.05), Vector3(0.42, 0.65, 0.14), track_steel, Basis(Vector3.RIGHT, deg_to_rad(40.0)))
+		# Опорные катки (5 шт на борт)
+		for r in range(5):
+			var rz := -1.4 + float(r) * 0.7
+			k.tube([Vector3(sx - 0.16, 0.38, rz), Vector3(sx + 0.16, 0.38, rz)], [0.28, 0.28], chassis_grey, 8, true, true)
+		# Снежные наносы в гусеницах
+		k.blob(Vector3(sx, 0.55, 0.5), Vector3(0.24, 0.22, 1.4), snow, 3, 6)
+
+	# 2. Корпус рамы и моторный отсек (носовая часть)
+	k.box(Vector3(0, 0.85, 0.3), Vector3(1.8, 0.85, 4.0), chassis_grey)
+	k.box(Vector3(0, 1.35, 1.1), Vector3(1.4, 0.75, 2.1), cab_orange)
+	# Радиаторная решетка
+	k.box(Vector3(0, 1.25, 2.18), Vector3(1.2, 0.6, 0.05), chassis_grey)
+
+	# 3. Кабина водителя со скошенным лобовым стеклом
+	k.box(Vector3(0, 1.85, -0.65), Vector3(1.5, 1.35, 1.7), cab_orange)
+	# Окна кабины
+	k.box(Vector3(0, 2.0, 0.22), Vector3(1.3, 0.65, 0.05), glass)
+	for sx in [-0.76, 0.76]:
+		k.box(Vector3(sx, 2.0, -0.65), Vector3(0.05, 0.65, 1.2), glass)
+	k.box(Vector3(0, 2.0, -1.52), Vector3(1.2, 0.55, 0.05), glass)
+
+	# 4. Трелёвочный погрузочный щит и лебедка сзади
+	k.box(Vector3(0, 0.85, -2.15), Vector3(1.9, 0.14, 1.1), rust, Basis(Vector3.RIGHT, deg_to_rad(-28.0)))
+	k.tube([Vector3(0, 1.2, -1.6), Vector3(0, 1.5, -1.6)], [0.22, 0.22], chassis_grey, 8) # барабан лебедки
+	# Защитная арка над кабиной
+	k.tube([Vector3(-0.72, 1.4, -1.5), Vector3(-0.72, 2.58, -1.5), Vector3(0.72, 2.58, -1.5), Vector3(0.72, 1.4, -1.5)], [0.045], chassis_grey, 6)
+
+	# 5. Выхлопная труба с искрогасителем
+	k.tube([Vector3(0.65, 1.5, 0.8), Vector3(0.65, 2.85, 0.8)], [0.055, 0.055], rust, 6)
+	k.box(Vector3(0.65, 2.88, 0.8), Vector3(0.14, 0.04, 0.14), rust)
+
+	return _mi(k, key, "tex_metal.png")
+
+
+## Заброшенный купол РЛС П-12 «Енисей» на вершине сопки:
+## круглый бетонный бункер-основание, разорванный геодезический радиопрозрачный купол,
+## решетчатая антенна кругового обзора внутри, стойки аппаратуры.
+static func radar_dome() -> Node3D:
+	var glb := _kedr_model("radar_dome", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
+	var key := &"radar_dome_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(303, 0.05)
+	var concrete := Color(0.42, 0.44, 0.42)
+	var dome_panels := Color(0.74, 0.76, 0.74)
+	var lattice_steel := Color(0.22, 0.24, 0.25)
+	var electronics := Color(0.18, 0.22, 0.19)
+	var rust := Color(0.36, 0.20, 0.14)
+	var snow := Color(0.88, 0.91, 0.96)
+
+	# 1. Круглое бетонное основание
+	k.tube([Vector3(0, 0.0, 0), Vector3(0, 1.1, 0)], [4.4, 4.4], concrete, 14, true, true)
+
+	# 2. Каркас купола (разорванная сфера радиусом 4.2 м)
+	for ring_i in range(4):
+		var y := 1.1 + float(ring_i) * 0.9
+		var r := 4.2 * cos(float(ring_i) * 0.35)
+		k.tube([Vector3(0, y, 0), Vector3(0, y + 0.12, 0)], [r, r], dome_panels, 12, false, false)
+	# Меридиональные ребра жесткости (кроме сектора пролома)
+	for rib_i in range(10):
+		var a := float(rib_i) * (TAU / 12.0)
+		# Пролом с северо-запада (угол ~180°..240°)
+		if a > PI * 0.85 and a < PI * 1.35:
+			continue
+		for seg in range(4):
+			var y0 := 1.1 + float(seg) * 0.9
+			var y1 := 1.1 + float(seg + 1) * 0.9
+			var r0 := 4.2 * cos(float(seg) * 0.35)
+			var r1 := 4.2 * cos(float(seg + 1) * 0.35)
+			var p0 := Vector3(cos(a) * r0, y0, sin(a) * r0)
+			var p1 := Vector3(cos(a) * r1, y1, sin(a) * r1)
+			k.box((p0 + p1) * 0.5, Vector3(0.08, 0.92, 0.08), dome_panels, Basis(Vector3.UP, -a))
+
+	# 3. Решетчатая параболическая антенна РЛС в центре
+	var dish_center := Vector3(0, 2.6, 0)
+	k.tube([Vector3(0, 1.1, 0), dish_center], [0.35, 0.28], lattice_steel, 8)
+	# Сетка зеркала антенны (ширина 4.6м, выгнутая дуга)
+	for i in range(7):
+		var dy := -0.8 + float(i) * 0.28
+		var curve_z := -pow(float(i - 3) * 0.35, 2.0) * 0.4
+		k.box(dish_center + Vector3(0, dy, curve_z), Vector3(4.2, 0.04, 0.04), lattice_steel)
+	for j in range(9):
+		var dx := -1.8 + float(j) * 0.45
+		k.box(dish_center + Vector3(dx, 0, 0), Vector3(0.04, 1.8, 0.04), lattice_steel)
+	# Облучатель на выносной штанге
+	k.tube([dish_center, dish_center + Vector3(0, 0.3, 1.6)], [0.035], lattice_steel, 4)
+	k.box(dish_center + Vector3(0, 0.3, 1.65), Vector3(0.24, 0.18, 0.18), rust)
+
+	# 4. Стойки радиоаппаратуры внутри купола
+	for s_idx in [-1.8, 1.8]:
+		k.box(Vector3(s_idx, 1.85, -2.2), Vector3(1.1, 1.5, 0.65), electronics)
+		k.box(Vector3(s_idx, 2.0, -1.86), Vector3(0.85, 0.9, 0.04), Color(0.1, 0.1, 0.1))
+
+	# 5. Наносы снега на разрушенном краю купола
+	k.blob(Vector3(-2.8, 1.6, -1.2), Vector3(1.6, 0.6, 1.2), snow, 3, 7)
+
+	return _mi(k, key, "tex_metal.png")
+
+
+## Устье Сверхглубокой опорной скважины СГ-4 («Голос Бездны»):
+## глухой фланец на 16 болтах, манометр высокого давления, акустический датчик,
+## штабели ящиков с керном горных пород.
+static func borehole_sg4() -> Node3D:
+	var glb := _kedr_model("borehole_sg4", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
+	var key := &"borehole_sg4_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(304, 0.05)
+	var heavy_steel := Color(0.20, 0.22, 0.24)
+	var flange_steel := Color(0.28, 0.30, 0.33)
+	var bronze := Color(0.55, 0.44, 0.22)
+	var wood := Color(0.32, 0.24, 0.16)
+	var dark_hole := Color(0.01, 0.01, 0.01)
+
+	# 1. Бетонный цоколь устья скважины
+	k.box(Vector3(0, 0.25, 0), Vector3(2.6, 0.5, 2.6), Color(0.40, 0.42, 0.40))
+
+	# 2. Направляющая обсадная колонна (труба диаметром 1.1 м)
+	k.tube([Vector3(0, 0.5, 0), Vector3(0, 1.45, 0)], [0.55, 0.55], heavy_steel, 14, true, true)
+
+	# 3. Массивный глухой фланец с венцом болтов
+	k.tube([Vector3(0, 1.45, 0), Vector3(0, 1.65, 0)], [0.72, 0.72], flange_steel, 16, true, true)
+	for b_i in range(16):
+		var ang := float(b_i) * (TAU / 16.0)
+		var bx := cos(ang) * 0.63
+		var bz := sin(ang) * 0.63
+		k.tube([Vector3(bx, 1.65, bz), Vector3(bx, 1.76, bz)], [0.038, 0.038], heavy_steel, 6)
+
+	# 4. Высоконапорная задвижка и манометр на отводе
+	k.tube([Vector3(0, 1.1, 0.52), Vector3(0, 1.1, 1.05)], [0.09, 0.09], heavy_steel, 8)
+	k.tube([Vector3(0, 1.1, 1.05), Vector3(0, 1.45, 1.05)], [0.07, 0.07], heavy_steel, 8)
+	# Корпус манометра и треснувшее стекло со шкалой
+	k.tube([Vector3(0, 1.45, 1.05), Vector3(0, 1.45, 1.18)], [0.18, 0.18], bronze, 12, true, true)
+	k.box(Vector3(0, 1.45, 1.19), Vector3(0.24, 0.24, 0.02), Color(0.85, 0.85, 0.82))
+	k.box(Vector3(0.04, 1.48, 1.205), Vector3(0.015, 0.14, 0.005), Color(0.8, 0.1, 0.1), Basis(Vector3.FORWARD, deg_to_rad(65.0))) # зашкалившая красная стрелка
+
+	# 5. Акустическая труба-волновод с датчиком («Голос Бездны»)
+	k.tube([Vector3(0, 1.65, 0), Vector3(0, 1.95, 0), Vector3(0.25, 1.95, 0)], [0.045], heavy_steel, 6)
+	k.tube([Vector3(0.25, 1.95, 0), Vector3(0.25, 1.75, 0)], [0.065, 0.065], bronze, 8, true, true)
+	k.box(Vector3(0.25, 1.74, 0), Vector3(0.09, 0.01, 0.09), dark_hole)
+
+	# 6. Ящики с керном горных пород рядом
+	for c_i in range(3):
+		var cx := -1.35 + float(c_i % 2) * 0.4
+		var cz := -1.1 + float(c_i / 2) * 0.7
+		k.box(Vector3(cx, 0.25 + (c_i * 0.18), cz), Vector3(0.95, 0.22, 0.55), wood)
+		# Цилиндрический керн в лотке
+		k.tube([Vector3(cx - 0.35, 0.38 + (c_i * 0.18), cz), Vector3(cx + 0.35, 0.38 + (c_i * 0.18), cz)], [0.045, 0.045], Color(0.12, 0.14, 0.16), 8)
+
+	return _mi(k, key, "tex_metal.png")
+

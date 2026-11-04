@@ -59,6 +59,10 @@ var tasks: NightTasks
 var forest_voice: ForestVoice
 var anomalies: Anomalies
 var zenit: Zenit
+var aftermath: Node
+var profiler: Node
+var hunter_brain: Node
+var psychosomatic: Node
 
 var zone: StringName = &"room"
 var activity: StringName = &"idle"
@@ -120,6 +124,7 @@ var countersign_known: bool:
 		SaveGame.flags["countersign_known"] = v
 		SaveGame.write()
 var skis_equipped := false          ## надеты ли охотничьи лыжи Семёнова (+40% скорость по снегу)
+var leer_attached := false          ## защёлкнут ли карабин на натяжном леере (иммунитет к Белой Тьме)
 var sv20_active := false            ## надеты ли наушники ТА-56М от геофона СВ-20 («Слухач»)
 var sv20_rumble_player: AudioStreamPlayer
 
@@ -263,6 +268,7 @@ func setup_phase(kind: StringName, index: int) -> void:
 	phase_kind = kind
 	phase_index = index
 	skis_equipped = false
+	leer_attached = false
 	set_sv20(false)
 
 	run_seed = forced_seed if forced_seed != 0 else randi()   # в коопе оба игрока строят одну и ту же ночь
@@ -872,8 +878,10 @@ func _tick_heat(delta: float) -> void:
 		&"shed", &"izba", &"gen_shack", &"lake_shack", &"corpus_gen", &"hangar":
 			warmth -= WARMTH_LOSS_OUTSIDE * 0.5 * cold * delta
 		_:
-			# Тулуп из снабжения — на морозе остываешь на четверть медленнее
+			# Тулуп из снабжения — на четверть медленнее; овчинный тулуп геолога с лесосеки — ещё на 35%
 			var coat := 0.75 if has_flag("upg_tulup") else 1.0
+			if has_item(&"sheepskin_coat") or has_flag("has_sheepskin_coat"):
+				coat *= 0.65
 			warmth -= WARMTH_LOSS_OUTSIDE * (1.0 + storm * 1.2) * cold * coat * delta
 
 	var door_open: bool = level != null and level.get(&"door_open") == true
@@ -985,6 +993,10 @@ func is_indoors() -> bool:
 
 func is_outside() -> bool:
 	return not is_indoors()
+
+
+func is_confined_space() -> bool:
+	return zone in [&"storage", &"vestibule", &"attic", &"cellar", &"tunnel", &"gen_shack", &"lake_shack", &"shed", &"walled"]
 
 
 func is_dark() -> bool:

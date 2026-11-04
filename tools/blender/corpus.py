@@ -85,6 +85,8 @@ LX0, LX1, LZ0, LZ1 = 90.0, 99.0, -34.5, -20.0
 TX0, TX1, TZ0, TZ1 = 94.5, 99.0, -39.0, -34.5
 L1, L2, L3, CAB = FL, 3.75, 7.05, 9.75
 SILL, GLASS1, CROOF = CAB + 0.9, CAB + 2.4, CAB + 2.6
+CAB_DOOR = (95.05, 95.95)
+CAB_DOOR_H = CAB + 2.05
 # Короткое крыло (газогенераторная) и дизельная пристройка во внутреннем углу
 SX0, SX1, SZ0, SZ1 = 99.0, 105.0, -39.0, -33.5
 GX0, GX1, GZ0, GZ1, GH = 99.0, 102.4, -33.5, -30.5, 2.8
@@ -168,7 +170,6 @@ def window(axis, u, c, n, w, y0, y1, boarded=False):
             for yy in (y0 + 0.03, y1 - 0.03, y0 + hgt * 0.68):
                 box(_uv(axis, u, c, yy, f), S(w, 0.06, 0.06), M["frame"])
             box(_uv(axis, u, c, yc, f), S(0.05, hgt, 0.05), M["frame"])
-            box(_uv(axis, u, c, yc, f + n * 0.01), S(w - 0.06, hgt - 0.06, 0.008), M["glass"])
         box(_uv(axis, u, c, y0 - 0.03, n * 0.06), S(w + 0.1, 0.04, 0.16), M["iron"])
     if INT:
         box(_uv(axis, u, c, y0 - 0.02, -n * (T + 0.08)), S(w + 0.1, 0.04, 0.2), M["frame"])
@@ -213,6 +214,7 @@ def partition(axis, u0, u1, c, holes=(), y0=FL, y1=CEIL, t=0.14):
                 box(_uv(axis, uu, c, (h[2] + h[3]) / 2, 0), S(0.02, h[3] - h[2], t + 0.02), M["reveal"])
                 box(_uv(axis, uu + (-0.04 if uu == h[0] else 0.04), c, (h[2] + h[3]) / 2, 0), S(0.07, h[3] - h[2], t + 0.06), M["white"])
             box(_uv(axis, (h[0] + h[1]) / 2, c, h[3] + 0.04, 0), S(h[1] - h[0] + 0.15, 0.08, t + 0.06), M["white"])
+            box(_uv(axis, (h[0] + h[1]) / 2, c, FL + 0.015, 0), S(h[1] - h[0] + 0.04, 0.03, t + 0.04), M["frame"])
 
 
 # --- Длинное крыло -------------------------------------------------------------------------
@@ -244,8 +246,15 @@ if INT:
         prism(0, LZ0 + 0.0, +1, rect_pts(r), 0.0, 0.02, M["whitewash"])
     for r in _rects(TX0 + T, TX1 - T, L1, L1 + 3.0, [TOWER_DOOR[:4]]):
         prism(0, LZ0 - T, -1, rect_pts(r), 0.0, 0.02, M["whitewash"])
+    # Южная стена башни внутри от верха коридора до пола кабины (без неё на лестнице дыра):
+    prism(0, LZ0 - T, -1, [(TX0 + T, L1 + 3.0), (TX1 - T, L1 + 3.0), (TX1 - T, CAB), (TX0 + T, CAB)], 0.0, 0.02, M["whitewash"])
+    # откосы и наличник проёма двери в башню:
+    for uu in (TOWER_DOOR[0], TOWER_DOOR[1]):
+        box(((uu + (-0.02 if uu == TOWER_DOOR[0] else 0.02)), (FL + DOOR_H) / 2, LZ0 - T / 2), (0.04, DOOR_H - FL, T + 0.02), M["whitewash"])
+    box(((TOWER_DOOR[0] + TOWER_DOOR[1]) / 2, DOOR_H + 0.02, LZ0 - T / 2), (TOWER_DOOR[1] - TOWER_DOOR[0] + 0.08, 0.04, T + 0.02), M["whitewash"])
 for r in _rects(TX0, TX1, 0.0, CEIL, [TOWER_DOOR[:4]]):
     colbox(((r[0] + r[1]) / 2, (r[2] + r[3]) / 2, LZ0 - T / 2), (r[1] - r[0], r[3] - r[2], T))
+colbox(((TX0 + TX1) / 2, (CAB + L1 + 3.0) / 2, LZ0 - T / 2), (TX1 - TX0, CAB - (L1 + 3.0), T))
 # Кровля длинного крыла: плита, снег, парапет изнутри и сверху (жесть)
 if EXT:
     box(((LX0 + LX1) / 2, (CEIL + ROOF) / 2, (LZ0 + LZ1) / 2), (LX1 - LX0 - 0.02, ROOF - CEIL, LZ1 - LZ0 - 0.02), M["roofing"])
@@ -268,10 +277,19 @@ partition(0, IX0, CW0 - 0.07, -25.93)
 partition(0, CW1 + 0.07, IX1, -29.52)
 partition(0, CW1 + 0.07, IX1, -24.92)
 for (x0, x1, z0, z1, m) in ((IX0, CW0, IZ0, -28.52, M["floor"]), (IX0, CW0, -28.52, -25.93, M["cfloor"]), (IX0, CW0, -25.93, IZ1, M["floor"]),
-                            (CW0, CW1, IZ0, IZ1, M["floor"]), (CW1, IX1, IZ0, -29.52, M["floor"]), (CW1, IX1, -29.52, -24.92, M["floor"]),
+                            (CW0, CW1, LZ0, IZ1, M["floor"]), (CW1, IX1, IZ0, -29.52, M["floor"]), (CW1, IX1, -29.52, -24.92, M["floor"]),
                             (CW1, IX1, -24.92, IZ1, M["cfloor"])):
     inner_floor(x0, x1, z0, z1, FL, m)
+# ниша и возвратная стена в северо-западном углу коридора (x=94.5..94.8, z=-34.5..-34.1):
+if INT:
+    prism(2, TX0, -1, [(-34.5, FL), (-34.1, FL), (-34.1, CEIL), (-34.5, CEIL)], 0.0, 0.02, M["whitewash"])
+colbox((TX0, (FL + CEIL) / 2, -34.3), (0.1, CEIL - FL, 0.4))
+inner_floor(TX0, CW0 + 0.02, LZ0, IZ0 + 0.02, FL, M["floor"])
+# сплошной бетонный пол на стыке башни и корпуса под всей южной стеной башни:
+inner_floor(TX0, TX1, TZ1 - T - 0.05, LZ0 + 0.05, FL, M["cfloor"])
+# потолок длинного крыла и коридора до стыка с башней:
 ceiling(IX0, IX1, IZ0, IZ1, CEIL)
+ceiling(TX0, CW1 + 0.05, LZ0, IZ0 + 0.05, CEIL)
 # Цоколь под полом (коллизия пола от земли до FL — чтобы не провалиться под корпус)
 colbox(((LX0 + LX1) / 2, FL / 2 - 0.05, (LZ0 + LZ1) / 2), (LX1 - LX0, FL - 0.1, LZ1 - LZ0))
 
@@ -279,7 +297,7 @@ colbox(((LX0 + LX1) / 2, FL / 2 - 0.05, (LZ0 + LZ1) / 2), (LX1 - LX0, FL - 0.1, 
 TW_TOP = SILL
 slit = lambda u, y: [u - 0.2, u + 0.2, y - 0.5, y + 0.5, "win"]
 wall(2, TZ0, TZ1, TX0, -1, 0.0, TW_TOP, [slit(-37.8, 2.4), slit(-37.8, 5.7)], inner=(L1, SILL), panel=False, in_u=(TZ0 + T, TZ1 - T))
-wall(0, TX0, TX1, TZ0, -1, 0.0, TW_TOP, [slit(96.0, 4.0), slit(96.0, 7.3), [95.1, 95.9, CAB, SILL, "door"]], inner=(L1, SILL), panel=False)
+wall(0, TX0, TX1, TZ0, -1, 0.0, TW_TOP, [slit(96.0, 4.0), slit(96.0, 7.3), [CAB_DOOR[0], CAB_DOOR[1], CAB, SILL, "door"]], inner=(L1, SILL), panel=False)
 wall(2, TZ0, TZ1, TX1, +1, 0.0, TW_TOP, [[-37.1, -36.1, FL, DOOR_H, "door"]], out_y0=PAR, inner=(L1, SILL), panel=False, in_u=(TZ0 + T, TZ1 - T))
 if EXT:   # южная грань башни над кровлей корпуса
     prism(0, TZ1, +1, [(TX0, ROOF), (TX1, ROOF), (TX1, TW_TOP), (TX0, TW_TOP)], 0.0, 0.03, M["plaster"])
@@ -370,30 +388,59 @@ for (a, b, c, ax) in ((TX0 - BAL, TX1 + BAL, TZ0 - BAL, 0), (TX0 - BAL, TX1 + BA
     colbox(_uv(ax, (a + b) / 2, c, CAB + 0.55, 0), (b - a, 1.1, 0.08) if ax == 0 else (0.08, 1.1, b - a))
 for (c, sz) in BAL_STRIPS:
     colbox(c, sz)
-# Остекление: стойки и ригели, стёкла; дверь на балкон с севера (95.1..95.9)
-CAB_DOOR = (95.1, 95.9)
+# Остекление кабины: деревянный каркас (стойки и ригели), открытый дверной проём на балкон (95.05..95.95)
+# Без глухого запечённого стекла — стёкла прозрачные через Godot (TRANSPARENCY_ALPHA)
 for (a, b, c, n, ax) in ((TX0, TX1, TZ0, -1, 0), (TX0, TX1, TZ1, +1, 0), (TZ0, TZ1, TX0, -1, 2), (TZ0, TZ1, TX1, +1, 2)):
     L = b - a
-    nseg = 4
+    is_door_side = (ax == 0 and c == TZ0)
     if EXT:
-        for i in range(nseg + 1):
-            u = a + L * i / nseg
-            box(_uv(ax, u, c, (SILL + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - SILL, 0.1) if ax == 0 else (0.1, GLASS1 - SILL, 0.08), M["frame"])
-        for yy in (SILL, SILL + 0.85, GLASS1):
-            box(_uv(ax, (a + b) / 2, c, yy, -n * 0.05), (L, 0.07, 0.1) if ax == 0 else (0.1, 0.07, L), M["frame"])
-        box(_uv(ax, (a + b) / 2, c, (SILL + GLASS1) / 2, -n * 0.05), (L - 0.04, GLASS1 - SILL, 0.01) if ax == 0 else (0.01, GLASS1 - SILL, L - 0.04), M["glass"])
-    is_door_side = ax == 0 and c == TZ0
-    holes = [[CAB_DOOR[0], CAB_DOOR[1], CAB, GLASS1]] if is_door_side else []
+        if is_door_side:
+            d0, d1 = CAB_DOOR[0], CAB_DOOR[1]
+            # Дверные косяки проёма на балкон от пола кабины до фрамуги
+            box(_uv(ax, d0, c, (CAB + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - CAB, 0.12), M["frame"])
+            box(_uv(ax, d1, c, (CAB + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - CAB, 0.12), M["frame"])
+            # Притолока / перемычка над дверью
+            box(_uv(ax, (d0 + d1) / 2, c, CAB_DOOR_H, -n * 0.05), (d1 - d0, 0.07, 0.12), M["frame"])
+            # Угловые стойки
+            box(_uv(ax, a, c, (SILL + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - SILL, 0.1), M["frame"])
+            box(_uv(ax, b, c, (SILL + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - SILL, 0.1), M["frame"])
+            # Стойки справа от двери (две промежуточные стойки делят простенок 3.05 м на 3 окна)
+            rw = b - d1
+            for k in (1, 2):
+                box(_uv(ax, d1 + rw * k / 3, c, (SILL + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - SILL, 0.1), M["frame"])
+            # Горизонтальные ригели слева от двери (подоконник и средник)
+            for yy in (SILL, SILL + 0.85):
+                box(_uv(ax, (a + d0) / 2, c, yy, -n * 0.05), (d0 - a, 0.07, 0.1), M["frame"])
+            # Горизонтальные ригели справа от двери
+            for yy in (SILL, SILL + 0.85):
+                box(_uv(ax, (d1 + b) / 2, c, yy, -n * 0.05), (b - d1, 0.07, 0.1), M["frame"])
+            # Верхний ригель над всей северной стеной (включая фрамугу над дверью)
+            box(_uv(ax, (a + b) / 2, c, GLASS1, -n * 0.05), (L, 0.07, 0.1), M["frame"])
+        else:
+            nseg = 4
+            for i in range(nseg + 1):
+                u = a + L * i / nseg
+                box(_uv(ax, u, c, (SILL + GLASS1) / 2, -n * 0.05), (0.08, GLASS1 - SILL, 0.1) if ax == 0 else (0.1, GLASS1 - SILL, 0.08), M["frame"])
+            for yy in (SILL, SILL + 0.85, GLASS1):
+                box(_uv(ax, (a + b) / 2, c, yy, -n * 0.05), (L, 0.07, 0.1) if ax == 0 else (0.1, 0.07, L), M["frame"])
+
+    # Коллизии остекления кабины (свободный дверной проём на балкон)
+    holes = [[CAB_DOOR[0], CAB_DOOR[1], CAB, CAB_DOOR_H]] if is_door_side else []
     for r in _rects(a, b, CAB, GLASS1, holes):
         colbox(_uv(ax, (r[0] + r[1]) / 2, c, (r[2] + r[3]) / 2, -n * 0.1), (r[1] - r[0], r[3] - r[2], 0.2) if ax == 0 else (0.2, r[3] - r[2], r[1] - r[0]))
-# Дверь на балкон: застеклённая, распахнута наружу и прижата к остеклению справа от проёма (поперёк
-# балкона она перегораживала проход); подоконная доска по периметру кабины
-if EXT:
-    box((CAB_DOOR[1] + 0.42, (CAB + GLASS1) / 2, TZ0 - 0.15), (0.8, GLASS1 - CAB - 0.05, 0.05), M["door"])
+
 if INT:
+    d0, d1 = CAB_DOOR[0], CAB_DOOR[1]
+    # Внутренние наличники и порог балконной двери
+    box(((d0 + d1) / 2, CAB + 0.02, TZ0 + 0.02), (d1 - d0 + 0.08, 0.04, 0.22), M["frame"])
+    box((d0, (CAB + CAB_DOOR_H) / 2, TZ0 + 0.02), (0.05, CAB_DOOR_H - CAB, 0.14), M["frame"])
+    box((d1, (CAB + CAB_DOOR_H) / 2, TZ0 + 0.02), (0.05, CAB_DOOR_H - CAB, 0.14), M["frame"])
+    box(((d0 + d1) / 2, CAB_DOOR_H, TZ0 + 0.02), (d1 - d0 + 0.08, 0.06, 0.14), M["frame"])
+    # Порог пола кабины в проём двери наружу на балконную плиту
+    inner_floor(d0 - 0.03, d1 + 0.03, TZ0 - 0.45, TZ0 + 0.1, CAB, M["floor"], collide=True, t=0.03)
+
     for (a, b, c, n, ax) in ((TX0, TX1, TZ0, -1, 0), (TX0, TX1, TZ1, +1, 0), (TZ0, TZ1, TX0, -1, 2), (TZ0, TZ1, TX1, +1, 2)):
         holes = [[CAB_DOOR[0], CAB_DOOR[1]]] if (ax == 0 and c == TZ0) else []
-        # доски вдоль северной и южной стен — до самых углов, иначе в углах оставалась дыра T×T
         for r in _rects(a, b, 0, 1, [h + [0, 2] for h in holes]):
             box(_uv(ax, (r[0] + r[1]) / 2, c, SILL + 0.02 + (0.003 if ax == 2 else 0.0), -n * (T / 2 + 0.05)), (r[1] - r[0], 0.04, T + 0.12) if ax == 0 else (T + 0.12, 0.04, r[1] - r[0]), M["frame"])
 # Кровля кабины с вылетом, антенны и решётка приёма радиозонда
@@ -468,9 +515,16 @@ wall(0, SX0, SX1, SZ0, -1, 0.0, PAR, [[100.6, 101.4, FL + 2.0, FL + 2.6, "win"],
 window(0, 101.0, SZ0, -1, 0.8, FL + 2.0, FL + 2.6)
 window(0, 103.5, SZ0, -1, 0.8, FL + 2.0, FL + 2.6, boarded=True)
 GG_DOOR = [-36.85, -35.65, FL, FL + 2.3, "door"]
+TOWER_GG_DOOR = [-37.1, -36.1, FL, DOOR_H, "door"]
 wall(2, SZ0, SZ1, SX1, +1, 0.0, PAR, [GG_DOOR], panel=False)
 wall(0, SX0, SX1, SZ1, +1, 0.0, PAR, [[103.6, 104.4, FL + 2.0, FL + 2.6, "win"]], out_y0=0.0, in_u=(SX0 + T, SX1 - T), panel=False)
 window(0, 104.0, SZ1, +1, 0.8, FL + 2.0, FL + 2.6)
+# Западная стена газогенераторной (смежная с башней и длинным крылом):
+wall(2, SZ0, SZ1, SX0, -1, 0.0, CEIL, [TOWER_GG_DOOR], inner=(FL, CEIL), in_u=(SZ0 + T, SZ1 - T), panel=False, outer=False)
+if INT:
+    for uu in (TOWER_GG_DOOR[0], TOWER_GG_DOOR[1]):
+        box((99.0, (FL + DOOR_H) / 2, uu), (0.84, DOOR_H - FL, 0.04), M["whitewash"])
+    box((99.0, DOOR_H + 0.02, (TOWER_GG_DOOR[0] + TOWER_GG_DOOR[1]) / 2), (0.84, 0.04, TOWER_GG_DOOR[1] - TOWER_GG_DOOR[0] + 0.08), M["whitewash"])
 if EXT:
     # Двустворчатые ворота газогенераторной (закрыты) и бетонный пандус
     for s in (0, 1):
@@ -484,6 +538,8 @@ if EXT:
         box(_uv(ax, (a + b) / 2, c, PAR + 0.02, -n * T / 2), (b - a, 0.04, T + 0.08) if ax == 0 else (T + 0.08, 0.04, b - a), M["iron"])
 colbox(((SX0 + SX1) / 2, (CEIL + ROOF) / 2, (SZ0 + SZ1) / 2), (SX1 - SX0, ROOF - CEIL, SZ1 - SZ0))
 inner_floor(SX0 + T, SX1 - T, SZ0 + T, SZ1 - T, FL, M["cfloor"])
+# сплошной пол под всей стеной между башней и газогенераторной:
+inner_floor(TX1 - T - 0.05, SX0 + T + 0.05, TZ0 - 0.05, TZ1 + 0.05, FL, M["cfloor"])
 ceiling(SX0 + T, SX1 - T, SZ0 + T, SZ1 - T, CEIL)
 colbox(((SX0 + SX1) / 2, FL / 2 - 0.05, (SZ0 + SZ1) / 2), (SX1 - SX0, FL - 0.1, SZ1 - SZ0))
 

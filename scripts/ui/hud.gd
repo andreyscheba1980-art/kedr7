@@ -161,22 +161,26 @@ func _process(delta: float) -> void:
 			if _fps_timer <= 0.0:
 				_fps_timer = 0.25
 				_fps.text = "FPS %d" % Engine.get_frames_per_second()
-	_clock.visible = not cinematic
+	_clock.visible = not cinematic and _modal == null
 	# Книга в руках закрывает центр: субтитр торчал из-за листа по краям — пока читаешь, он ждёт
 	if _subtitle != null:
 		var m := modal()
 		_subtitle.self_modulate.a = 0.0 if m is HeldPaper and (m as HeldPaper).inner is BookUI else 1.0
-	if _flash_box != null and cinematic:
+	if _flash_box != null and (cinematic or _modal != null):
 		_flash_box.visible = false
 	if _objective != null:
-		_objective.visible = not cinematic
+		_objective.visible = not cinematic and _modal == null
 		# Сюжетный режим ведёт за руку; на обычной и сложной — только аварии (их нельзя пропустить).
 		_objective.text = Game.objective_text() if Game.is_story() or Game.is_prologue() else Game.alarm_text()
 	if _frost != null:
 		var frost := clampf((65.0 - Game.warmth) / 55.0, 0.0, 1.0)
 		if Game.mirror_covered:
 			frost = 0.0
-		_frost.modulate.a = lerpf(_frost.modulate.a, frost * 0.85, minf(delta * 2.0, 1.0))
+		# Возле горящей печи в избе иней тает в 3 раза быстрее, давая ощущение согревающего тепла
+		var melt_k := 2.0
+		if Game.is_indoors() and Game.zone == &"room" and Game.stove_wood > 0.0 and frost < _frost.modulate.a:
+			melt_k = 5.5
+		_frost.modulate.a = lerpf(_frost.modulate.a, frost * 0.85, minf(delta * melt_k, 1.0))
 
 	if _dark_vignette != null:
 		var tension_factor := Director.tension / 100.0 if Game.is_night() else 0.0
@@ -197,6 +201,9 @@ func _process(delta: float) -> void:
 # --- Публичное API -----------------------------------------------------------
 
 func set_prompt(text: String) -> void:
+	if _modal != null:
+		_prompt.text = ""
+		return
 	if Game != null and Game.is_gamepad:
 		text = _format_gamepad_prompt(text)
 	_prompt.text = text

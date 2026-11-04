@@ -39,6 +39,23 @@ void fragment() {
 	float bloom = max(0.0, l0 - 0.72);
 	col += vec3(bloom * 0.14, bloom * 0.10, bloom * 0.04);
 
+	// Советский анаморфный горизонтальный стрик (линзы «Гелиос»/«Индустар» от фар ГТ-Т, маяка, огня, ракетницы)
+	vec3 streak = vec3(0.0);
+	const float STREAK_OFFSETS[5] = float[5](0.0035, 0.008, 0.015, 0.024, 0.036);
+	const float STREAK_WEIGHTS[5] = float[5](0.32, 0.25, 0.19, 0.14, 0.10);
+	for (int i = 0; i < 5; i++) {
+		float dx = STREAK_OFFSETS[i];
+		float w = STREAK_WEIGHTS[i];
+		vec3 s_l = texture(TEXTURE, UV - vec2(dx, 0.0)).rgb * brightness;
+		vec3 s_r = texture(TEXTURE, UV + vec2(dx, 0.0)).rgb * brightness;
+		float lum_l = dot(s_l, vec3(0.299, 0.587, 0.114));
+		float lum_r = dot(s_r, vec3(0.299, 0.587, 0.114));
+		float b_l = max(0.0, lum_l - 0.80);
+		float b_r = max(0.0, lum_r - 0.80);
+		streak += (s_l * b_l + s_r * b_r) * w;
+	}
+	col += streak * vec3(0.13, 0.16, 0.24);
+
 	// Виньетка: края кадра темнее — взгляд тянет в центр, углы комнаты тонут.
 	col *= 1.0 - vignette * smoothstep(0.25, 0.85, d2 * 2.2);
 

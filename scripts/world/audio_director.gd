@@ -31,11 +31,12 @@ var _mirage_noise_recorded := false
 var _mirage_last_pos := Vector3.ZERO
 static var _stream_cache: Dictionary = {}
 
-## Живой лес: редкие звуки вдалеке. Ночью — волки, филин; днём — вороны. Скрип и снег — всегда.
+## Живой лес: редкие звуки вдалеке. Ночью — волки, филин; днём — вороны. Скрип елей, треск мороза и снег — всегда.
 const LIFE_NIGHT := [["res://assets/audio/wolf_howl.ogg", 1.0, 70.0], ["res://assets/audio/owl.ogg", 1.5, 40.0],
-	["res://assets/audio/tree_creak.ogg", 2.0, 18.0], ["res://assets/audio/snow_fall.ogg", 2.0, 9.0]]
-const LIFE_DAY := [["res://assets/audio/raven.ogg", 2.0, 45.0], ["res://assets/audio/tree_creak.ogg", 1.5, 18.0],
-	["res://assets/audio/snow_fall.ogg", 2.0, 9.0]]
+	["res://assets/audio/tree_creak.ogg", 2.2, 18.0], ["res://assets/audio/snow_fall.ogg", 2.0, 9.0],
+	["res://assets/sfx/cc0/tree_frost_crack.ogg", 1.8, 32.0]]
+const LIFE_DAY := [["res://assets/audio/raven.ogg", 2.0, 45.0], ["res://assets/audio/tree_creak.ogg", 1.8, 18.0],
+	["res://assets/audio/snow_fall.ogg", 2.0, 9.0], ["res://assets/sfx/cc0/branch_snow_drop_1.ogg", 1.5, 14.0]]
 
 
 func _ready() -> void:
@@ -193,7 +194,7 @@ func _process(delta: float) -> void:
 	var inside := Game.is_indoors()
 	var storm := Game.weather.intensity if Game.weather != null else 0.0
 
-	var hum_target := -14.0 if Game.is_home() else -36.0
+	var hum_target := -18.0 if Game.is_home() else -38.0
 	if _silenced or not Game.power_on:
 		hum_target = -80.0
 	_hum.volume_db = lerpf(_hum.volume_db, hum_target, minf(delta * 4.0, 1.0))
@@ -201,7 +202,7 @@ func _process(delta: float) -> void:
 
 	# Звуковая окклюзия метели (Low-Pass Filter на шине Weather):
 	# На улице — звонкий, ледяной свист бурана (20 кГц).
-	# В доме при закрытой двери — глухой, низкий гул в стенах и трубе (380 Гц).
+	# В доме при закрытой двери — глухой, низкий гул в стенах и трубе (360 Гц).
 	var w_bus := AudioServer.get_bus_index(&"Weather")
 	if w_bus >= 0 and AudioServer.get_bus_effect_count(w_bus) > 0:
 		var lp := AudioServer.get_bus_effect(w_bus, 0) as AudioEffectLowPassFilter
@@ -209,16 +210,19 @@ func _process(delta: float) -> void:
 			var target_cutoff := 20000.0
 			if inside:
 				var door_open: bool = Game.level != null and Game.level.has_method(&"is_door_open") and bool(Game.level.call(&"is_door_open"))
-				target_cutoff = 2200.0 if door_open else 380.0
+				target_cutoff = 2200.0 if door_open else 360.0
 			lp.cutoff_hz = lerpf(lp.cutoff_hz, target_cutoff, minf(delta * 5.0, 1.0))
 
 	var door_open_now: bool = inside and Game.level != null and Game.level.has_method(&"is_door_open") and bool(Game.level.call(&"is_door_open"))
-	var wind_base := (-24.0 + storm * 4.0 + (9.0 if door_open_now else 0.0)) if inside else (-7.0 + storm * 7.0)   # открыл дверь — буран врывается в дом
-	var wind_target := wind_base + t * 2.0
+	# Мастеринг громкости бурана:
+	# Снаружи: от -16.0 дБ (тихий полярный бриз) до -8.0 дБ (лютый ураганный буран) — не перегружает шину и оставляет запас для шагов.
+	# Внутри: -25.0 дБ при закрытой двери (глухой низкий рокот в стенах); при открытии двери врывается снежный вихрь (-15 дБ).
+	var wind_base := (-25.0 + storm * 3.5 + (10.0 if door_open_now else 0.0)) if inside else (-16.0 + storm * 8.0)
+	var wind_target := wind_base + t * 1.5
 	if _silenced or _vacuum_timer > 0.0:
 		wind_target = -75.0   # зловещая тишина перед атакой или скримером
 	_wind.volume_db = lerpf(_wind.volume_db, wind_target, minf(delta * 3.0, 1.0))
-	_wind.pitch_scale = lerpf(_wind.pitch_scale, 1.0 + storm * 0.3, minf(delta, 1.0))
+	_wind.pitch_scale = lerpf(_wind.pitch_scale, 0.95 + storm * 0.25 + sin(Time.get_ticks_msec() * 0.0004) * 0.04, minf(delta, 1.0))
 
 	# Дрон: низкий психоакустический гул в голове.
 	# На улице отключён (там царит только естественный буран и тайга).
@@ -311,9 +315,9 @@ func _update_life(delta: float) -> void:
 	var dist: float = entry[2] * randf_range(0.7, 1.3)
 	var dir := Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU)
 	var pos := Game.player.global_position + dir * dist + Vector3(0, 2.0, 0)
-	var vol := -2.0 if Game.is_outside() else -12.0
+	var vol := -4.0 if Game.is_outside() else -13.0
 	play_3d(String(entry[0]), pos, vol, maxf(dist * 0.35, 3.0))
-	if String(entry[0]).ends_with("snow_fall.ogg") and Game.is_outside():
+	if (String(entry[0]).ends_with("snow_fall.ogg") or String(entry[0]).contains("branch_snow_drop")) and Game.is_outside():
 		_snow_puff(pos - Vector3(0, 2.0, 0))
 	if String(entry[0]).ends_with("wolf_howl.ogg"):
 		Director.add_tension(4.0, "волки")

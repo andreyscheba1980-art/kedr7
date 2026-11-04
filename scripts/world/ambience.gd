@@ -31,11 +31,10 @@ func _ready() -> void:
 	_gusts = _loop2d("wire_gust_loop", &"Weather")
 	_indoor = _loop2d("wind_indoor_loop", &"Ambient")
 	# Точечные петли
-	_spot("stove_crackle_loop", Vector3(-1.5, 0.5, 1.2), 3.5, 12.0, -9.0, func() -> bool: return Game.stove_wood > 0.0)
 	for p: Vector3 in [Vector3(0.5, 2.5, 3.3), Vector3(7.5, 2.5, 0.1), Vector3(7.5, 2.5, 4.4), Vector3(13.0, 2.5, 3.5)]:
 		_spot("bulb_buzz_loop", p, 1.2, 5.0, -24.0, func() -> bool: return _st != null and _st.lights_lit())
 	_spot("radio_hum_loop", Vector3(9.2, 1.0, -1.4), 1.6, 7.0, -20.0, func() -> bool: return Game.power_on)
-	_spot("elec_buzz_loop", Vector3(14.5, 1.2, -13.6), 2.5, 14.0, -16.0, func() -> bool: return Game.power_on and not Game.gen_broken)
+	_spot("elec_buzz_loop", Vector3(14.5, 1.2, -13.6), 2.2, 12.0, -22.0, func() -> bool: return Game.power_on and not Game.gen_broken)
 	_spot("wind_whistle_loop", Vector3(14.55, 1.4, 3.1), 2.0, 8.0, -18.0, func() -> bool: return _storm() > 0.25)
 	_spot("anemometer_squeak_loop", Yard.METEO + Yard.M_VANE + Vector3(0, 2.6, 0), 3.0, 28.0, -17.0, func() -> bool: return true)
 	_spot("pole_hum_loop", Yard.MAST + Vector3(0, 6.0, 0), 5.0, 35.0, -15.0, func() -> bool: return true)
@@ -50,10 +49,10 @@ func _process(delta: float) -> void:
 	var storm := _storm()
 	var hush := _hushed()
 	var k := minf(delta * 2.0, 1.0)
-	# Ветер слоями. Шина Weather сама глушит верха в доме — здесь только громкость.
-	var bz := (-20.0 + storm * 8.0) if inside else lerpf(-36.0, -13.0, storm)
-	var gs := -44.0 if inside else (-27.0 if Game.is_night() else -31.0) + storm * 5.0
-	var ind := lerpf(-34.0, -13.0, storm) if inside else -80.0
+	# Ветер слоями. Шина Weather сама глушит верха в доме — здесь только балансировка громкости.
+	var bz := (-22.0 + storm * 5.0) if inside else lerpf(-30.0, -14.0, storm)
+	var gs := -44.0 if inside else (-28.0 if Game.is_night() else -32.0) + storm * 5.0
+	var ind := lerpf(-34.0, -16.0, storm) if inside else -80.0
 	if hush:
 		bz = -80.0
 		gs = -80.0
@@ -115,7 +114,8 @@ func _event(inside: bool, storm: float) -> void:
 		if Game.is_night():
 			pool.append(["tree_frost_crack", 2.0])
 		else:
-			pool.append(["crow_caw", 2.5])
+			pool.append(["crow_caw", 2.2])
+			pool.append(["tree_frost_crack", 1.8])
 	else:
 		pool.append(["log_frost_crack", 1.0])
 	if pool.is_empty():
@@ -139,14 +139,14 @@ func _event(inside: bool, storm: float) -> void:
 			for i in randi_range(2, 5):
 				get_tree().create_timer(float(i) * randf_range(0.9, 1.6), false).timeout.connect(func() -> void: _one(_variant("drip", 5), dp, -16.0, 1.5))
 		"log_frost_crack":
-			_one(D + "log_frost_crack.ogg", _house_point() + Vector3(0, 1.2, 0), -11.0, 4.0)
+			_one(_variant("log_frost_crack", 5), _house_point() + Vector3(0, 1.2, 0), -12.0, 4.0)
 		"chimney_howl":
-			_one(D + "chimney_howl.ogg", Vector3(-1.5, 2.3, 1.0), -12.0, 5.0)
+			_one(_variant("chimney_howl", 3), Vector3(-1.5, 2.3, 1.0), -11.0, 5.0)
 		"window_rattle":
 			var w: Dictionary = _st.window_spots.pick_random() if _st != null and not _st.window_spots.is_empty() else {"glass": pp}
-			_one(_variant("window_rattle", 4), w["glass"], -10.0, 3.0)
+			_one(_variant("window_rattle", 4), w["glass"], -11.0, 3.0)
 		"door_rattle":
-			_one(D + "door_rattle.ogg", Vector3(14.55, 1.3, 3.1), -10.0, 3.0)
+			_one(_variant("door_rattle", 3), Vector3(14.55, 1.3, 3.1), -11.0, 3.0)
 		"branch_snow_drop":
 			var bp := pp + Vector3.FORWARD.rotated(Vector3.UP, randf() * TAU) * randf_range(9.0, 16.0)
 			_one(_variant("branch_snow_drop", 3), bp + Vector3(0, 3.0, 0), -8.0, 5.0)
@@ -178,7 +178,14 @@ func _one(path: String, pos: Vector3, vol: float, unit: float) -> AudioStreamPla
 
 
 func _variant(base: String, n: int) -> String:
-	return D + "%s_%d.ogg" % [base, randi_range(1, n)]
+	var idx := randi_range(1, n)
+	var path_num := D + "%s_%d.ogg" % [base, idx]
+	if ResourceLoader.exists(path_num):
+		return path_num
+	var path_v := D + ("%s.ogg" % base if idx == 1 else "%s_v%d.ogg" % [base, idx])
+	if ResourceLoader.exists(path_v):
+		return path_v
+	return D + "%s.ogg" % base
 
 
 ## Случайная точка в доме — откуда «скрипнуло».

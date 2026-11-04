@@ -45,7 +45,7 @@ def W(M, key, axis):
     return v if v is not None else M[key]
 
 
-def wall(M, axis, c, nrm, u0, u1, holes, lower, upper, divider=True):
+def wall(M, axis, c, nrm, u0, u1, holes, lower, upper, divider=True, floor_key="floor"):
     """Стена комнаты: поверхность на FACE от линии стены внутрь (nrm — в сторону комнаты)."""
     for y0, y1, key in ((FL, PANEL, lower), (PANEL, H, upper)):
         for r in _rects(u0, u1, y0, y1, holes):
@@ -56,11 +56,11 @@ def wall(M, axis, c, nrm, u0, u1, holes, lower, upper, divider=True):
                 continue    # над/под проёмом плинтус и поясок не ставим
             prism(axis, c, nrm, [(r[0], y0), (r[1], y0), (r[1], y1), (r[0], y1)], FACE + 0.02, FACE + 0.02 + depth, M[key])
     for h in holes:
-        opening(M, axis, c, nrm, h)
+        opening(M, axis, c, nrm, h, floor_key)
 
 
-def opening(M, axis, c, nrm, h):
-    """Откосы проёма (от поверхности до линии стены) и наличник по поверхности комнаты."""
+def opening(M, axis, c, nrm, h, floor_key="floor"):
+    """Откосы проёма (от поверхности до линии стены), порог двери и наличник по поверхности комнаты."""
     u0, u1, v0, v1 = h
     v0 = max(v0, FL)
     door = v0 <= FL + 0.01
@@ -74,6 +74,9 @@ def opening(M, axis, c, nrm, h):
     box(P((u0 + u1) / 2, v1, mid), S(u1 - u0, 0.025, FACE + 0.02), M["reveal"])
     if not door:
         box(P((u0 + u1) / 2, v0, mid), S(u1 - u0, 0.025, FACE + 0.02), M["reveal"])
+    else:
+        # Порог в дверном проёме: закрывает 20-сантиметровый зазор между комнатами
+        box(P((u0 + u1) / 2, FL - 0.015, mid), S(u1 - u0, 0.03, FACE + 0.02), M.get(floor_key, M["floor"]))
     f = FACE + 0.035
     w = 0.08
     for u in (u0 - w / 2, u1 + w / 2):
@@ -112,10 +115,10 @@ def room(name, x0, x1, z0, z1, holes, lower, upper, floor_key, res, divider=True
     kit.reset()
     M = mats()
     # N: z = z0 (внутрь +Z), S: z = z1 (внутрь −Z), W: x = x0 (внутрь +X), E: x = x1 (внутрь −X)
-    wall(M, 0, z0, +1, x0 + FACE, x1 - FACE, holes.get("N", []), lower, upper, divider)
-    wall(M, 0, z1, -1, x0 + FACE, x1 - FACE, holes.get("S", []), lower, upper, divider)
-    wall(M, 2, x0, +1, z0 + FACE, z1 - FACE, holes.get("W", []), lower, upper, divider)
-    wall(M, 2, x1, -1, z0 + FACE, z1 - FACE, holes.get("E", []), lower, upper, divider)
+    wall(M, 0, z0, +1, x0 + FACE, x1 - FACE, holes.get("N", []), lower, upper, divider, floor_key)
+    wall(M, 0, z1, -1, x0 + FACE, x1 - FACE, holes.get("S", []), lower, upper, divider, floor_key)
+    wall(M, 2, x0, +1, z0 + FACE, z1 - FACE, holes.get("W", []), lower, upper, divider, floor_key)
+    wall(M, 2, x1, -1, z0 + FACE, z1 - FACE, holes.get("E", []), lower, upper, divider, floor_key)
     floor_ceiling(M, x0, x1, z0, z1, floor_key, beams_along_z, ceil_key)
     obj, img, tris = kit.finish(name, OUT, res=res, origin="keep", samples=32, pack=0.003, ao_blur=3, ao_min=0.45)
     kit.export(os.path.join(OUT, name + ".glb"), None)

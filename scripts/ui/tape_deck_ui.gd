@@ -114,7 +114,7 @@ func _ready() -> void:
 	_tape_player = _make_player()
 	_hiss_player = _make_player()
 	_hiss_player.stream = AudioDirector.cached_stream(HISS)
-	_hiss_player.volume_db = -6.0
+	_hiss_player.volume_db = -12.0
 
 	_rev_whisper_player = _make_player()
 	_rev_whisper_player.stream = AudioDirector.cached_stream("res://assets/sfx/whisper_many.ogg")
@@ -169,7 +169,7 @@ func _process(delta: float) -> void:
 		clarity = pow(clampf(1.0 - err, 0.0, 1.0), 2.0)
 	mat.set_shader_parameter(&"clarity", clarity)
 	_hidden_img.modulate.a = clarity
-	_hiss_player.volume_db = lerpf(-6.0, -30.0, clarity)
+	_hiss_player.volume_db = lerpf(-12.0, -32.0, clarity)
 	_clarity_label.text = Loc.t(&"tape.clarity", [int(clarity * 100.0)])
 	if clarity >= REVEAL_AT and not _revealed():
 		_hold += delta

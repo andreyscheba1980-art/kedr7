@@ -253,7 +253,7 @@ func _process(delta: float) -> void:
 		tablet_root.position = _tablet_pos + lag3 * 0.35 + breathe
 		tablet_root.visible = _tablet_up or _tablet_pos.y > -0.60
 		if compass_needle != null and player != null:
-			compass_needle.rotation.y = -player.global_rotation.y
+			compass_needle.rotation.y = -player.global_rotation.y + player.compass_glitch
 
 
 ## На «Буране»: обе варежки на руле. Руль поворачивается с поворотом, руки трясёт мотором.

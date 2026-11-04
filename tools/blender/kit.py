@@ -15,9 +15,11 @@ def mat(name, col, rough=0.6, metal=0.0, noise=0.0, noise_scale=60.0, wear=0.0, 
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nt = m.node_tree
-    bsdf = nt.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*col, 1)
-    bsdf.inputs["Roughness"].default_value = rough
+    bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None) or nt.nodes.get("Principled BSDF") or nt.nodes.get("Принципиальный BSDF")
+    base_col_inp = bsdf.inputs.get("Base Color") or bsdf.inputs.get("Базовый цвет") or bsdf.inputs[0]
+    base_col_inp.default_value = (*col, 1)
+    rough_inp = bsdf.inputs.get("Roughness") or bsdf.inputs.get("Шероховатость") or bsdf.inputs[2]
+    rough_inp.default_value = rough
     bsdf.inputs["Metallic"].default_value = 0.0   # для запекания DIFFUSE металл = чёрный; блеск даёт цвет
     src = None
     if noise > 0:
@@ -211,8 +213,11 @@ def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pa
     out.filepath_raw = os.path.join(out_dir, name + ".png"); out.file_format = "PNG"; out.save()
     final = bpy.data.materials.new(name + "_baked"); final.use_nodes = True
     tn = final.node_tree.nodes.new("ShaderNodeTexImage"); tn.image = out
-    final.node_tree.links.new(tn.outputs["Color"], final.node_tree.nodes["Principled BSDF"].inputs["Base Color"])
-    final.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.8
+    f_bsdf = next((n for n in final.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None) or final.node_tree.nodes.get("Principled BSDF") or final.node_tree.nodes.get("Принципиальный BSDF")
+    f_base_col = f_bsdf.inputs.get("Base Color") or f_bsdf.inputs.get("Базовый цвет") or f_bsdf.inputs[0]
+    final.node_tree.links.new(tn.outputs["Color"], f_base_col)
+    f_rough = f_bsdf.inputs.get("Roughness") or f_bsdf.inputs.get("Шероховатость") or f_bsdf.inputs[2]
+    f_rough.default_value = 0.8
     body.data.materials.clear(); body.data.materials.append(final)
     tris = sum(len(p.vertices) - 2 for p in body.data.polygons)
     return body, out, tris

@@ -240,9 +240,9 @@ static func backdrop(owner: Control) -> void:
 ## Кнопки под книжкой — общие для всех приборов: «Записать» — штампом, «Закрыть» — машинописью.
 static func add_buttons(owner: Control, again: bool, on_write: Callable, on_close: Callable) -> void:
 	var write_btn := UiStyle.stamp_button(Loc.t(&"thermo.write_again" if again else &"thermo.write").to_upper(), on_write)
-	UiKit.place(owner, write_btn, 0.5, 0.5, 0.5, 0.5, 170, 196, 450, 238)
+	UiKit.place(owner, write_btn, 0.5, 0.5, 0.5, 0.5, 170, 196, 315, 238)
 	var close_btn := UiStyle.text_button(Loc.t(&"thermo.close_key"), on_close)
-	UiKit.place(owner, close_btn, 0.5, 0.5, 0.5, 0.5, 220, 244, 400, 270)
+	UiKit.place(owner, close_btn, 0.5, 0.5, 0.5, 0.5, 325, 196, 450, 238)
 
 
 ## Латунный шильдик прибора над кадром.

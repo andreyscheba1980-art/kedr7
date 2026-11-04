@@ -53,6 +53,7 @@ const HIT_SOUND := "res://assets/audio/ice_hit.ogg"
 const CLANK_SOUND := "res://assets/audio/clank.ogg"
 const WOOD_SOUND := "res://assets/audio/stove_add.ogg"
 const DOOR_SOUND := "res://assets/audio/door.ogg"
+const DayPOIsClass = preload("res://scripts/world/day_pois.gd")
 
 ## Полилинии лееров — по ним считаем, сошёл ли игрок с верёвки.
 var paths: Array[PackedVector3Array] = []
@@ -62,6 +63,8 @@ var _shed_door_left_hinge: Node3D
 var _shed_door_right_hinge: Node3D
 var _shed_doors_busy := false
 var _shed_drift: Interactable
+var _shed_padlock: Node3D
+var _shed_padlock_it: Interactable
 var izba_door_open := false
 var _izba_door_hinge: Node3D
 var _izba_door_busy := false
@@ -81,6 +84,8 @@ var _mast_lamp_out := false
 var _mast_ground_active := false
 var _mast_ground_sparks: CPUParticles3D
 var _mast_ground_sound: AudioStreamPlayer3D
+var _mast_shadow: MeshInstance3D
+var _mast_shadow_mat: StandardMaterial3D
 var _zimnik_cd := 0.0
 var _t := 0.0
 var _shed_tracks_done := false
@@ -177,6 +182,7 @@ func _ready() -> void:
 	add_child(SourceSite.new())
 	add_child(EfirSites.new())
 	add_child(StationLore.new())
+	add_child(DayPOIsClass.new())
 	Dog.ensure(self)
 	_build_woodpile()
 	_build_izba()
@@ -233,6 +239,16 @@ func _process(delta: float) -> void:
 		var rep_e := 1.0 if fmod(_t + 0.7, 2.2) < 0.4 else 0.0
 		if _repeater_light.light_energy != rep_e:
 			_repeater_light.light_energy = rep_e
+	# Лунная тень от антенной мачты на снегу
+	if _mast_shadow != null and _mast_shadow_mat != null:
+		var is_night := not Game.is_daylight()
+		_mast_shadow.visible = is_night
+		if is_night:
+			var w_int: float = Game.weather.intensity if Game.weather != null else 0.0
+			var moon_vis := clampf(1.0 - w_int * 0.7, 0.12, 1.0)
+			var sway_drift := sin(_t * 0.32) * 0.025 + cos(_t * 0.68) * 0.012
+			_mast_shadow.rotation.y = deg_to_rad(45.0) + sway_drift
+			_mast_shadow_mat.albedo_color.a = 0.44 * moon_vis
 	_check_zimnik(delta)
 	if _fresh_tracks_active and Game.player != null:
 		var p_pos := Game.player.global_position
@@ -495,7 +511,7 @@ func _build_wall_drifts() -> void:
 		# [от, до, нормаль наружу, высота]
 		[Vector3(-2.5 - face, 0, 0.2), Vector3(-2.5 - face, 0, 6.4), Vector3(-1, 0, 0), 0.55],   # запад жилой
 		[Vector3(-2.3, 0, -face), Vector3(3.3, 0, -face), Vector3(0, 0, -1), 0.45],                # север жилой
-		[Vector3(3.7, 0, -5.5 - face), Vector3(6.8, 0, -5.5 - face), Vector3(0, 0, -1), 0.5],       # север кладовой
+		[Vector3(3.7, 0, -5.5 - face - 0.35), Vector3(6.8, 0, -5.5 - face - 0.35), Vector3(0, 0, -1), 0.45],       # север кладовой
 		[Vector3(7.2, 0, -2.0 - face), Vector3(11.3, 0, -2.0 - face), Vector3(0, 0, -1), 0.42],     # север рубки
 		[Vector3(-2.3, 0, 6.6 + face), Vector3(11.0, 0, 6.6 + face), Vector3(0, 0, 1), 0.28],       # юг — меньше, подветренный
 	]
@@ -517,6 +533,7 @@ func _build_wall_drifts() -> void:
 			var mi := MeshInstance3D.new()
 			mi.mesh = blob
 			mi.material_override = Palette.m(&"drift")
+			mi.layers = Station.LAYER_OUT
 			mi.position = p + Vector3(0, -h * 0.25, 0)
 			var along := absf(nrm.x) < 0.5
 			var len := rng.randf_range(1.4, 2.2)
@@ -661,6 +678,14 @@ func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
 		post.rotation = Vector3(rng.randf_range(-0.05, 0.05), rng.randf_range(-PI, PI), rng.randf_range(-0.05, 0.05))
 		add_child(post)
 		_rope_nodes.append(post)
+		var it_post := Interactable.new()
+		it_post.collision_layer = Geo.LAYER_INTERACT
+		it_post.position = Vector3(0, 0.9, 0)
+		it_post.add_child(Geo.box_shape(Vector3(0.55, 1.3, 0.55)))
+		it_post.prompt_provider = func() -> String:
+			return Loc.t(&"it.leer_detach") if Game.leer_attached else Loc.t(&"it.leer_attach")
+		it_post.used.connect(_on_leer_post_used)
+		post.add_child(it_post)
 		tops.append(post.transform * Vector3(0, 1.05, 0))
 		if i > 0 and not _near_fork((posts[i - 1] + p) * 0.5):
 			_rope_span(tops[i - 1], tops[i])
@@ -690,6 +715,16 @@ func _near_fork(p: Vector3) -> bool:
 		if _flat_dist(p, f) < 3.2:
 			return true
 	return false
+
+
+func _on_leer_post_used(_p: Player) -> void:
+	Game.leer_attached = not Game.leer_attached
+	var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -6.0)
+	if lp != null:
+		lp.pitch_scale = 1.85 if Game.leer_attached else 1.15
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.leer_attached") if Game.leer_attached else Loc.t(&"sub.leer_detached"), 3.5)
+
 
 
 ## Таблички на развилках: стоят на самой ветке, лицом к развилке. Видны только в свете.
@@ -776,7 +811,25 @@ func _build_meteo() -> void:
 		return Loc.t(&"it.booth_done") if Game.readings.get(&"temp", false) else Loc.t(&"it.booth")
 	booth_it.name = "BoothThermo"
 	# Задание «откопать будку»: сугроб закрывает термометры, пока не разгребёшь лопатой.
-	_drift = Geo.interactable(self, Vector3(1.3, 1.75, 1.2), booth_pos + Vector3(0, 0.95, 0), Palette.m(&"drift"), "", _on_drift_dug)
+	_drift = Geo.interactable(self, Vector3(1.3, 1.75, 1.2), booth_pos + Vector3(0, 0.95, 0), null, "", _on_drift_dug)
+	# Округлый естественный перемет вокруг будки вместо серого монолитного ящика
+	var d_blob := SphereMesh.new()
+	d_blob.radius = 0.95
+	d_blob.height = 1.9
+	d_blob.radial_segments = 14
+	d_blob.rings = 6
+	for part: Array in [
+		[Vector3(0.0, -0.2, 0.0), Vector3(1.15, 1.05, 1.15)],
+		[Vector3(-0.25, -0.45, 0.35), Vector3(1.0, 0.75, 1.2)],
+		[Vector3(0.3, -0.5, -0.25), Vector3(0.9, 0.7, 0.95)],
+		[Vector3(0.0, 0.35, 0.0), Vector3(0.75, 0.55, 0.75)]
+	]:
+		var dm := MeshInstance3D.new()
+		dm.mesh = d_blob
+		dm.material_override = Palette.m(&"drift")
+		dm.position = part[0]
+		dm.scale = part[1]
+		_drift.add_child(dm)
 	_drift.prompt_provider = func() -> String:
 		if Game.player != null and Game.player.held == &"shovel":
 			return Loc.t(&"it.drift")
@@ -983,6 +1036,22 @@ func _build_mast() -> void:
 	add_child(base_ice)
 	_ice_nodes.append(base_ice)
 
+	# Лунная дорожка/тень от ажурной мачты на снегу (длинный шпиль, ползущий по насту)
+	var shadow_mesh := QuadMesh.new()
+	shadow_mesh.size = Vector2(0.48, 25.0)
+	_mast_shadow = MeshInstance3D.new()
+	_mast_shadow.mesh = shadow_mesh
+	var shadow_dir := Vector3(sin(deg_to_rad(45.0)), 0.0, cos(deg_to_rad(45.0)))
+	_mast_shadow.position = MAST + shadow_dir * 12.5 + Vector3(0.0, 0.038, 0.0)
+	_mast_shadow.rotation = Vector3(-PI * 0.5, deg_to_rad(45.0), 0.0)
+	_mast_shadow_mat = StandardMaterial3D.new()
+	_mast_shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_mast_shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_mast_shadow_mat.albedo_color = Color(0.015, 0.03, 0.06, 0.44)
+	_mast_shadow_mat.albedo_texture = _make_mast_shadow_texture()
+	_mast_shadow.material_override = _mast_shadow_mat
+	add_child(_mast_shadow)
+
 	# Трансформаторный ящик у основания мачты с табличкой «НЕ ВЛЕЗАЙ — УБЬЕТ!»
 	var tb := Props.transformer_booth()
 	tb.position = MAST + Vector3(1.05, 0.45, -0.6)
@@ -1055,6 +1124,21 @@ func _build_mast() -> void:
 	]
 	Geo.bulb(_mast_light, &"red", 0.14)
 	Game.level.register_lamp(_mast_light)
+
+
+static func _make_mast_shadow_texture() -> ImageTexture:
+	var img := Image.create(32, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		var v := float(y) / 127.0
+		var tip_fade := 1.0 - smoothstep(0.82, 1.0, v)
+		var is_crossbar := (y % 14 < 3)
+		for x in 32:
+			var u := (float(x) / 31.0) * 2.0 - 1.0
+			var edge := clampf((1.0 - absf(u)) * 1.6, 0.0, 1.0)
+			var dens := 0.9 if is_crossbar else (0.65 if absf(u) > 0.45 else 0.28)
+			var a := edge * dens * tip_fade
+			img.set_pixel(x, y, Color(1.0, 1.0, 1.0, a))
+	return ImageTexture.create_from_image(img)
 
 
 func _on_mast_used(_p: Player) -> void:
@@ -1170,6 +1254,15 @@ func _build_shed() -> void:
 	s_right.add_child(Geo.box_shape(Vector3(0.08, 2.6, 1.08)))
 	s_right.used.connect(_on_shed_doors_used)
 	_shed_door_right_hinge.add_child(s_right)
+
+	# Обледеневший замок на воротах склада ГСМ
+	var padlock_needed: bool = not Game.is_prologue() and (Game.night >= 1 or (Game.synoptic != null and Game.synoptic.temp_dry <= -26.0)) and not Game.has_flag("shed_padlock_thawed")
+	if padlock_needed:
+		var pad_pos := shed_center + Vector3(-total_len / 2.0 - 0.08, 1.25, 0.0)
+		_shed_padlock = Props.frozen_padlock()
+		_shed_padlock.position = pad_pos
+		add_child(_shed_padlock)
+		_shed_padlock_it = Geo.interactable(self, Vector3(0.5, 0.5, 0.5), pad_pos, null, Loc.t(&"it.frozen_padlock"), _on_shed_padlock_used)
 
 	# Занос/сугроб перед входом в сарай (начиная со второй ночи/дня)
 	var shed_drift_pos := shed_center + Vector3(-total_len / 2.0 - 0.7, 0.0, 0.0)
@@ -1445,8 +1538,53 @@ func set_shed_doors_open(open: bool) -> void:
 	_shed_doors_busy = false
 
 
-func _on_shed_doors_used(_p: Player) -> void:
+func _on_shed_doors_used(p: Player) -> void:
+	if not Game.is_prologue() and (Game.night >= 1 or (Game.synoptic != null and Game.synoptic.temp_dry <= -26.0)) and not Game.has_flag("shed_padlock_thawed"):
+		_on_shed_padlock_used(p)
+		return
 	set_shed_doors_open(not shed_doors_open)
+
+
+func _on_shed_padlock_used(p: Player) -> void:
+	if Game.has_flag("shed_padlock_thawed"):
+		return
+	if p != null and p.held == &"kettle":
+		if p.kettle_heat_timer > 0.0:
+			Game.set_flag("shed_padlock_thawed", true)
+			Game.audio.play_3d(CLANK_SOUND, _shed_padlock.global_position if _shed_padlock != null else global_position, 0.0)
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.padlock_thawed_kettle"), 4.0)
+			Director.add_tension(-5.0, "замок отогрет чайником")
+			if _shed_padlock != null:
+				var tw := create_tween()
+				tw.tween_property(_shed_padlock, "position:y", _shed_padlock.position.y - 1.2, 0.4)
+				await tw.finished
+				_shed_padlock.visible = false
+			if _shed_padlock_it != null:
+				_shed_padlock_it.collision_layer = 0
+		else:
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.kettle_cold_now"), 3.0)
+		return
+	elif p != null and p.held == &"blowtorch":
+		Game.set_flag("shed_padlock_thawed", true)
+		Game.audio.play_3d("res://assets/audio/flare.ogg", _shed_padlock.global_position if _shed_padlock != null else global_position, 2.0)
+		Game.audio.play_3d(CLANK_SOUND, _shed_padlock.global_position if _shed_padlock != null else global_position, 0.0)
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.t(&"sub.padlock_thawed_torch"), 4.0)
+		Director.add_tension(-5.0, "замок отогрет паяльной лампой")
+		if _shed_padlock != null:
+			var tw := create_tween()
+			tw.tween_property(_shed_padlock, "position:y", _shed_padlock.position.y - 1.2, 0.4)
+			await tw.finished
+			_shed_padlock.visible = false
+		if _shed_padlock_it != null:
+			_shed_padlock_it.collision_layer = 0
+		return
+
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.padlock_frozen"), 4.0)
+
 
 
 func _on_shed_drift_dug(_p: Player) -> void:
@@ -2279,27 +2417,46 @@ func _build_bunker() -> void:
 
 	# 2. Подземный бункер связи ГО «Отзвук» (глубина -30м):
 	var r := BUNKER_ROOM
-	var shell := CSGCombiner3D.new()
-	shell.use_collision = true
-	shell.collision_layer = Geo.LAYER_WORLD
-	add_child(shell)
+	var hall_w := 12.0
+	var hall_d := 8.0
+	var hall_h := 3.2
+	var hall_c := r + Vector3(8.0, 0, 0)
 
-	# --- 2.1 Тамбур спуска (x: -7.5 .. -4.5, z: -2.5 .. 2.5, h: 3.0) ---
-	_csg(shell, Vector3(3.4, 0.3, 5.4), r + Vector3(-6.0, -0.15, 0), c)
-	_csg(shell, Vector3(3.4, 0.3, 5.4), r + Vector3(-6.0, 3.0, 0), c)
-	_csg(shell, Vector3(3.4, 3.0, 0.3), r + Vector3(-6.0, 1.5, -2.6), c)
-	_csg(shell, Vector3(3.4, 3.0, 0.3), r + Vector3(-6.0, 1.5, 2.6), c)
-	_csg(shell, Vector3(0.3, 3.0, 5.4), r + Vector3(-7.6, 1.5, 0), c)
+	# 2.1 Цельная запечённая 3D-модель аппаратного зала (tools/blender/bunker_interior.py)
+	Models.spawn(self, "kedr/bunker_interior", r, 0.0, -1.0, {"keep": true, "center": false, "bright": 1.25, "sat": 0.95})
 
-	# Лестница наверх в тамбуре
-	for k in range(7):
-		Geo.block(self, Vector3(0.5, 0.04, 0.04), r + Vector3(-6.8, 0.3 + k * 0.42, 0), Palette.m(&"metal"), false)
+	# 2.2 Физические коллизии бункера (пол, стены, потолок, стойки и пульт)
+	var bunk_body := StaticBody3D.new()
+	bunk_body.collision_layer = Geo.LAYER_WORLD
+	bunk_body.collision_mask = 0
+	# Полы
+	bunk_body.add_child(Geo.box_shape(Vector3(3.4, 0.3, 5.4), r + Vector3(-6.0, -0.15, 0))) # тамбур
+	bunk_body.add_child(Geo.box_shape(Vector3(6.8, 0.3, 2.4), r + Vector3(-1.25, -0.15, 0))) # коридор
+	bunk_body.add_child(Geo.box_shape(Vector3(hall_w + 0.4, 0.3, hall_d + 0.4), hall_c + Vector3(0, -0.15, 0))) # зал
+	# Стены тамбура
+	bunk_body.add_child(Geo.box_shape(Vector3(3.4, 3.0, 0.3), r + Vector3(-6.0, 1.5, -2.6)))
+	bunk_body.add_child(Geo.box_shape(Vector3(3.4, 3.0, 0.3), r + Vector3(-6.0, 1.5, 2.6)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, 3.0, 5.4), r + Vector3(-7.6, 1.5, 0)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, 3.0, 2.0), r + Vector3(-4.5, 1.5, -1.7)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, 3.0, 2.0), r + Vector3(-4.5, 1.5, 1.7)))
+	# Стены коридора
+	bunk_body.add_child(Geo.box_shape(Vector3(6.8, 2.5, 0.3), r + Vector3(-1.25, 1.2, -1.2)))
+	bunk_body.add_child(Geo.box_shape(Vector3(6.8, 2.5, 0.3), r + Vector3(-1.25, 1.2, 1.2)))
+	# Стены зала
+	bunk_body.add_child(Geo.box_shape(Vector3(hall_w + 0.4, hall_h, 0.3), hall_c + Vector3(0, hall_h / 2.0, -hall_d / 2.0)))
+	bunk_body.add_child(Geo.box_shape(Vector3(hall_w + 0.4, hall_h, 0.3), hall_c + Vector3(0, hall_h / 2.0, hall_d / 2.0)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, hall_h, hall_d + 0.4), hall_c + Vector3(hall_w / 2.0, hall_h / 2.0, 0)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, hall_h, 3.4), r + Vector3(2.0, hall_h / 2.0, -2.6)))
+	bunk_body.add_child(Geo.box_shape(Vector3(0.3, hall_h, 3.4), r + Vector3(2.0, hall_h / 2.0, 2.6)))
+	# Коллизии стоек аппаратуры и пульта связи
+	bunk_body.add_child(Geo.box_shape(Vector3(7.6, 2.4, 0.75), hall_c + Vector3(-1.5, 1.2, -2.4)))
+	bunk_body.add_child(Geo.box_shape(Vector3(7.6, 2.4, 0.75), hall_c + Vector3(-1.5, 1.2, 2.4)))
+	bunk_body.add_child(Geo.box_shape(Vector3(1.1, 0.8, 3.2), hall_c + Vector3(4.2, 0.4, 0.0)))
+	add_child(bunk_body)
+
+	# 2.3 Интерактивные объекты и декор
 	var ladder := Geo.interactable(self, Vector3(0.5, 2.8, 0.4), r + Vector3(-6.8, 1.4, 0), null, Loc.t(&"it.ladder"), _on_ladder_used)
 	ladder.name = "Ladder"
-
-	# Разделительная стена с тяжелой гермодверью между тамбуром и коридором (x = -4.5)
-	_csg(shell, Vector3(0.3, 3.0, 5.4), r + Vector3(-4.5, 1.5, 0), c)
-	_csg(shell, Vector3(0.6, 2.1, 1.2), r + Vector3(-4.5, 1.05, 0), null, true)
 
 	var blast_door := Props.bunker_blast_door()
 	blast_door.position = r + Vector3(-4.5, 0.0, 0.0)
@@ -2310,86 +2467,11 @@ func _build_bunker() -> void:
 	door_it.name = "BlastDoor"
 	door_it.collision_layer = Geo.LAYER_INTERACT
 
-	# --- 2.2 Узкий сырой коридор с кабель-каналами (x: -4.5 .. 2.0, z: -1.0 .. 1.0, h: 2.4) ---
-	_csg(shell, Vector3(6.8, 0.3, 2.4), r + Vector3(-1.25, -0.15, 0), c)
-	_csg(shell, Vector3(6.8, 0.3, 2.4), r + Vector3(-1.25, 2.5, 0), c)
-	_csg(shell, Vector3(6.8, 2.5, 0.3), r + Vector3(-1.25, 1.2, -1.1), c)
-	_csg(shell, Vector3(6.8, 2.5, 0.3), r + Vector3(-1.25, 1.2, 1.1), c)
-
-	# Металлические кабель-каналы и жгуты толстых кабелей под потолком коридора
-	for side in [-1.0, 1.0]:
-		# Кабельный лоток
-		Geo.block(self, Vector3(6.5, 0.06, 0.25), r + Vector3(-1.25, 2.2, side * 0.9), Palette.m(&"metal"), false)
-		# Пучки кабелей
-		Geo.cylinder(self, 0.035, 6.5, r + Vector3(-1.25, 2.1, side * 0.95), Palette.m(&"dark"), false).rotation.z = deg_to_rad(90.0)
-		Geo.cylinder(self, 0.025, 6.5, r + Vector3(-1.25, 2.15, side * 0.85), Palette.m(&"dark"), false).rotation.z = deg_to_rad(90.0)
-		# Труба вентиляции
-		Geo.cylinder(self, 0.06, 6.5, r + Vector3(-1.25, 1.9, side * 0.95), Palette.m(&"canister"), false).rotation.z = deg_to_rad(90.0)
-
-	# Аварийное красное освещение в узком коридоре (пульсирующие тусклые фонари)
+	# Аварийное красное освещение в коридоре
 	for k in range(2):
 		var lamp_pos := r + Vector3(-3.2 + k * 3.4, 2.2, 0)
 		var red_lamp := Geo.omni(self, lamp_pos, 4.0, 0.8, Color(1.0, 0.15, 0.1))
 		Geo.bulb(red_lamp, &"red", 0.06)
-
-	# Вход из коридора в аппаратный зал (x = 2.0)
-	_csg(shell, Vector3(0.3, 3.2, 8.4), r + Vector3(2.0, 1.6, 0), c)
-	_csg(shell, Vector3(0.6, 2.4, 1.4), r + Vector3(2.0, 1.2, 0), null, true)
-
-	# --- 2.3 Просторный аппаратный зал со стойками связи (x: 2.0 .. 14.0, z: -4.0 .. 4.0, h: 3.2) ---
-	var hall_w := 12.0
-	var hall_d := 8.0
-	var hall_h := 3.2
-	var hall_c := r + Vector3(8.0, 0, 0)
-
-	_csg(shell, Vector3(hall_w + 0.4, 0.3, hall_d + 0.4), hall_c + Vector3(0, -0.15, 0), c)
-	_csg(shell, Vector3(hall_w + 0.4, 0.3, hall_d + 0.4), hall_c + Vector3(0, hall_h + 0.15, 0), c)
-	_csg(shell, Vector3(hall_w + 0.4, hall_h, 0.3), hall_c + Vector3(0, hall_h / 2.0, -hall_d / 2.0), c) # север
-	_csg(shell, Vector3(hall_w + 0.4, hall_h, 0.3), hall_c + Vector3(0, hall_h / 2.0, hall_d / 2.0), c)  # юг
-	_csg(shell, Vector3(0.3, hall_h, hall_d + 0.4), hall_c + Vector3(hall_w / 2.0, hall_h / 2.0, 0), c)  # восток
-
-	# Оцинкованный массивный воздуховод под сводом аппаратного зала
-	Geo.block(self, Vector3(hall_w, 0.35, 0.5), hall_c + Vector3(0, hall_h - 0.25, 2.8), Palette.m(&"metal"), false)
-
-	# Ряды гудящих 19-дюймовых стоек аппаратуры связи «Отзвук»
-	for row: float in [-1.0, 1.0]:
-		var rz: float = row * 2.4
-		for i in range(5):
-			var rx := hall_c.x - 4.5 + i * 1.5
-			# Высокая стойка
-			Geo.block(self, Vector3(1.1, 2.4, 0.7), Vector3(rx, r.y + 1.2, hall_c.z + rz), Palette.m(&"radio"))
-			# Лицевая панель: блоки с щелями, шкалы, тумблеры, бобины магнитной ленты за стеклом
-			var face_z := hall_c.z + rz - row * 0.36
-			var spool := _bunker_mat(Color(0.26, 0.17, 0.1))
-			var flange := _bunker_mat(Color(0.55, 0.56, 0.55))
-			for j in range(2):
-				var rc := Vector3(rx + (j - 0.5) * 0.48, r.y + 1.85, face_z - row * 0.01)
-				var fl := Geo.cylinder(self, 0.2, 0.012, rc, flange, false)
-				fl.rotation.x = PI / 2.0
-				var tp := Geo.cylinder(self, 0.14 - j * 0.03, 0.03, rc - Vector3(0, 0, row * 0.015), spool, false)
-				tp.rotation.x = PI / 2.0
-				var hub := Geo.cylinder(self, 0.04, 0.04, rc - Vector3(0, 0, row * 0.02), flange, false)
-				hub.rotation.x = PI / 2.0
-				for cyl_n: Node3D in [fl, tp]:   # круглые, а не восьмигранные
-					((cyl_n as MeshInstance3D).mesh as CylinderMesh).radial_segments = 24
-			Geo.block(self, Vector3(1.0, 0.5, 0.012), Vector3(rx, r.y + 1.85, face_z - row * 0.03), _bunker_mat(Color(0.5, 0.6, 0.62, 0.25), true), false)
-			for j in range(3):
-				var dial := Geo.cylinder(self, 0.06, 0.015, Vector3(rx - 0.3 + j * 0.3, r.y + 1.38, face_z - row * 0.008), _bunker_mat(Color(0.82, 0.8, 0.72)), false)
-				dial.rotation.x = PI / 2.0
-				((dial as MeshInstance3D).mesh as CylinderMesh).radial_segments = 16
-				Geo.block(self, Vector3(0.012, 0.05, 0.004), Vector3(rx - 0.3 + j * 0.3 + 0.012, r.y + 1.395, face_z - row * 0.018), Palette.m(&"dark"), false)
-			for j in range(6):
-				Geo.block(self, Vector3(0.02, 0.05, 0.03), Vector3(rx - 0.35 + j * 0.14, r.y + 0.85, face_z - row * 0.015), Palette.m(&"metal"), false)
-			for j in range(4):
-				Geo.block(self, Vector3(1.05, 0.006, 0.006), Vector3(rx, r.y + 0.3 + j * 0.06, face_z - row * 0.004), Palette.m(&"dark"), false)
-			Geo.block(self, Vector3(1.1, 0.012, 0.01), Vector3(rx, r.y + 1.6, face_z - row * 0.004), Palette.m(&"metal"), false)
-			# Мерцающие янтарные индикаторы и лампы
-			Geo.block(self, Vector3(0.8, 0.06, 0.01), Vector3(rx, r.y + 1.1, hall_c.z + rz - row * 0.36), Palette.glow(&"amber"), false)
-			Geo.block(self, Vector3(0.4, 0.05, 0.01), Vector3(rx, r.y + 0.6, hall_c.z + rz - row * 0.36), Palette.glow(&"amber"), false)
-
-	# Главный рабочий пульт радиста связи в торце зала
-	Geo.block(self, Vector3(3.2, 0.8, 1.1), hall_c + Vector3(4.2, 0.4, 0.0), Palette.m(&"metal"))
-	Geo.block(self, Vector3(1.2, 0.6, 0.6), hall_c + Vector3(4.2, 1.1, -0.2), Palette.m(&"radio"), false)
 
 	# Семёнов: сидит у пульта в наушниках
 	var body := Creatures.make_corpse()
@@ -2405,6 +2487,31 @@ func _build_bunker() -> void:
 	var roll := Geo.interactable(self, Vector3(0.7, 0.9, 0.02), hall_c + Vector3(5.7, 1.6, 0.0), Palette.m(&"paper"), Loc.t(&"it.bunker_list"), _on_bunker_list)
 	roll.name = "BunkerList"
 	roll.rotation.y = deg_to_rad(-90.0)
+
+	# Магнитная бобина «Спецсвязь-17» на столе аппаратуры
+	var tape_it: Interactable = null
+	tape_it = Geo.interactable(self, Vector3(0.28, 0.08, 0.28), hall_c + Vector3(4.3, 0.82, -0.4), Palette.m(&"dark"), Loc.t(&"it.tape_bunker"), func(_p: Player) -> void:
+		if not Game.has_item(&"tape_bunker"):
+			Game.give_item(&"tape_bunker")
+			Game.add_tape(&"tape_bunker")
+			AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
+			Game.hud.subtitle(Loc.t(&"sub.tape_bunker_found"), 5.0)
+			SaveGame.write()
+			if tape_it != null:
+				tape_it.queue_free()
+	)
+	tape_it.name = "BunkerTapeSpecComms"
+
+	# Капель воды в тамбуре бункера
+	var drip := AudioStreamPlayer3D.new()
+	drip.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/drip_1.ogg")
+	drip.position = hall_c + Vector3(-6.0, 2.2, 0)
+	drip.unit_size = 4.0
+	drip.max_distance = 18.0
+	drip.volume_db = -10.0
+	drip.bus = &"SFX"
+	drip.autoplay = true
+	add_child(drip)
 
 	# Освещение аппаратного зала: тусклое люминесцентное зелёно-болотное
 	var lamp := Geo.omni(self, hall_c + Vector3(0, 2.7, 0), 10.0, 0.65, Color(0.7, 1.0, 0.75))
@@ -2427,6 +2534,7 @@ func _on_hatch_used(p: Player) -> void:
 
 
 func _on_ladder_used(p: Player) -> void:
+	Game.audio.play_3d(CLANK_SOUND, BUNKER + Vector3(0, 0.8, 0), 0.0)
 	await Game.hud.blink(0.5)
 	p.global_position = BUNKER + Vector3(-1.9, 0.05, 0)
 	p.rotation.y = deg_to_rad(90.0)
@@ -2702,6 +2810,9 @@ func _build_windfall(points: Array[Vector3], rng: RandomNumberGenerator) -> void
 		if _flat_dist(p, LAKE) < LAKE_R + 4.0 or _flat_dist(p, LAKE_SHACK) < 6.0 or _flat_dist(p, REPEATER) < 9.0 or _flat_dist(p, BUNKER) < 6.0:
 			continue
 		var off := Vector3(rng.randf_range(-1.6, 1.6), 0, rng.randf_range(-1.6, 1.6))
+		var target_pos := p + off
+		if _dist_to(_all_paths, target_pos) < 3.5 or _flat_dist(target_pos, PLOT) < 7.5:
+			continue
 		var roll := rng.randf()
 		if roll < 0.55:
 			Models.spawn(self, "nature/log_large", p + off - Vector3(0, 0.08, 0), rng.randf() * 360.0, rng.randf_range(0.4, 0.6),

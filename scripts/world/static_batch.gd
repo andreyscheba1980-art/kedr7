@@ -92,6 +92,8 @@ func _pinned_nodes(root: Node) -> Dictionary:
 func _pin_value(v: Variant, out: Dictionary, depth: int) -> void:
 	if depth > 2:
 		return
+	if typeof(v) == TYPE_OBJECT and not is_instance_valid(v):
+		return
 	if v is Node:
 		if is_instance_valid(v):
 			out[v] = true
@@ -125,7 +127,11 @@ func _eligible(mi: MeshInstance3D, root: Node, containers: Dictionary, pinned: D
 		if pinned.has(p):
 			return "parent pinned"
 		if p.get_script() != null:
-			return "parent script:" + (p.get_script() as Script).resource_path.get_file()
+			var sname: String = (p.get_script() as Script).resource_path.get_file()
+			if sname in ["station_lore.gd", "corpus_dressing.gd", "site_dressing.gd", "life_dressing.gd", "day_pois.gd"]:
+				p = p.get_parent()
+				continue
+			return "parent script:" + sname
 		if p is Light3D or p is RigidBody3D or p is AnimatableBody3D or p is CharacterBody3D or p is VehicleBody3D or not (p is Node3D):
 			return "parent " + p.get_class()
 		var pn := String(p.name).to_lower()

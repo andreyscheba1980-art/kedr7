@@ -59,6 +59,9 @@ func _apply_quality() -> void:
 	visible = on
 	set_process(on)
 	SpruceMesh.set_near_cut(on)
+	var shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Settings.quality >= 2 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for mi in _mmi:
+		mi.cast_shadow = shadow
 	if on:
 		_last = Vector3(1e9, 0.0, 1e9)
 

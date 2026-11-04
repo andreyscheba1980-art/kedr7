@@ -62,6 +62,18 @@ const DATA := {
 		"lines": [&"sig.rec0310.1", &"sig.rec0310.2"], "recordable": false,
 		"tape": {"hidden": {"band": Vector2(400.0, 900.0), "image": "res://assets/textures/hidden_ravine.png", "text": &"hid.ravine"}},
 	},
+	## Полевой дневник геофизика Дубова (найден на заброшенном посте РЛС на сопке)
+	&"tape_field": {
+		"freq": 0.0, "width": 0.0, "stream": "res://assets/audio/voice_mainland.ogg",
+		"lines": [&"sig.tape_field.1", &"sig.tape_field.2", &"sig.tape_field.3"], "recordable": false,
+		"tape": {"hidden": {"band": Vector2(300.0, 800.0), "image": "res://assets/textures/hidden_ravine.png", "text": &"hid.tape_field"}},
+	},
+	## Архив объекта «Отзвук» (найден в подземном бункере ГО)
+	&"tape_bunker": {
+		"freq": 0.0, "width": 0.0, "stream": "res://assets/audio/otzvuk_loop.ogg",
+		"lines": [&"sig.tape_bunker.1", &"sig.tape_bunker.2", &"sig.tape_bunker.3"], "recordable": false,
+		"tape": {"hidden": {"band": Vector2(100.0, 450.0), "image": "res://assets/textures/hidden_bunker.png", "text": &"hid.tape_bunker", "scare": true}},
+	},
 	## Сигналы заданий: частоту назначает NightTasks на ночь.
 	&"beacon": {
 		"freq": 0.0, "width": 9.0, "stream": "res://assets/audio/beacon_loop.ogg",
@@ -84,6 +96,22 @@ const DATA := {
 	&"alone": {
 		"freq": 5210.0, "width": 14.0, "stream": "res://assets/audio/radio_anomaly.ogg",
 		"lines": [&"sig.alone"], "recordable": true,
+	},
+	## Дневной эфир (Daytime Dread): метроном, обрывки радиоспектакля 50-х, переговоры геологов
+	&"day_metronome": {
+		"freq": 4220.0, "width": 14.0, "stream": "res://assets/audio/clock_tick.ogg",
+		"lines": [&"sig.day_metronome"], "recordable": true,
+		"tape": {"hidden": {"band": Vector2(100.0, 500.0), "image": "", "text": &"hid.metronome"}},
+	},
+	&"day_radioplay": {
+		"freq": 5840.0, "width": 16.0, "stream": "res://assets/audio/voice_loop.ogg",
+		"lines": [&"sig.day_radioplay.1", &"sig.day_radioplay.2"], "recordable": true,
+		"tape": {"hidden": {"band": Vector2(600.0, 1400.0), "image": "", "text": &"hid.radioplay"}},
+	},
+	&"day_geologists": {
+		"freq": 7310.0, "width": 14.0, "stream": "res://assets/audio/voice_mainland.ogg",
+		"lines": [&"sig.day_geologists.1", &"sig.day_geologists.2", &"sig.day_geologists.3"], "recordable": true,
+		"tape": {"hidden": {"band": Vector2(400.0, 1000.0), "image": "res://assets/textures/hidden_bunker.png", "text": &"hid.geologists"}},
 	},
 }
 
@@ -138,9 +166,9 @@ static func broadcast_for_night(n: int) -> Array[StringName]:
 	return out
 
 
-## Передачи, которые идут в этот день (сеансы связи геологов Белова).
+## Передачи, которые идут в этот день (сеансы связи геологов Белова + дневной эфир).
 static func broadcast_for_day(d: int) -> Array[StringName]:
-	var out: Array[StringName] = []
+	var out: Array[StringName] = [&"day_metronome", &"day_radioplay", &"day_geologists"]
 	for e: Array in BROADCAST.get(d, []):
 		if String(e[0]).begins_with("bc_belov_"):
 			out.append(e[0])

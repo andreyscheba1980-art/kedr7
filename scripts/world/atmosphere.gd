@@ -13,6 +13,7 @@ static var _shaft_mat: ShaderMaterial    ## общий для всех луче�
 var density := 0.0                      ## 0 — ясно и в доме, 1 — метель
 var _drift: CPUParticles3D
 var _veil: CPUParticles3D
+var _ribbons: CPUParticles3D        ## быстрые стелющиеся ленты позёмки над настом
 var _dust: CPUParticles3D           ## пыль в доме — видна только в луче фонаря и у ламп
 var _ridge: CPUParticles3D          ## в метель с конька крыши срывает снежные струи
 var _spark: CPUParticles3D          ## «алмазная пыль»: в ясный мороз ледяные искры блестят только в луче фонаря
@@ -38,6 +39,13 @@ func _ready() -> void:
 func _build_drift() -> void:
 	# Мелкая снежная пыль, которую ветер несёт над самым настом
 	_drift = _ground_emitter(int(520 * Settings.detail()), Vector2(0.05, 0.05), Color(0.85, 0.9, 0.97, 0.5), 0.1, 2.2)
+	# Быстрые позёмные ленты-струи, стелющиеся над самым настом
+	_ribbons = _ground_emitter(int(140 * Settings.detail()), Vector2(0.38, 0.032), Color(0.88, 0.92, 0.98, 0.55), 0.06, 1.8)
+	_ribbons.initial_velocity_min = 4.2
+	_ribbons.initial_velocity_max = 7.5
+	_ribbons.spread = 7.0
+	_ribbons.scale_amount_min = 0.8
+	_ribbons.scale_amount_max = 1.6
 	# И полупрозрачная пелена — рваные клубы позёмки по колено
 	_veil = _ground_emitter(int(46 * Settings.detail()), Vector2(1.6, 0.7), Color(0.75, 0.82, 0.92, 0.07), 0.35, 3.4)
 	_veil.scale_amount_min = 0.7
@@ -368,11 +376,18 @@ func _process(delta: float) -> void:
 	var target := (0.35 + storm * 0.65) if outside else 0.0
 	density = lerpf(density, target, minf(delta * 1.5, 1.0))
 	# Позёмка — у ног игрока, гуще и быстрее в метель
-	for e: CPUParticles3D in [_drift, _veil]:
+	var ground_y: float = p.global_position.y
+	for e: CPUParticles3D in [_drift, _veil, _ribbons]:
+		if e == null:
+			continue
 		e.visible = outside
-		e.global_position = Vector3(p.global_position.x, 0.12 if e == _drift else 0.35, p.global_position.z)
+		var off_y := 0.05 if e == _ribbons else (0.10 if e == _drift else 0.32)
+		e.global_position = Vector3(p.global_position.x, ground_y + off_y, p.global_position.z)
 		e.speed_scale = 0.7 + storm * 1.8
-	(_drift.mesh.material as StandardMaterial3D).albedo_color.a = 0.25 + storm * 0.45
+	if _drift != null and _drift.mesh != null and _drift.mesh.material != null:
+		(_drift.mesh.material as StandardMaterial3D).albedo_color.a = 0.25 + storm * 0.45
+	if _ribbons != null and _ribbons.mesh != null and _ribbons.mesh.material != null:
+		(_ribbons.mesh.material as StandardMaterial3D).albedo_color.a = 0.32 + storm * 0.48
 	_dust.visible = not outside
 	# Алмазная пыль — ясная ночь, мороз, перед глазами (горит только в луче фонаря)
 	var sparkle := outside and storm < 0.25 and Game.is_night()

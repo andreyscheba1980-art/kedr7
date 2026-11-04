@@ -32,11 +32,16 @@ var muted := false                ## испуг может заглушить э
 var static_boost := 0.0           ## испуг может поднять помехи
 var voice_override := false       ## голос слышен на любой частоте (бит с Семёновым)
 var recording_t := -1.0           ## < 0 — не пишем
+var morning_call_active := false  ## утренний сеанс связи с Большой Землей
+
+func set_morning_call_active(v: bool) -> void:
+	morning_call_active = v
 
 var _signals: Array[StringName] = []
 var _static: AudioStreamPlayer3D
 var _tune: AudioStreamPlayer3D     ## шорох верньера, пока крутят ручку
 var _tune_idle := 1.0
+var _heterodyne: AudioStreamPlayer3D ## свист гетеродина при приближении к несущей
 var _morse_t := 70.0               ## далёкая чужая морзянка между станциями
 var _players: Dictionary = {}
 var _static_amp := 0.3
@@ -184,13 +189,16 @@ func _ready() -> void:
 	Game.radio = self
 	freq = Game.rng.randf_range(5600.0, 6500.0)
 	for id: StringName in Game.cfg.get("signals", [&"mainland"]):
-		_signals.append(id)
+		if not _signals.has(id):
+			_signals.append(id)
 	if Game.is_night():
 		for id in Signals.broadcast_for_night(Game.night):
-			_signals.append(id)
+			if not _signals.has(id):
+				_signals.append(id)
 	elif Game.is_day():
 		for id in Signals.broadcast_for_day(Game.phase_index):
-			_signals.append(id)
+			if not _signals.has(id):
+				_signals.append(id)
 
 	_static = AudioStreamPlayer3D.new()
 	_static.stream = AudioDirector.cached_stream(STATIC_LOOP)
@@ -208,17 +216,32 @@ func _ready() -> void:
 		_tune.stream = AudioDirector.cached_stream(tune_path)
 		_tune.unit_size = 2.5
 		_tune.max_distance = 12.0
-		_tune.volume_db = -10.0
+		_tune.volume_db = -12.0
 		_tune.bus = &"Radio"
 		add_child(_tune)
 
+	_heterodyne = AudioStreamPlayer3D.new()
+	var het_s := load("res://assets/audio/carrier_loop.ogg") as AudioStream
+	if het_s is AudioStreamOggVorbis:
+		het_s = het_s.duplicate()
+		(het_s as AudioStreamOggVorbis).loop = true
+	_heterodyne.stream = het_s
+	_heterodyne.unit_size = 2.5
+	_heterodyne.max_distance = 14.0
+	_heterodyne.volume_db = -80.0
+	_heterodyne.bus = &"Radio"
+	add_child(_heterodyne)
+	_heterodyne.play()
+
 	for id in _signals:
 		var p := AudioStreamPlayer3D.new()
+		p.name = "Signal_" + String(id)
 		p.stream = NumbersVoice.stream_or_default(id)
 		p.unit_size = 3.0
 		p.max_distance = 18.0
 		p.volume_db = -80.0
 		p.bus = &"Radio"
+		p.set_meta(&"src", "radio:" + String(id))
 		add_child(p)
 		p.finished.connect(_on_signal_finished.bind(p, id))
 		p.play()
@@ -284,22 +307,42 @@ func _process(delta: float) -> void:
 			vol = 0.0
 		p.volume_db = linear_to_db(maxf(vol, 0.0001)) + base_db
 
-	var target_amp := lerpf(0.32, 0.04, best_s) + static_boost
+	var target_amp := lerpf(0.28, 0.03, best_s) + static_boost
 	if Game.knife_in_lintel:
 		target_amp += 0.42
 	if Game.antenna_iced:
-
 		target_amp += 0.1
 	if is_voice_busy():
-		target_amp = 0.0 if _fake_voice else 0.04
+		target_amp = 0.0 if _fake_voice else 0.03
 	elif voice_override:
-		target_amp = 0.18
+		target_amp = 0.16
 	elif voice_active:
-		target_amp = 0.06
+		target_amp = 0.05
 	if muted:
 		target_amp = 0.0
 	_static_amp = lerpf(_static_amp, target_amp, minf(delta * 5.0, 1.0))   # без резких скачков шума
 	_static.volume_db = base_db + linear_to_db(maxf(_static_amp, 0.0001))
+
+	# Гетеродинный свист при приближении к несущей частоте (биения гетеродина Р-250)
+	var het_target_db := -80.0
+	var het_pitch := 1.0
+	if active and not voice_active and not muted:
+		var min_d := 9999.0
+		for id in _signals:
+			if not Efir.window_ok(id):
+				continue
+			var s_def := Signals.get_def(id)
+			var cf: float = _freq_over.get(id, float(s_def["freq"]))
+			var df := absf(freq - cf)
+			if df < min_d:
+				min_d = df
+		if min_d < 140.0 and min_d > 6.0:
+			var prox := 1.0 - (min_d / 140.0)
+			het_target_db = -24.0 + prox * 10.0
+			het_pitch = clampf(0.4 + (min_d / 140.0) * 1.5, 0.35, 2.0)
+	if _heterodyne != null:
+		_heterodyne.volume_db = lerpf(_heterodyne.volume_db, het_target_db, minf(delta * 8.0, 1.0))
+		_heterodyne.pitch_scale = lerpf(_heterodyne.pitch_scale, het_pitch, minf(delta * 12.0, 1.0))
 
 	_tick_sfx(delta, voice_active)
 	if active:
@@ -317,6 +360,9 @@ func enter() -> void:
 	active = true
 	Game.player.mode = Player.Mode.RADIO
 	Game.hud.show_radio(true)
+	var sq := Voice.sfx(&"radio_squelch")
+	if sq != "":
+		Game.audio.play_3d(sq, global_position + Vector3.UP * 0.2, -8.0, 3.5)
 
 
 func exit() -> void:
@@ -325,6 +371,9 @@ func exit() -> void:
 	recording_t = -1.0
 	Game.player.mode = Player.Mode.WALK
 	Game.hud.show_radio(false)
+	var sq := Voice.sfx(&"radio_squelch")
+	if sq != "":
+		Game.audio.play_3d(sq, global_position + Vector3.UP * 0.2, -11.0, 3.5)
 
 
 func nudge(dir: int) -> void:
@@ -367,11 +416,13 @@ func add_dynamic(id: StringName, f: float) -> void:
 	_freq_over[id] = f
 	_signals.append(id)
 	var p := AudioStreamPlayer3D.new()
+	p.name = "Signal_" + String(id)
 	p.stream = NumbersVoice.stream_or_default(id)
 	p.unit_size = 3.0
 	p.max_distance = 18.0
 	p.volume_db = -80.0
 	p.bus = &"Radio"
+	p.set_meta(&"src", "radio:" + String(id))
 	add_child(p)
 	p.finished.connect(_on_signal_finished.bind(p, id))
 	p.play()

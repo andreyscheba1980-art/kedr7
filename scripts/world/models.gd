@@ -15,6 +15,14 @@ static var _grime: Dictionary = {}
 static var _shader: Shader
 
 
+const ALIASES: Dictionary = {
+	"survival/barrel": "kedr/soviet_barrel",
+	"survival/barrel-open": "kedr/soviet_barrel_open",
+	"survival/box": "kedr/soviet_crate",
+	"survival/box-large": "kedr/soviet_crate_large",
+	"survival/bucket": "kedr/soviet_bucket",
+}
+
 ## id — путь внутри assets/models без расширения ("survival/barrel").
 ## height — высота в метрах (≤0 — масштаб scale). opts:
 ##   scale: float — явный масштаб; tint: Color; collide: bool; shadow: bool; grime: float (0..1);
@@ -23,6 +31,11 @@ static var _shader: Shader
 ##   keep: bool — модель в своих координатах как есть, без посадки низа на pos.y (center: false низ всё равно
 ##   сажает: модели «в координатах игры» с фундаментом ниже нуля или на чердаке иначе съезжают по высоте).
 static func spawn(parent: Node, id: String, pos: Vector3, yaw_deg := 0.0, height := -1.0, opts := {}) -> Node3D:
+	if ALIASES.has(id):
+		id = ALIASES[id]
+	var is_baked := id.begins_with("kedr/")
+	if is_baked and not opts.has("is_baked"):
+		opts["is_baked"] = true
 	var ps := _scene(id)
 	if ps == null:
 		return null
@@ -60,6 +73,8 @@ static func spawn(parent: Node, id: String, pos: Vector3, yaw_deg := 0.0, height
 
 ## Габариты модели в метрах при заданной высоте — для раскладки.
 static func size_of(id: String, height := -1.0) -> Vector3:
+	if ALIASES.has(id):
+		id = ALIASES[id]
 	var ps := _scene(id)
 	if ps == null:
 		return Vector3.ZERO
@@ -129,9 +144,11 @@ static func _meshes(n: Node) -> Array[MeshInstance3D]:
 
 
 static func _restyle(inst: Node3D, opts: Dictionary) -> void:
+	var is_baked: bool = opts.get("is_baked", false)
 	var tint: Color = opts.get("tint", Color.WHITE)
-	var grime: float = opts.get("grime", 0.7)
-	var bright: float = opts.get("bright", 0.5)
+	var grime: float = opts.get("grime", 0.0 if is_baked else 0.7)
+	var bright: float = opts.get("bright", 1.0 if is_baked else 0.5)
+	var sat: float = opts.get("sat", 1.0 if is_baked else 0.6)
 	var shadow: bool = opts.get("shadow", true)
 	for mi in _meshes(inst):
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -139,7 +156,7 @@ static func _restyle(inst: Node3D, opts: Dictionary) -> void:
 			continue
 		for si in mi.mesh.get_surface_count():
 			var src := mi.get_active_material(si)
-			mi.set_surface_override_material(si, _convert(src, tint, grime, bright, opts.get("sat", 0.6)))
+			mi.set_surface_override_material(si, _convert(src, tint, grime, bright, sat))
 
 
 static func _convert(src: Material, tint: Color, grime: float, bright := 0.5, sat := 0.6) -> ShaderMaterial:

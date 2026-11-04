@@ -55,7 +55,8 @@ void sky() {
 	vec3 d = normalize(EYEDIR);
 	float el = d.y;
 	float az = atan(d.x, d.z) / 6.2831853 * 6.0;
-	vec3 col = mix(horizon_color, top_color, pow(smoothstep(-0.02, 0.75, el), 0.7));
+	float horiz_glow = exp(-max(el, 0.0) * 8.5) * 0.28;
+	vec3 col = mix(horizon_color + horizon_color * horiz_glow, top_color, pow(smoothstep(-0.02, 0.50, el), 0.75));
 
 	// Звёзды: редкие, тусклее у горизонта и в метель.
 	vec3 sp = d * 220.0;
@@ -99,7 +100,8 @@ void sky() {
 			vec3 c = mix(aurora_tint, aurora_top, smoothstep(0.03, 0.22, hgt));
 			acc += c * a * (1.0 - fi * 0.35);
 		}
-		col += acc * aurora * 0.42 * sector * (1.0 - cloud_amount) * smoothstep(0.02, 0.12, el);
+		float pulse = 1.0 + sin(TIME * 0.35 + ang * 1.8) * 0.18;
+		col += acc * aurora * 0.62 * pulse * sector * (1.0 - cloud_amount) * smoothstep(0.02, 0.12, el);
 	}
 
 	// Хребты: дальний — в дымке почти цвета горизонта, ближний — темнее.
@@ -114,7 +116,7 @@ void sky() {
 	if (el < -0.01) {
 		col = mix(near_ridge, below_color, smoothstep(-0.01, -0.2, el));
 	}
-	// Метель: всё небо затягивает мутью цвета горизонта.
-	col = mix(col, horizon_color * 0.85, cloud_amount * 0.55);
+	// Метель: небо затягивает ночной мглой цвета горизонта (без высветления).
+	col = mix(col, horizon_color * 0.45, cloud_amount * 0.45);
 	COLOR = col;
 }

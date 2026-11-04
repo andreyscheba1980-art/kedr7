@@ -425,6 +425,24 @@ func _build_shift_spread() -> void:
 
 	sign_box.add_spacer(false)
 
+	if cur_night >= 2:
+		var prop_box := PanelContainer.new()
+		var psb := StyleBoxFlat.new()
+		psb.bg_color = Color(0.15, 0.22, 0.45, 0.08)
+		psb.border_color = Color(0.20, 0.30, 0.60, 0.35)
+		psb.set_border_width_all(1)
+		psb.content_margin_left = 8
+		psb.content_margin_right = 8
+		psb.content_margin_top = 4
+		psb.content_margin_bottom = 4
+		prop_box.add_theme_stylebox_override("panel", psb)
+		var pl := Label.new()
+		pl.text = "✍ " + Loc.t(&"tm1.prophecy_2")
+		pl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		style_paper_label(pl, Color(0.12, 0.16, 0.42), 11)
+		prop_box.add_child(pl)
+		left_box.add_child(prop_box)
+
 	var is_sent: bool = (SaveGame.flags.get("forecast_day", -1) == Game.phase_index)
 	_transmitted = is_sent
 
@@ -643,6 +661,17 @@ func _populate_archive_entries() -> void:
 			"note": Loc.p("Запись внесена в Государственный архив метеонаблюдений.", "Entered into the State Archive of Weather Observations.")
 		})
 
+	# Пророческие записи наперёд (почерком Виктора)
+	if Game.night >= 2 or Game.is_night():
+		entries.append({
+			"date": Loc.p("Ночь %d — Срок 04:00 (БУДУЩЕЕ)", "Night %d — Due 04:00 (FUTURE)") % (Game.night if Game.is_night() else 2),
+			"author": Loc.p("Ваш почерк (тёмно-синие чернила)", "Your handwriting (dark blue ink)"),
+			"title": Loc.t(&"tm1.prophecy_title"),
+			"body": "%s\n\n%s\n\n%s" % [Loc.t(&"tm1.prophecy_1"), Loc.t(&"tm1.prophecy_2"), Loc.t(&"tm1.prophecy_3")],
+			"note": Loc.p("Особая отметка: чернила ещё не высохли. Но ты этого не писал...", "Special note: the ink is still wet. But you never wrote this..."),
+			"prophecy": true
+		})
+
 	for i in range(entries.size()):
 		var e := entries[i]
 		var btn := Button.new()
@@ -665,11 +694,19 @@ func _select_archive_entry(idx: int, entries: Array[Dictionary]) -> void:
 	_active_archive_idx = idx
 	AudioDirector.play_raw(TICK_SFX, -4.0)
 
+	var e := entries[idx]
+	if e.get("prophecy", false) and not bool(SaveGame.flags.get("journal_prophecy_seen", false)):
+		SaveGame.flags["journal_prophecy_seen"] = true
+		SaveGame.write()
+		AudioDirector.play_raw("res://assets/audio/radio_anomaly.ogg", -6.0)
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.t(&"sub.journal_prophecy_seen"), 4.5)
+		Director.add_tension(14.0, "пророческие записи в журнале")
+
 	for i in range(_archive_buttons.size()):
 		var b := _archive_buttons[i]
 		b.modulate = Color(1.2, 1.1, 0.8) if i == idx else Color.WHITE
 
-	var e := entries[idx]
 	_archive_doc_title.text = e.get("title", "")
 	_archive_doc_meta.text = "%s • %s" % [e.get("date", ""), e.get("author", "")]
 	_archive_doc_body.text = e.get("body", "")

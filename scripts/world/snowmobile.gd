@@ -45,6 +45,16 @@ var _deep := 0.0                 ## 0 — зимник/двор, 1 — цели�
 var _deep_told := false
 var _stuck_t := 0.0
 var _stall_t := 20.0
+var _ark_gauge: Node3D
+var _ark_needle: Node3D
+var _ark_eye_mat: StandardMaterial3D
+var _ark_angle := 0.0
+var _trail_mmi: MultiMeshInstance3D
+var _trail_mm: MultiMesh
+var _trail_idx := 0
+var _last_trail_pos := Vector3.INF
+const MAX_TRAIL_SEGMENTS := 350
+static var _trail_mat: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -67,6 +77,9 @@ func _exit_tree() -> void:
 		instance = null
 	if riding:
 		Game.set_flag("riding", false)
+	if _trail_mmi != null and is_instance_valid(_trail_mmi):
+		_trail_mmi.queue_free()
+		_trail_mmi = null
 
 
 func is_covered() -> bool:
@@ -106,6 +119,7 @@ func _build() -> void:
 	_light.visible = false
 	_body.add_child(_light)
 	apply_upgrades()
+	_build_ark_gauge(_body)
 	# Чехол — тот же брезент, что в гараже
 	_tarp = Node3D.new()
 	_body.add_child(_tarp)
@@ -306,7 +320,8 @@ func _physics_process(delta: float) -> void:
 	# В гору «Буран» тянет хуже, в целине — ещё и проваливается.
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
 	var slope := -Terrain.normal(pos.x, pos.z).dot(fwd)   # > 0 — в гору
-	var cap := lerpf(MAX_SPEED, DEEP_SPEED, _deep) * clampf(1.0 - maxf(slope, 0.0) * (1.6 + _deep * 2.0), 0.25, 1.0)
+	var deep_cap: float = DEEP_SPEED * (1.35 if (Game.has_item(&"belt_variator") or Game.has_flag("buran_belt")) else 1.0)
+	var cap := lerpf(MAX_SPEED, deep_cap, _deep) * clampf(1.0 - maxf(slope, 0.0) * (1.6 + _deep * 2.0), 0.25, 1.0)
 	var acc := ACCEL * lerpf(1.0, 0.55, _deep)
 	if throttle > 0.0:
 		speed = move_toward(speed, cap * throttle, acc * delta)
@@ -332,6 +347,7 @@ func _physics_process(delta: float) -> void:
 	p.rotation.y += dyaw
 	_move(delta)
 	_seat_player(p)
+	_tick_ark(delta)
 	# Топливо, звук, шум для Ырки
 	if engine_on:
 		fuel = maxf(fuel - (FUEL_IDLE * delta + absf(speed) * delta * FUEL_RUN * lerpf(1.0, 1.7, _deep)), 0.0)
@@ -383,6 +399,7 @@ func _move(delta: float) -> void:
 			return
 		driven += step.length()
 	_place(global_position + step)
+	_tick_trail()
 
 
 func _place(p: Vector3) -> void:
@@ -461,3 +478,165 @@ func apply_upgrades() -> void:
 	_light.light_energy = 5.5 if up else 3.5
 	_light.spot_range = 62.0 if up else 34.0
 	_light.spot_angle = 36.0 if up else 30.0
+
+
+# --- АРК (Автоматический Радиокомпас) и буранный след ------------------------
+
+func _build_ark_gauge(parent: Node3D) -> void:
+	_ark_gauge = Node3D.new()
+	_ark_gauge.name = "ARK9Gauge"
+	_ark_gauge.position = Vector3(0.0, 0.96, -0.05)
+	_ark_gauge.rotation.x = deg_to_rad(-35.0)
+
+	var housing_mat := _mat(Color(0.12, 0.13, 0.14), 0.5)
+	var face_mat := _mat(Color(0.08, 0.09, 0.08), 0.7)
+	Geo.cylinder(_ark_gauge, 0.085, 0.03, Vector3.ZERO, housing_mat, false)
+	Geo.cylinder(_ark_gauge, 0.076, 0.005, Vector3(0, 0.016, 0), face_mat, false)
+
+	var rim_mat := _mat(Color(0.75, 0.72, 0.65), 0.4)
+	for i in range(12):
+		var ang := float(i) * TAU / 12.0
+		var r_outer := 0.068
+		var r_inner := 0.056 if (i % 3 == 0) else 0.062
+		var p_tick := Vector3(sin(ang) * (r_outer + r_inner) * 0.5, 0.018, cos(ang) * (r_outer + r_inner) * 0.5)
+		var tick := Geo.block(_ark_gauge, Vector3(0.004, 0.004, 0.012 if i % 3 == 0 else 0.006), p_tick, rim_mat, false)
+		tick.rotation.y = ang
+
+	_ark_eye_mat = StandardMaterial3D.new()
+	_ark_eye_mat.albedo_color = Color(0.2, 0.9, 0.35)
+	_ark_eye_mat.emission_enabled = true
+	_ark_eye_mat.emission = Color(0.15, 0.85, 0.3)
+	_ark_eye_mat.emission_energy_multiplier = 1.2
+	var eye := Geo.cylinder(_ark_gauge, 0.012, 0.006, Vector3(0.0, 0.019, 0.045), _ark_eye_mat, false)
+	eye.name = "MagicEye"
+
+	_ark_needle = Node3D.new()
+	_ark_needle.name = "NeedlePivot"
+	_ark_needle.position = Vector3(0, 0.021, 0)
+	_ark_gauge.add_child(_ark_needle)
+
+	var needle_mat := _mat(Color(0.95, 0.3, 0.1), 0.3)
+	needle_mat.emission_enabled = true
+	needle_mat.emission = Color(0.9, 0.25, 0.08)
+	needle_mat.emission_energy_multiplier = 0.5
+	var needle_tail_mat := _mat(Color(0.7, 0.75, 0.8), 0.4)
+
+	# Стрелка: северный нос по -Z, противовес по +Z
+	Geo.block(_ark_needle, Vector3(0.006, 0.003, 0.045), Vector3(0, 0, -0.024), needle_mat, false)
+	Geo.block(_ark_needle, Vector3(0.005, 0.003, 0.025), Vector3(0, 0, 0.015), needle_tail_mat, false)
+	Geo.cylinder(_ark_needle, 0.008, 0.006, Vector3.ZERO, housing_mat, false)
+
+	var glass_mat := StandardMaterial3D.new()
+	glass_mat.albedo_color = Color(0.7, 0.8, 0.88, 0.25)
+	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass_mat.roughness = 0.1
+	Geo.cylinder(_ark_gauge, 0.08, 0.004, Vector3(0, 0.025, 0), glass_mat, false)
+
+	parent.add_child(_ark_gauge)
+
+
+func _tick_ark(delta: float) -> void:
+	if _ark_needle == null:
+		return
+	var station_pos := Yard.HOUSE_CENTER
+	var to_station := station_pos - global_position
+	to_station.y = 0.0
+	var dist := to_station.length()
+	var station_bearing := atan2(to_station.x, -to_station.z)
+	var rel_yaw := wrapf(station_bearing - _yaw, -PI, PI)
+
+	var anomaly_strength := 0.0
+	for pos: Vector3 in [Vector3(86.0, 0.0, 16.0), Vector3(30.0, 0.0, -78.0), Vector3(145.0, 0.0, -140.0), Vector3(-140.0, 0.0, -135.0)]:
+		var d := global_position.distance_to(pos)
+		if d < 35.0:
+			anomaly_strength = maxf(anomaly_strength, 1.0 - (d / 35.0))
+
+	if anomaly_strength > 0.05:
+		_ark_angle += (randf() - 0.5) * anomaly_strength * 3.5
+		if _ark_eye_mat != null:
+			_ark_eye_mat.albedo_color = Color(1.0, 0.2, 0.1)
+			_ark_eye_mat.emission = Color(0.9, 0.15, 0.05)
+	else:
+		_ark_angle = lerp_angle(_ark_angle, -rel_yaw, delta * 7.0)
+		if _ark_eye_mat != null:
+			var sig := clampf(1.0 - (dist / 900.0), 0.25, 1.0)
+			_ark_eye_mat.albedo_color = Color(0.2 * sig, 0.9 * sig, 0.4 * sig)
+			_ark_eye_mat.emission = Color(0.15 * sig, 0.85 * sig, 0.3 * sig)
+
+	_ark_needle.rotation.y = _ark_angle
+
+
+func _tick_trail() -> void:
+	var cur_pos := global_position
+	if _last_trail_pos == Vector3.INF:
+		_last_trail_pos = cur_pos
+		return
+	var d := _last_trail_pos.distance_to(cur_pos)
+	if d >= 2.6:
+		_spawn_trail_segment(_last_trail_pos, cur_pos)
+		_last_trail_pos = cur_pos
+
+
+static var _trail_combined_mesh: ArrayMesh = null
+
+
+static func _get_trail_mesh() -> ArrayMesh:
+	if _trail_combined_mesh != null:
+		return _trail_combined_mesh
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var cm := BoxMesh.new()
+	cm.size = Vector3(0.48, 0.012, 2.8)
+	st.append_from(cm, 0, Transform3D.IDENTITY)
+	var sm1 := BoxMesh.new()
+	sm1.size = Vector3(0.12, 0.012, 2.8)
+	st.append_from(sm1, 0, Transform3D(Basis.IDENTITY, Vector3(-0.42, 0, 0)))
+	var sm2 := BoxMesh.new()
+	sm2.size = Vector3(0.12, 0.012, 2.8)
+	st.append_from(sm2, 0, Transform3D(Basis.IDENTITY, Vector3(0.42, 0, 0)))
+	st.generate_normals()
+	_trail_combined_mesh = st.commit()
+	return _trail_combined_mesh
+
+
+func _init_trail_multimesh() -> void:
+	if _trail_mmi != null and is_instance_valid(_trail_mmi):
+		return
+	_trail_mmi = MultiMeshInstance3D.new()
+	_trail_mmi.name = "BuranTrackTrail"
+	_trail_mmi.top_level = true
+	_trail_mm = MultiMesh.new()
+	_trail_mm.transform_format = MultiMesh.TRANSFORM_3D
+	_trail_mm.mesh = _get_trail_mesh()
+	_trail_mm.instance_count = MAX_TRAIL_SEGMENTS
+	for i in MAX_TRAIL_SEGMENTS:
+		_trail_mm.set_instance_transform(i, Transform3D(Basis.IDENTITY.scaled(Vector3.ZERO), Vector3(0, -999.0, 0)))
+	_trail_mmi.multimesh = _trail_mm
+	if _trail_mat == null:
+		_trail_mat = StandardMaterial3D.new()
+		_trail_mat.albedo_color = Color(0.32, 0.38, 0.46)
+		_trail_mat.roughness = 0.95
+	_trail_mmi.material_override = _trail_mat
+	_trail_mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var parent_node := get_parent()
+	if parent_node != null:
+		parent_node.add_child(_trail_mmi)
+
+
+func _spawn_trail_segment(p0: Vector3, p1: Vector3) -> void:
+	if _trail_mmi == null or not is_instance_valid(_trail_mmi):
+		_init_trail_multimesh()
+	if _trail_mm == null:
+		return
+	var dir := p1 - p0
+	dir.y = 0.0
+	var seg_len := dir.length()
+	if seg_len < 0.2:
+		return
+	var mid := (p0 + p1) * 0.5
+	mid.y = Terrain.height(mid.x, mid.z) + 0.02
+	var yaw := atan2(dir.x, dir.z)
+	var scale_z := (seg_len + 0.12) / 2.8
+	var t := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(1.0, 1.0, scale_z)), mid)
+	_trail_mm.set_instance_transform(_trail_idx, t)
+	_trail_idx = (_trail_idx + 1) % MAX_TRAIL_SEGMENTS

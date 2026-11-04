@@ -44,10 +44,18 @@ var cranking := false
 var _ray: RayCast3D
 var _snow: CPUParticles3D
 var _snow_near: CPUParticles3D
+var _flash_dust: CPUParticles3D
+var _beam_mesh: MeshInstance3D
+var _beam_mat: ShaderMaterial
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 var _bob_t := 0.0
 var _shake_left := 0.0
 var _shake_power := 0.0
+var _gust_timer := 12.0
+var _gust_flinch_t := 0.0
+var _gust_dip := 0.0
+var _gust_jerk := 0.0
+var _gust_roll := 0.0
 var _focused: Interactable
 var _hold_target: Interactable
 var _hold_t := 0.0
@@ -83,6 +91,8 @@ var _cached_off_path := 0.0
 var _zone_timer := 0.0
 var _flash_warned := false
 var _flash_near := 1.0   ## приглушение фонаря у близкой стены
+var _flash_base_pos := Vector3(-0.19, -0.2, -0.55)
+var _mouse_sway := Vector2.ZERO
 
 var holding_breath := false
 var breath_stamina := 100.0
@@ -91,6 +101,17 @@ var _hold_breath_cooldown := 0.0
 var _hold_breath_muffle := 0.0
 var _hold_breath_hint_timer := 0.0
 var _heartbeat_haptic_timer := 0.0
+
+var compass_glitch := 0.0           ## отклонение стрелки компаса при «Белой тьме»
+var whiteout_panic := 0.0          ## дезориентация и паника без леера (0..1)
+var _whiteout_warned := false
+var kettle_heat_timer := 0.0       ## таймер тепла чайника на морозе (секунды)
+
+# Динамические психосоматические модификаторы (Deep Phobia Engine)
+var fov_offset: float = 0.0
+var stamina_drain_mult: float = 1.0
+var speed_mult: float = 1.0
+var _prev_velocity_len: float = 0.0
 
 
 func _ready() -> void:
@@ -126,7 +147,7 @@ func _ready() -> void:
 	flashlight.spot_attenuation = 1.0
 	flashlight.light_cull_mask = 0xFFFFFFFF
 	flashlight.shadow_caster_mask = 0xFFFFFFFF
-	flashlight.position = Vector3(-0.19, -0.2, -0.55)   # из фонаря в левой руке
+	flashlight.position = _flash_base_pos   # из фонаря в левой руке
 	flashlight.visible = false
 	# Тени от фонаря: силуэты деревьев, тень существа на стене — половина атмосферы.
 	flashlight.shadow_enabled = Settings.quality >= 1   # на низком пресете фонарь без теней
@@ -191,6 +212,8 @@ func _ready() -> void:
 	_breath_player = _loop_player(BREATH_LOOP)
 
 	_build_snow()
+	_build_flash_dust()
+	_build_flashlight_beam()
 	_build_breath_emitter()
 	Game.player = self
 	if Game.is_prologue_trail() and not Game.has_flag("in_cabin") and Game.has_flag("left_cabin"):
@@ -220,6 +243,9 @@ func handle_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		var sens := MOUSE_SENS * Settings.mouse_sens
 		var y_sign := -1.0 if Settings.invert_y else 1.0
+		_mouse_sway += Vector2(mm.relative.x, mm.relative.y * y_sign) * 0.00075
+		_mouse_sway.x = clampf(_mouse_sway.x, -0.09, 0.09)
+		_mouse_sway.y = clampf(_mouse_sway.y, -0.09, 0.09)
 		if Game.has_flag("in_cabin"):
 			var base_yaw := deg_to_rad(225.0)
 			var cur_yaw := wrapf(rotation.y - base_yaw, -PI, PI)
@@ -335,6 +361,9 @@ func _physics_process(delta: float) -> void:
 		if look_vec.length_squared() > 0.005:
 			var stick_sens: float = 2.4 * Settings.gamepad_sens
 			var y_sign := -1.0 if Settings.invert_y else 1.0
+			_mouse_sway += Vector2(look_vec.x, look_vec.y * y_sign) * delta * 0.18
+			_mouse_sway.x = clampf(_mouse_sway.x, -0.09, 0.09)
+			_mouse_sway.y = clampf(_mouse_sway.y, -0.09, 0.09)
 			rotate_y(-look_vec.x * stick_sens * delta)
 			head.rotation.x = clampf(head.rotation.x - look_vec.y * stick_sens * delta * y_sign, deg_to_rad(-85.0), deg_to_rad(85.0))
 	var speed := WALK_SPEED
@@ -347,6 +376,8 @@ func _physics_process(delta: float) -> void:
 		speed = CANISTER_SPEED
 	elif held == &"trunk" or held == &"dog":
 		speed = 1.95
+	elif held == &"kettle" or held == &"blowtorch":
+		speed = WALK_SPEED * 0.92
 	elif held == &"wood":
 		speed = 2.7 if _sprinting else 2.1
 	elif _sprinting:
@@ -365,13 +396,14 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.55
 	elif not Game.skis_equipped and _cached_off_path > 6.0:
 		speed *= 0.75
-
+	speed *= speed_mult
 
 	var target := dir * speed
 	velocity.x = move_toward(velocity.x, target.x, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, target.z, ACCEL * delta)
 	move_and_slide()
 	_lay_footprints()
+	_prev_velocity_len = Vector2(velocity.x, velocity.z).length()
 
 	# Страховка от провала в пропасть (если игрок выпал из геометрии)
 	var in_bunker_zone := Game.zone == &"bunker" or (global_position.x > 50.0 and global_position.z > 5.0 and global_position.z < 20.0 and global_position.y < -20.0) 		or StationLore.zone_at(global_position) != &""   # подпол Брагина и тоннель к «Отзвуку» — тоже под землёй
@@ -401,6 +433,7 @@ func _process(delta: float) -> void:
 	_update_breath(delta)
 	_update_shiver(delta)
 	_update_camera_fx(delta)
+	_update_whiteout_disorientation(delta)
 	var outside := Game.is_outside()
 	for sn: CPUParticles3D in [_snow, _snow_near]:
 		if sn == null:
@@ -409,6 +442,73 @@ func _process(delta: float) -> void:
 		if Game.weather != null:
 			sn.speed_scale = 1.0 + Game.weather.intensity * 1.6
 			sn.direction = Vector3(0.3 + Game.weather.intensity * 2.5, -1.0, 0.1)
+	var flash_active: bool = flashlight != null and flashlight.visible and Game.flash_charge > 0.5 and not closeup_dim and flashlight.light_energy > 0.15
+	if _flash_dust != null:
+		_flash_dust.visible = flash_active
+		if flash_active:
+			if outside and Game.weather != null:
+				var w_int: float = Game.weather.intensity
+				_flash_dust.direction = Vector3(0.3 + w_int * 2.2, -1.0, 0.15).normalized()
+				_flash_dust.spread = 22.0
+				_flash_dust.initial_velocity_min = 1.4 + w_int * 2.5
+				_flash_dust.initial_velocity_max = 2.6 + w_int * 4.0
+				_flash_dust.gravity = Vector3(0.4, -0.6, 0.0)
+				_flash_dust.speed_scale = 1.0 + w_int * 1.5
+			else:
+				_flash_dust.direction = Vector3(0.0, -0.15, 0.0)
+				_flash_dust.spread = 180.0
+				_flash_dust.initial_velocity_min = 0.06
+				_flash_dust.initial_velocity_max = 0.22
+				_flash_dust.gravity = Vector3(0.0, -0.04, 0.0)
+				_flash_dust.speed_scale = 1.0
+	if _beam_mesh != null:
+		_beam_mesh.visible = flash_active
+		if flash_active and _beam_mat != null:
+			var base_int := 0.16 * (_flash_near * (minf(flashlight.light_energy, 3.0) / 3.0))
+			if outside and Game.weather != null:
+				base_int *= (1.0 + Game.weather.intensity * 0.75)
+			_beam_mat.set_shader_parameter(&"intensity", clampf(base_int, 0.0, 0.32))
+
+
+func _update_whiteout_disorientation(delta: float) -> void:
+	if held == &"kettle" and kettle_heat_timer > 0.0:
+		if Game.is_outside():
+			kettle_heat_timer -= delta
+			if kettle_heat_timer <= 0.0 and Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.kettle_cold_now"), 3.0)
+		else:
+			kettle_heat_timer = 90.0
+
+	var outside := Game.is_outside()
+	var in_whiteout: bool = outside and Game.weather != null and bool(Game.weather.get("is_whiteout"))
+
+	if Game.leer_attached:
+		if not outside or _cached_off_path > 2.8:
+			Game.leer_attached = false
+			Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0)
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.leer_snapped"), 3.5)
+		else:
+			whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 1.5)
+			compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.5)
+			return
+
+	if in_whiteout and _cached_off_path > 3.2:
+		whiteout_panic = minf(whiteout_panic + delta * 0.25, 1.0)
+		compass_glitch = sin(Time.get_ticks_msec() * 0.007) * 1.85 * whiteout_panic + cos(Time.get_ticks_msec() * 0.011) * 0.4
+		if camera != null:
+			camera.rotation.z = sin(Time.get_ticks_msec() * 0.0025) * 0.035 * whiteout_panic
+		if not _whiteout_warned and Game.hud != null:
+			_whiteout_warned = true
+			Game.hud.subtitle(Loc.t(&"sub.whiteout_lost"), 4.5)
+			Director.add_tension(15.0, "потерян леер в белой тьме")
+		if Game.audio != null and is_instance_valid(Game.audio._heart):
+			Game.audio._heart.volume_db = maxf(Game.audio._heart.volume_db, lerpf(-22.0, -3.0, whiteout_panic))
+	else:
+		whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 0.8)
+		compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.0)
+		if camera != null and absf(camera.rotation.z) > 0.001:
+			camera.rotation.z = move_toward(camera.rotation.z, 0.0, delta * 0.1)
 
 
 ## Механика гипноза/наваждения Ырки: мягкий дрейф взгляда назад, преодолеваемый мышью.
@@ -491,8 +591,12 @@ func _update_steps(delta: float) -> void:
 	if Game.level is Station and (Game.level as Station).is_pos_inside_house(global_position):
 		is_out = false
 	var path := _step_sound(is_out)
-	var p := Game.audio.play_2d(path, -14.0 if not _sprinting else -9.0)
+	var p := Game.audio.play_2d(path, -12.0 if not _sprinting else -8.0)
 	p.pitch_scale = randf_range(0.9, 1.1)
+	if Game.leer_attached and is_out:
+		var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
+		if lp != null:
+			lp.pitch_scale = randf_range(1.6, 2.1)
 	if is_out and _sprinting and Game.audio != null and Game.audio.has_method(&"record_player_noise"):
 		Game.audio.record_player_noise(global_position)
 
@@ -522,6 +626,7 @@ func _update_stamina(delta: float) -> void:
 			drain *= 1.3
 		if Game.has_flag("in_deep_snow"):
 			drain *= 1.5
+		drain *= stamina_drain_mult
 		stamina = maxf(stamina - drain * delta, 0.0)
 	else:
 		stamina = minf(stamina + STAMINA_REGEN * delta, 100.0)
@@ -637,7 +742,7 @@ func _update_hold_breath(delta: float) -> void:
 		if Game.audio != null and is_instance_valid(Game.audio._heart):
 			var heart_vol: float = lerpf(-16.0, -2.0, (100.0 - breath_stamina) / 100.0)
 			Game.audio._heart.volume_db = maxf(Game.audio._heart.volume_db, heart_vol)
-		camera.fov = lerpf(camera.fov, Settings.fov - 4.0, minf(delta * 5.0, 1.0))
+		camera.fov = lerpf(camera.fov, Settings.fov - 4.0 + fov_offset, minf(delta * 5.0, 1.0))
 		# Тактильная пульсация сердца на геймпаде
 		_heartbeat_haptic_timer -= delta
 		if _heartbeat_haptic_timer <= 0.0:
@@ -653,7 +758,7 @@ func _update_hold_breath(delta: float) -> void:
 		breath_stamina = minf(breath_stamina + delta * 20.0, 100.0)
 		_hold_breath_cooldown = maxf(_hold_breath_cooldown - delta, 0.0)
 		_hold_breath_muffle = lerpf(_hold_breath_muffle, 0.0, minf(delta * 4.0, 1.0))
-		camera.fov = lerpf(camera.fov, zoom_fov if zoom_fov > 0.0 else Settings.fov, minf(delta * (8.0 if zoom_fov > 0.0 else 4.0), 1.0))
+		camera.fov = lerpf(camera.fov, (zoom_fov if zoom_fov > 0.0 else Settings.fov) + fov_offset, minf(delta * (8.0 if zoom_fov > 0.0 else 4.0), 1.0))
 
 	# Аудиофильтр приглушения внешнего мира
 	if AudioServer.get_bus_effect_count(0) > 2:
@@ -757,18 +862,27 @@ func _update_extra_step(delta: float) -> void:
 	if moving and Game.is_outside():
 		_walk_outside_time += delta
 	else:
-		if _walk_outside_time > 2.2 and not _extra_step_pending and Game.is_outside() and Game.is_night():
+		var step_thresh := 2.2
+		if Game.psychosomatic != null and Game.psychosomatic.has_method(&"get_extra_step_threshold"):
+			step_thresh = float(Game.psychosomatic.call(&"get_extra_step_threshold"))
+		if _walk_outside_time > step_thresh and not _extra_step_pending and Game.is_outside() and Game.is_night():
 			_extra_step_pending = true
 			_play_delayed_extra_step()
 		_walk_outside_time = 0.0
 
 
 func _play_delayed_extra_step() -> void:
-	await get_tree().create_timer(0.42, false).timeout
+	var delay := 0.42
+	var behind_dist := 2.2
+	if Game.psychosomatic != null and Game.psychosomatic.has_method(&"get_delayed_step_params"):
+		var p: Vector2 = Game.psychosomatic.call(&"get_delayed_step_params")
+		delay = p.x
+		behind_dist = p.y
+	await get_tree().create_timer(delay, false).timeout
 	_extra_step_pending = false
 	if Game.player == null or not Game.is_outside():
 		return
-	var behind := global_position + global_transform.basis.z * 2.2   # +Z тела — это за спиной
+	var behind := global_position + global_transform.basis.z * behind_dist   # +Z тела — это за спиной
 	var snd: String = STEPS_SNOW[randi() % STEPS_SNOW.size()]
 	Game.audio.play_3d(snd, behind, -4.0, 6.0)
 	Director.add_tension(8.0, "шаг за спиной")
@@ -785,6 +899,43 @@ func _update_flashlight(delta: float) -> void:
 			Game.vibrate(0.22, 0.08, 0.09)
 	if _crank_player != null:
 		_crank_player.volume_db = lerpf(_crank_player.volume_db, -6.0 if cranking else -80.0, minf(delta * 12.0, 1.0))
+
+	# Инерция взгляда, шаг и тремор замерзающих рук на фонаре
+	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(delta * 9.0, 1.0))
+	var speed := Vector2(velocity.x, velocity.z).length()
+	var walk_k := clampf(speed / WALK_SPEED, 0.0, 1.35)
+	var bob_factor: float = Settings.head_bob if (Settings != null and "head_bob" in Settings) else 1.0
+	var bob_offset := Vector3(
+		sin(_bob_t * 0.5) * 0.015 * walk_k * bob_factor,
+		-absf(cos(_bob_t)) * 0.016 * walk_k * bob_factor,
+		0.0
+	)
+	var bob_rot := Vector3(
+		cos(_bob_t) * 0.022 * walk_k * bob_factor,
+		sin(_bob_t * 0.5) * 0.035 * walk_k * bob_factor,
+		-sin(_bob_t * 0.5) * 0.025 * walk_k * bob_factor
+	)
+	var shiver_pos := Vector3.ZERO
+	var shiver_rot := Vector3.ZERO
+	if Game.warmth < 35.0:
+		var cold_k := (35.0 - Game.warmth) / 35.0
+		var t_ms := Time.get_ticks_msec() * 0.048
+		var jx := sin(t_ms * 1.1) * 0.6 + (randf() - 0.5) * 0.4
+		var jy := cos(t_ms * 1.3) * 0.6 + (randf() - 0.5) * 0.4
+		var jz := sin(t_ms * 0.9) * 0.5 + (randf() - 0.5) * 0.3
+		shiver_pos = Vector3(jx, jy, jz) * (cold_k * 0.014)
+		shiver_rot = Vector3(jy * 1.2, jx * 1.5, jz * 0.8) * (cold_k * 0.045)
+	var sway_pos := Vector3(-_mouse_sway.x * 0.16, _mouse_sway.y * 0.14, 0.0)
+	var sway_rot := Vector3(-_mouse_sway.y * 0.42, -_mouse_sway.x * 0.52, _mouse_sway.x * 0.22)
+	var target_pos := _flash_base_pos + bob_offset + shiver_pos + sway_pos
+	var target_rot := bob_rot + shiver_rot + sway_rot
+	if flashlight != null:
+		if flashlight.visible and mode == Mode.WALK:
+			flashlight.position = flashlight.position.lerp(target_pos, minf(delta * 13.0, 1.0))
+			flashlight.rotation = flashlight.rotation.lerp(target_rot, minf(delta * 13.0, 1.0))
+		else:
+			flashlight.position = flashlight.position.lerp(_flash_base_pos, minf(delta * 10.0, 1.0))
+			flashlight.rotation = flashlight.rotation.lerp(Vector3.ZERO, minf(delta * 10.0, 1.0))
 
 	if not flashlight.visible:
 		return
@@ -856,6 +1007,31 @@ func _update_camera_fx(delta: float) -> void:
 		var g_vib := sin(Time.get_ticks_msec() * 0.038) * 0.0028
 		sx += g_vib * 0.5
 		sy += g_vib
+
+	# Вздрагивание и толчок камеры при сильных порывах ветра в метель
+	if not Game.is_indoors() and Game.weather != null and (Game.weather.intensity > 0.22 or Game.weather.blizzard):
+		_gust_timer -= delta
+		if _gust_timer <= 0.0:
+			var w_int: float = Game.weather.intensity
+			_gust_timer = Game.rng.randf_range(7.0, 15.0) / (0.8 + w_int * 0.7)
+			_gust_flinch_t = 0.16
+			_gust_dip = Game.rng.randf_range(0.025, 0.046) * (1.0 + w_int * 0.55)
+			_gust_jerk = Game.rng.randf_range(-0.024, 0.024) * (1.0 + w_int * 0.55)
+			_gust_roll = Game.rng.randf_range(-0.012, 0.012) * (1.0 + w_int * 0.5)
+			if randf() < 0.65:
+				Game.audio.play_3d("res://assets/audio/gust.ogg", global_position, -6.5, 4.0)
+	else:
+		_gust_timer = minf(_gust_timer, 5.0)
+
+	if _gust_flinch_t > 0.0:
+		_gust_flinch_t -= delta
+		var gust_k := clampf(_gust_flinch_t / 0.16, 0.0, 1.0)
+		sx += _gust_jerk * sin(gust_k * PI)
+		sy -= _gust_dip * sin(gust_k * PI)
+		camera.rotation.z = _gust_roll * sin(gust_k * PI)
+	else:
+		camera.rotation.z = move_toward(camera.rotation.z, 0.0, delta * 2.0)
+
 	camera.h_offset = sx
 	camera.v_offset = bob + sy
 
@@ -879,6 +1055,8 @@ func toggle_flashlight() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.flash_dead"), 3.0)
 		return
 	flashlight.visible = not flashlight.visible
+	if Game.profiler != null:
+		Game.profiler.call(&"record_flashlight_toggle")
 
 
 func set_flashlight(on: bool) -> void:
@@ -896,6 +1074,8 @@ func fire_flare() -> void:
 	if not Game.use_flare():
 		Game.hud.subtitle(Loc.t(&"sub.flare_empty"), 2.5)
 		return
+	if Game.hunter_brain != null:
+		Game.hunter_brain.call(&"record_flare_fired", global_position)
 	var f := Flare.new()
 	var fwd := -camera.global_basis.z
 	f.velocity = fwd * 9.0 + Vector3(0, 6.0, 0)
@@ -974,6 +1154,27 @@ func set_held(item: StringName) -> void:
 			var m = _held_models[&"trunk"]
 			m.scale = Vector3(0.52, 0.52, 0.52)
 			m.visible = true
+	elif item == &"kettle":
+		_held_base_pos = Vector3(0.25, -0.42, -0.42)
+		_held_base_rot = Vector3(10.0, -15.0, 0.0)
+		if not _held_models.has(&"kettle"):
+			var km := Props.kettle()
+			km.scale = Vector3.ONE * 0.75
+			_held_root.add_child(km)
+			_held_models[&"kettle"] = km
+			FPHands.to_view_layer(km)
+		_held_models[&"kettle"].visible = true
+		kettle_heat_timer = 90.0
+	elif item == &"blowtorch":
+		_held_base_pos = Vector3(0.24, -0.40, -0.42)
+		_held_base_rot = Vector3(12.0, -10.0, 0.0)
+		if not _held_models.has(&"blowtorch"):
+			var bm := Props.blowtorch()
+			bm.scale = Vector3.ONE * 0.9
+			_held_root.add_child(bm)
+			_held_models[&"blowtorch"] = bm
+			FPHands.to_view_layer(bm)
+		_held_models[&"blowtorch"].visible = true
 	else:
 		_held_base_pos = Vector3(0.22, -0.32, -0.48)
 		_held_base_rot = Vector3(8.0, -12.0, 6.0)
@@ -1156,6 +1357,93 @@ func _build_snow() -> void:
 	nq.material = nm
 	_snow_near.mesh = nq
 	add_child(_snow_near)
+
+
+func _build_flash_dust() -> void:
+	_flash_dust = CPUParticles3D.new()
+	_flash_dust.name = "FlashlightDust"
+	_flash_dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_flash_dust.amount = maxi(int(90 * Settings.detail()), 24)
+	_flash_dust.lifetime = 1.6
+	_flash_dust.preprocess = 0.8
+	_flash_dust.local_coords = false
+	_flash_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	_flash_dust.emission_box_extents = Vector3(0.70, 0.65, 1.8)
+	_flash_dust.position = Vector3(0.0, -0.05, -2.2)
+	_flash_dust.direction = Vector3(0.0, -0.15, 0.0)
+	_flash_dust.spread = 180.0
+	_flash_dust.initial_velocity_min = 0.06
+	_flash_dust.initial_velocity_max = 0.22
+	_flash_dust.damping_min = 0.1
+	_flash_dust.damping_max = 0.3
+	_flash_dust.gravity = Vector3(0.0, -0.04, 0.0)
+	_flash_dust.scale_amount_min = 0.5
+	_flash_dust.scale_amount_max = 1.3
+
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(1, 1, 1, 0.0))
+	ramp.add_point(0.12, Color(1, 1, 1, 1.0))
+	ramp.add_point(0.75, Color(1, 1, 1, 0.85))
+	ramp.set_color(1, Color(1, 1, 1, 0.0))
+	_flash_dust.color_ramp = ramp
+
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.018, 0.018)
+	var mat := puff_material(0.75)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+	mat.emission_enabled = false
+	mat.distance_fade_mode = BaseMaterial3D.DISTANCE_FADE_PIXEL_ALPHA
+	mat.distance_fade_min_distance = 0.45
+	mat.distance_fade_max_distance = 0.95
+	quad.material = mat
+	_flash_dust.mesh = quad
+	_flash_dust.visible = false
+	camera.add_child(_flash_dust)
+
+
+func _build_flashlight_beam() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var segs := 24
+	var r_top := 0.04
+	var r_bot := 1.45
+	var z_top := -0.15
+	var z_bot := -7.5
+	for i in range(segs):
+		var a0 := (float(i) / float(segs)) * TAU
+		var a1 := (float(i + 1) / float(segs)) * TAU
+		var p0_top := Vector3(cos(a0) * r_top, sin(a0) * r_top, z_top)
+		var p1_top := Vector3(cos(a1) * r_top, sin(a1) * r_top, z_top)
+		var p0_bot := Vector3(cos(a0) * r_bot, sin(a0) * r_bot, z_bot)
+		var p1_bot := Vector3(cos(a1) * r_bot, sin(a1) * r_bot, z_bot)
+		var n0 := Vector3(cos(a0), sin(a0), 0.18).normalized()
+		var n1 := Vector3(cos(a1), sin(a1), 0.18).normalized()
+
+		st.set_normal(n0)
+		st.add_vertex(p0_top)
+		st.set_normal(n1)
+		st.add_vertex(p1_top)
+		st.set_normal(n0)
+		st.add_vertex(p0_bot)
+
+		st.set_normal(n1)
+		st.add_vertex(p1_top)
+		st.set_normal(n1)
+		st.add_vertex(p1_bot)
+		st.set_normal(n0)
+		st.add_vertex(p0_bot)
+
+	var cone_mesh := st.commit()
+	_beam_mesh = MeshInstance3D.new()
+	_beam_mesh.name = "VolumetricBeam"
+	_beam_mesh.mesh = cone_mesh
+	_beam_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	_beam_mat = ShaderMaterial.new()
+	_beam_mat.shader = load("res://assets/shaders/flashlight_beam.gdshader")
+	_beam_mesh.material_override = _beam_mat
+	_beam_mesh.visible = false
+	flashlight.add_child(_beam_mesh)
 
 
 ## Снег вокруг точки. Используется и игроком, и фоном меню.

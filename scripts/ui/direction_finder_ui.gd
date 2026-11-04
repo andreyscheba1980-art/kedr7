@@ -55,7 +55,8 @@ func _ready() -> void:
 	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
 	_book.setup([{"label": Loc.t(&"df.row"), "cells": [&"digit", &"digit", &"digit"], "unit": "°"}])
 	ThermometerUI.add_buttons(self, false, _write, _close)
-	_hint = ThermometerUI.hint_label(self)
+	_hint = UiStyle.hint()
+	UiKit.place(self, _hint, 0.5, 0.5, 0.5, 0.5, -500, -282, 100, -254)
 
 	_static = AudioStreamPlayer.new()
 	_static.stream = AudioDirector.cached_stream(STATIC_LOOP)
@@ -134,8 +135,8 @@ func _process(delta: float) -> void:
 		else:
 			_sig.stop()
 	var level := _strength * _pattern(id)
-	_sig.volume_db = linear_to_db(maxf(level, 0.0001)) - 2.0
-	_static.volume_db = linear_to_db(maxf(0.35 - _strength * 0.3 + 0.05, 0.0001)) - 6.0
+	_sig.volume_db = linear_to_db(maxf(level, 0.0001)) - 4.0
+	_static.volume_db = linear_to_db(maxf(0.32 - _strength * 0.28 + 0.03, 0.0001)) - 8.0
 	_meter = lerpf(_meter, level + randf_range(-0.02, 0.02) * _strength, clampf(delta * 8.0, 0.0, 1.0))
 
 	# Перехват: подержал настройку — сигнал в журнале

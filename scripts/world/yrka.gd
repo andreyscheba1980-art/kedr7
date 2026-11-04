@@ -498,7 +498,12 @@ func _update_contact(delta: float) -> void:
 		_contact_timer += delta * 0.8      # свет его держит
 		Game.flash_charge = maxf(Game.flash_charge - BEAM_DRAIN * 1.5 * delta, 0.0)
 		_creature.position += Vector3(randf_range(-0.04, 0.04), 0.0, randf_range(-0.04, 0.04))
-		if _beam_t >= BEAM_TIME * 1.6:
+		var rig := _creature as CreatureRig
+		var shield: bool = bool(Game.hunter_brain.call(&"should_shield_eyes")) if Game.hunter_brain != null else false
+		if shield and rig != null:
+			rig.set_rest(&"ArmL", Vector3(deg_to_rad(-85.0), deg_to_rad(35.0), deg_to_rad(45.0)))
+		var threshold := BEAM_TIME * (2.4 if shield else 1.6)
+		if _beam_t >= threshold:
 			_end_chase("repelled")
 			return
 
@@ -587,6 +592,8 @@ func _play_whistle() -> void:
 	if Game.is_home() or Game.is_indoors() or Game.player == null:
 		return
 	if _whistle_cd > 0.0:
+		return
+	if Game.hunter_brain != null and int(Game.hunter_brain.get("current_tactic")) == 3: # Tactic.AMBUSH
 		return
 	_whistle_cd = Game.rng.randf_range(35.0, 60.0)
 	# Свист исходит из реального направления невидимого агента в тайге
@@ -724,7 +731,16 @@ func _update_chase(delta: float) -> void:
 		_beam_t += delta
 		Game.flash_charge = maxf(Game.flash_charge - BEAM_DRAIN * delta, 0.0)
 		_creature.position += Vector3(randf_range(-0.03, 0.03), 0.0, randf_range(-0.03, 0.03))  # корчится
-		if _beam_t >= BEAM_TIME:
+		var rig := _creature as CreatureRig
+		var shield: bool = bool(Game.hunter_brain.call(&"should_shield_eyes")) if Game.hunter_brain != null else false
+		var dodge: bool = bool(Game.hunter_brain.call(&"should_dodge_beam")) if Game.hunter_brain != null else false
+		if shield and rig != null:
+			rig.set_rest(&"ArmL", Vector3(deg_to_rad(-85.0), deg_to_rad(35.0), deg_to_rad(45.0)))
+		if dodge and p.camera != null:
+			var side := -p.camera.global_basis.x
+			_creature.global_position += side * (sin(Time.get_ticks_msec() * 0.007) * 2.2 * delta)
+		var threshold := BEAM_TIME * (1.8 if shield else 1.0)
+		if _beam_t >= threshold:
 			_end_chase("repelled")
 		return
 	_beam_t = maxf(_beam_t - delta * 0.5, 0.0)
@@ -753,6 +769,8 @@ func _update_chase(delta: float) -> void:
 
 func _end_chase(how: String) -> void:
 	if how == "repelled":
+		if Game.hunter_brain != null:
+			Game.hunter_brain.call(&"record_light_repel")
 		Game.audio.play_3d(SHRIEK, _creature.global_position + Vector3(0, 1.3, 0), 4.0, 8.0)
 		threat = 20.0
 		_cooldown = 45.0

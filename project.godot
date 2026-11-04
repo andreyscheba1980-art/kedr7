@@ -12,21 +12,19 @@ config_version=5
 
 config/name="Кедр-7"
 config/description="Хоррор на радиометеостанции в уральской тайге, 1983."
-config/version="1.33.0-test"
+config/version="1.40.2"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/bg_color=Color(0, 0, 0, 1)
+boot_splash/show_image=false
 config/icon="res://assets/icon.png"
 config/windows_native_icon="res://assets/icon.ico"
-boot_splash/show_image=false
-boot_splash/bg_color=Color(0, 0, 0, 1)
-boot_splash/minimum_display_time=0
 
 [audio]
 
 driver/enable_input=true
 
 [autoload]
-
 
 Loc="*res://scripts/autoload/loc.gd"
 Settings="*res://scripts/autoload/settings.gd"
@@ -39,12 +37,10 @@ Net="*res://scripts/autoload/net.gd"
 
 [display]
 
-
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-window/vsync/vsync_mode=1
 
 [filesystem]
 
@@ -61,10 +57,10 @@ import/blender/enabled=false
 textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-lights_and_shadows/positional_shadow/atlas_size=2048
-lights_and_shadows/positional_shadow/atlas_size.mobile=1024
 limits/opengl/max_lights_per_object=16
 occlusion_culling/use_occlusion_culling=true
+lights_and_shadows/positional_shadow/atlas_size=2048
+lights_and_shadows/positional_shadow/atlas_size.mobile=1024
 
 [shader_globals]
 

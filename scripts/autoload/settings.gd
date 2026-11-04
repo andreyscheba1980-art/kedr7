@@ -168,14 +168,14 @@ func _set_bus(bus_name: String, value: float) -> void:
 func _ensure_buses() -> void:
 	# Общий лимитер: крик и удары не перегружают, а громкие места не «звенят».
 	if AudioServer.get_bus_effect_count(0) == 0:
-		# Сначала мягкий компрессор: резкие всплески (визг, удар, помехи) прижимаются на 4–6 дБ,
-		# тихое не трогается. Потом жёсткий потолок.
+		# Мягкий прозрачный компрессор: сдерживает пиковые перегрузки (выстрел ракетницы, визг, удар),
+		# сохраняя динамический диапазон между тишиной избы и рёвом бурана.
 		var comp := AudioEffectCompressor.new()
-		comp.threshold = -14.0
-		comp.ratio = 3.0
-		comp.attack_us = 3000.0
-		comp.release_ms = 220.0
-		comp.gain = 1.5
+		comp.threshold = -12.0
+		comp.ratio = 2.5
+		comp.attack_us = 5000.0
+		comp.release_ms = 180.0
+		comp.gain = 0.5
 		AudioServer.add_bus_effect(0, comp, 0)
 		var lim := AudioEffectHardLimiter.new()
 		lim.ceiling_db = -1.0
@@ -192,24 +192,46 @@ func _ensure_buses() -> void:
 		AudioServer.set_bus_name(idx, bus_name)
 		AudioServer.set_bus_send(idx, "Master")
 		if bus_name == "Radio":
-			# Эфир: срез верхов и мягкая компрессия — рация шипит, но не режет уши.
+			# Эфир: полосовой фильтр связного диапазона 260..3400 Гц и вещательная компрессия
+			var hp := AudioEffectHighPassFilter.new()
+			hp.cutoff_hz = 260.0
+			AudioServer.add_bus_effect(idx, hp, 0)
 			var lp := AudioEffectLowPassFilter.new()
-			lp.cutoff_hz = 3200.0
-			AudioServer.add_bus_effect(idx, lp, 0)
+			lp.cutoff_hz = 3400.0
+			AudioServer.add_bus_effect(idx, lp, 1)
 			var comp := AudioEffectCompressor.new()
-			comp.threshold = -16.0
-			comp.ratio = 3.0
-			AudioServer.add_bus_effect(idx, comp, 1)
+			comp.threshold = -15.0
+			comp.ratio = 3.2
+			comp.attack_us = 2500.0
+			comp.release_ms = 140.0
+			comp.gain = 1.0
+			AudioServer.add_bus_effect(idx, comp, 2)
 		if bus_name == "SFX":
 			var lp2 := AudioEffectLowPassFilter.new()
-			lp2.cutoff_hz = 9000.0
+			lp2.cutoff_hz = 14000.0
 			AudioServer.add_bus_effect(idx, lp2, 0)
 		if bus_name == "Tape":
-			# Магнитофон чистит плёнку настоящими фильтрами: [0] срез низов, [1] срез верхов.
-			AudioServer.add_bus_effect(idx, AudioEffectHighPassFilter.new(), 0)
-			AudioServer.add_bus_effect(idx, AudioEffectLowPassFilter.new(), 1)
+			# Магнитофон чистит плёнку настоящими фильтрами: срез низов, срез верхов, аналоговая сатурация
+			var hp_t := AudioEffectHighPassFilter.new()
+			hp_t.cutoff_hz = 180.0
+			AudioServer.add_bus_effect(idx, hp_t, 0)
+			var lp_t := AudioEffectLowPassFilter.new()
+			lp_t.cutoff_hz = 6500.0
+			AudioServer.add_bus_effect(idx, lp_t, 1)
+			var comp_t := AudioEffectCompressor.new()
+			comp_t.threshold = -12.0
+			comp_t.ratio = 2.2
+			comp_t.gain = 0.8
+			AudioServer.add_bus_effect(idx, comp_t, 2)
 		if bus_name == "Weather":
-			# Внешняя метель: динамическая окклюзия при входе в дом
+			# Внешняя метель: динамическая окклюзия при входе в дом + срез инфразвука
 			var lpw := AudioEffectLowPassFilter.new()
 			lpw.cutoff_hz = 20000.0
 			AudioServer.add_bus_effect(idx, lpw, 0)
+			var hpw := AudioEffectHighPassFilter.new()
+			hpw.cutoff_hz = 35.0
+			AudioServer.add_bus_effect(idx, hpw, 1)
+		if bus_name == "Ambient":
+			var hpa := AudioEffectHighPassFilter.new()
+			hpa.cutoff_hz = 35.0
+			AudioServer.add_bus_effect(idx, hpa, 0)

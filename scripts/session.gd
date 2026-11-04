@@ -9,10 +9,13 @@ signal finished(result: String)
 const POST_SHADER := "res://assets/shaders/ps1_post.gdshader"
 const KNOCK := "res://assets/audio/door_knock.ogg"
 const SCREAM := "res://assets/audio/scream.ogg"
-const ENGINE := "res://assets/audio/engine_loop.ogg"
 const SeismographUIScript = preload("res://scripts/ui/seismograph_ui.gd")
 const JournalTM1UIScript = preload("res://scripts/ui/journal_tm1_ui.gd")
 const MeteorFaxUIScript = preload("res://scripts/ui/meteor_fax_ui.gd")
+const AftermathClass = preload("res://scripts/world/aftermath.gd")
+const PlayerProfilerClass = preload("res://scripts/ai/player_profiler.gd")
+const HunterBrainClass = preload("res://scripts/ai/hunter_brain.gd")
+const PsychosomaticFXClass = preload("res://scripts/world/psychosomatic_fx.gd")
 
 var _player: Player
 var _vp: SubViewport
@@ -60,6 +63,9 @@ func _ready() -> void:
 		_player.head.position.y = 0.90
 	Net.on_session_ready()
 	_vp.add_child(Atmosphere.new())
+	add_child(PlayerProfilerClass.new())
+	add_child(HunterBrainClass.new())
+	add_child(PsychosomaticFXClass.new())
 	add_child(YrkaThreat.new())
 	add_child(NightEvents.new())
 	if Game.is_night() and not Game.is_prologue():
@@ -75,6 +81,10 @@ func _ready() -> void:
 		add_child(NightTasks.new())
 	else:
 		Game.tasks = null
+		if not Game.is_prologue():
+			var aft := AftermathClass.new()
+			add_child(aft)
+			Game.aftermath = aft
 
 	EventBus.shift_ended.connect(_on_shift_ended)
 	EventBus.player_died.connect(_on_player_died)
@@ -160,9 +170,9 @@ func _begin() -> void:
 	for i in range(3):
 		await get_tree().process_frame
 		Perf.mark("first frame %d" % i)
-	await get_tree().create_timer(3.0, false).timeout
 	if _needs_cold_open():
 		await _cold_open(title)
+	_ensure_player_safe_spawn()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_player.mode = Player.Mode.WALK
 	Game.start_shift()
@@ -182,6 +192,32 @@ func _begin() -> void:
 		Game.hud.subtitle(Loc.t(StringName("day%d.start" % Game.phase_index)), 6.0)
 	elif Loc.has_key(StringName("n%d.start" % Game.night)):
 		Game.hud.subtitle(Loc.t(StringName("n%d.start" % Game.night)), 7.0)
+
+
+func _ensure_player_safe_spawn() -> void:
+	if _player == null:
+		return
+	var p := _player.global_position
+	var terrain_h := Terrain.height(p.x, p.z)
+	# 1. Если координаты некорректны, ниже рельефа или за пределами локации:
+	if not p.is_finite() or p.y < terrain_h - 1.2 or p.length() > 650.0:
+		_player.global_position = Station.SPAWN
+		return
+	# 2. Если игрок не сидит в кабине пролога, проверяем пересечение с коллизиями твердых тел:
+	if not (Game.is_prologue() and not Game.has_flag("prologue_arrived") and not Game.has_flag("left_cabin")):
+		var w := _player.get_world_3d()
+		if w == null or w.direct_space_state == null:
+			return
+		var space := w.direct_space_state
+		var q := PhysicsPointQueryParameters3D.new()
+		q.position = _player.global_position + Vector3(0, 0.9, 0)
+		q.collision_mask = Geo.LAYER_WORLD
+		q.exclude = [_player.get_rid()]
+		var hits := space.intersect_point(q, 1)
+		if not hits.is_empty():
+			# Игрок внутри твердого тела (новая стена или шкаф) -> безопасный перенос в дом
+			print("[Session] Обнаружено застревание при спавне. Безопасный перенос в дом: ", Station.SPAWN)
+			_player.global_position = Station.SPAWN
 
 
 # --- Холодный старт -----------------------------------------------------------------

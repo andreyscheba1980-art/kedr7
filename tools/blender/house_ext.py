@@ -152,7 +152,7 @@ for x in (x0 + 1.74,):
 
 # --- Табличка станции и инвентарный номер ---
 sign((12.9, 2.25, 6.6 + F + 0.03), 0.0, ["МЕТЕОСТАНЦИЯ «КЕДР-7»", "Свердловское УГМС"], M, w=1.5, h=0.42, size=0.1)
-sign((14.5 + F + 0.03, 1.75, 4.15), math.pi / 2, ["ИНВ. № 0417"], M, w=0.5, h=0.16, size=0.06)
+sign((14.5 + F + 0.03, 1.75, 3.85), math.pi / 2, ["ИНВ. № 0417"], M, w=0.5, h=0.16, size=0.06)
 
 obj, img, tris = kit.finish("house_ext", OUT, res=2048, origin="keep", samples=32, pack=0.002, ao_blur=2)
 kit.export(os.path.join(OUT, "house_ext.glb"), None)

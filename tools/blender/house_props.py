@@ -84,7 +84,7 @@ def attic_junk():
     wood = mat("aj_wood", (0.3, 0.2, 0.13), rough=0.85, noise=0.3, noise_scale=40, wear=0.5, dirt=0.6)
     leather = mat("aj_leather", (0.24, 0.15, 0.1), rough=0.6, wear=0.7, dirt=0.5, wear_col=(0.4, 0.3, 0.22))
     rug = mat("aj_rug", (0.36, 0.12, 0.1), rough=0.95, noise=0.4, noise_scale=20, dirt=0.6)
-    broom = mat("aj_broom", (0.34, 0.33, 0.2), rough=0.95, noise=0.4, noise_scale=30)
+    broom = mat("aj_broom", (0.24, 0.22, 0.12), rough=0.95, noise=0.5, noise_scale=45, wear=0.4, dirt=0.5)
     linen = mat("aj_linen", (0.7, 0.66, 0.56), rough=0.9, noise=0.2, noise_scale=10, dirt=0.7)
     glass = mat("aj_glass", (0.2, 0.26, 0.16), rough=0.2)
     iron = mat("aj_iron", (0.16, 0.15, 0.14), rough=0.6, wear=0.6, wear_col=(0.38, 0.25, 0.16))
@@ -110,11 +110,14 @@ def attic_junk():
     gbox((7.4, A + 0.12, 5.6), (0.5, 0.24, 0.36), wood, bevel=0.01)
     for k in range(6):
         gcyl((7.24 + (k % 3) * 0.16, A + 0.3, 5.52 + (k // 3) * 0.16), 0.05, 0.3, glass, verts=8)
-    # веники на стропилах
+    # сухие берёзовые веники на стропилах: плоские веера сухой листвы на поперечном брусе
+    gbox((2.65, A + 1.56, 3.3), (1.4, 0.05, 0.05), wood)
     for k in range(4):
         x = 2.2 + k * 0.3
-        gcyl((x, A + 1.45, 3.3), 0.006, 0.4, twine, verts=4)
-        gcyl((x, A + 1.05, 3.3), 0.09, 0.45, broom, verts=8, r2=0.03)
+        gcyl((x, A + 1.40, 3.3), 0.005, 0.32, twine, verts=4)
+        gbox((x, A + 1.22, 3.3), (0.035, 0.12, 0.035), wood, yaw=k * 0.25)
+        gbox((x, A + 1.05, 3.3), (0.15, 0.30, 0.045), broom, yaw=k * 0.35 + 0.08)
+        gbox((x, A + 0.94, 3.3), (0.19, 0.18, 0.038), broom, yaw=k * 0.35 - 0.12)
     # лыжи и палки на балке у ската
     for k in range(2):
         gbox((10.2, A + 0.62 + k * 0.03, 1.3 + k * 0.12), (1.9, 0.02, 0.07), wood, tilt_z=0.04)
@@ -124,7 +127,8 @@ def attic_junk():
     o = kit.sphere(ugms._nm("torso"), 1.0, ugms.g2b((13.6, A + 1.0, 4.9)), linen, scale=ugms.gsize((0.2, 0.32, 0.15)), segs=14, rings=10)
     gcyl((13.6, A + 0.78, 4.9), 0.24, 0.5, linen, verts=12, r2=0.17)
     # люлька на очепе у восточного фронтона
-    gcyl((13.4, A + 1.75, 3.3), 0.012, 0.9, twine, verts=4)
+    gbox((13.4, A + 1.62, 3.3), (0.06, 0.06, 0.9), wood)
+    gcyl((13.4, A + 1.35, 3.3), 0.010, 0.5, twine, verts=4)
     gbox((13.4, A + 1.12, 3.3), (0.75, 0.24, 0.42), wood, bevel=0.02)
     gbox((13.4, A + 1.06, 3.3), (0.7, 0.04, 0.38), linen)
     obj, img, tris = kit.finish("attic_junk", OUT, res=1024, origin="keep", samples=24, pack=0.003)
