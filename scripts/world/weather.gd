@@ -56,7 +56,7 @@ func _process(delta: float) -> void:
 		_env.fog_density = lerpf(_env.fog_density, target_fog, minf(delta * 3.0, 1.0))
 		# Небо затягивает: днём пасмурно, ночью — ясно до первой метели.
 		if _env.sky != null and _env.sky.sky_material is ShaderMaterial:
-			var base := 0.85 if Game.is_daylight() else 0.12
+			var base := lerpf(0.85, 0.22, clearness()) if Game.is_daylight() else 0.12
 			(_env.sky.sky_material as ShaderMaterial).set_shader_parameter("cloud_amount", lerpf(base, 1.0, intensity))
 			# Северное сияние в ясные ночи; с 5-й ночи — не того цвета, что бывает.
 			var sky_m := _env.sky.sky_material as ShaderMaterial
@@ -68,6 +68,22 @@ func _process(delta: float) -> void:
 			var wrong := Game.is_night() and Game.night >= 5
 			sky_m.set_shader_parameter("aurora_tint", Color(0.8, 0.1, 0.16) if wrong else Color(0.16, 0.9, 0.48))
 			sky_m.set_shader_parameter("aurora_top", Color(0.25, 0.04, 0.12) if wrong else Color(0.42, 0.22, 0.62))
+
+
+## Насколько ясно. Ночью — до метели. Днём — перед ночным фронтом утро ясное и морозное (антициклон),
+## к вечеру небо затягивает: буря идёт; в туманный день — белёсая мгла; каждый третий день — пасмурно.
+func clearness() -> float:
+	var c := 1.0 - clampf(intensity * 2.5, 0.0, 1.0)
+	if not Game.is_daylight():
+		return c
+	var front: StringName = Game.synoptic.front_type if Game.synoptic != null else &""
+	if front == &"fog":
+		c *= 0.25
+	elif front in [&"storm", &"blizzard", &"anomaly"]:
+		c *= 1.0 - smoothstep(60.0, 150.0, Game.shift_minutes) * 0.85
+	if Game.night % 3 == 2:
+		c *= 0.15
+	return c
 
 
 func force_blizzard(on: bool, duration := 40.0) -> void:

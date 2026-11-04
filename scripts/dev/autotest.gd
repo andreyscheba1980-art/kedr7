@@ -69,9 +69,32 @@ func _prologue_b() -> void:
 			menu_music += 1
 	print("[pb] музыка меню после «Новой игры»: ", menu_music)
 	var t := 0.0
-	while not Vehicle.can_exit_cabin() and t < 120.0:
+	var hk := {}
+	while not Vehicle.can_exit_cabin() and t < 150.0:
 		await _wait(0.5)
 		t += 0.5
+		if args.has("hookshots"):   # крючок: человек у обочины, проезжаем мимо, ладонь на стекле
+			var man: Node3D = Game.level.find_child("RoadsideMan", true, false)
+			if man != null and not hk.has("ahead") and man.global_position.distance_to(Game.player.global_position) < 20.0:
+				hk["ahead"] = true
+				await _shot("hk_ahead")
+			if man != null and not hk.has("pass") and man.global_position.distance_to(Game.player.global_position) < 6.0:
+				hk["pass"] = true
+				var y0 := Game.player.rotation.y
+				Game.player.rotation.y = y0 - 1.3
+				await _wait(0.1)
+				await _shot("hk_pass")
+				Game.player.rotation.y = y0
+			var hand: Node3D = Game.level.find_child("HandOnGlass", true, false)
+			if hand != null and hand.visible and not hk.has("hand"):
+				hk["hand"] = true
+				var y1 := Game.player.rotation.y
+				Game.player.rotation.y = y1 - 1.45
+				Game.player.head.rotation.x = 0.05
+				await _wait(0.1)
+				await _shot("hk_hand")
+				Game.player.rotation.y = y1
+				Game.player.head.rotation.x = 0.0
 	print("[pb] в кабине %.0f с, выход=%s" % [t, Vehicle.can_exit_cabin()])
 	await _shot("pb_cabin_stuck")
 	if args.has("cabshots"):
@@ -3015,6 +3038,21 @@ func _tour(args: PackedStringArray) -> void:
 				if ok:
 					out.append("(%d,%d)" % [gx, gz])
 		print("[free] ", " ".join(out))
+		get_tree().quit()
+		return
+	if args.has("vistas"):   # красота: двор, дом, лес с фонарём, небо, озеро, мачта — для оценки картинки
+		Game.player.set_flashlight(true)
+		print("[vis] ясно=%.2f метель=%.2f фронт=%s ночь=%d мин=%.0f" % [Game.weather.clearness(), Game.weather.intensity, Game.synoptic.front_type if Game.synoptic != null else &"-", Game.night, Game.shift_minutes])
+		for v: Array in [["house", Vector3(26, 0, 14), Vector3(12, 2.5, 3)], ["forest", Vector3(-20, 0, -48), Vector3(-34, 1.5, -62)],
+				["sky", Vector3(10, 0, -10), Vector3(10, 30, -60)], ["lake", Yard.LAKE + Vector3(12, 0, 10), Yard.LAKE],
+				["mast", Yard.MAST + Vector3(14, 0, 12), Yard.MAST + Vector3(0, 8, 0)], ["trail", Vector3(-9.4, 0, -35), Vector3(-2, 1.4, -28)]]:
+			var p0: Vector3 = v[1]
+			var t0: Vector3 = v[2]
+			p0.y = Terrain.height(p0.x, p0.z)
+			t0.y += Terrain.height(t0.x, t0.z)
+			_look(p0, t0)
+			await _wait(1.6)
+			await _shot("vista_" + v[0])
 		get_tree().quit()
 		return
 	if args.has("landshots"):   # рельеф: горизонт со двора, распадок с мостком, ЛЭП, лог

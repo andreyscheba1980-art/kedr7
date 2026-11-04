@@ -62,8 +62,9 @@ void fragment() {
 	// Кристаллы наста: ~0.7 % клеток 3×3 см, у каждой своя наклонённая микронормаль
 	vec2 cell = floor(uv * 32.0);
 	float h = hash2(cell);
-	v_is_spark = step(0.993, h) * glitter
-		* (1.0 - smoothstep(5.0, 12.0, length(wpos - CAMERA_POSITION_WORLD)));   // искры видны только у ног, вдали — не «конфетти»
+	float cd = length(wpos - CAMERA_POSITION_WORLD);
+	v_is_spark = step(mix(0.99, 0.997, smoothstep(4.0, 20.0, cd)), h) * glitter
+		* (1.0 - smoothstep(14.0, 28.0, cd));   // у ног гуще, дальше — реже; совсем вдали — не «конфетти»
 	vec3 rnd = vec3(hash2(cell + 17.0), 1.6, hash2(cell + 41.0)) - vec3(0.5, 0.0, 0.5);
 	v_spark = normalize((VIEW_MATRIX * vec4(normalize(rnd), 0.0)).xyz);
 }

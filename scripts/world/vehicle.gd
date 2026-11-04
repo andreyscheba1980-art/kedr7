@@ -10,8 +10,8 @@ extends Node3D
 const ENGINE := "res://assets/audio/engine_loop.ogg"
 const CABIN_SEAT_LOCAL := Vector3(0.50, 0.42, -0.95)
 const CABIN_DRIVER_LOCAL := Vector3(-0.52, 0.10, -0.95)
-const DRIVE_TIME := 34.0          ## сколько едем по зимнику до перемёта (начало разговора в кабине)
-const BACK_M := 130.0             ## откуда начинаем — метров дальше по дороге от места, где сядем
+const DRIVE_TIME := 58.0          ## сколько едем по зимнику до перемёта (разговор, «попутчик», стуки)
+const BACK_M := 220.0             ## откуда начинаем — метров дальше по дороге от места, где сядем
 const DIG_SPOTS := [Vector3(-1.45, 0.0, -2.4), Vector3(1.45, 0.0, -2.4)]   ## перемёт у передних катков (оси тягача)
 const STEP_M := 2.0
 
@@ -52,6 +52,9 @@ var _engine_dead := false
 var _beams: Array[Light3D] = []
 var _alone_said := false
 var _leash_hinted := false
+var _rush := false                 ## после стуков Михалыч гонит — и с ходу в перемёт
+var _hand: Node3D                  ## ладонь за инеем окна двери
+var _door_print: Vector3           ## где снаружи у двери кончаются босые следы
 const LEASH_M := 30.0      ## пока Михалыч не договорил, дальше от тягача не уйти: иначе вся просека — молча
 
 
@@ -418,16 +421,22 @@ func _run_cabin() -> void:
 	await get_tree().create_timer(2.0, false).timeout
 	# Разговор в кабине: кто ты, зачем сюда, что было с Семёновым, байки про ырку — и уговор про три гудка.
 	# [ключ, куда смотрит Михалыч (°), минимум секунд]. Реплики Виктора — Михалыч смотрит на дорогу.
-	var lines: Array = [
-		[&"cab.1", -42.0, 3.0], [&"cab.2", -12.0, 2.4], [&"cab.3", -36.0, 3.2], [&"cab.4", -10.0, 2.6],
-		[&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4],
-		[&"th.cab", -8.0, 3.6],
-	]
-	for ln: Array in lines:
+	# Посередине — крючок: человек у обочины, рация зовёт позывным станции, три стука в окно.
+	for ln: Array in [[&"cab.1", -42.0, 3.0], [&"cab.2", -12.0, 2.4], [&"cab.3", -36.0, 3.2]]:
 		if not await _say(ln[0], ln[1], ln[2]):
 			_talking = false
 			return
 		await get_tree().create_timer(0.35, false).timeout
+	if not await _hook_figure():
+		_talking = false
+		return
+	# Виктор заговаривает о другом — лишь бы не молчать
+	for ln: Array in [[&"cab.4", -10.0, 2.6], [&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4]]:
+		if not await _say(ln[0], ln[1], ln[2]):
+			_talking = false
+			return
+		await get_tree().create_timer(0.35, false).timeout
+	await _hook_knock()
 	_talking = false
 	while _driving and _in_cabin:
 		await get_tree().process_frame
@@ -489,6 +498,7 @@ func _on_exit_cabin() -> void:
 	_engine.volume_db = -6.0
 	Game.set_flag("dig_pending", true)
 	_build_dig_spots()
+	_build_evidence()
 	_talk_while_digging()
 
 
@@ -526,9 +536,217 @@ func _build_dig_spots() -> void:
 const SFX_SNOW_FALL := "res://assets/audio/snow_fall.ogg"
 
 
+# --- Крючок пролога: «попутчик» -----------------------------------------------------
+
+## В свете фар у обочины стоит человек — у столба «40», в старом ватнике, не голосует, просто стоит.
+## Михалыч не тормозит и не поворачивает головы. Проезжаем — фары мигают, голова того поворачивается
+## вслед за кабиной. Оглянешься — никого. Потом рация: позывной станции, «подберите… у сорокового».
+## Михалыч молча выключает. Ложь «никого нет» — первая; правило «не отзывайся» — уже работает.
+func _hook_figure() -> bool:
+	var ahead := 30.0 / STEP_M
+	var sf := _s - ahead
+	if sf < _drop_i + 6.0 or _road.size() < 4:
+		return _in_cabin and is_inside_tree()
+	var i := clampi(floori(sf), 1, _road.size() - 1)
+	var p := _road[i]
+	var dir := _road[i - 1] - _road[i]          # по ходу: индексы убывают к высадке
+	dir.y = 0.0
+	dir = dir.normalized()
+	var right := Vector3(-dir.z, 0, dir.x)
+	var at := Terrain.at(p + right * 2.7)
+	var fig := Creatures.make_human(&"hunter")
+	fig.name = "RoadsideMan"
+	add_child(fig)
+	fig.global_position = at
+	fig.look_at(Vector3(at.x, at.y, at.z) - dir * 8.0 - right * 2.7, Vector3.UP)   # навстречу, на дорогу
+	if fig.has_clip(&"still"):
+		fig.pose_override = &"still"
+	fig.twitch = 0.0
+	var post := Props.km_post()
+	if post != null:
+		add_child(post)
+		post.global_position = Terrain.at(p + right * 2.4 + dir * 0.9)
+		post.rotation.y = atan2(-dir.x, -dir.z)
+	var t := 0.0
+	while _in_cabin and is_inside_tree() and _body.global_position.distance_to(at) > 19.0 and t < 14.0:
+		t += get_process_delta_time()
+		await get_tree().process_frame
+	_track_figure(fig, at, dir)
+	if not await _say(&"hk.see", 6.0, 2.6):
+		return false
+	if not await _say(&"hk.no", 0.0, 2.2):        # смотрит прямо на дорогу
+		return false
+	if not await _say(&"hk.stop", 0.0, 2.4):
+		return false
+	if not await _say(&"hk.drive", 0.0, 4.0):
+		return false
+	await get_tree().create_timer(1.2, false).timeout
+	# Рация: сквозь шум — позывной станции и чужой, замёрзший голос
+	if _cabin_radio != null and _in_cabin:
+		_cabin_radio.volume_db = -8.0
+		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", _cabin_radio.global_position, -6.0, 2.0)
+		var voice := AudioStreamPlayer3D.new()
+		voice.stream = AudioDirector.cached_stream("res://assets/audio/voice_loop.ogg")
+		voice.bus = &"Radio"
+		voice.pitch_scale = 0.78
+		voice.volume_db = -10.0
+		voice.unit_size = 2.0
+		_cabin_root.add_child(voice)
+		voice.position = Vector3(0.72, 0.67, -1.39)
+		voice.play()
+		var dial := _cabin_root.get_node_or_null("RadioDial") as Node3D
+		Game.hud.subtitle(Loc.t(&"hk.radio"), 5.0)
+		await get_tree().create_timer(5.2, false).timeout
+		if _driver_cabin != null:
+			_driver_cabin.head_look_target_yaw = deg_to_rad(28.0)   # к рации
+		await get_tree().create_timer(0.7, false).timeout
+		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -2.0)
+		voice.queue_free()
+		_cabin_radio.stop()
+		if dial != null:
+			dial.visible = false
+		Game.hud.subtitle(Loc.t(&"hk.off"), 2.6)
+		await get_tree().create_timer(2.8, false).timeout
+	if not await _say(&"hk.callsign", -10.0, 3.0):
+		return false
+	await get_tree().create_timer(1.6, false).timeout     # молчит
+	if not await _say(&"hk.semyonov", 0.0, 4.2):
+		return false
+	Game.hud.subtitle(Loc.t(&"hk.th"), 3.6)
+	await get_tree().create_timer(3.8, false).timeout
+	Director.add_tension(8.0, "пролог: человек у обочины")
+	return _in_cabin and is_inside_tree()
+
+
+## Пока проезжаем — голова того поворачивается вслед за кабиной; фары мигают; потом его нет.
+func _track_figure(fig: CreatureRig, at: Vector3, dir: Vector3) -> void:
+	var flick := false
+	var gone_t := -1.0
+	while is_instance_valid(fig) and is_inside_tree():
+		var cab := _tracked.to_global(CABIN_SEAT_LOCAL)
+		var loc := fig.global_basis.inverse() * (cab - (at + Vector3(0, 1.6, 0)))
+		fig.head_look_target_yaw = clampf(atan2(-loc.x, -loc.z), -1.5, 1.5)
+		var along := (at - _body.global_position).dot(dir)
+		if not flick and along < 5.0:
+			flick = true
+			Game.audio.play_3d("res://assets/audio/tree_creak_v2.ogg", at + Vector3(0, 1.5, 0), -4.0, 6.0)
+			for b in _beams:
+				var e := b.light_energy
+				var tw := b.create_tween()
+				tw.tween_property(b, "light_energy", e * 0.15, 0.06)
+				tw.tween_property(b, "light_energy", e, 0.05)
+				tw.tween_property(b, "light_energy", e * 0.3, 0.08).set_delay(0.12)
+				tw.tween_property(b, "light_energy", e, 0.1)
+		if along < -4.0 and gone_t < 0.0:
+			gone_t = 1.4
+		if gone_t >= 0.0:
+			gone_t -= get_process_delta_time()
+			if gone_t <= 0.0:
+				fig.queue_free()     # оглянулся — у столба никого
+				return
+		await get_tree().process_frame
+
+
+## Три стука в стекло твоей двери. За инеем — бледная ладонь, снаружи. Михалыч шёпотом: не поворачивайся.
+## На третьем ладонь сползает вниз — Михалыч бьёт по газу. Тягач с ходу зарывается в перемёт.
+func _hook_knock() -> void:
+	if not _in_cabin or not is_inside_tree():
+		return
+	await get_tree().create_timer(1.8, false).timeout
+	_hand = _build_hand()
+	var win := _tracked.to_global(Vector3(1.2, 1.22, -1.12))
+	for k in 3:
+		if not _in_cabin:
+			return
+		if k == 0:
+			_hand.visible = true
+		Game.audio.play_3d("res://assets/audio/knock.ogg" if k != 1 else "res://assets/audio/knock_v2.ogg", win, -2.0 + k * 2.0, 3.0)
+		_hand.position.x = 1.192
+		var tw := _hand.create_tween()
+		tw.tween_property(_hand, "position:x", 1.2, 0.12)
+		if Game.player != null:
+			Game.player.shake(0.015, 0.15)
+		if k == 0:
+			await get_tree().create_timer(0.5, false).timeout
+			if _driver_cabin != null:
+				_driver_cabin.head_look_target_yaw = 0.0
+			Voice.say(&"hk.dont", 3.4)
+			await get_tree().create_timer(1.1, false).timeout
+		else:
+			await get_tree().create_timer(1.5, false).timeout
+	# Ладонь сползает по стеклу и пропадает
+	var slide := _hand.create_tween().set_parallel(true)
+	slide.tween_property(_hand, "position:y", _hand.position.y - 0.28, 1.4).set_ease(Tween.EASE_IN)
+	for mi in _hand.find_children("*", "MeshInstance3D", true, false):
+		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
+		if m != null:
+			slide.tween_property(m, "albedo_color:a", 0.0, 1.4)
+	await get_tree().create_timer(1.0, false).timeout
+	if not _in_cabin:
+		return
+	Voice.say(&"hk.hold", 1.8)
+	_rush = true
+	create_tween().tween_property(_engine, "pitch_scale", 1.35, 0.5)
+	await get_tree().create_timer(0.6, false).timeout
+
+
+## Ладонь — бледная, расплывчатая за инеем: ладонь и пять пальцев, прижата снаружи к стеклу двери.
+func _build_hand() -> Node3D:
+	var h := Node3D.new()
+	h.name = "HandOnGlass"
+	_cabin_root.add_child(h)
+	h.position = Vector3(1.2, 1.18, -1.1)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.44, 0.5, 0.56, 0.72)   # бледная, обмороженная — проступает сквозь иней
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	Geo.block(h, Vector3(0.006, 0.1, 0.085), Vector3.ZERO, m, false)
+	for f in 4:
+		var fz := -0.03 + f * 0.02
+		var fl := 0.1 + (0.018 if f in [1, 2] else 0.0)     # длинные, тонкие — не совсем человеческие
+		var fing := Geo.block(h, Vector3(0.006, fl, 0.012), Vector3(0, 0.05 + fl * 0.5, fz * 1.15), m, false)
+		fing.rotation.x = (f - 1.5) * 0.12
+	var th := Geo.block(h, Vector3(0.006, 0.055, 0.018), Vector3(0, 0.0, 0.055), m, false)
+	th.rotation.x = -0.8
+	h.visible = false
+	return h
+
+
+## Снаружи: босые следы из леса к двери — и ни одного обратно; на стекле — оттаявший отпечаток ладони.
+func _build_evidence() -> void:
+	var right := _tracked.global_basis.x
+	right.y = 0.0
+	right = right.normalized()
+	var back := _tracked.global_basis.z
+	back.y = 0.0
+	back = back.normalized()
+	var door := _tracked.to_global(Vector3(1.75, 0.0, -1.15))
+	door.y = Terrain.height(door.x, door.z)
+	_door_print = door
+	var pts := PackedVector3Array([door + right * 14.0 + back * 6.0, door + right * 7.0 + back * 2.0, door + right * 0.6])
+	for k in pts.size():
+		pts[k] = Terrain.at(pts[k])
+	Footprints.trail(self, &"bare", pts, 0.0, 0.66)
+	# Отпечаток на стекле снаружи: тёмное пятно оттаявшего инея
+	var pr := Node3D.new()
+	pr.name = "HandPrint"
+	_tracked.add_child(pr)
+	pr.position = Vector3(1.24, 1.12, -1.1)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.12, 0.14, 0.17, 0.75)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	Geo.block(pr, Vector3(0.006, 0.1, 0.085), Vector3.ZERO, m, false)
+	for f in 4:
+		Geo.block(pr, Vector3(0.006, 0.08, 0.016), Vector3(0, 0.09, -0.03 + f * 0.02), m, false)
+	Geo.block(pr, Vector3(0.006, 0.28, 0.07), Vector3(0, -0.14, 0.0), m, false)   # сползла вниз
+
+
 ## Пока Виктор копает — Михалыч из кабины: про Свердловск, про Семёнова, про ырку и три гудка.
 func _talk_while_digging() -> void:
-	await get_tree().create_timer(1.5, false).timeout
+	await get_tree().create_timer(0.9, false).timeout
+	if _door_print != Vector3.ZERO:
+		Game.hud.subtitle(Loc.t(&"hk.th_tracks"), 4.0)
+		await get_tree().create_timer(4.4, false).timeout
 	for ln: Array in [[&"cab.dig_hint", 3.4], [&"cab.11", 5.0], [&"cab.12", 5.0], [&"cab.13", 3.4], [&"cab.14", 2.6],
 			[&"cab.15", 6.0], [&"cab.16", 2.0], [&"cab.17", 7.5], [&"cab.18", 6.5]]:
 		if not is_inside_tree():
@@ -677,7 +895,9 @@ func _process(delta: float) -> void:
 		# Подъезд к высадке: плавно тормозим к концу
 		var remain := _s - _drop_i
 		var v := clampf(remain / 1.5, 0.5, 1.0) * (BACK_M / DRIVE_TIME) / STEP_M   # в перемёт — с ходу
-		if _talking and remain < 5.0:
+		if _rush:
+			v *= 2.0           # после стуков — гонит, не глядя, и с ходу в перемёт
+		elif _talking and remain < 5.0:
 			v *= 0.12          # разговор не закончен — у высадки ползём, а не встаём молча
 		_s = maxf(_s - v * delta, _drop_i)
 		_place(_s, true)

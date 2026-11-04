@@ -12,6 +12,7 @@ uniform vec3 moon_color : source_color = vec3(0.85, 0.92, 1.0);
 uniform float moon_size = 0.9991;      // косинус углового радиуса диска
 uniform float star_amount = 1.0;
 uniform float cloud_amount = 0.5;       // 1 — метель, неба почти не видно
+uniform float moon_cover = 0.0;         // туча на луне: диск и ореол гаснут, тучу видно силуэтом
 uniform float aurora = 0.0;             // северное сияние: 0 — нет, 1 — во всё небо (ясные ночи)
 uniform vec3 aurora_tint : source_color = vec3(0.2, 0.95, 0.55);
 uniform vec3 aurora_top : source_color = vec3(0.45, 0.25, 0.6);   // верх шторы — лиловый
@@ -72,7 +73,7 @@ void sky() {
 	// Луна: диск + два ореола (узкий и широкий), видна сквозь лёгкую дымку.
 	if (LIGHT0_ENABLED) {
 		float m = dot(d, LIGHT0_DIRECTION);
-		float vis = 1.0 - cloud_amount * 0.75;
+		float vis = (1.0 - cloud_amount * 0.75) * (1.0 - moon_cover * 0.9);
 		col += moon_color * smoothstep(moon_size - 0.00012, moon_size, m) * 1.2 * vis;
 		col += moon_color * pow(max(m, 0.0), 500.0) * 0.45 * vis;
 		col += horizon_color * pow(max(m, 0.0), 10.0) * 0.8 * vis;

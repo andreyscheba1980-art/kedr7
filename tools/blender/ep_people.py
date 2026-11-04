@@ -470,17 +470,24 @@ for s, n in ((-1, "L"), (1, "R")):
     else:
         limb(f"thigh{n}", l0 + Vector((0, 0, 0.05)), l1, 0.082 * G, 0.055, cm("stocking", tuple(c * 0.8 for c in V["skin"]), 0.5, 0.04, 30))
     if FEM or long_coat:
-        # Пола юбки/пальто — половина на каждом бедре: идёт за ногой, а сидя ложится на колени
-        lo = l1 + Vector((0, 0, -0.06 if FEM and OUT_ != "coat" else -0.09))
-        sw = (0.13 if FEM else 0.125) * G
+        # Пола юбки/пальто — половина на каждом бедре, сужается к колену (сидя — ровные колени, а не тумбы);
+        # подол ниже колена — отдельно, на голени: стоя продолжает юбку, сидя свисает с колен вниз
         sw = (0.115 if FEM else 0.12) * G
-        loft(f"skirt{n}", [(l0.z + 0.03, l0.x * 0.7, 0.0, sw, 0.12 * G), ((l0.z + lo.z) / 2, l0.x * 0.8 + 0.01 * s, 0.005, sw * 1.05, 0.125 * G),
-                           (lo.z + 0.02, l0.x * 0.85 + 0.015 * s, 0.01, sw * 1.08, 0.125 * G), (lo.z, l0.x * 0.85 + 0.015 * s, 0.01, sw * 1.06, 0.12 * G)],
+        kz = l1.z + 0.03
+        loft(f"skirt{n}", [(l0.z + 0.03, l0.x * 0.7, 0.0, sw, 0.118 * G), ((l0.z + kz) / 2, l0.x * 0.78 + 0.008 * s, 0.006, sw * 0.97, 0.105 * G),
+                           (kz, l0.x * 0.82 + 0.012 * s, 0.012, sw * 0.86, 0.09 * G)],
              skirt_mat, 14, caps=(True, True))
         if long_coat and s > 0:
-            strip("coat_split", (0.0, 0.135 * G, l0.z + 0.0), (0.0, 0.145 * G, lo.z + 0.01), 0.01, 0.004, CLOTH_D)
+            strip("coat_split", (0.0, 0.135 * G, l0.z + 0.0), (0.0, 0.125 * G, kz), 0.01, 0.004, CLOTH_D)
     own(f"thigh.{n}", since(m))
     m = mark()
+    if FEM or long_coat:
+        hem = 0.13 if FEM and OUT_ != "coat" else 0.24
+        sw = (0.115 if FEM else 0.12) * G
+        cx = l1.x * 0.82 / 0.82 * 0.82 + 0.012 * s
+        loft(f"drape{n}", [(l1.z + 0.06, cx, 0.016, sw * 0.9, 0.095 * G), (l1.z - hem * 0.5, cx + 0.008 * s, 0.014, sw * 0.98, 0.1 * G),
+                           (l1.z - hem, cx + 0.012 * s, 0.01, sw * 1.03, 0.1 * G)],
+             skirt_mat, 14, caps=(True, True))
     if OUT_ == "guard":
         limb(f"boot_shaft{n}", l1 + Vector((0, 0, -0.04)), l2, 0.062, 0.055, SHOE)
         blob(f"boot_top{n}", l1 + Vector((0, 0, -0.04)), 0.062, SHOE, scale=(1, 1, 0.3))

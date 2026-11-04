@@ -78,13 +78,20 @@ const SKY_DAY := {"top_color": Color(0.42, 0.47, 0.55), "horizon_color": Color(0
 const SKY_NIGHT := {"top_color": Color(0.008, 0.015, 0.03), "horizon_color": Color(0.075, 0.115, 0.17),
 	"below_color": Color(0.02, 0.03, 0.04), "far_ridge": Color(0.038, 0.06, 0.085), "near_ridge": Color(0.02, 0.032, 0.048),
 	"moon_color": Color(0.85, 0.92, 1.0)}
+## Ясный морозный день: глубокое синее небо, низкое солнце (диск — на месте «луны» в шейдере неба).
+const SKY_CLEAR := {"top_color": Color(0.13, 0.27, 0.52), "horizon_color": Color(0.66, 0.74, 0.84),
+	"below_color": Color(0.56, 0.62, 0.7), "far_ridge": Color(0.48, 0.58, 0.72), "near_ridge": Color(0.28, 0.36, 0.48),
+	"moon_color": Color(1.0, 0.86, 0.66)}
 const FOG_DAY_COL := Color(0.58, 0.61, 0.68)
+const FOG_CLEAR_COL := Color(0.7, 0.76, 0.86)   ## ясно: дымка голубая, дальний лес — светлыми слоями
 const FOG_NIGHT_COL := Color(0.032, 0.052, 0.08)   ## лунная дымка: дальний лес — слоями силуэтов, а не светлой стеной
 ## Ночь: без фонаря видно только силуэты на фоне неба, окна и огни; снег под ногами — еле-еле.
 const NIGHT_AMB_COL := Color(0.03, 0.06, 0.11)
 const NIGHT_AMB := 0.06
 const PROLOGUE_FOG := Color(0.085, 0.115, 0.16)
 const NIGHT_MOON := 0.05
+const MOON_CLEAR := 0.3          ## ясная ночь: снег светится синим, от елей — чёрные тени
+var _moon_gap := 1.0             ## 1 — луна открыта, 0 — ушла за тучу
 var _swinging_bulb: Node3D
 var _porch_bulb: Node3D
 var _storm_beacon: OmniLight3D
@@ -424,15 +431,18 @@ func _process(delta: float) -> void:
 		if Game.barograph_live():
 			_baro_dead_said = false
 
-	# Плавное сгущение зимних сумерек днём (16:00 → 17:30)
+	# День: пасмурно или ясно (низкое тёплое солнце, синее небо, длинные голубые тени); к 17:30 — сумерки
 	if Game.is_daylight() and _sky_light != null and env != null:
 		var t_dusk := clampf((Game.shift_minutes - 120.0) / 100.0, 0.0, 1.0)
+		var clear: float = Game.weather.clearness() if Game.weather != null else 0.0
 		env.background_color = Color(0.4, 0.43, 0.5).lerp(Color(0.055, 0.155, 0.235), t_dusk)
-		env.ambient_light_color = Color(0.55, 0.6, 0.7).lerp(NIGHT_AMB_COL, t_dusk)
-		env.ambient_light_energy = lerpf(0.75, NIGHT_AMB, t_dusk)
-		_apply_sky_tint(t_dusk)
-		_sky_light.light_color = Color(0.85, 0.85, 0.9).lerp(Color(0.58, 0.72, 0.92), t_dusk)
-		_sky_light.light_energy = lerpf(0.45, NIGHT_MOON, t_dusk)
+		env.ambient_light_color = Color(0.55, 0.6, 0.7).lerp(Color(0.46, 0.56, 0.8), clear).lerp(NIGHT_AMB_COL, t_dusk)
+		env.ambient_light_energy = lerpf(lerpf(0.75, 0.62, clear), NIGHT_AMB, t_dusk)
+		_apply_sky_tint(t_dusk, clear)
+		_sky_light.light_color = Color(0.85, 0.85, 0.9).lerp(Color(1.0, 0.84, 0.64), clear).lerp(Color(1.0, 0.55, 0.35), clear * smoothstep(0.3, 0.8, t_dusk)).lerp(Color(0.58, 0.72, 0.92), smoothstep(0.75, 1.0, t_dusk))
+		_sky_light.light_energy = lerpf(lerpf(0.45, 2.1, clear), NIGHT_MOON, t_dusk)
+		# Зимнее солнце низко: к вечеру садится к хребтам — тени через весь двор
+		_sky_light.rotation_degrees = Vector3(lerpf(-25.0, lerpf(-21.0, -6.0, t_dusk), clear), lerpf(40.0, 60.0, t_dusk), 0.0)
 
 	# Медленное покачивание лунного света на ветру (±1–2°): тени вековых елей и построек тягуче ползут по снегу
 	if not Game.is_daylight() and _sky_light != null:
@@ -441,6 +451,17 @@ func _process(delta: float) -> void:
 		var sway_y := (sin(_t * 0.32) * 1.5 + sin(_t * 0.68) * 0.65) * w_scale
 		var sway_x := (cos(_t * 0.24) * 0.8 + sin(_t * 0.53) * 0.35) * w_scale
 		_sky_light.rotation_degrees = Vector3(-32.0 + sway_x, -135.0 + sway_y, 0.0)
+		# Ясно — луна светит в полную, снег светится, от елей тени; тучи то и дело закрывают её — и темно
+		if not Game.is_prologue_trail():
+			var clear_n := 1.0 - clampf(w_intensity * 2.5, 0.0, 1.0)
+			var cov := sin(_t * 0.021) * 0.6 + sin(_t * 0.057 + 1.3) * 0.4
+			var gap_want := 1.0 - smoothstep(0.35, 0.75, cov) * 0.85
+			_moon_gap = move_toward(_moon_gap, gap_want, delta * 0.08)
+			var moon := clear_n * _moon_gap
+			_sky_light.light_energy = lerpf(NIGHT_MOON, MOON_CLEAR, moon)
+			env.ambient_light_energy = lerpf(NIGHT_AMB, NIGHT_AMB + 0.015, moon)
+			if _sky_mat != null:
+				_sky_mat.set_shader_parameter("moon_cover", 1.0 - _moon_gap)
 
 	if _tape_deck != null:
 		var has_deck := Game.has_item(&"tape_recorder")   # стоит на столе только когда его нашли
@@ -879,7 +900,7 @@ func _build_environment() -> void:
 	_sky_light.rotation_degrees = Vector3(-25.0, 40.0, 0.0) if day else Vector3(-32.0, -135.0, 0.0)   # луна на северо-западе, над лесом за домом
 	# Тени луны ночью почти не видны (свет 0.08 против фонаря и окон), а стоят ещё 2 прохода всей сцены.
 	# Ночью — только на высоком пресете; днём солнце даёт заметные тени — со среднего.
-	_sky_light.shadow_enabled = Settings.quality >= (1 if day else 2)
+	_sky_light.shadow_enabled = Settings.quality >= 1   # тени елей от луны на снегу — главная красота ночи
 	_sky_light.light_cull_mask = 1 | LAYER_OUT   # в дом луна не светит и без теней: внутренность — свой слой
 	# И тени солнца/луны отбрасывает только наружная геометрия. Раньше вся обстановка дома (сотни
 	# предметов) шла в каскады теней, как только дом попадал в кадр: ~1100 лишних вызовов, просадка FPS
@@ -894,13 +915,13 @@ func _build_environment() -> void:
 	weather.setup(env)
 
 
-func _apply_sky_tint(t: float) -> void:
+func _apply_sky_tint(t: float, clear := 0.0) -> void:
 	if env != null:
-		env.fog_light_color = FOG_DAY_COL.lerp(FOG_NIGHT_COL, t)
+		env.fog_light_color = FOG_DAY_COL.lerp(FOG_CLEAR_COL, clear).lerp(FOG_NIGHT_COL, t)
 	if _sky_mat == null:
 		return
 	for k: String in SKY_DAY:
-		_sky_mat.set_shader_parameter(k, (SKY_DAY[k] as Color).lerp(SKY_NIGHT[k], t))
+		_sky_mat.set_shader_parameter(k, (SKY_DAY[k] as Color).lerp(SKY_CLEAR[k], clear).lerp(SKY_NIGHT[k], t))
 	_sky_mat.set_shader_parameter("star_amount", t)
 
 
