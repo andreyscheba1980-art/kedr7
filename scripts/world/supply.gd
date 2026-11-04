@@ -68,6 +68,24 @@ static func place_crate(yard: Node3D) -> void:
 	if crate_items.is_empty():
 		return
 	var pos := Vector3(44.0, 0.0, 6.0) + Vector3(1.5, 0.0, -1.5)
+	var drifted := false
+	if SaveGame.flags.get("supply_fresh", false):
+		SaveGame.flags.erase("supply_crate_pos")
+		# Сброс на парашюте: чем сильнее ветер на высоте, тем вероятнее купол снесёт мимо площадки
+		var aloft := Game.synoptic.wind_aloft_speed if Game.synoptic != null else 18.0
+		var rng := RandomNumberGenerator.new()
+		rng.seed = Game.run_seed + Game.phase_index * 53
+		if rng.randf() < clampf((aloft - 12.0) / 20.0, 0.2, 0.85):
+			var az := deg_to_rad((Game.synoptic.wind_azimuth_deg if Game.synoptic != null else rng.randf() * 360.0) + 180.0 + rng.randf_range(-25.0, 25.0))
+			var dist := clampf(50.0 + aloft * 3.0, 60.0, 160.0) * rng.randf_range(0.8, 1.15)
+			var p := pos + Vector3(sin(az), 0.0, -cos(az)) * dist
+			SaveGame.flags["supply_crate_pos"] = [p.x, p.z, rad_to_deg(az), dist]
+	var cp: Variant = SaveGame.flags.get("supply_crate_pos")
+	if cp is Array:
+		pos = Vector3(float(cp[0]), 0.0, float(cp[1]))
+		drifted = true
+	if Terrain.ready():
+		pos.y = Terrain.height(pos.x, pos.z)
 	var root := Node3D.new()
 	root.name = "SupplyCrate"
 	yard.add_child(root)
@@ -90,9 +108,29 @@ static func place_crate(yard: Node3D) -> void:
 	it.used.connect(func(p: Player) -> void:
 		open_crate(p, root.global_position)
 		root.queue_free())
+	if drifted:
+		# Радиомаяк на грузе: пищит, мигает красным — ищи по звуку
+		var beep := AudioStreamPlayer3D.new()
+		beep.stream = AudioDirector.cached_stream("res://assets/audio/morse_loop.ogg")
+		beep.volume_db = -6.0
+		beep.unit_size = 10.0
+		beep.max_distance = 110.0
+		beep.position = Vector3(0, 0.8, 0)
+		root.add_child(beep)
+		beep.play()
+		var strobe := Geo.omni(root, Vector3(0, 1.4, 0), 6.0, 1.2, Color(1.0, 0.15, 0.1))
+		var tw := root.create_tween().set_loops()
+		tw.tween_property(strobe, "light_energy", 0.0, 0.05).set_delay(0.9)
+		tw.tween_property(strobe, "light_energy", 1.2, 0.05)
+		it.used.connect(func(_p: Player) -> void: SaveGame.flags.erase("supply_crate_pos"))
 	if SaveGame.flags.get("supply_fresh", false) and Game.hud != null:
 		SaveGame.flags["supply_fresh"] = false
-		Game.hud.subtitle(Loc.t(&"sup.crate_arrived"), 5.0)
+		if drifted:
+			var az_deg := float((cp as Array)[2])
+			var sector := int(round(fposmod(az_deg, 360.0) / 45.0)) % 8
+			Game.hud.subtitle(Loc.t(&"sup.crate_drifted", [Loc.t(StringName("dir8.%d" % sector)), int(round(float((cp as Array)[3]) / 10.0)) * 10]), 8.0)
+		else:
+			Game.hud.subtitle(Loc.t(&"sup.crate_arrived"), 5.0)
 
 
 static func open_crate(p: Player, at: Vector3) -> void:

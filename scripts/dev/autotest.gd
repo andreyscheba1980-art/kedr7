@@ -2607,6 +2607,49 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("droptest"):   # сброс снабжения при сильном ветре: снесло ли, где маяк
+		Hud.log_subs = true
+		for n in Game.yard.find_children("SupplyCrate", "", true, false):
+			n.queue_free()
+		SaveGame.flags["supply_pending"] = ["tea"]
+		Game.synoptic.wind_aloft_speed = 34.0
+		Supply.place_crate(Game.yard)
+		await _wait(0.5)
+		var cr: Node3D = Game.yard.find_child("SupplyCrate", true, false)
+		print("[drop] ящик=%s поз=%s флаг=%s" % [cr != null, cr.global_position if cr else Vector3.ZERO, SaveGame.flags.get("supply_crate_pos")])
+		var fwd := (Yard.HELIPAD - cr.global_position)
+		fwd.y = 0
+		_look(cr.global_position + fwd.normalized() * 9.0, cr.global_position + Vector3(0, 0.5, 0))
+		await _wait(1.2)
+		await _shot("drop_crate")
+		get_tree().quit()
+		return
+	if args.has("freespots"):   # пустые места двора: 9 м до любой геометрии, 5 м до троп
+		var boxes: Array[AABB] = []
+		for n in Game.level.find_children("*", "GeometryInstance3D", true, false):
+			var g := n as GeometryInstance3D
+			if not g.is_visible_in_tree() or g.name.begins_with("Mountains") or g.name.begins_with("Ground"):
+				continue
+			var bb: AABB = g.global_transform * g.get_aabb()
+			if bb.size.x < 60.0 and bb.size.z < 60.0:
+				boxes.append(bb)
+		var out: PackedStringArray = []
+		for gx in range(-60, 101, 4):
+			for gz in range(-70, 71, 4):
+				var p := Vector3(gx, 0, gz)
+				if Vector2(p.x - 20, p.z + 5).length() > 70.0 or Game.yard._dist_to(Game.yard._all_paths, p) < 3.5:
+					continue
+				var ok := true
+				for bb in boxes:
+					var q := Vector2(clampf(p.x, bb.position.x, bb.end.x), clampf(p.z, bb.position.z, bb.end.z))
+					if q.distance_to(Vector2(p.x, p.z)) < 4.5 and bb.end.y > 0.3:
+						ok = false
+						break
+				if ok:
+					out.append("(%d,%d)" % [gx, gz])
+		print("[free] ", " ".join(out))
+		get_tree().quit()
+		return
 	if args.has("landshots"):   # рельеф: горизонт со двора, распадок с мостком, ЛЭП, лог
 		for q: Vector2 in [Vector2(0, 208), Vector2(0, 230), Vector2(0, 250), Vector2(49, 222), Vector2(-262, -70), Vector2(-262, -92), Vector2(-262, -112)]:
 			print("[land] h(%s)=%.1f" % [q, Terrain.height(q.x, q.y)])

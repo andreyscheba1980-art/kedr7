@@ -144,6 +144,21 @@ static func _yard_more(st: Node3D) -> void:
 	for p: Vector3 in [Vector3(18.6, 0, 7.8), Vector3(-5.5, 0, 11.0), Vector3(11.0, 0, -9.0)]:
 		if _free(p, 1.2):
 			_m(st, "nature/plant_bush", p - Vector3(0, 0.08, 0), randf() * 360.0, 0.45, {"tint": Color(0.45, 0.38, 0.32), "shadow": false})
+	# Брошенный тягач у кромки двора: снег по гусеницы, на кабине — шапка (пусто было между мачтой и корпусом)
+	var tv := Props.tracked_vehicle()
+	tv.position = Vector3(56.0, -0.25, -18.0)
+	tv.rotation.y = deg_to_rad(25.0)
+	st.add_child(tv)
+	var tv_body := Geo.collider(st, Vector3(2.6, 2.2, 5.4), Vector3(56.0, 1.0, -18.0))
+	tv_body.rotation.y = deg_to_rad(25.0)
+	_m(st, "holiday/snow-bunker", Vector3(57.2, 0, -16.2), 115.0, 0.55, snow)
+	_m(st, "holiday/snow-pile", Vector3(54.6, 0, -20.4), 30.0, 0.3, snow)
+	# Старый флюгер Вильда на покосившемся столбе — прежняя метеоплощадка
+	var vane := Props.wild_vane()
+	vane.position = Vector3(44.0, 0.0, -10.0)
+	vane.rotation = Vector3(0.0, deg_to_rad(-30.0), deg_to_rad(4.0))
+	st.add_child(vane)
+	Geo.collider(st, Vector3(0.4, 3.0, 0.4), Vector3(44.0, 1.5, -10.0))
 	# Скамья у крыльца — курилка
 	_m(st, "town/stall-bench", Vector3(17.9, 0, 5.4), 90.0, 0.45, {"collide": true})
 
