@@ -2658,6 +2658,24 @@ func _tour(args: PackedStringArray) -> void:
 		print("[num] найден=%s пайки %d → %d" % [NumbersCache.found(), r0, Supply.rations()])
 		get_tree().quit()
 		return
+	if args.has("notetest"):   # записки игры — крупным листом DocView
+		Game.hud.visible = true
+		for key: StringName in [&"note.bunker", &"note.mine_semenov"]:
+			Game.hud.show_note(Loc.t(key))
+			await _wait(0.5)
+			await RenderingServer.frame_post_draw
+			get_tree().root.get_texture().get_image().save_png(SHOTS + "note_%s.png" % String(key).replace(".", "_"))
+			var ev := InputEventAction.new()
+			ev.action = &"interact"
+			ev.pressed = true
+			var n := 0
+			while Game.hud.is_note_open() and n < 10:
+				Game.hud.note_input(ev)
+				n += 1
+				await get_tree().process_frame
+			print("[note] %s: листов пролистано=%d, закрыта=%s" % [key, n, not Game.hud.is_note_open()])
+		get_tree().quit()
+		return
 	if args.has("repairtest"):   # ремонт руками: ритм и порядок, колбэк починки
 		Game.hud.visible = true
 		var done := [0]

@@ -336,7 +336,31 @@ func toast(text: String, duration := 2.5) -> void:
 	tw.tween_callback(l.queue_free)
 
 
+## Записка/документ — крупным листом (DocView), длинное — по страницам.
+var _doc: DocView
+
+
 func show_note(text: String) -> void:
+	if _doc != null and is_instance_valid(_doc):
+		_doc.queue_free()
+	var low := text.to_lower()
+	_doc = DocView.sheet(PackedStringArray([text]), low.contains("секрет") or low.contains("secret"))
+	root.add_child(_doc)
+	_doc.closed.connect(hide_note)
+	_subtitle.visible = false
+	if Game.player != null and not Game.dead:
+		Game.player.mode = Player.Mode.READING
+
+
+## Ввод, пока открыт документ: дальше / назад / закрыть.
+func note_input(event: InputEvent) -> void:
+	if _doc != null and is_instance_valid(_doc):
+		_doc.handle_input(event)
+	else:
+		hide_note()
+
+
+func _show_note_old(text: String) -> void:
 	_note_label.text = text + "\n\n" + Loc.t(&"ui.close_e")
 	# Длинные страницы (журнал с дописками) — мельче, пока не влезут в лист: панель растёт под текст,
 	# и журнал Семёнова уезжал низом за экран.
@@ -355,6 +379,9 @@ func show_note(text: String) -> void:
 
 
 func hide_note() -> void:
+	if _doc != null and is_instance_valid(_doc):
+		_doc.queue_free()
+	_doc = null
 	if _note_backdrop != null:
 		_note_backdrop.visible = false
 	_note_panel.visible = false
@@ -364,7 +391,7 @@ func hide_note() -> void:
 
 
 func is_note_open() -> bool:
-	return _note_panel != null and _note_panel.visible
+	return (_doc != null and is_instance_valid(_doc)) or (_note_panel != null and _note_panel.visible)
 
 
 func toggle_tasks() -> void:

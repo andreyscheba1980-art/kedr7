@@ -64,6 +64,7 @@ var _doc_page: Label
 var _doc_pages: PackedStringArray = []
 var _doc_i := 0
 var _doc_done: Callable
+var _docv: DocView
 
 
 func _ready() -> void:
@@ -333,7 +334,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_pitch = clampf(_pitch - event.relative.y * sens * ys, -1.3, 1.3)
 	if event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_cancel"):
 		if mode == &"doc":
-			_close_doc()
+			if _docv != null and is_instance_valid(_docv):
+				_docv.handle_input(event)
+			else:
+				_close_doc()
 		elif _esc_armed > 0.0:
 			_finish()
 		else:
@@ -341,12 +345,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_say(&"ep.skip", 3.0)
 		return
 	if mode == &"doc":
-		if event.is_action_pressed(&"interact") or event.is_action_pressed(&"ui_accept") or event.is_action_pressed(&"move_right") \
-				or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
-			_doc_next()
-		elif event.is_action_pressed(&"move_left"):
-			_doc_i = maxi(_doc_i - 1, 0)
-			_show_page()
+		if _docv != null and is_instance_valid(_docv):
+			if not (event is InputEventMouseMotion):
+				_docv.handle_input(event)
+				if event.is_pressed() and not (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_cancel")):
+					_sfx(PAGE, -10.0, randf_range(0.95, 1.05))
 		return
 	if event.is_action_pressed(&"interact"):
 		_interact()
@@ -515,17 +518,23 @@ func _park() -> void:
 
 # --- Документы ----------------------------------------------------------------------
 
-func _open_doc(p: PackedStringArray, on_done := Callable()) -> void:
+func _open_doc(p: PackedStringArray, on_done := Callable(), folder := false) -> void:
 	if p.is_empty():
 		return
 	_doc_pages = p
 	_doc_i = 0
 	_doc_done = on_done
-	_doc.visible = true
 	_sub.text = ""
 	mode = &"doc"
 	_sfx(PAGE, -6.0)
-	_show_page()
+	if _docv != null and is_instance_valid(_docv):
+		_docv.queue_free()
+	if folder:
+		_docv = DocView.folder(PackedStringArray([Loc.t(&"ep.folder_no"), Loc.t(&"ep.folder_obj"), Loc.t(&"ep.folder_who")]), p)
+	else:
+		_docv = DocView.sheet(p, true)
+	_hud.add_child(_docv)
+	_docv.closed.connect(_close_doc)
 
 
 func _doc_from(prefix: String) -> PackedStringArray:
@@ -554,6 +563,9 @@ func _doc_next() -> void:
 
 func _close_doc() -> void:
 	_doc.visible = false
+	if _docv != null and is_instance_valid(_docv):
+		_docv.queue_free()
+	_docv = null
 	mode = &"walk"
 	var cb := _doc_done
 	_doc_done = Callable()
@@ -667,7 +679,7 @@ func _dress_floor() -> void:
 			if stage == &"case":
 				stage = &"archive"
 				_set_goal(&"ep.goal.archive")
-				_say(&"ep.after_case", 6.0)))
+				_say(&"ep.after_case", 6.0), true))
 	_spot(ph.position + Vector3(0, 0.1, 0), Vector3(0.4, 0.3, 0.4), func() -> String:
 		return Loc.t(&"ep.p.phone") if stage == &"ring" else Loc.t(&"ep.p.phone_idle"), func() -> void:
 		if stage == &"ring":
@@ -812,7 +824,7 @@ func _zoya_comes() -> void:
 
 
 func _case_pages() -> PackedStringArray:
-	var out: PackedStringArray = [Loc.t(&"ep.case_cover")]
+	var out: PackedStringArray = [Loc.t(&"ep.case_cover")]   # первый лист — сопроводительная
 	for p in pages:
 		out.append(p)
 	if out.size() == 1:
@@ -839,6 +851,7 @@ func _answer_phone() -> void:
 	_sub.text = ""
 	await get_tree().create_timer(1.5, false).timeout
 	_open_doc(PackedStringArray([Loc.t(&"ep.final"), Loc.t(&"credits")]), _finish)
+	_docv.secret = false
 
 
 func _finish() -> void:

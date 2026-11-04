@@ -142,9 +142,16 @@ func _run() -> void:
 	await _shot("zoya")
 	_use(ep, ep._world.find_child("CaseFolder", true, false).global_position)
 	await _wait(0.4)
-	await _shot("case_doc")
-	for k in ep._doc_pages.size():
-		ep._doc_next()
+	await _shot("case_cover")
+	ep._docv.advance()
+	await _wait(0.6)
+	await _shot("case_spread")
+	ep._docv.advance()
+	await _wait(0.4)
+	await _shot("case_spread2")
+	while ep._docv != null and is_instance_valid(ep._docv) and ep.mode == &"doc":
+		ep._docv.advance()
+		await get_tree().process_frame
 	print("[ep] после дела: этап=%s" % ep.stage)
 	var r2: Dictionary = ep._f4[&"414"]
 	ep._body.global_position = (r2["door"] as Vector3) + Vector3(0.8, 0.05, -1.2)
@@ -161,6 +168,7 @@ func _run() -> void:
 	var r4: Dictionary = ep._f4[&"418"]
 	_use(ep, ep._world.find_child("PhotoBoard", true, false).global_position)
 	await _wait(0.3)
+	await _wait(0.4)
 	await _shot("doc_yrka")
 	ep._close_doc()
 	_use(ep, Vector3(float(r4["x0"]) + 4.0, 1.2, float(r4["zout"]) + 0.9))

@@ -235,8 +235,9 @@ func handle_input(event: InputEvent) -> void:
 
 	if mode == Mode.READING:
 		if event.is_action_pressed(&"interact") or event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"drop") or event.is_action_pressed(&"ui_accept") or (event is InputEventMouseButton and event.is_pressed()):
-			Game.hud.hide_note()
-			mode = Mode.WALK
+			Game.hud.note_input(event)
+			if not Game.hud.is_note_open():
+				mode = Mode.WALK
 		return
 
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:

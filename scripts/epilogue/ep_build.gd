@@ -29,11 +29,47 @@ const ROOMS := {
 }
 
 
-static func mat(c: Color, rough := 0.85) -> StandardMaterial3D:
+static var _tex_cache: Dictionary = {}
+
+
+## Материал с настоящей текстурой (дерево, металл, ткань, штукатурка, бетон) — без «голых» однотонных коробок.
+## Текстура подбирается по цвету, если не задана; накладывается в мировых координатах (не тянется на длинных брусках).
+static func mat(c: Color, rough := 0.85, tex := "") -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
-	m.albedo_color = c
 	m.roughness = rough
+	if tex == "":
+		tex = _tex_for(c, rough)
+	if tex == "none":
+		m.albedo_color = c
+		return m
+	if not _tex_cache.has(tex):
+		_tex_cache[tex] = load("res://assets/textures/%s.png" % tex)
+	m.albedo_texture = _tex_cache[tex]
+	m.uv1_triplanar = true
+	m.uv1_world_triplanar = true
+	var sc := 1.6 if tex == "tex_wood" or tex == "tex_metal" else 1.0
+	m.uv1_scale = Vector3(sc, sc, sc)
+	m.uv1_triplanar_sharpness = 4.0
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	# Текстуры серые (~0.6): поднимаем цвет, чтобы итоговый тон остался тем, что задан
+	m.albedo_color = Color(minf(c.r * 1.6, 1.0), minf(c.g * 1.6, 1.0), minf(c.b * 1.6, 1.0), c.a)
+	if tex == "tex_metal" and rough < 0.45:
+		m.metallic = 0.45
 	return m
+
+
+static func _tex_for(c: Color, rough: float) -> String:
+	var grey := absf(c.r - c.g) < 0.06 and absf(c.g - c.b) < 0.07
+	if grey:
+		if c.get_luminance() < 0.12:
+			return "tex_metal"
+		return "tex_metal" if rough < 0.5 else "tex_concrete"
+	if c.r > c.b * 1.3 and c.r >= c.g:
+		# коричневые — дерево; насыщенно-красные (ткань, дерматин, знамёна) — ткань
+		return "tex_wood" if c.g > c.b * 1.15 and c.g > c.r * 0.45 else "tex_cloth"
+	if c.get_luminance() > 0.6:
+		return "tex_plaster"
+	return "tex_cloth"
 
 
 static func glow_mat(c: Color, energy := 1.0) -> StandardMaterial3D:
@@ -124,11 +160,15 @@ void fragment() {
 		c = mix(col_a, col_b, k) * (0.95 + 0.07 * n2(q * 3.0));
 		c = mix(c, vec3(0.35), clamp(grout, 0.0, 1.0) * 0.6);
 		rough = 0.3;
+	} else if (mode == 6) {
+		c = col_a * (0.82 + 0.18 * n2(vec2(uv.x * 2.0, uv.y * 140.0))) * (0.95 + 0.08 * fbm(uv * 3.0));
+		rough = 0.32;
 	} else {
 		c = col_a * (0.95 + 0.06 * fbm(uv * 2.0));
 	}
 	ALBEDO = c;
 	ROUGHNESS = rough;
+	METALLIC = mode == 6 ? 0.55 : 0.0;
 }
 """
 static var _surf_shader: Shader
@@ -555,11 +595,8 @@ static func lobby(root: Node3D) -> Dictionary:
 	label3d(root, "ДЕЖУРНАЯ ЧАСТЬ", c + Vector3(-6.97, 2.9, 0.5), PI * 0.5, 0.004, Color(0.9, 0.8, 0.5))
 	# Лифтовой холл (x 4…12, z −13…−6): два лифта, лестница с перилами, ограждение «ремонт»
 	wall(root, Vector3(0.3, H, 7.0), c + Vector3(4.0, H * 0.5, -9.5), paint)
-	for lx: float in [6.5, 9.8]:
-		Geo.block(root, Vector3(1.6, 2.5, 0.08), c + Vector3(lx, 1.25, -12.82), mat(Color(0.5, 0.48, 0.44), 0.25), false)
-		Geo.block(root, Vector3(0.04, 2.5, 0.09), c + Vector3(lx, 1.25, -12.8), mat(Color(0.2, 0.2, 0.2)), false)
-		label3d(root, "▲", c + Vector3(lx, 2.75, -12.78), 0.0, 0.004, Color(1.0, 0.6, 0.25))
-	Geo.block(root, Vector3(0.12, 0.3, 0.06), c + Vector3(8.15, 1.3, -12.8), mat(Color(0.8, 0.65, 0.3), 0.3), false)   # кнопка вызова
+	for lx: float in [6.3, 9.9]:
+		lift_portal(root, c + Vector3(lx, 0, -12.85), Vector3(0, 0, 1))
 	for k in 10:
 		Geo.block(root, Vector3(1.6, 0.18, 0.3), c + Vector3(10.9, 0.09 + k * 0.18, -6.6 - k * 0.3), marble, true)
 	Geo.block(root, Vector3(0.05, 0.05, 3.3), c + Vector3(10.05, 1.9, -8.0), mat(Color(0.3, 0.2, 0.12), 0.4), false).rotation.x = deg_to_rad(31.0)
@@ -606,8 +643,7 @@ static func floor4(root: Node3D) -> Dictionary:
 	wall(root, Vector3(0.3, WALL_H, CORR_HALF * 2), c + Vector3(x0, WALL_H * 0.5, 0), white)
 	wall(root, Vector3(0.3, WALL_H, CORR_HALF * 2), c + Vector3(x1, WALL_H * 0.5, 0), white)
 	Geo.block(root, Vector3(0.05, 1.4, 1.4), c + Vector3(x0 + 0.17, 1.7, 0), glow_mat(Color(0.12, 0.16, 0.28), 0.6), false)
-	Geo.block(root, Vector3(0.1, 2.4, 1.6), c + Vector3(x1 - 0.17, 1.2, 0), mat(Color(0.45, 0.42, 0.36), 0.3), false)
-	label3d(root, "4", c + Vector3(x1 - 0.22, 2.7, 0), -PI * 0.5, 0.006, Color(1.0, 0.7, 0.3))
+	lift_portal(root, c + Vector3(x1 - 0.15, 0, 0), Vector3(-1, 0, 0), "4")
 	# Стены коридора с проёмами в кабинеты; панели — зелёная краска до 1.5 м
 	for side: float in [1.0, -1.0]:
 		var z := c.z + side * CORR_HALF
@@ -682,31 +718,104 @@ static func floor4(root: Node3D) -> Dictionary:
 	return spots
 
 
-## Кабина лифта: полированные стены, раздвижные створки, панель с кнопками и табло.
+## Кабина лифта: стенки — деревянные панели в стальной обвязке, на задней — зеркало, поручень на кронштейнах,
+## пол — рифлёная резина, потолок — решётка-плафон; спереди — шлифованные створки с резиновым уплотнителем,
+## панель: латунные кнопки с цифрами 1–8, «Стоп», «Вызов», табличка завода, табло этажа со стрелкой.
 static func lift_cabin(root: Node3D) -> Dictionary:
 	var c := LIFT
-	var wood := surf(3, Color(0.48, 0.33, 0.2), Color(0.36, 0.24, 0.14), 1.0)
-	var steel := mat(Color(0.55, 0.56, 0.58), 0.25)
-	Geo.block(root, Vector3(2.0, 0.1, 2.0), c + Vector3(0, -0.05, 0), surf(4, Color(0.3, 0.26, 0.22), Color(0.2, 0.17, 0.14)), true)
-	Geo.block(root, Vector3(2.0, 0.1, 2.0), c + Vector3(0, 2.45, 0), mat(Color(0.7, 0.68, 0.62)), true)
-	wall(root, Vector3(2.0, 2.4, 0.1), c + Vector3(0, 1.2, 1.0), wood)
-	wall(root, Vector3(0.1, 2.4, 2.0), c + Vector3(-1.0, 1.2, 0), wood)
-	wall(root, Vector3(0.1, 2.4, 2.0), c + Vector3(1.0, 1.2, 0), wood)
-	Geo.block(root, Vector3(1.9, 0.04, 0.04), c + Vector3(0, 0.95, 0.94), steel, false)   # поручень
-	# Передняя стенка с проёмом и две створки
+	var wood := surf(3, Color(0.5, 0.34, 0.2), Color(0.38, 0.25, 0.14), 1.6)
+	var steel := surf(6, Color(0.62, 0.63, 0.65), Color.BLACK, 1.0)
+	var trim := mat(Color(0.35, 0.36, 0.38), 0.35)
+	var rubber := mat(Color(0.1, 0.1, 0.1), 0.95, "tex_cloth")
+	var brass := mat(Color(0.75, 0.6, 0.28), 0.3, "tex_metal")
+	# Пол — рифлёная резина: полосы
+	Geo.block(root, Vector3(2.0, 0.1, 2.0), c + Vector3(0, -0.05, 0), rubber, true)
+	for k in 12:
+		Geo.block(root, Vector3(1.9, 0.008, 0.03), c + Vector3(0, 0.004, -0.85 + k * 0.155), mat(Color(0.16, 0.16, 0.16), 0.9, "tex_cloth"), false)
+	# Потолок: плафон-решётка
+	Geo.block(root, Vector3(2.0, 0.1, 2.0), c + Vector3(0, 2.45, 0), steel, true)
+	Geo.block(root, Vector3(1.2, 0.02, 1.2), c + Vector3(0, 2.39, 0), glow_mat(Color(1.0, 0.95, 0.8), 1.0), false)
+	for k in 7:
+		Geo.block(root, Vector3(1.24, 0.03, 0.02), c + Vector3(0, 2.37, -0.6 + k * 0.2), trim, false)
+		Geo.block(root, Vector3(0.02, 0.03, 1.24), c + Vector3(-0.6 + k * 0.2, 2.37, 0), trim, false)
+	# Стенки: панели дерева в стальной обвязке
+	for e: Array in [[Vector3(0, 1.2, 1.0), Vector3(2.0, 2.4, 0.1)], [Vector3(-1.0, 1.2, 0), Vector3(0.1, 2.4, 2.0)], [Vector3(1.0, 1.2, 0), Vector3(0.1, 2.4, 2.0)]]:
+		Geo.block(root, e[1], c + e[0], wood, true)
+	for sx: float in [-1.0, 1.0]:
+		Geo.block(root, Vector3(0.025, 0.06, 1.9), c + Vector3(sx * 0.945, 0.15, 0), trim, false)
+		Geo.block(root, Vector3(0.025, 0.06, 1.9), c + Vector3(sx * 0.945, 2.3, 0), trim, false)
+		Geo.block(root, Vector3(0.025, 2.2, 0.04), c + Vector3(sx * 0.945, 1.2, 0.0), trim, false)
+	Geo.block(root, Vector3(1.9, 0.06, 0.025), c + Vector3(0, 0.15, 0.945), trim, false)
+	Geo.block(root, Vector3(1.9, 0.06, 0.025), c + Vector3(0, 2.3, 0.945), trim, false)
+	# Зеркало на задней стенке (верхняя половина)
+	var mirror := StandardMaterial3D.new()
+	mirror.albedo_color = Color(0.55, 0.6, 0.64)
+	mirror.metallic = 0.9
+	mirror.roughness = 0.08
+	Geo.block(root, Vector3(1.3, 1.0, 0.01), c + Vector3(0, 1.65, 0.945), mirror, false)
+	Geo.block(root, Vector3(1.36, 1.06, 0.012), c + Vector3(0, 1.65, 0.948), trim, false)
+	# Поручень на кронштейнах по трём стенкам
+	for e: Array in [[Vector3(0, 0.95, 0.88), Vector3(1.7, 0.035, 0.035)], [Vector3(-0.88, 0.95, 0.1), Vector3(0.035, 0.035, 1.4)], [Vector3(0.88, 0.95, 0.35), Vector3(0.035, 0.035, 0.9)]]:
+		Geo.block(root, e[1], c + e[0], steel, false)
+	for p: Vector3 in [Vector3(-0.7, 0.95, 0.92), Vector3(0.7, 0.95, 0.92), Vector3(-0.92, 0.95, -0.5), Vector3(0.92, 0.95, 0.75)]:
+		Geo.block(root, Vector3(0.04, 0.04, 0.06) if absf(p.z) > 0.9 else Vector3(0.06, 0.04, 0.04), c + p, trim, false)
+	# Передняя стенка: стальные косяки с резиновым уплотнителем, шлифованные створки
 	wall(root, Vector3(0.45, 2.4, 0.1), c + Vector3(-0.78, 1.2, -1.0), steel)
 	wall(root, Vector3(0.45, 2.4, 0.1), c + Vector3(0.78, 1.2, -1.0), steel)
+	Geo.block(root, Vector3(2.0, 0.2, 0.1), c + Vector3(0, 2.3, -1.0), steel, false)
 	var dl := Geo.block(root, Vector3(0.55, 2.2, 0.05), c + Vector3(-0.28, 1.1, -0.97), steel, true)
 	var dr := Geo.block(root, Vector3(0.55, 2.2, 0.05), c + Vector3(0.28, 1.1, -0.97), steel, true)
-	# Панель: латунные кнопки 1–8, табло этажа
-	Geo.block(root, Vector3(0.05, 0.6, 0.22), c + Vector3(0.94, 1.3, -0.6), mat(Color(0.2, 0.18, 0.15)), false)
+	for d: Node3D in [dl, dr]:
+		Geo.block(d, Vector3(0.015, 2.2, 0.06), Vector3(0.27 if d == dl else -0.27, 0, 0), rubber, false)
+		Geo.block(d, Vector3(0.5, 0.012, 0.055), Vector3(0, -0.5, 0), trim, false)
+		Geo.block(d, Vector3(0.5, 0.012, 0.055), Vector3(0, 0.6, 0), trim, false)
+	Geo.block(root, Vector3(1.2, 0.03, 0.12), c + Vector3(0, 0.015, -0.95), trim, false)   # порог
+	# Панель управления справа: стальная плита, кнопки с цифрами, «Стоп», табличка завода
+	Geo.block(root, Vector3(0.03, 0.75, 0.26), c + Vector3(0.94, 1.3, -0.62), steel, false)
 	for k in 8:
-		Geo.cylinder(root, 0.018, 0.02, c + Vector3(0.91, 1.08 + (k / 2) * 0.12, -0.66 + (k % 2) * 0.1), mat(Color(0.8, 0.65, 0.3), 0.2), false).rotation.z = PI * 0.5
-	var ind := label3d(root, "1", c + Vector3(0, 2.25, -0.94), 0.0, 0.006, Color(1.0, 0.55, 0.2))
+		var bp := c + Vector3(0.92, 1.05 + (k / 2) * 0.12, -0.67 + (k % 2) * 0.1)
+		var btn := Geo.cylinder(root, 0.022, 0.025, bp, brass, false)
+		btn.rotation.z = PI * 0.5
+		label3d(root, str(k + 1), bp + Vector3(-0.015, 0, 0), -PI * 0.5, 0.0008, Color(0.12, 0.1, 0.08))
+	var stop := Geo.cylinder(root, 0.026, 0.025, c + Vector3(0.92, 1.57, -0.62), mat(Color(0.75, 0.1, 0.08), 0.4), false)
+	stop.rotation.z = PI * 0.5
+	label3d(root, "СТОП", c + Vector3(0.905, 1.62, -0.62), -PI * 0.5, 0.0008, Color(0.9, 0.85, 0.8))
+	Geo.block(root, Vector3(0.006, 0.07, 0.18), c + Vector3(0.92, 0.88, -0.62), brass, false)
+	label3d(root, "ЛИФТ ПАССАЖИРСКИЙ\n4 чел. · 320 кг", c + Vector3(0.914, 0.88, -0.62), -PI * 0.5, 0.0011, Color(0.12, 0.1, 0.08))
+	# Табло над дверью: стрелка и цифра
+	Geo.block(root, Vector3(0.36, 0.14, 0.02), c + Vector3(0, 2.22, -0.94), mat(Color(0.05, 0.05, 0.05), 0.4), false)
+	var ind := label3d(root, "1", c + Vector3(0.06, 2.22, -0.928), 0.0, 0.0045, Color(1.0, 0.55, 0.2))
+	label3d(root, "▲", c + Vector3(-0.09, 2.22, -0.928), 0.0, 0.003, Color(1.0, 0.55, 0.2))
 	var lamp := Geo.omni(root, c + Vector3(0, 2.2, 0), 3.5, 1.1, Color(1.0, 0.9, 0.7))
 	lamp.shadow_enabled = false
-	Geo.block(root, Vector3(0.6, 0.04, 0.6), c + Vector3(0, 2.39, 0), glow_mat(Color(1.0, 0.95, 0.8), 1.2), false)
 	return {"door_l": dl, "door_r": dr, "indicator": ind, "panel": c + Vector3(0.9, 1.3, -0.6), "spawn": c + Vector3(0, 0.05, 0.4), "out": c + Vector3(0, 1.0, -1.4)}
+
+
+## Двери шахты на этаже: стальной портал, шлифованные створки, табло со стрелкой, кнопка вызова. Лицом в +normal.
+static func lift_portal(root: Node3D, center: Vector3, normal: Vector3, label := "") -> void:
+	var steel := surf(6, Color(0.58, 0.59, 0.61), Color.BLACK, 1.0)
+	var trim := mat(Color(0.32, 0.33, 0.35), 0.35)
+	var along := Vector3(normal.z, 0, -normal.x)   # вдоль стены
+	var yaw := atan2(normal.x, normal.z)
+	var face := center + normal * 0.06
+	var pf := func(size: Vector3, off: Vector3, m: Material) -> void:
+		var b := Geo.block(root, size, face + along * off.x + Vector3(0, off.y, 0) + normal * off.z, m, false)
+		b.rotation.y = yaw
+	# портал
+	pf.call(Vector3(0.12, 2.5, 0.08), Vector3(-0.86, 1.25, 0), trim)
+	pf.call(Vector3(0.12, 2.5, 0.08), Vector3(0.86, 1.25, 0), trim)
+	pf.call(Vector3(1.84, 0.14, 0.08), Vector3(0, 2.55, 0), trim)
+	# створки и стык
+	pf.call(Vector3(0.8, 2.4, 0.04), Vector3(-0.4, 1.2, -0.01), steel)
+	pf.call(Vector3(0.8, 2.4, 0.04), Vector3(0.4, 1.2, -0.01), steel)
+	pf.call(Vector3(0.012, 2.4, 0.045), Vector3(0, 1.2, -0.005), mat(Color(0.08, 0.08, 0.08), 0.9, "tex_cloth"))
+	# табло и кнопка вызова
+	pf.call(Vector3(0.36, 0.14, 0.02), Vector3(0, 2.8, 0), mat(Color(0.05, 0.05, 0.05), 0.4))
+	var t := label3d(root, label if label != "" else "▲", face + Vector3(0, 2.8, 0) + normal * 0.02, yaw, 0.004, Color(1.0, 0.55, 0.2))
+	t.name = "LiftSign"
+	pf.call(Vector3(0.12, 0.26, 0.03), Vector3(1.12, 1.35, 0), steel)
+	var cb := Geo.cylinder(root, 0.025, 0.03, face + along * 1.12 + Vector3(0, 1.38, 0) + normal * 0.025, mat(Color(0.75, 0.6, 0.28), 0.3, "tex_metal"), false)
+	cb.rotation = Vector3(PI * 0.5, yaw, 0)
 
 
 ## Южное крыло: коридор от главного, кабинеты 422 (радиоконтроль), 424 (красный уголок), в торце — спецхран.

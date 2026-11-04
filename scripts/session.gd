@@ -458,7 +458,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if has_note:
 		if event.is_action_pressed(&"interact") or event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause") or event.is_action_pressed(&"drop") or event.is_action_pressed(&"ui_accept") or (event is InputEventMouseButton and event.is_pressed()):
 			get_viewport().set_input_as_handled()
-			Game.hud.hide_note()
+			Game.hud.note_input(event)   # лист за листом; на последнем — закрыть
 			return
 
 	var has_tasks_panel: bool = (Game.hud != null and Game.hud._tasks_panel != null and Game.hud._tasks_panel.visible)
