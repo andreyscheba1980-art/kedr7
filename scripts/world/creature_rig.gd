@@ -47,6 +47,7 @@ var clip_run: StringName = &"run"
 var idle_alts: Array = []              ## чем разбавлять стояние (Ырка нюхает, тени замирают)
 var _bone_add: Dictionary = {}         ## имя кости → Quaternion, добавляется поверх клипа
 var _bone_idx: Dictionary = {}
+var blend_time := 0.0                  ## плавный переход между клипами (люди эпилога), 0 — рывком
 
 
 func _ready() -> void:
@@ -144,7 +145,7 @@ func _play(n: StringName) -> void:
 	if _clip == n or not anim.has_animation(n):
 		return
 	_clip = n
-	anim.play(n, 0.0)
+	anim.play(n, blend_time)
 	if n != &"lunge":
 		anim.seek(_rng.randf() * anim.get_animation(n).length, true)
 
@@ -153,6 +154,8 @@ func _process_skeletal(delta: float) -> void:
 	var want := pose_override
 	if want == &"" and seated:
 		want = &"sit_talk" if talk > 0.0 and anim.has_animation(&"sit_talk") else &"sit_drive"
+	if want == &"" and talk > 0.0 and gait <= 0.12 and anim.has_animation(&"talk"):
+		want = &"talk"   # говорит стоя — жестикулирует
 	if want == &"":
 		if gait > 0.6:
 			want = clip_run
@@ -170,8 +173,7 @@ func _process_skeletal(delta: float) -> void:
 					_idle_t = _rng.randf_range(3.0, 8.0)
 			want = _idle_clip
 	_play(want)
-	if seated:
-		talk = maxf(talk - delta, 0.0)
+	talk = maxf(talk - delta, 0.0)
 	anim.speed_scale = gait_speed / 13.0 if _clip == &"run" and clip_run == &"run" and name == "Yrka" else 1.0
 	_anim_acc += delta
 	var step := 1.0 / stepped_hz if stepped_mode else 0.0
@@ -185,8 +187,9 @@ func _process_skeletal(delta: float) -> void:
 		_twitch_t = _rng.randf_range(0.35, 1.8)
 		_twitch_target = Vector3(_rng.randf_range(-0.3, 0.3), _rng.randf_range(-0.4, 0.4), _rng.randf_range(-0.3, 0.3)) * twitch * 0.6
 	_twitch_now = _twitch_now.lerp(_twitch_target, 0.45)
-	head_look_yaw = lerp_angle(head_look_yaw, head_look_target_yaw, 0.3)
-	head_look_pitch = lerpf(head_look_pitch, head_look_target_pitch, 0.3)
+	var hk := 0.3 if stepped_mode else minf(delta * 4.0, 1.0)
+	head_look_yaw = lerp_angle(head_look_yaw, head_look_target_yaw, hk)
+	head_look_pitch = lerpf(head_look_pitch, head_look_target_pitch, hk)
 	for bn: StringName in _bone_add:
 		var bi: int = _bone_idx.get(bn, -2)
 		if bi == -2:

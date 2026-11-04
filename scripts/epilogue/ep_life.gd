@@ -13,6 +13,12 @@ var _spinners: Array[Node3D] = []
 var _typist: Node3D
 var _type_t := 0.0
 var _rng := RandomNumberGenerator.new()
+var _people: Array[CreatureRig] = []    ## скелетные люди: смотрят на подошедшего, отдают честь
+var _look_t := 0.0
+var _ring_room_t := 40.0
+var _keys_t := 0.0
+var _room_snd: Array[Vector3] = []   ## центры кабинетов — откуда звонят и стучат
+var _keys: AudioStreamPlayer3D
 
 
 func setup(e: Epilogue) -> void:
@@ -29,6 +35,7 @@ func _ready() -> void:
 	_rooms(w)
 	_wing(w)
 	_atmos(w)
+	_behind_walls(w)
 
 
 # --- Люди ------------------------------------------------------------------------------
@@ -103,16 +110,28 @@ static func figure(o: Dictionary) -> Node3D:
 
 
 ## Стиль модели по описанию: платье — секретарь, фуражка — постовой, длинное пальто — прохожий, иначе — офицер.
+## Какая модель (tools/blender/ep_people.py): по одежде, волосам и номеру — десять разных людей.
 static func style_of(o: Dictionary) -> StringName:
-	if o.has("style"):
-		return o["style"]
-	if o.get("skirt", false):
-		return &"clerk"
-	if o.get("hat", &"") == &"cap":
-		return &"guard"
-	if o.get("long", false):
-		return &"civil"
-	return &"officer"
+	if o.has("ep"):
+		return o["ep"]
+	var sd: int = o.get("seed", 0)
+	var st: StringName = o.get("style", &"")
+	var hair: Color = o.get("hair", Color(0.2, 0.15, 0.1))
+	var grey := hair.r > 0.45 and absf(hair.r - hair.b) < 0.12
+	var coat: Color = o.get("coat", Color(0.2, 0.2, 0.2))
+	if coat.v > 0.7:
+		return &"ep_lab"
+	if st == &"guard" or o.get("hat", &"") == &"cap":
+		return &"ep_uniform" if grey else &"ep_guard"
+	if o.get("skirt", false) or st == &"clerk":
+		if o.get("long", false):
+			return &"ep_civil2"
+		return &"ep_clerk2" if grey or o.get("glasses", false) or sd % 3 == 0 else &"ep_clerk1"
+	if st == &"civil" or o.get("long", false):
+		return &"ep_civil1"
+	if o.get("glasses", false):
+		return &"ep_officer2"
+	return ([&"ep_officer1", &"ep_officer3", &"ep_uniform", &"ep_officer2", &"ep_officer1"] as Array)[sd % 5]
 
 
 ## Скелетный человек (tools/blender/human_rig.py) с позой и оттенком; null — если модели нет.
@@ -124,14 +143,24 @@ func rig_person(o: Dictionary) -> CreatureRig:
 			rig.free()
 		return null
 	rig.twitch = 0.0
+	# Живые люди: плавно, с переходами между клипами, и стоят не столбом
+	rig.stepped_mode = false
+	rig.blend_time = 0.35
+	rig.idle_alts = [&"idle_shift", &"look_around", &"idle_watch", &"idle_shift"]
+	if o.get("glasses", false) or style_of(o) in [&"ep_officer2", &"ep_clerk2", &"ep_lab"]:
+		rig.idle_alts.append(&"idle_glasses")
 	rig.clip_walk = &"walk_folder" if o.get("arm", &"") == &"folder" else &"walk"
 	match o.get("arm", &""):
 		&"type":
 			rig.pose_override = &"type"
 		&"smoke":
 			rig.pose_override = &"smoke"
-	# Оттенок: одинаковые модели не должны выглядеть близнецами
-	var tint: Color = o.get("tint", Color(0.7, 0.7, 0.72))
+	rig.set_meta(&"base_pose", rig.pose_override)
+	rig.set_meta(&"ep_style", style_of(o))
+	_people.append(rig)
+	# Чуть разная яркость: одинаковые модели не должны выглядеть близнецами
+	var sd: int = o.get("seed", 0)
+	var tint := Color.WHITE * (0.9 + float((sd * 37) % 13) * 0.012)
 	for mi in rig.find_children("*", "MeshInstance3D", true, false):
 		var m := (mi as MeshInstance3D).material_override as ShaderMaterial
 		if m != null:
@@ -169,6 +198,8 @@ func _add_person(w: Node3D, o: Dictionary, pos: Vector3, yaw: float, talk_key: S
 				n += 1
 			var idx: int = p.get_meta(&"talk_i", 0) % maxi(n - 1, 1)
 			p.set_meta(&"talk_i", idx + 1)
+			if p.has_meta(&"rig"):
+				(p.get_meta(&"rig") as CreatureRig).talk = 4.5   # отвечает — с жестами
 			ep._say(StringName("%s.%d" % [talk_key, idx + 1]), 5.5))
 		a.name = "Talk_" + String(talk_key).replace(".", "_")
 	if not p.has_meta(&"rig"):
@@ -211,8 +242,44 @@ func _smoke(w: Node3D, at: Vector3) -> CPUParticles3D:
 	return s
 
 
+## Люди замечают подошедшего: поворачивают голову, машинистка поднимает глаза от машинки,
+## постовой при первой встрече отдаёт честь. Раз в 0.1 с — людей несколько десятков.
+func _react(delta: float) -> void:
+	_look_t -= delta
+	if _look_t > 0.0 or ep._cam == null:
+		return
+	_look_t = 0.1
+	var eye := ep._cam.global_position
+	for r in _people:
+		if not is_instance_valid(r) or not r.is_visible_in_tree():
+			continue
+		var head := r.global_position + Vector3(0, 1.6 if not r.seated else 1.15, 0)
+		var d := eye.distance_to(head)
+		var near := d < 4.5 and r.gait < 0.12
+		if near:
+			var loc := r.global_basis.inverse() * (eye - head)
+			var yaw := atan2(-loc.x, -loc.z)
+			near = absf(yaw) < 1.9
+			r.head_look_target_yaw = clampf(yaw, -1.0, 1.0) if near else 0.0
+			r.head_look_target_pitch = clampf(atan2(loc.y, Vector2(loc.x, loc.z).length()), -0.3, 0.35) if near else 0.0
+		else:
+			r.head_look_target_yaw = 0.0
+			r.head_look_target_pitch = 0.0
+		var base: StringName = r.get_meta(&"base_pose", &"")
+		if base == &"type":
+			r.pose_override = &"sit_look" if near and d < 2.4 else &"type"
+		if r.get_meta(&"ep_style", &"") == &"ep_guard" and not r.seated and near and d < 3.2 and not r.has_meta(&"saluted"):
+			r.set_meta(&"saluted", true)
+			r.pose_override = &"salute"
+			get_tree().create_timer(2.2, false).timeout.connect(func() -> void:
+				if is_instance_valid(r):
+					r.pose_override = base)
+
+
 func _process(delta: float) -> void:
 	var t := Time.get_ticks_msec() * 0.001
+	_react(delta)
+	_tick_walls(delta)
 	for wk: Dictionary in _walkers:
 		var n: Node3D = wk["node"]
 		if not is_instance_valid(n):
@@ -845,6 +912,108 @@ func _atmos(w: Node3D) -> void:
 		w.add_child(pud)
 		pud.global_position = lb + Vector3(randf_range(-1.2, 1.2), 0.006, 10.5 - k * 1.1)
 		pud.rotation.y = randf() * TAU
+
+
+# --- За стенами: жизнь управления, которую не видно -------------------------------------
+
+## Глухие голоса за дверями, машинка в соседнем кабинете, где-то звонит телефон; за окнами 4-го этажа
+## идёт снег; на подоконнике остывает чай в подстаканнике.
+func _behind_walls(w: Node3D) -> void:
+	var c := EpBuild.FLOOR4
+	for id: StringName in EpBuild.ROOMS:
+		var r: Array = EpBuild.ROOMS[id]
+		var dx := (float(r[0]) + float(r[1])) * 0.5
+		var side: float = r[2]
+		var zin := c.z + side * EpBuild.CORR_HALF
+		var zout := zin + side * EpBuild.ROOM_D
+		_room_snd.append(Vector3(dx, 1.4, (zin + zout) * 0.5))
+		# Снег за стеклом: тонкий слой между рамой и стеклом — снаружи метёт
+		var sn := CPUParticles3D.new()
+		sn.amount = 36
+		sn.lifetime = 4.0
+		sn.preprocess = 4.0
+		sn.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		sn.emission_box_extents = Vector3(0.8, 0.1, 0.01)
+		sn.direction = Vector3(0.4, -1, 0)
+		sn.spread = 20.0
+		sn.initial_velocity_min = 0.25
+		sn.initial_velocity_max = 0.5
+		sn.gravity = Vector3(0.05, -0.1, 0)
+		var q := QuadMesh.new()
+		q.size = Vector2(0.012, 0.012)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		m.albedo_color = Color(0.85, 0.88, 0.95)
+		q.material = m
+		sn.mesh = q
+		w.add_child(sn)
+		sn.global_position = Vector3(dx, 2.55, zout - side * 0.16)
+		# Чай на подоконнике — в 412 и 420, пар вьётся
+		if id in [&"412", &"420"]:
+			var tea := Props.podstakannik()
+			if tea != null:
+				w.add_child(tea)
+				tea.global_position = Vector3(dx + 0.55, 1.02, zout - side * 0.3)
+				var st := _smoke(w, tea.global_position + Vector3(0, 0.13, 0))
+				st.amount = 8
+				st.initial_velocity_max = 0.1
+				(st.mesh.material as StandardMaterial3D).albedo_color = Color(0.9, 0.9, 0.92, 0.12)
+				var em := w.get_child(w.get_child_count() - 1)
+				if em.name == "Ember":
+					em.queue_free()
+		# Голоса за дверью — глухо, срез верхов
+		if id in [&"414", &"418"]:
+			var v := AudioStreamPlayer3D.new()
+			v.stream = AudioDirector.cached_stream("res://assets/audio/voice_loop.ogg")
+			v.volume_db = -20.0
+			v.pitch_scale = 0.86 if id == &"414" else 0.95
+			v.max_distance = 10.0
+			v.unit_size = 2.0
+			v.attenuation_filter_cutoff_hz = 900.0
+			v.attenuation_filter_db = -30.0
+			w.add_child(v)
+			v.global_position = Vector3(dx, 1.5, (zin + zout) * 0.5)
+			v.play()
+			v.finished.connect(v.play)
+	# Машинка за стеной 415 — очередями, с паузами на перевод каретки
+	_keys = AudioStreamPlayer3D.new()
+	_keys.stream = AudioDirector.cached_stream(TYPE_SND)
+	_keys.volume_db = -22.0
+	_keys.max_distance = 12.0
+	_keys.attenuation_filter_cutoff_hz = 1500.0
+	w.add_child(_keys)
+	var r5: Array = EpBuild.ROOMS[&"415"]
+	_keys.global_position = Vector3((float(r5[0]) + float(r5[1])) * 0.5, 1.0, c.z + EpBuild.CORR_HALF + EpBuild.ROOM_D * 0.6)
+
+
+func _tick_walls(delta: float) -> void:
+	if _keys == null or ep._cam == null:
+		return
+	_keys_t -= delta
+	if _keys_t <= 0.0:
+		_keys_t = _rng.randf_range(0.1, 0.24) if _rng.randf() > 0.05 else _rng.randf_range(1.2, 3.0)
+		if ep._cam.global_position.distance_to(_keys.global_position) < 14.0:
+			_keys.pitch_scale = _rng.randf_range(2.1, 2.7)
+			_keys.play()
+	_ring_room_t -= delta
+	if _ring_room_t <= 0.0 and not _room_snd.is_empty():
+		_ring_room_t = _rng.randf_range(35.0, 80.0)
+		if ep.stage in [&"ring", &"call", &"done"]:
+			return   # звонят уже нам
+		var at: Vector3 = _room_snd[_rng.randi() % _room_snd.size()]
+		if ep._cam.global_position.distance_to(at) > 18.0:
+			return
+		var ph := AudioStreamPlayer3D.new()
+		ph.stream = AudioDirector.cached_stream("res://assets/audio/buzzer_loop.ogg")
+		ph.pitch_scale = 1.35
+		ph.volume_db = -14.0
+		ph.max_distance = 16.0
+		ph.attenuation_filter_cutoff_hz = 2500.0
+		ep._world.add_child(ph)
+		ph.global_position = at
+		ph.play()
+		get_tree().create_timer(_rng.randf_range(2.5, 5.0), false).timeout.connect(ph.queue_free)
 
 
 ## Зоя садится печатать, когда принесла дело.

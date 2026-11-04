@@ -230,6 +230,9 @@ const S := {
 	&"sup.cut.1": ["Над тайгой — гул. Ми-8 идёт низко, почти по верхушкам.", "A drone over the taiga. A Mi-8 flying low, almost over the treetops."],
 	&"sup.cut.2": ["Груз сбросили. Борт не садится — разворачивается и уходит на Ивдель.", "The cargo's been dropped. The helicopter doesn't land — it turns and heads back to Ivdel."],
 	# --- Ночь 4: «Логово» (MineStory) ---
+	&"mst.torch_lost": ["Фонарь выронил — вон он, мигает на полу.", "You dropped the torch — there it is, blinking on the floor."],
+	&"mst.goal.torch": ["Подобрать фонарь", "Pick up the torch"],
+	&"mst.it.torch": ["Поднять фонарь", "Pick up the torch"],
 	&"mst.order.1": ["РАЦИЯ (Большая Земля): — Кедр-7, срочно. Пеленг на 4170 сошёлся. Источник — старая штольня, квадрат 214.", "RADIO (Mainland): \"Kedr-7, urgent. The 4170 bearing has converged. Source — the old adit, square 214.\""],
 	&"mst.order.2": ["— У устья на треноге — маяк партии Дубова, с кассетой. Он до сих пор передаёт. Снимите кассету и уходите.", "\"At the adit mouth, on a tripod — the Dubov party's beacon, with a cassette. It's still transmitting. Take the cassette and leave.\""],
 	&"mst.order.3": ["— В штольню не спускаться. Повторяю: в штольню не спускаться. Конец связи.", "\"Do not go down into the adit. I repeat: do not go down. Over and out.\""],

@@ -58,6 +58,23 @@ func _run() -> void:
 		OverlapAudit.run(ep._world, Vector3(0, 0, -130), 160.0, 30)
 		get_tree().quit()
 		return
+	if OS.get_cmdline_user_args().has("--eppeople"):
+		# Люди крупно: встаём перед каждым в полутора метрах и ждём, пока повернёт голову
+		var life: EpLife = get_tree().root.find_children("*", "EpLife", true, false)[0]
+		var k := 0
+		for r in life._people:
+			if k >= 16 or not is_instance_valid(r) or r.gait > 0.1:
+				continue
+			k += 1
+			var fwd := -r.global_basis.z
+			fwd.y = 0.0
+			var at := r.global_position + fwd.normalized() * 1.4 + fwd.normalized().rotated(Vector3.UP, 1.2) * 0.5
+			var dir := r.global_position - at
+			ep._enter_walk(Vector3(at.x, r.global_position.y + (0.05 if not r.seated else 0.52), at.z), atan2(-dir.x, -dir.z))
+			await _wait(1.6)
+			await _shot("person_%s" % String(r.get_meta(&"ep_style", &"")))
+		get_tree().quit()
+		return
 	await _shot("start_car")
 	# Едем: газ 6 с
 	Input.action_press(&"move_forward")

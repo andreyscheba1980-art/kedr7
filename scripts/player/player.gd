@@ -63,6 +63,7 @@ var _hold_sound_t := 0.0
 var _step_acc := 0.0
 var _held_root: Node3D
 var _hands: FPHands
+var torch_lost := false        ## фонарь выронил (падение в шахту): не включить, пока не поднимешь
 var _held_models: Dictionary = {}
 var _held_base_pos := Vector3(0.26, -0.32, -0.50)
 var _held_base_rot := Vector3.ZERO
@@ -1055,6 +1056,9 @@ func _update_camera_fx(delta: float) -> void:
 # --- API для систем и испугов ------------------------------------------------
 
 func toggle_flashlight() -> void:
+	if torch_lost:
+		Game.hud.subtitle(Loc.t(&"mst.torch_lost"), 2.5)
+		return
 	if not flashlight.visible and Game.flash_charge <= 0.5:
 		Game.hud.subtitle(Loc.t(&"sub.flash_dead"), 3.0)
 		return

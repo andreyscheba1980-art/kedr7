@@ -43,6 +43,9 @@ var _prev_look := Vector2.ZERO
 var _frost := 0.0                 ## иней на варежке: на морозе белеет, в тепле оттаивает
 
 var tablet_root: Node3D
+var torch_root: Node3D
+var flail := 0.0                  ## падение: руки машут сами (сцены от первого лица), 0..1 — сила
+var climb := -1.0                 ## подъём по лестнице: фаза перехвата перекладин (≥0 — лезем)
 var tablet_model: Node3D
 var compass_needle: Node3D
 var _tablet_up := false
@@ -58,7 +61,7 @@ func _ready() -> void:
 	right.position = R_OFF
 	# Динамо-фонарик «Жучок» в левой: овальный корпус из тёмного карболита, хромированный ободок,
 	# рычаг-«ручка» снизу — его жмут, чтобы зарядить (Q), и он ходит под пальцами.
-	var torch_root := Node3D.new()
+	torch_root = Node3D.new()
 	# Фонарь лежит на кулаке: корпус и ободок видно над варежкой, рычаг — под пальцами
 	torch_root.position = Vector3(0.006, 0.058, -0.045)
 	torch_root.rotation_degrees = Vector3(-4.0, 9.0, -6.0)
@@ -164,6 +167,9 @@ func _ready_rest() -> void:
 func _process(delta: float) -> void:
 	if player == null:
 		return
+	if flail > 0.0 or climb >= 0.0:
+		_scripted()
+		return
 	var walking := player.mode == Player.Mode.WALK
 	visible = walking
 	if not walking:
@@ -254,6 +260,28 @@ func _process(delta: float) -> void:
 		tablet_root.visible = _tablet_up or _tablet_pos.y > -0.60
 		if compass_needle != null and player != null:
 			compass_needle.rotation.y = -player.global_rotation.y + player.compass_glitch
+
+
+## Сюжетные сцены от первого лица: падение (руки хватают воздух) и подъём по лестнице (перехват).
+func _scripted() -> void:
+	visible = true
+	left.visible = true
+	right.visible = true
+	flare_gun.visible = false
+	var t := Time.get_ticks_msec() * 0.001
+	if climb >= 0.0:
+		for k in 2:
+			var arm := left if k == 0 else right
+			var side := -1.0 if k == 0 else 1.0
+			var ph := sin(climb * PI + k * PI)
+			arm.position = Vector3(0.16 * side, -0.2 + maxf(ph, 0.0) * 0.26, -0.34 - maxf(ph, 0.0) * 0.06)
+			arm.rotation_degrees = Vector3(-35.0 + maxf(ph, 0.0) * 40.0, -6.0 * side, 8.0 * side)
+		return
+	var f := flail
+	left.position = Vector3(-0.24, -0.05, -0.4) + Vector3(sin(t * 13.0), cos(t * 10.7), sin(t * 7.1) * 0.5) * 0.1 * f
+	left.rotation_degrees = Vector3(sin(t * 9.0) * 50.0, cos(t * 8.0) * 30.0, sin(t * 11.0) * 40.0) * f
+	right.position = Vector3(0.24, -0.02, -0.42) + Vector3(cos(t * 12.3), sin(t * 9.9), cos(t * 6.6) * 0.5) * 0.1 * f
+	right.rotation_degrees = Vector3(cos(t * 8.5) * 50.0, sin(t * 7.0) * 30.0, cos(t * 10.0) * 40.0) * f
 
 
 ## На «Буране»: обе варежки на руле. Руль поворачивается с поворотом, руки трясёт мотором.

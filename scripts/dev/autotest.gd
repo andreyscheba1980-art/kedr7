@@ -2677,12 +2677,53 @@ func _tour(args: PackedStringArray) -> void:
 		await _wait(1.0)
 		await _shot("ms_beacon")
 		ms._fall()
-		await _wait(2.0)
-		await _shot("ms_fall")
-		await _wait(13.0)
-		print("[ms] после провала: этап=%s зона=%s поз=%s" % [ms.stage, Game.zone, (Game.player.global_position - MineStory.ROOT).snapped(Vector3.ONE * 0.1)])
+		await _wait(1.8)
+		await _shot("ms_cracks")
+		await _wait(1.6)
+		await _shot("ms_fall_a")
+		await _wait(0.5)
+		await _shot("ms_fall_b")
+		await _wait(4.6)
+		await _shot("ms_lying")
+		await _wait(7.5)
+		await _shot("ms_kneel")
+		await _wait(4.0)
+		print("[ms] после провала: этап=%s зона=%s поз=%s фонарь_потерян=%s" % [ms.stage, Game.zone, (Game.player.global_position - MineStory.ROOT).snapped(Vector3.ONE * 0.1), Game.player.torch_lost])
 		await _shot("ms_wake")
-		await _wait(6.0)
+		if args.has("msprobe"):
+			var pp := Game.player.global_position
+			for n in ms.find_children("*", "CanvasItem", true, false):
+				print("[msp] overlay %s a=%.2f vis=%s" % [n.get_class(), (n as CanvasItem).modulate.a * ((n as ColorRect).color.a if n is ColorRect else 1.0), (n as CanvasItem).visible])
+			print("[msp] cam current=%s mode=%s" % [Game.player.camera.current, Game.player.mode])
+			for n in get_tree().root.find_children("*", "Light3D", true, false):
+				var l := n as Light3D
+				if not (l is DirectionalLight3D) and l.global_position.distance_to(pp) < 12.0:
+					print("[msp] light %s vis=%s e=%.2f mask=%d pos=%s" % [l.name, l.is_visible_in_tree(), l.light_energy, l.light_cull_mask, (l.global_position - MineStory.ROOT).snapped(Vector3.ONE * 0.1)])
+			for n in get_tree().root.find_children("*", "GeometryInstance3D", true, false):
+				var g := n as GeometryInstance3D
+				var bb := g.global_transform * g.get_aabb()
+				if g.is_visible_in_tree() and bb.grow(0.5).has_point(pp):
+					print("[msp] geom %s layers=%d mat=%s size=%s" % [g.get_path(), g.layers, g.material_override.get_class() if g.material_override != null else "-", bb.size.snapped(Vector3.ONE * 0.1)])
+			var dbg := OmniLight3D.new()
+			dbg.light_energy = 4.0
+			dbg.omni_range = 10.0
+			Game.yard.add_child(dbg)
+			dbg.global_position = pp + Vector3(0, 1.5, 0)
+			await _wait(0.3)
+			await _shot("msp_omni")
+			dbg.queue_free()
+			Game.player.set_flashlight(true)
+			await _wait(0.3)
+			await _shot("msp_flash")
+			Game.player.head.rotation.x = -0.6
+			await _wait(0.3)
+			await _shot("msp_flash_down")
+			get_tree().quit()
+			return
+		var dt: Node3D = Game.yard.find_child("FallenTorch", true, false)
+		if dt != null:
+			ms._pick_torch(dt)
+		await _wait(7.0)
 		print("[ms] этап=%s оно=%s" % [ms.stage, ms._lurker != null])
 		var fl := Game.player.flashlight
 		print("[ms] фонарь vis=%s e=%.2f mask=%d заряд=%.0f" % [fl.visible, fl.light_energy, fl.light_cull_mask, Game.flash_charge])
@@ -2706,9 +2747,13 @@ func _tour(args: PackedStringArray) -> void:
 		await _shot("ms_run")
 		_tp(L + Vector3(0, 0.05, 1.2), 0.0)
 		ms.climb(Game.player)
+		await _wait(2.2)
+		await _shot("ms_climb_a")
+		await _wait(0.9)
+		await _shot("ms_climb_look")
 		await _wait(3.0)
 		await _shot("ms_climb")
-		await _wait(10.0)
+		await _wait(16.0)
 		await _shot("ms_out")
 		print("[ms] конец: этап=%s флаг=%s зона=%s" % [ms.stage, Game.has_flag("mine_story_done"), Game.zone])
 		get_tree().quit()
