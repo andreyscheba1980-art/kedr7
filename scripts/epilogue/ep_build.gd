@@ -451,7 +451,8 @@ static func floor4(root: Node3D) -> Dictionary:
 		lamp.shadow_enabled = false
 		Geo.block(root, Vector3(0.5, 0.06, 0.5), Vector3((rx0 + rx1) * 0.5, WALL_H - 0.03, cz), glow_mat(Color(1.0, 0.95, 0.8), 1.2), false)
 		var dx := (rx0 + rx1) * 0.5
-		label3d(root, String(id), Vector3(dx + 0.9, 1.75, zin - side * 0.12), 0.0 if side < 0 else PI, 0.004, Color(0.9, 0.82, 0.55))
+		Geo.block(root, Vector3(0.24, 0.12, 0.01), Vector3(dx + 0.9, 1.75, zin - side * 0.11), mat(Color(0.12, 0.1, 0.08)), false)   # табличка
+		label3d(root, String(id), Vector3(dx + 0.9, 1.75, zin - side * 0.12), 0.0 if side < 0 else PI, 0.0016, Color(0.9, 0.82, 0.55))
 		spots[id] = {"center": Vector3(dx, 0.0, cz), "door": Vector3(dx, 0.0, zin), "side": side, "x0": rx0, "x1": rx1, "zout": zout}
 	# Свет в коридоре
 	for k in 4:

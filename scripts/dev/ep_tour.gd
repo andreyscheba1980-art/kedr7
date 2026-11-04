@@ -60,9 +60,20 @@ func _run() -> void:
 	await _wait(1.2)
 	ep._yaw = PI
 	await _shot("lobby")
+	ep._yaw = PI * 0.75
+	await _wait(0.2)
+	await _shot("lobby_cloak")
+	_use(ep, ep._world.find_child("Talk_ep_npc_cloak", true, false).global_position)
 	_use(ep, ep._lobby["lift"])
 	await _wait(2.0)
 	await _shot("floor4")
+	ep._body.global_position = EpBuild.FLOOR4 + Vector3(-9.0, 0.05, 0)
+	ep._yaw = PI * 0.5
+	await _wait(0.5)
+	await _shot("corridor_west")
+	ep._yaw = -PI * 0.5
+	await _wait(0.5)
+	await _shot("corridor_east")
 	var r: Dictionary = ep._f4[&"412"]
 	ep._body.global_position = (r["center"] as Vector3) + Vector3(1.5, 0.05, -1.0)
 	ep._yaw = PI * 0.75
@@ -79,6 +90,12 @@ func _run() -> void:
 	for k in ep._doc_pages.size():
 		ep._doc_next()
 	print("[ep] после дела: этап=%s" % ep.stage)
+	var r2: Dictionary = ep._f4[&"414"]
+	ep._body.global_position = (r2["door"] as Vector3) + Vector3(0.8, 0.05, -1.2)
+	ep._yaw = 0.3
+	await _wait(0.5)
+	await _shot("room414")
+	_use(ep, ep._world.find_child("Talk_ep_npc_zoya", true, false).global_position)
 	for room: StringName in [&"415", &"418", &"420"]:
 		var rr: Dictionary = ep._f4[room]
 		ep._body.global_position = (rr["door"] as Vector3) + Vector3(0, 0.05, float(rr["side"]) * 1.2)

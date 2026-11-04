@@ -45,6 +45,7 @@ var _flags := {}
 var _f4: Dictionary
 var _lobby: Dictionary
 var _ring_t := -1.0
+var _life: EpLife
 
 # HUD
 var _hud: CanvasLayer
@@ -74,6 +75,9 @@ func _ready() -> void:
 	_dress_lobby()
 	_dress_floor()
 	_build_car()
+	_life = EpLife.new()
+	_life.setup(self)
+	add_child(_life)
 	_build_walker()
 	_engine = _loop(ENGINE, -14.0)
 	_wind = _loop("res://assets/audio/wind_loop.ogg", -20.0)
@@ -732,7 +736,9 @@ func _zoya_comes() -> void:
 	(_world.find_child("CaseFolder", true, false) as Node3D).visible = true
 	get_tree().create_timer(7.0, false).timeout.connect(func() -> void:
 		z.queue_free()
-		_sfx(WOOD[0], -14.0))
+		_sfx(WOOD[0], -14.0)
+		if _life != null:
+			_life.zoya_at_desk())
 
 
 func _case_pages() -> PackedStringArray:
