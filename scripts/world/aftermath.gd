@@ -157,39 +157,32 @@ func _setup_chore(chore: StringName, station: Station, yard: Yard) -> void:
 
 			var it: Interactable = null
 			it = Geo.interactable(_window_repair_node, Vector3(1.2, 1.2, 0.6), window_pos, null, Loc.t(&"it.repair_window"), func(p: Player) -> void:
-				_repair_window(p, window_pos, it)
+				RepairUI.open(&"rhythm", &"rep.t.window", func() -> void: _repair_window(p, window_pos, it), 3)   # доска и гвозди — в ритм
 			)
-			it.hold_time = 2.0
-			it.hold_sound = WOOD_SOUND
 
 		&"generator_condensate":
 			# Дизель-генератор: замерзший отстойник фильтра
 			var gen_pos := Station.DOOR_LAMP + Vector3(0, -1.0, 3.5) # у сарая ГСМ
 			var it: Interactable = null
 			it = Geo.interactable(station, Vector3(1.0, 1.0, 1.0), Vector3(14.8, 0.8, 6.2), null, Loc.t(&"it.gen_drain"), func(p: Player) -> void:
-				_repair_gen_drain(p, it)
+				RepairUI.open(&"sequence", &"rep.t.gen", func() -> void: _repair_gen_drain(p, it), 4, ["rep.s.unscrew", "rep.s.drain", "rep.s.blow", "rep.s.screw"])
 			)
-			it.hold_time = 2.5
-			it.hold_sound = CLANK_SOUND
 
 		&"mast_loose_cable":
 			# Талреп оттяжки мачты ослаб
 			var cable_pos := Yard.MAST + Vector3(-3.5, 0.8, 3.5)
 			var it: Interactable = null
 			it = Geo.interactable(yard, Vector3(1.2, 1.5, 1.2), cable_pos, null, Loc.t(&"it.tighten_guywire"), func(p: Player) -> void:
-				_repair_guywire(p, cable_pos, it)
+				RepairUI.open(&"rhythm", &"rep.t.guy", func() -> void: _repair_guywire(p, cable_pos, it), 4)   # талреп — по обороту
 			)
-			it.hold_time = 2.0
-			it.hold_sound = CLANK_SOUND
 
 		&"chimney_ice":
 			# Наледь на печной трубе
 			var chimney_pos := Vector3(0.5, 1.2, -0.6) # возле печи в комнате
 			var it: Interactable = null
 			it = Geo.interactable(station, Vector3(1.2, 1.2, 1.2), chimney_pos, null, Loc.t(&"it.clear_chimney"), func(p: Player) -> void:
-				_repair_chimney(p, it)
+				RepairUI.open(&"rhythm", &"rep.t.chimney", func() -> void: _repair_chimney(p, it), 3)
 			)
-			it.hold_time = 2.0
 			it.hold_sound = "res://assets/audio/ice_hit.ogg"
 
 		&"frozen_crow":
@@ -223,10 +216,8 @@ func _setup_chore(chore: StringName, station: Station, yard: Yard) -> void:
 			var snap_pos := Vector3(28.0, 0.4, 2.0)
 			var it: Interactable = null
 			it = Geo.interactable(yard, Vector3(1.8, 1.0, 1.8), snap_pos, null, Loc.t(&"it.splice_rope"), func(p: Player) -> void:
-				_repair_rope(p, snap_pos, it)
+				RepairUI.open(&"sequence", &"rep.t.rope", func() -> void: _repair_rope(p, snap_pos, it), 4, ["rep.s.untie", "rep.s.splice", "rep.s.wrap", "rep.s.tie"])
 			)
-			it.hold_time = 3.0
-			it.hold_sound = WOOD_SOUND
 
 
 # --- Обработчики ремонта ---

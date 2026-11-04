@@ -160,6 +160,15 @@ func _has_tool(tools: Array) -> bool:
 func _fix(id: StringName, p: Player) -> void:
 	if _fixed.get(id, false):
 		return
+	# Изморозь обстукиваешь в ритм — не просто держишь кнопку
+	if id == &"antenna_rime" and not bool(get_meta(&"rime_ok", false)):
+		if not _has_tool(_tools_for(id)):
+			Game.hud.subtitle(Loc.t(&"tr.need.antenna_rime"), 3.0)
+			return
+		RepairUI.open(&"rhythm", &"rep.t.rime", func() -> void:
+			set_meta(&"rime_ok", true)
+			_fix(id, p), 4)
+		return
 	if id != &"fox_raid" and not _has_tool(_tools_for(id)):
 		Game.hud.subtitle(Loc.t(StringName("tr.need." + String(id))), 3.0)
 		return
@@ -237,7 +246,9 @@ func _build_woodpile() -> void:
 func _build_antenna() -> void:
 	var at := Yard.MAST + Vector3(1.2, 0.0, 1.2)
 	at.y = Terrain.height(at.x, at.z)
-	_spot(&"antenna_rime", Game.yard, Vector3(1.6, 1.8, 1.6), at + Vector3(0, 0.9, 0), [&"shovel"], 3.5, "res://assets/audio/ice_hit.ogg")
+	var it := _spot(&"antenna_rime", Game.yard, Vector3(1.6, 1.8, 1.6), at + Vector3(0, 0.9, 0), [&"shovel"], 3.5, "res://assets/audio/ice_hit.ogg")
+	it.hold_time = 0.0   # не удержание — ритм (RepairUI)
+	it.hold_check = Callable()
 
 
 func _build_fox() -> void:

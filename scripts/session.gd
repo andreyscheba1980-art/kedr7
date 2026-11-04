@@ -560,6 +560,8 @@ func _open_ui(id: StringName) -> void:
 			ui = SeismographUIScript.new()
 		&"supply":
 			ui = SupplyUI.new()
+		&"repair":
+			ui = RepairUI.new()
 		_:
 			return
 

@@ -2607,6 +2607,34 @@ func _tour(args: PackedStringArray) -> void:
 		print("[tr] пайки %d → %d; блоки после: Буран=%s канистры=%s дрова=%s антенна=%s" % [rations0, Supply.rations(), Troubles.blocks(&"buran_cold"), Troubles.blocks(&"canisters_gel"), Troubles.blocks(&"woodpile_buried"), Troubles.blocks(&"antenna_rime")])
 		get_tree().quit()
 		return
+	if args.has("repairtest"):   # ремонт руками: ритм и порядок, колбэк починки
+		Game.hud.visible = true
+		var done := [0]
+		RepairUI.open(&"rhythm", &"rep.t.guy", func() -> void: done[0] += 1, 3)
+		await _wait(0.3)
+		var ui := Game.hud.modal() as RepairUI
+		print("[rep] открыт ритм=%s" % [ui != null])
+		await RenderingServer.frame_post_draw
+		get_tree().root.get_texture().get_image().save_png(SHOTS + "ui_repair_rhythm.png")
+		ui._strike()   # мимо или нет — как повезёт
+		for _hit in 3:
+			ui._pos = (ui._zone.x + ui._zone.y) * 0.5
+			ui._strike()
+		await _wait(1.0)
+		print("[rep] ритм починил=%d, окно закрыто=%s" % [done[0], Game.hud.modal() == null])
+		RepairUI.open(&"sequence", &"rep.t.gen", func() -> void: done[0] += 1, 4, ["rep.s.unscrew", "rep.s.drain", "rep.s.blow", "rep.s.screw"])
+		await _wait(0.3)
+		ui = Game.hud.modal() as RepairUI
+		await RenderingServer.frame_post_draw
+		get_tree().root.get_texture().get_image().save_png(SHOTS + "ui_repair_seq.png")
+		ui._press((ui._seq[0] + 1) % 4)
+		print("[rep] ошибка → шаг=%d" % ui._seq_i)
+		for k in ui._seq:
+			ui._press(k)
+		await _wait(1.0)
+		print("[rep] порядок починил=%d, окно закрыто=%s, режим=%s" % [done[0], Game.hud.modal() == null, Game.player.mode])
+		get_tree().quit()
+		return
 	if args.has("wolftest"):   # волки: глаза, фонарь, укус, бегство от твари
 		Hud.log_subs = true
 		var wl := Wildlife.instance
