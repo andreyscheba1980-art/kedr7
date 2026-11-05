@@ -254,6 +254,9 @@ static func _make_human_skeletal(style: StringName, seated: bool) -> CreatureRig
 	if style == &"driver":
 		_blinker(rig)
 		_breather(rig, Vector3(0.0, 1.49, -0.16))
+	if style != &"shadow":
+		rig.breathe_amp = 0.018           # живые дышат: грудь поднимается раз в ~4,5 с
+		rig.find_lids()                   # люди эпилога моргают (кости век из ep_people.py)
 	rig.twitch = 0.0 if style == &"driver" else 0.35
 	rig.clip_walk = &"walk"
 	rig.idle_alts = [] if style == &"driver" else [&"still"]

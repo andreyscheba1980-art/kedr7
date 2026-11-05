@@ -14,6 +14,17 @@ const S := {
 	&"talk.you": ["ВИКТОР: %s", "VIKTOR: %s"],
 	&"talk.mikh": ["МИХАЛЫЧ", "MIKHALYCH"],
 
+	# Пролог — Михалыч с дороги
+	&"t0.l1": ["МИХАЛЫЧ: — Витёк, приём. Михалыч. Я у брода, дальше лёд держит. Ну как, дошёл? Печь взялась?", "MIKHALYCH: \"Vitya, come in. Mikhalych. I'm at the ford, the ice holds from here. Well, did you make it? Stove going?\""],
+	&"t0.l2": ["МИХАЛЫЧ: — Ты это... Если ночью что почудится — ты мне скажи. Я по утрам на связи.", "MIKHALYCH: \"Listen... if something seems off at night — tell me. I'm on the air in the mornings.\""],
+	&"t0.c1": ["«Дошёл. Тепло. Спасибо, Михалыч.»", "\"Made it. It's warm. Thanks, Mikhalych.\""],
+	&"t0.c2": ["«Дошёл. На обочине стоял человек. Ты его видел?»", "\"Made it. There was a man on the roadside. Did you see him?\""],
+	&"t0.c3": ["«Всё нормально. Сам разберусь.»", "\"Everything's fine. I'll manage.\""],
+	&"t0.r1": ["МИХАЛЫЧ: — Ну и добро. Дверь на засов. Кто бы ни стучал — до утра не открывай. Даже мне.", "MIKHALYCH: \"Good then. Bolt the door. Whoever knocks — don't open till morning. Not even for me.\""],
+	&"t0.r2": ["МИХАЛЫЧ: — (долгая пауза) Не было там никого, Витёк. Я не останавливался. Дверь на засов — и спи.", "MIKHALYCH: \"(a long pause) There was no one there, Vitya. I didn't stop. Bolt the door and sleep.\""],
+	&"t0.r3": ["МИХАЛЫЧ: — Все так говорят. Ну, бывай. Дверь только на засов.", "MIKHALYCH: \"They all say that. Well, take care. Just bolt the door.\""],
+	&"t0.rs": ["МИХАЛЫЧ: — Спит уже, что ли... Ну спи. Засов только.", "MIKHALYCH: \"Asleep already... Sleep then. Just the bolt.\""],
+
 	# Ночь 1 — Зоя
 	&"t1.l1": ["ЗОЯ: — Витя, это Зоя, диспетчерская. Как первая ночь? Ничего не беспокоит?", "ZOYA: \"Vitya, it's Zoya, dispatch. How's the first night? Anything bothering you?\""],
 	&"t1.c1": ["«Свист в лесу. И рация сама ловит чужие голоса.»", "\"Whistling in the woods. And the radio picks up voices by itself.\""],
@@ -91,6 +102,25 @@ const S := {
 	&"talk.dog_wrong": ["ГОЛОС ИЗ МЕТЕЛИ: — ...Найда.", "VOICE FROM THE BLIZZARD: \"...Naida.\""],
 	&"talk.dog_after": ["(Пират. Его звали Пират. Найда — собака Семёнова. Это не он.)", "(Pirat. His name was Pirat. Naida was Semyonov's dog. That isn't him.)"],
 	&"talk.dog_gone": ["Фары гаснут. Из метели — долгий, обиженный вой. Потом ничего.", "The headlights go out. A long, wounded howl from the blizzard. Then nothing."],
+
+	# Дневные находки (1.55)
+	&"find1.a": ["(К двери сарая — босые следы. Свежие. Пока я был внутри.)", "(Bare footprints to the shed door. Fresh. While I was inside.)"],
+	&"find1.b": ["(Они кончаются у порога. Обратно — ни одного.)", "(They end at the threshold. Not one leading back.)"],
+	&"find2.a": ["«Зорька» в углу играет колыбельную. Батарей в ней нет с пятьдесят восьмого года.", "The Zorka in the corner is playing a lullaby. There haven't been batteries in it since fifty-eight."],
+	&"find2.b": ["(Мама пела её мне. Её никто больше не знает.)", "(Mum used to sing it to me. Nobody else knows it.)"],
+	&"find3.a": ["(Отсюда видно станцию. Крыльцо. Свет.)", "(The station is visible from here. The porch. The light.)"],
+	&"find3.b": ["(Три раза. Как Михалыч сигналит. В доме никого нет. Рубильник — у двери.)", "(Three times. Like Mikhalych signals. There's nobody in the house. The switch is by the door.)"],
+	&"find4.a": ["Подо льдом что-то прошло. Длинное. Против течения.", "Something passed under the ice. Long. Against the current."],
+	&"find4.b": ["(В озере нет течения.)", "(There is no current in this lake.)"],
+	&"find5.a": ["Люк наверху захлопнулся. И открылся сам — медленно, со скрипом.", "The hatch above slammed shut. And opened by itself — slowly, creaking."],
+	&"find5.b": ["(Ветер. Это ветер. Люк весит сорок килограммов.)", "(The wind. It's the wind. The hatch weighs forty kilos.)"],
+	&"find6.a": ["От навеса в лес уходит лыжня. Свежая. А лыжи Семёнова — у меня в руках.", "A ski track runs from the shack into the woods. Fresh. And Semyonov's skis are in my hands."],
+	&"find6.b": ["(И рядом — босые. Шаг в шаг. Кто-то шёл с ним. Или вёл его.)", "(And beside it — bare feet. Step for step. Someone walked with him. Or led him.)"],
+
+	# Кода концовок (1.55)
+	&"coda.mikh": ["Утром Михалыч приехал, как обещал. Долго стоял у крыльца. Стучать не стал.", "In the morning Mikhalych came, as he'd promised. He stood by the porch a long time. He didn't knock."],
+	&"coda.heli": ["В 09:40 над перевалом прошёл борт. Сесть не смог: видимость ноль. Зоя записала: «станция не отвечает».", "At 09:40 a helicopter passed over the pass. It couldn't land: zero visibility. Zoya wrote: 'station not responding'."],
+	&"coda.double": ["У зимника нашли следы вездехода. Гусеницы шли в тайгу и обрывались. Рядом — собачьи, к станции.", "By the winter road they found crawler tracks. They ran into the taiga and stopped dead. Beside them — a dog's, leading to the station."],
 
 	# Дело №83-М
 	&"case.talk_honest": ["— На сеансах связи дежурный докладывал о происшествиях: %d раз.", "— During radio sessions the duty officer reported incidents: %d times."],

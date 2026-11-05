@@ -332,7 +332,58 @@ PI_A = {"hips@loc": (0, 0, -0.18), "spine": (-30, 0, 0), "chest": (-24, 0, 0), "
 PI_B = dict(PI_A, **{"upper_arm.L": (40, 0, 20), "upper_arm.R": (110, 0, -20), "forearm.L": (20, 0, 0), "forearm.R": (-40, 0, 0), "jaw": (20, 0, 0), "head": (-14, 0, -6)})
 clip("pin", 21, {1: PI_A, 11: PI_B, 21: PI_A})
 
+# --- 1.55: на четырёх, рывок, замирание в луче -------------------------------------------
+# crawl — бег на четырёх: тело горизонтально, руки — передние лапы, диагональный аллюр (левая рука с правой ногой)
+ROOT_UP = float(os.environ.get("ROOT_UP", "0.36"))
+CR_BASE = {"root": (-76, 0, 0), "root@loc": (0, ROOT_UP, 0), "spine": (-4, 0, 0), "chest": (-6, 0, 0), "neck": (48, 0, 0), "head": (34, 0, 0), "jaw": (16, 0, 0)}
+CR_A = dict(CR_BASE, **{"thigh.L": (98, 0, 0), "shin.L": (-58, 0, 0), "foot.L": (-30, 0, 0), "thigh.R": (52, 0, 0), "shin.R": (-20, 0, 0), "foot.R": (10, 0, 0),
+                        "upper_arm.L": (58, 0, 6), "forearm.L": (8, 0, 0), "hand.L": (-46, 0, 0), "upper_arm.R": (104, 0, -6), "forearm.R": (-14, 0, 0), "hand.R": (-60, 0, 0),
+                        "hips": (0, 0, 6), "chest@loc": (0, 0, 0)})
+CR_B = dict(CR_BASE, **{"root@loc": (0, ROOT_UP + 0.05, 0), "thigh.L": (78, 0, 0), "shin.L": (-70, 0, 0), "thigh.R": (74, 0, 0), "shin.R": (-64, 0, 0),
+                        "upper_arm.L": (82, 0, 6), "forearm.L": (20, 0, 0), "hand.L": (-50, 0, 0), "upper_arm.R": (80, 0, -6), "forearm.R": (18, 0, 0), "hand.R": (-50, 0, 0),
+                        "spine": (-10, 0, 0), "head": (30, 0, 0)})
+clip("crawl", 17, cycle(CR_A, CR_B, 8))
+# dash — короткий рывок: низко, длинный шаг, руки отброшены назад, пасть раскрыта
+DA_BASE = {"root": (-38, 0, 0), "root@loc": (0, 0.06, 0), "spine": (-8, 0, 0), "chest": (-8, 0, 0), "neck": (34, 0, 0), "head": (20, 0, 0), "jaw": (34, 0, 0)}
+DA_A = dict(DA_BASE, **{"thigh.L": (88, 0, 0), "shin.L": (-40, 0, 0), "thigh.R": (-6, 0, 0), "shin.R": (-50, 0, 0), "foot.R": (24, 0, 0),
+                        "upper_arm.L": (-46, 0, 14), "upper_arm.R": (-30, 0, -14), "forearm.L": (20, 0, 0), "forearm.R": (30, 0, 0)})
+DA_B = dict(DA_BASE, **{"root@loc": (0, 0.14, 0), "thigh.L": (40, 0, 0), "shin.L": (-80, 0, 0), "thigh.R": (34, 0, 0), "shin.R": (-30, 0, 0),
+                        "upper_arm.L": (-56, 0, 14), "upper_arm.R": (-50, 0, -14), "forearm.L": (10, 0, 0), "forearm.R": (10, 0, 0), "jaw": (40, 0, 0)})
+clip("dash", 11, cycle(DA_A, DA_B, 5))
+# freeze — застыл на полушаге, голова набок к свету, руки чуть приподняты; дрожат только кисти и челюсть
+FZ = {"hips@loc": (0, 0, -0.06), "spine": (-12, 0, 4), "chest": (-8, 0, 6), "neck": (16, 0, -8), "head": (-6, 12, -34), "jaw": (22, 0, 0),
+      "thigh.L": (22, 0, 0), "shin.L": (-34, 0, 0), "thigh.R": (-8, 0, 0), "shin.R": (-20, 0, 0), "foot.L": (-8, 0, 0),
+      "upper_arm.L": (34, 0, 18), "forearm.L": (46, 0, 0), "hand.L": (-20, 0, 0), "upper_arm.R": (20, 0, -12), "forearm.R": (30, 0, 0), "hand.R": (-14, 0, 0)}
+fk = {}
+for i, f in enumerate(range(1, 62, 3)):
+    j = 1.6 if i % 2 else -1.6
+    fk[f] = dict(FZ, **{"hand.L": (-20 + j * 2, j, 0), "hand.R": (-14 - j * 2, -j, 0), "jaw": (22 + j * 1.5, 0, 0), "head": (-6, 12 + j * 0.4, -34)})
+fk[61] = FZ
+clip("freeze", 61, fk)
+
 an.export_rigged(arm, bodym, OUT, "yrka")
+if os.environ.get("PREVIEW"):
+    sc = bpy.context.scene
+    sc.render.engine = "BLENDER_WORKBENCH"; sc.display.shading.light = "STUDIO"; sc.display.shading.color_type = "TEXTURE"
+    sc.render.resolution_x, sc.render.resolution_y = 560, 420
+    cam_d = bpy.data.cameras.new("pcam"); cam = bpy.data.objects.new("pcam", cam_d); sc.collection.objects.link(cam); sc.camera = cam
+    for t in arm.animation_data.nla_tracks:
+        t.mute = True
+    for nm, frames in (("crawl", (1, 5)), ("dash", (1, 3)), ("freeze", (1,)), ("run", (1,))):
+        arm.animation_data.action = bpy.data.actions[nm]
+        for fr in frames:
+            sc.frame_set(fr)
+            dg = bpy.context.evaluated_depsgraph_get()
+            ev = bodym.evaluated_get(dg)
+            zs = [(ev.matrix_world @ v.co).z for v in ev.to_mesh().vertices]
+            print("MINZ", nm, fr, round(min(zs), 3), "max", round(max(zs), 3))
+            ev.to_mesh_clear()
+            for tag, loc in (("side", (3.2, 0.6, 0.8)), ("front", (0.4, 3.2, 0.9))):
+                cam.location = loc
+                cam.rotation_euler = (Vector((0, 0.5, 0.6)) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+                cam_d.lens = 35
+                sc.render.filepath = os.path.join(OUT, f"_prev_{nm}_{fr}_{tag}.png")
+                bpy.ops.render.render(write_still=True)
 # Где глаза в покое — для катафотов в Godot (Creatures._make_yrka_skeletal)
 eye_pts = [Vector((ex, 0.098, 1.574)) for ex in (-0.033, 0.033)]
 print("[OK] yrka v3 (HBM) tris:", tris, "bones:", len(BONES))

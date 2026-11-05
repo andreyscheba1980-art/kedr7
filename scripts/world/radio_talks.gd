@@ -15,6 +15,11 @@ const WAIT_REAL := 75.0          ## сколько секунд рация зо�
 const CHOICE_TIME := 14.0
 
 ## who, минута смены, условие (см. _cond), реплики, варианты [ключ, эффекты, ответ], ответ на молчание
+## Пролог: Михалыч с дороги, пока Виктор устраивается на ночь (через 25 с дома). Первый выбор в игре.
+const PROLOGUE_TALK := {"night": 0, "min": 0, "who": &"mikh", "lines": [&"t0.l1", &"t0.l2"],
+	"choices": [[&"t0.c1", {"talk_trust": 1}, [&"t0.r1"]], [&"t0.c2", {"talk_trust": 1, "talk_honest": 1}, [&"t0.r2"]], [&"t0.c3", {"talk_quiet": 1}, [&"t0.r3"]]],
+	"silent": [&"t0.rs"]}
+
 const TALKS := [
 	{"night": 1, "min": 168, "who": &"zoya", "lines": [&"t1.l1"],
 		"choices": [[&"t1.c1", {"talk_honest": 1, "said_whistle": 1}, [&"t1.r1"]], [&"t1.c2", {"talk_quiet": 1}, [&"t1.r2"]], [&"t1.c3", {"talk_honest": 1}, [&"t1.r3"]]],
@@ -49,7 +54,14 @@ var _ring_t := 0.0
 var _goal_set := false
 
 
+var _home_t := 0.0
+
+
 func _ready() -> void:
+	if Game.is_prologue() and not Game.has_flag("prologue_arrived") and Net.role == "" and not SaveGame.flags.get("talk_done_0", false):
+		_talk = PROLOGUE_TALK
+		_state = 0
+		return
 	if not Game.is_night() or Net.role != "":
 		_state = 3
 		return
@@ -105,6 +117,17 @@ func _on_minute(m: int) -> void:
 
 
 func _process(delta: float) -> void:
+	if _state == 0 and _talk.get("night", -1) == 0:
+		# Пролог: через 25 с в доме — вызов (если не заняты кабиной, катсценой, радио)
+		_home_t = _home_t + delta if Game.is_home() and not Game.has_flag("in_cabin") else 0.0
+		if _home_t > 25.0 and not _busy():
+			_state = 1
+			_call_t = WAIT_REAL
+			_ring_t = 0.0
+			if Game.story_goal == "":
+				Game.story_goal = Loc.t(&"talk.goal")
+				_goal_set = true
+		return
 	if _state != 1:
 		return
 	if Game.shift_over or Game.dead:
@@ -169,7 +192,7 @@ func _conversation() -> void:
 		if Game.shift_over or Game.dead:
 			break
 		await _say(k)
-	SessionLog.note("сеанс связи ночь %d: выбор %d" % [Game.night, pick + 1])
+	SessionLog.note("сеанс связи %s: выбор %d" % ["пролог" if _talk.get("night", -1) == 0 else "ночь %d" % Game.night, pick + 1])
 	_finish(true)
 
 
@@ -178,6 +201,6 @@ func _finish(_talked: bool) -> void:
 	if _goal_set:
 		Game.story_goal = ""
 		_goal_set = false
-	SaveGame.flags["talk_done_%d" % Game.night] = true
+	SaveGame.flags["talk_done_%d" % (0 if _talk.get("night", -1) == 0 else Game.night)] = true
 	Director.hold = false
 	set_process(false)

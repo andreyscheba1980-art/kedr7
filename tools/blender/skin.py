@@ -50,6 +50,8 @@ def smooth_joints(body, bones, skip=("root",)):
                 best = (d / r, p)
         # суставы с детьми (их головы)
         for c in children.get(b, []):
+            if c in skip:
+                continue
             d = (co - heads[c]).length
             r = _radius(c)
             if d < r and (best is None or d / r < best[0]):

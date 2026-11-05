@@ -46,6 +46,8 @@ var _lamps: Array[OmniLight3D] = []   ## керосинки 1982 года: тё�
 static func wants(n: int) -> bool:
 	if n < 1 or n > 6 or Net.role != "" or Game.has_flag("new_shift"):
 		return false
+	if SaveGame._testing() and not autopilot:
+		return false                  # автотесты гоняют смены подряд — флешбэк только в сквозном прогоне
 	return not OS.get_cmdline_user_args().has("--no_flashback")
 
 

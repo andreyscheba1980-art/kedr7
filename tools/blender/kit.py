@@ -140,7 +140,43 @@ def tube(name, pts, r, m, verts=8):
             sphere(f"{name}j{i}", r, a, m, segs=verts, rings=max(4, verts // 2))
 
 
-def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pack=0.0, ao_blur=0):
+def _boost_islands(body, pred, factor):
+    """Острова UV, чьи грани в среднем попадают в pred(центр грани), — крупнее в factor раз (лицо персонажа)."""
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(body.data)
+    uv = bm.loops.layers.uv.active
+    parent = {}
+    def find(a):
+        while parent.setdefault(a, a) != a:
+            parent[a] = parent[parent[a]]; a = parent[a]
+        return a
+    key = lambda l: (l.vert.index, round(l[uv].uv.x, 5), round(l[uv].uv.y, 5))
+    for f in bm.faces:
+        ks = [key(l) for l in f.loops]
+        for k in ks[1:]:
+            ra, rb = find(ks[0]), find(k)
+            if ra != rb: parent[ra] = rb
+    isl = {}
+    for f in bm.faces:
+        isl.setdefault(find(key(f.loops[0])), []).append(f)
+    n = 0
+    for faces in isl.values():
+        hit = sum(1 for f in faces if pred(f.calc_center_median()))
+        if hit * 2 < len(faces):
+            continue
+        us = [l[uv].uv.copy() for f in faces for l in f.loops]
+        cx = sum(u.x for u in us) / len(us); cy = sum(u.y for u in us) / len(us)
+        for f in faces:
+            for l in f.loops:
+                l[uv].uv.x = cx + (l[uv].uv.x - cx) * factor
+                l[uv].uv.y = cy + (l[uv].uv.y - cy) * factor
+        n += 1
+    bm.to_mesh(body.data); bm.free()
+    print("UV_BOOST islands:", n)
+
+
+def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pack=0.0, ao_blur=0, uv_boost=None):
+    """uv_boost=(pred(Vector)->bool, factor): острова головы крупнее — лицу больше пикселей текстуры."""
     """Сборка в один меш, UV, запекание цвет×AO в одну текстуру, GLB + .blend (текстура упакована).
     origin: "bottom" — центр по XY, низ на 0 (как ждёт Models.spawn); "keep" — мировые координаты как есть."""
     bpy.context.view_layer.update()
@@ -175,7 +211,15 @@ def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pa
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.012)
-    if pack:
+    if uv_boost:
+        bpy.ops.uv.average_islands_scale()
+        bpy.ops.object.mode_set(mode="OBJECT")
+        _boost_islands(body, uv_boost[0], uv_boost[1])
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.select_all(action="SELECT")
+        bpy.ops.uv.pack_islands(rotate=True, margin=0.004)
+    elif pack:
         # Большие модели (здания): равный масштаб островов и плотная упаковка — иначе текстура пустая
         bpy.ops.uv.average_islands_scale()
         bpy.ops.uv.pack_islands(rotate=True, margin=pack)

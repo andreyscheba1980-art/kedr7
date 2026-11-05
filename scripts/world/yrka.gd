@@ -744,8 +744,10 @@ func _update_chase(delta: float) -> void:
 	if beamed:
 		_beam_t += delta
 		Game.flash_charge = maxf(Game.flash_charge - BEAM_DRAIN * delta, 0.0)
-		_creature.position += Vector3(randf_range(-0.03, 0.03), 0.0, randf_range(-0.03, 0.03))  # корчится
+		_creature.position += Vector3(randf_range(-0.01, 0.01), 0.0, randf_range(-0.01, 0.01))  # дрожит
 		var rig := _creature as CreatureRig
+		if rig != null and rig.has_clip(&"freeze"):
+			rig.pose_override = &"freeze"     # застыл на полушаге, голова набок к свету — дрожат только пальцы
 		var shield: bool = bool(Game.hunter_brain.call(&"should_shield_eyes")) if Game.hunter_brain != null else false
 		var dodge: bool = bool(Game.hunter_brain.call(&"should_dodge_beam")) if Game.hunter_brain != null else false
 		if shield and rig != null:
@@ -758,6 +760,13 @@ func _update_chase(delta: float) -> void:
 			_end_chase("repelled")
 		return
 	_beam_t = maxf(_beam_t - delta * 0.5, 0.0)
+	# Издалека — на четырёх, низко над снегом; вблизи — рывок; между — сгорбленный бег
+	var crig := _creature as CreatureRig
+	if crig != null:
+		if crig.pose_override == &"freeze":
+			crig.pose_override = &""
+		if crig.has_clip(&"crawl"):
+			crig.clip_run = &"crawl" if dist > 10.0 else (&"dash" if dist < 5.0 and crig.has_clip(&"dash") else &"run")
 
 	var top := CHASE_SPEED * (0.85 if Game.is_story() else 1.12 if Game.is_hard() else 1.0)
 	var speed := lerpf(2.2, top, clampf(_chase_t / 2.5, 0.0, 1.0))
@@ -798,6 +807,9 @@ func _end_chase(how: String) -> void:
 		var rig := _creature as CreatureRig
 		if rig != null:
 			rig.set_eye_glow(0.0)
+			rig.clip_run = &"run"
+			if rig.pose_override == &"freeze":
+				rig.pose_override = &""
 		_creature.visible = false
 		_creature.position = Vector3(0, -100, 0)
 		_creature.set_process(false)

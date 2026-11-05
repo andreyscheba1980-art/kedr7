@@ -335,6 +335,13 @@ static func book() -> Node3D:
 
 ## Поленница: штабель берёзовых и еловых чурбаков под навесом на столбах. Начало — земля.
 static func woodpile(length: float, depth: float) -> Node3D:
+	# Модель навеса с колотыми чурбаками (tools/blender/yard_props.py, 3 × 1,5 м) — под нужный размер
+	var glb := _kedr_model("woodshed", {"bright": 1.1})
+	if glb != null:
+		var holder := Node3D.new()
+		holder.add_child(glb)
+		glb.scale = Vector3(length / 3.0, minf(length / 3.0, 1.25), depth / 1.5)
+		return holder
 	var k := _kit(21, 0.12)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 9

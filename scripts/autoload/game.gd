@@ -1063,7 +1063,7 @@ func objective_text() -> String:
 	if shift_over or dead:
 		return ""
 	if is_prologue():
-		return _tutorial_objective()
+		return story_goal if story_goal != "" else _tutorial_objective()
 	if warmth < 30.0:
 		return Loc.t(&"obj.cold")
 	if story_goal != "":

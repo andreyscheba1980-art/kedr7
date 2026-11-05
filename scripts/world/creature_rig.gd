@@ -48,6 +48,12 @@ var idle_alts: Array = []              ## чем разбавлять стоян
 var _bone_add: Dictionary = {}         ## имя кости → Quaternion, добавляется поверх клипа
 var _bone_idx: Dictionary = {}
 var blend_time := 0.0                  ## плавный переход между клипами (люди эпилога), 0 — рывком
+var breathe_amp := 0.0                 ## живые люди: грудь поднимается (рад), двойники и нечисть — 0
+var _alive_add: Dictionary = {}        ## дыхание и веки — отдельно от поз set_rest
+var _lids: Array[StringName] = []      ## кости век (люди эпилога, 1.55) — моргают
+var _blink_t := 3.0
+var _blink_k := 0.0
+const LID_CLOSED := -1.05              ## поворот века вокруг X до закрытого глаза (≈ −60°)
 
 
 func _ready() -> void:
@@ -173,6 +179,7 @@ func _process_skeletal(delta: float) -> void:
 					_idle_t = _rng.randf_range(3.0, 8.0)
 			want = _idle_clip
 	_play(want)
+	_tick_alive(delta)
 	talk = maxf(talk - delta, 0.0)
 	anim.speed_scale = gait_speed / 13.0 if _clip == &"run" and clip_run == &"run" and name == "Yrka" else 1.0
 	_anim_acc += delta
@@ -197,6 +204,13 @@ func _process_skeletal(delta: float) -> void:
 			_bone_idx[bn] = bi
 		if bi >= 0:
 			skel.set_bone_pose_rotation(bi, skel.get_bone_pose_rotation(bi) * (_bone_add[bn] as Quaternion))
+	for bn: StringName in _alive_add:
+		var bi: int = _bone_idx.get(bn, -2)
+		if bi == -2:
+			bi = skel.find_bone(String(bn))
+			_bone_idx[bn] = bi
+		if bi >= 0:
+			skel.set_bone_pose_rotation(bi, skel.get_bone_pose_rotation(bi) * (_alive_add[bn] as Quaternion))
 	if _head_bone >= 0:
 		var add := Quaternion.from_euler(_twitch_now + Vector3(head_look_pitch, head_look_yaw, 0.0))
 		skel.set_bone_pose_rotation(_head_bone, skel.get_bone_pose_rotation(_head_bone) * add)
@@ -256,6 +270,36 @@ func _process(delta: float) -> void:
 		_rot(&"Head", _twitch_now + Vector3(swing * 0.1 + head_look_pitch + nod, head_look_yaw, 0))
 		var chat := absf(sin(_t * 11.0)) * 0.22 * clampf(talk, 0.0, 1.0)
 		_rot(&"Jaw", Vector3(0.15 + sin(_t * 2.3) * 0.08 + chat, 0, 0))
+
+
+## Дыхание и моргание — поверх клипа (через _bone_add, применяется на шаге анимации).
+func _tick_alive(delta: float) -> void:
+	if breathe_amp > 0.0:
+		var b := sin(_t * 1.35)
+		_alive_add[&"chest"] = Quaternion(Vector3.RIGHT, b * breathe_amp)
+		_alive_add[&"spine"] = Quaternion(Vector3.RIGHT, sin(_t * 1.35 - 0.5) * breathe_amp * 0.45)
+	if _lids.is_empty():
+		return
+	_blink_t -= delta
+	if _blink_t <= 0.0:
+		_blink_k = 1.0
+		_blink_t = _rng.randf_range(2.2, 6.5) if _rng.randf() > 0.18 else 0.35   # иногда — двойное моргание
+	else:
+		_blink_k = maxf(_blink_k - delta / 0.14, 0.0)
+	var q := Quaternion(Vector3.RIGHT, LID_CLOSED * sin(_blink_k * PI * 0.5))
+	for l in _lids:
+		_alive_add[l] = q
+
+
+## Найти кости век в скелете: есть — человек моргает.
+func find_lids() -> void:
+	_lids.clear()
+	if skel == null:
+		return
+	for n: StringName in [&"lid.L", &"lid.R"]:
+		if skel.find_bone(String(n)) >= 0:
+			_lids.append(n)
+	_blink_t = _rng.randf_range(0.5, 4.0)
 
 
 func _rot(id: StringName, add: Vector3) -> void:

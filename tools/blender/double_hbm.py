@@ -8,7 +8,7 @@
 # Запуск: blender --background --python double_hbm.py -- <bundle.blend> <out_dir> <variant|all>
 import bpy, bmesh, math, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import kit, hbm, anatomy as an
+import kit, hbm, anatomy as an, face_paint
 from mathutils import Vector, Matrix, noise
 
 BUNDLE, OUT, WHICH = sys.argv[-3], sys.argv[-2], sys.argv[-1]
@@ -128,6 +128,13 @@ def ushanka(body, name, ne, mat, flaps_down=True):
         if flaps_down:
             kit.box(name + "_flap", (0.035, 0.1, 0.13), (0.088 * s, 0.01, hz(1.535)), mat, bevel=0.015, rot=(0.0, -0.12 * s, 0.0))
             parts.append(kit.objs[-1])
+        else:
+            # уши подняты и подвязаны на макушке: два меховых клапана вдоль тульи, сверху — шнурок
+            kit.box(name + "_flapup", (0.024, 0.1, 0.095), (0.058 * s, 0.014, hz(1.698)), mat, bevel=0.012, rot=(0.0, 1.18 * s, 0.0))
+            parts.append(kit.objs[-1])
+    if not flaps_down:
+        kit.box(name + "_tie", (0.04, 0.006, 0.006), (0.0, 0.014, hz(1.722)), mat, bevel=0.0)
+        parts.append(kit.objs[-1])
     for p in parts[2:]:
         bpy.ops.object.select_all(action="DESELECT")
         p.select_set(True); bpy.context.view_layer.objects.active = p
@@ -178,7 +185,7 @@ def build(variant):
     name = "human_driver" if variant == "driver" else "double_" + variant
     ne = V["neck"]
     kit.reset()
-    SKIN = kit.mat(f"{name}_skin", V["skin"], rough=0.7, noise=0.08, noise_scale=40)
+    SKIN = face_paint.face_mat(f"{name}_skin", V["skin"], ne, variant)   # глазницы, брови, губы, щетина — по координатам
     WHITE = kit.mat(f"{name}_sclera", (0.74, 0.72, 0.67), rough=0.4)
     IRIS = kit.mat(f"{name}_iris", (0.03, 0.025, 0.02), rough=0.3)
     body = hbm.load_body(BUNDLE, SKIN)
@@ -215,11 +222,15 @@ def build(variant):
                     if d.length > 1e-4:
                         p.x += d.x / d.length * 0.0035 * k
                         p.z += d.z / d.length * 0.0045 * k
-        if V["smile"] > 0 and abs(p.z - hbm.MOUTH_Z) < 0.014 and 0.008 < abs(p.x) < 0.045:
-            w = (1.0 - abs(p.z - hbm.MOUTH_Z) / 0.014) * V["smile"]
-            t = (abs(p.x) - 0.008) / 0.037
-            p.x *= 1.0 + 0.22 * w
-            p.z += 0.006 * w * t
+        if V["smile"] > 0 and abs(p.z - hbm.MOUTH_Z) < 0.02 and abs(p.x) < 0.055 and p.y > 0.09:
+            # Застывшая улыбка: углы рта вверх и в стороны. Колокол и по x, и по z — без складки на краю зоны
+            tz = abs(p.z - hbm.MOUTH_Z) / 0.02
+            wz = (1.0 - tz * tz) ** 2
+            tx = abs(p.x) / 0.055
+            wx = math.sin(math.pi * min(tx * 1.15, 1.0)) ** 2
+            w = wz * wx * V["smile"]
+            p.x *= 1.0 + 0.12 * w
+            p.z += 0.005 * w
     me.update()
     hbm.stretch_neck(body, ne)
     an.sculpt(body, amp=0.0012, scale=50.0, seed=7.0)
@@ -227,7 +238,8 @@ def build(variant):
     ez = EYE_C[2] + ne
     for s in (-1, 1):
         kit.sphere("sclera", EYE_R, (EYE_C[0] * s, EYE_C[1], ez), WHITE, segs=10, rings=7)
-        kit.sphere("iris", 0.0058, (EYE_C[0] * s, EYE_C[1] + EYE_R - 0.0015, ez), IRIS, scale=(1, 0.45, 1), segs=8, rings=5)
+        ir = 0.0042 if variant == "orekhov" else 0.0058
+        kit.sphere("iris", ir, (EYE_C[0] * s, EYE_C[1] + EYE_R - 0.0015, ez), IRIS, scale=(1, 0.45, 1), segs=8, rings=5)
     eyes = kit.objs[-4:]
 
     def arm_lower(c, frac):
@@ -325,9 +337,21 @@ def build(variant):
     hbm.pose_to_rest(arm, [body] + extra, aims)
     print("EYE_GODOT", [(round(EYE_C[0] * s, 3), round(ez, 3), round(-(EYE_C[1] + EYE_R), 3)) for s in (-1, 1)])
 
-    hbm.decimate([(body, 0.42)] + [d for d in dec if d[1] < 1.0])
+    keep = body.vertex_groups.new(name="dec_keep")
+    keep.add([v.index for v in body.data.vertices if v.co.z < 1.43 + ne], 1.0, "REPLACE")
+    keep.add([v.index for v in body.data.vertices if v.co.z >= 1.43 + ne], 0.08, "REPLACE")
+    dm = body.modifiers.new("dec", "DECIMATE")
+    dm.ratio = 0.4
+    dm.vertex_group = "dec_keep"
+    dm.vertex_group_factor = 1.0
+    bpy.ops.object.select_all(action="DESELECT")
+    body.select_set(True); bpy.context.view_layer.objects.active = body
+    bpy.ops.object.modifier_apply(modifier="dec")
+    hbm.decimate([d for d in dec if d[1] < 1.0])
     kit.objs = [o for o in kit.objs if o.name in bpy.data.objects and o.type == "MESH"]
-    bodym, img, tris = kit.finish(name, OUT, res=2048, origin="keep", samples=32, ao_min=0.45, pack=0.004, ao_blur=2)
+    head_z0 = 1.45 + ne
+    bodym, img, tris = kit.finish(name, OUT, res=2048, origin="keep", samples=32, ao_min=0.45, pack=0.004, ao_blur=2,
+                                  uv_boost=(lambda c: c.z > head_z0 and abs(c.x) < 0.13, 2.6))
 
     # --- Клипы людей (human_rig.py), поверх покоя «руки по швам» --------------------------
     bpy.context.scene.render.fps = 24

@@ -104,6 +104,12 @@ for s, n in ((-1, "L"), (1, "R")):
         (f"shin.{n}", ((0.1 if not FEM else 0.085) * s, 0.02, hip_z * 0.5), ((0.1 if not FEM else 0.08) * s, 0, 0.08), f"thigh.{n}"),
         (f"foot.{n}", ((0.1 if not FEM else 0.08) * s, 0, 0.08), ((0.1 if not FEM else 0.08) * s, 0.19, 0.03), f"shin.{n}"),
     ]
+# Веки (1.55): верхнее веко — своя кость у центра глаза; Godot закрывает его поворотом — люди моргают
+_hc = Vector((0, 0.0, head_z + 0.115))
+_sk = 0.94 if FEM else 1.0
+for s, n in ((-1, "L"), (1, "R")):
+    _e = _hc + Vector((0.032 * s * _sk, 0.083 * _sk, 0.016))
+    BONES.append((f"lid.{n}", tuple(_e), tuple(_e + Vector((0, 0.02, 0))), "head"))
 B = {b[0]: b for b in BONES}
 owner = {}
 
@@ -409,6 +415,9 @@ elif V.get("hat") == "pirozhok":
 elif V.get("hat") == "fur":
     blob("fur_hat", hc + Vector((0, -0.01, 0.1)), 0.112, cm("fur_hat", (0.22, 0.16, 0.11), 0.95, 0.45, 160), scale=(1.0, 1.0, 0.68), wobble=0.009)
 own("head", since(m))
+for o in since(m):
+    if o.name.startswith("lid_up"):
+        owner[o.name] = "lid.L" if o.name.startswith("lid_up-1") else "lid.R"
 
 # --- Руки: рукава, манжеты, кисти с пальцами, часы ---------------------------------------
 for s, n in ((-1, "L"), (1, "R")):
@@ -527,7 +536,7 @@ for o in kit.objs:
 NAME = f"human_ep_{VAR}"
 body, img, tris = kit.finish(NAME, OUT, res=1024, origin="keep", samples=20, ao_min=0.55)
 import skin
-print("[skin] плавных вершин у суставов:", skin.smooth_joints(body, BONES))
+print("[skin] плавных вершин у суставов:", skin.smooth_joints(body, BONES, skip=("root", "lid.L", "lid.R")))
 
 arm_data = bpy.data.armatures.new(NAME + "_arm")
 arm = bpy.data.objects.new("Armature", arm_data)
@@ -665,6 +674,7 @@ if os.environ.get("PREVIEW"):
     for t in arm.animation_data.nla_tracks:
         t.mute = True
     shots = [("face", "idle", 1, (0.35, 0.9, head_z + 0.12), (0, 0, head_z + 0.11), 30),
+             ("blink", "idle", 1, (0.35, 0.9, head_z + 0.12), (0, 0, head_z + 0.11), 30),
              ("idle", "idle", 1, (1.4, 3.2, 1.1), (0, 0, 0.9), 40)]
     for cn, fr in (("idle_watch", 30), ("idle_glasses", 20), ("salute", 20), ("talk", 10), ("walk", 5), ("sit_drive", 1), ("type", 1), ("smoke", 50)):
         shots.append((cn, cn, fr, (1.4, 3.2, 1.1), (0, 0, 0.85), 40))
@@ -675,9 +685,17 @@ if os.environ.get("PREVIEW"):
         sc.frame_set(fr)
         cam.location = cp
         cam.rotation_euler = (Vector(look) - Vector(cp)).to_track_quat("-Z", "Y").to_euler()
-        cam.data.lens = lens if sn != "face" else 85
+        cam.data.lens = lens if sn not in ("face", "blink") else 85
+        if sn == "blink":
+            tr.mute = True
+            for ln in ("lid.L", "lid.R"):
+                arm.pose.bones[ln].rotation_euler = (D(float(os.environ.get("LID_DEG", "-60"))), 0, 0)
+            bpy.context.view_layer.update()
         sc.render.filepath = os.path.join(OUT, f"prev_{VAR}_{sn}.png")
         bpy.ops.render.render(write_still=True)
+        if sn == "blink":
+            for ln in ("lid.L", "lid.R"):
+                arm.pose.bones[ln].rotation_euler = (0, 0, 0)
         tr.mute = True
 
 for t in arm.animation_data.nla_tracks:

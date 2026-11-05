@@ -3361,6 +3361,99 @@ func _tour(args: PackedStringArray) -> void:
 		print("[front] после: метель=%s %.2f" % [Game.weather.blizzard, Game.weather.intensity])
 		get_tree().quit()
 		return
+	if args.has("talk0"):   # пролог: Михалыч выходит на связь, когда Виктор в доме
+		await _wait(8.0)
+		Game.set_flag("in_cabin", false)
+		Game.set_flag("left_cabin", true)
+		Game.player.mode = Player.Mode.WALK
+		_tp(Vector3(3.0, 0.05, 2.6), 0.0)
+		await _wait(1.0)
+		print("[t0] зона=", Game.zone, " поз=", Game.player.global_position, " флаги cabin=", Game.has_flag("in_cabin"), " riding=", Game.has_flag("riding"))
+		var talks: RadioTalks = Game.events.find_children("*", "RadioTalks", true, false)[0]
+		print("[t0] talk=", talks._talk.get("night", -1), " state=", talks._state)
+		var t := 0.0
+		while t < 8.0 and talks._state == 0:
+			await _wait(0.5)
+			t += 0.5
+		print("[t0] вызов через %.0f с, state=%d, цель=%s" % [t, talks._state, Game.objective_text()])
+		if talks._state == 0:   # в тестовом старте пролога кабина держит игрока — запускаем разговор напрямую
+			talks._state = 2
+			talks._conversation()
+		_tp(Vector3(9.2, 0.05, -0.5), 0.0)
+		var ui: TalkChoiceUI = null
+		t = 0.0
+		while t < 40.0 and ui == null:
+			await _wait(0.5)
+			t += 0.5
+			var f := Game.hud.find_children("*", "TalkChoiceUI", true, false)
+			if not f.is_empty():
+				ui = f[0]
+		if ui == null:
+			print("[t0] ОШИБКА: нет выбора реплик")
+		else:
+			ui._pick(1)
+			await _wait(10.0)
+			print("[t0] trust=%d honest=%d done=%s" % [RadioTalks.flag("talk_trust"), RadioTalks.flag("talk_honest"), SaveGame.flags.get("talk_done_0", false)])
+		get_tree().quit()
+		return
+	if args.has("faces155"):   # 1.55: Ырка в новых клипах, лица двойников, моргание людей эпилога — вблизи
+		var base := Vector3(20, 0, -20)
+		base.y = Terrain.height(base.x, base.z)
+		_tp(base, 0.0)
+		Game.player.set_flashlight(false)
+		var lamp := OmniLight3D.new()
+		lamp.light_energy = 2.2
+		lamp.omni_range = 9.0
+		Game.level.add_child(lamp)
+		var cam := Game.player.camera
+		var spot := base + Vector3(0, 0, -3.2)
+		lamp.global_position = base + Vector3(0.6, 2.2, -1.2)
+		var y := Creatures.make_yrka()
+		Game.level.add_child(y)
+		y.global_position = spot
+		y.look_at(Vector3(base.x, spot.y, base.z), Vector3.UP)
+		for clip: StringName in [&"crawl", &"dash", &"freeze", &"run"]:
+			y.pose_override = clip
+			await _wait(0.9)
+			_look(base, spot + Vector3(0, 0.7, 0))
+			await _wait(0.4)
+			await _shot("f155_yrka_" + String(clip))
+		y.queue_free()
+		for face: StringName in [&"mikhalych", &"semenov", &"orekhov"]:
+			var d := Creatures.make_double(face)
+			Game.level.add_child(d)
+			d.global_position = base + Vector3(0, 0, -1.0)
+			d.look_at(Vector3(base.x, d.global_position.y, base.z), Vector3.UP)
+			d.pose_override = &"still"
+			lamp.global_position = base + Vector3(0.4, 1.9, -0.3)
+			await _wait(0.8)
+			_look(base, d.global_position + Vector3(0, float(d.get_meta(&"eye_h", 1.6)) - 0.05, 0))
+			await _wait(0.4)
+			await _shot("f155_double_" + String(face))
+			d.queue_free()
+		var drv := Creatures.make_human(&"driver")
+		Game.level.add_child(drv)
+		drv.global_position = base + Vector3(0, 0, -1.0)
+		drv.look_at(Vector3(base.x, drv.global_position.y, base.z), Vector3.UP)
+		await _wait(0.8)
+		_look(base, drv.global_position + Vector3(0, 1.5, 0))
+		await _wait(0.3)
+		await _shot("f155_driver")
+		drv.queue_free()
+		var h := Creatures.make_human(&"ep_officer1")
+		if h != null:
+			Game.level.add_child(h)
+			h.global_position = base + Vector3(0, 0, -0.8)
+			h.look_at(Vector3(base.x, h.global_position.y, base.z), Vector3.UP)
+			await _wait(1.0)
+			_look(base, h.global_position + Vector3(0, 1.6, 0))
+			print("[f155] веки: ", h._lids, " дыхание ", h.breathe_amp)
+			await _shot("f155_ep_open")
+			h._blink_t = 0.0
+			await _wait(0.06)
+			await _shot("f155_ep_blink")
+		get_tree().quit()
+		return
 	if args.has("story154"):   # сюжетный патч: заветы, сеанс связи с выбором, вступление ночи, флешбэк Семёнова
 		var nn := Game.night
 		print("[s154] ночь %d · заветов видно %d, ловушек %d" % [nn, CovenantsClass.ENTRIES.filter(func(e: Dictionary) -> bool: return CovenantsClass.visible(e)).size(), CovenantsClass.traps_total()])

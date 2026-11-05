@@ -69,6 +69,7 @@ func _ready() -> void:
 	add_child(PsychosomaticFXClass.new())
 	add_child(YrkaThreat.new())
 	add_child(NightEvents.new())
+	add_child(DayFinds.new())          # дневная находка-сцена после цели дня (1.55)
 	if Game.is_night() and not Game.is_prologue():
 		add_child(Signal0310.new())
 	add_child(ForestVoice.new())

@@ -267,9 +267,28 @@ static func _generate_time_pips() -> AudioStreamWAV:
 	return wav
 
 
+var _bulb_omni: OmniLight3D
+var _shadow_t := 0.0
+
+
+## Тени печи и лампы коридора нужны только в доме: снаружи их не видно, а каждая — лишний проход
+## теней на кадр (во дворе ~14 FPS). Раз в полсекунды включаем по месту.
+func _tick_indoor_shadows(delta: float) -> void:
+	_shadow_t -= delta
+	if _shadow_t > 0.0:
+		return
+	_shadow_t = 0.5
+	var inside := Game.is_indoors() or Game.player == null or Game.player.global_position.distance_to(Vector3(6.0, 1.0, 2.0)) < 14.0
+	if _fire != null:
+		_fire.shadow_enabled = Settings.quality >= 1 and inside
+	if _bulb_omni != null:
+		_bulb_omni.shadow_enabled = Settings.quality >= 2 and inside
+
+
 func _process(delta: float) -> void:
 	_t += delta
 	_tick_creak(delta)
+	_tick_indoor_shadows(delta)
 	var burning := Game.stove_wood > 0.0
 	if _fire != null:
 		_fire.visible = burning
@@ -2411,6 +2430,7 @@ func _build_corridor() -> void:
 	var socket := Geo.cylinder(_swinging_bulb, 0.022, 0.06, Vector3(0.0, -0.58, 0.0), Palette.m(&"metal"), false)
 	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.64, 0.0), 7.5, 0.9, Color(1.0, 0.86, 0.68))
 	bulb_omni.shadow_enabled = Settings.quality >= 2   # скользящие тени по коридору — с высокого пресета
+	_bulb_omni = bulb_omni
 	bulb_omni.shadow_bias = 0.12
 	bulb_omni.shadow_normal_bias = 2.0
 	Geo.bulb(bulb_omni, &"bulb", 0.065)

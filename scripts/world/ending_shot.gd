@@ -51,6 +51,7 @@ func run(id: StringName) -> void:
 			await _echo()
 		&"taiga":
 			await _taiga()
+	await _coda(id)
 	await _fade_to(1.0, 1.2)
 	for n in _extra:
 		if is_instance_valid(n):
@@ -159,6 +160,61 @@ func _light(pos: Vector3, col: Color, energy: float, rng: float) -> OmniLight3D:
 	l.global_position = pos
 	_extra.append(l)
 	return l
+
+
+## Кода (1.55): что стало с теми, с кем ты говорил по рации. Михалыч приехал утром и не стучал;
+## борт прошёл над перевалом; двойник с чужой собакой. Только если это было в прохождении.
+func _coda(id: StringName) -> void:
+	var trust := RadioTalks.flag("talk_trust")
+	var heli := RadioTalks.flag("heli_asked") > 0
+	var dbl := RadioTalks.flag("double_exposed") > 0
+	if trust < 2 and not heli and not dbl:
+		return
+	await _fade_to(1.0, 1.0)
+	for c in _layer.get_children():
+		if c is Label:
+			c.queue_free()
+	var porch := Vector3(15.8, 0.0, 3.1)
+	var cam0 := _ground(27.0, 13.0, 2.0)
+	var cam1 := _ground(23.5, 10.5, 1.7)
+	_moon(0.9, 40.0)
+	var lines: PackedStringArray = []
+	if trust >= 2 and id != &"leave":
+		var m := Creatures.make_human(&"driver")
+		if m != null:
+			Game.level.add_child(m)
+			_extra.append(m)
+			m.global_position = _ground(17.4, 3.4)
+			m.look_at(Vector3(14.5, m.global_position.y, 3.1), Vector3.UP)
+		lines.append(Loc.t(&"coda.mikh"))
+	if heli:
+		var b := _beacon(_ground(-60.0, -80.0, 60.0), Color(1.0, 0.2, 0.15, 0.9), 1.2)
+		_extra.append(b)
+		Game.audio.play_2d("res://assets/audio/engine_loop.ogg", -14.0, 9.0)
+		lines.append(Loc.t(&"coda.heli"))
+	if dbl:
+		lines.append(Loc.t(&"coda.double"))
+	_cam.global_position = cam0
+	_cam.look_at(porch + Vector3(0, 1.2, 0), Vector3.UP)
+	await _fade_to(0.0, 1.4)
+	var i := 0
+	var beacon: MeshInstance3D = _extra[-1] as MeshInstance3D if heli and _extra[-1] is MeshInstance3D else null
+	for ln in lines:
+		for c in _layer.get_children():
+			if c is Label:
+				c.queue_free()
+		_caption(ln)
+		var t := 0.0
+		while t < 5.0:
+			var k := (float(i) * 5.0 + t) / (5.0 * lines.size())
+			_cam.global_position = cam0.lerp(cam1, smoothstep(0.0, 1.0, k))
+			_cam.look_at(porch + Vector3(0, 1.2, 0), Vector3.UP)
+			if beacon != null and is_instance_valid(beacon):
+				beacon.global_position += Vector3(9.0, 0.0, 6.0) * get_process_delta_time()
+				beacon.visible = fmod(t, 1.0) < 0.5
+			await get_tree().process_frame
+			t += get_process_delta_time()
+		i += 1
 
 
 # --- Концовки ------------------------------------------------------------------------
