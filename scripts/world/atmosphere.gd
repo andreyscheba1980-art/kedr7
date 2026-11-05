@@ -30,6 +30,7 @@ func _ready() -> void:
 	_build_ridge()
 	_build_fall()
 	_build_prints()
+	_build_trodden()
 	# Луч фонаря от первого лица делаем не конусом (изнутри он виден как пузырь), а светом на снежинках:
 	# частицы освещаемые — в луче и у ламп снег вспыхивает, в темноте гаснет.
 
@@ -362,6 +363,95 @@ func _fade_prints(delta: float) -> void:
 		mm.set_instance_color(i, Color(1, 1, 1, a))
 
 
+# --- Тропы: где ходишь каждый день, снег утоптан ------------------------------------------
+# Сетка 0.7 м: каждый шаг утаптывает клетку; часто хоженое (крыльцо → ДЭС → мачта) за пару дней
+# становится настоящей тропой — плотный голубоватый наст. Метель понемногу заметает. Хранится в сохранении.
+
+const TREAD_CELL := 0.7
+const TREAD_MAX := 1400
+var _trodden: MultiMeshInstance3D
+var _tread_last := Vector2i(1 << 20, 0)
+var _trodden_t := 0.0
+var _trodden_dirty := true
+
+
+func _build_trodden() -> void:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.15, 1.15)
+	mm.mesh = pm
+	mm.instance_count = TREAD_MAX
+	mm.visible_instance_count = 0
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 1))
+	g.set_color(1, Color(1, 1, 1, 0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = g
+	gt.fill = GradientTexture2D.FILL_RADIAL
+	gt.fill_from = Vector2(0.5, 0.5)
+	gt.fill_to = Vector2(1.0, 0.5)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = gt
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(0.34, 0.42, 0.58)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.roughness = 0.6
+	_trodden = MultiMeshInstance3D.new()
+	_trodden.multimesh = mm
+	_trodden.material_override = m
+	_trodden.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_trodden)
+
+
+func _tread(pos: Vector3) -> void:
+	var c := Vector2i(roundi(pos.x / TREAD_CELL), roundi(pos.z / TREAD_CELL))
+	if c == _tread_last:
+		return
+	_tread_last = c
+	var d: Dictionary = SaveGame.flags.get("trodden", {})
+	var key := "%d_%d" % [c.x, c.y]
+	if not d.has(key) and d.size() >= TREAD_MAX:
+		return
+	d[key] = minf(float(d.get(key, 0.0)) + 0.07, 1.0)
+	SaveGame.flags["trodden"] = d
+	_trodden_dirty = true
+
+
+## Метель заметает тропы; раз в три секунды перекладываем наклейки, если что-то поменялось.
+func _settle_trodden(dt: float, storm: float) -> void:
+	var d: Dictionary = SaveGame.flags.get("trodden", {})
+	if storm > 0.4 and not d.is_empty():
+		var dec := dt * 0.0012 * storm
+		for k: String in d.keys():
+			var v := float(d[k]) - dec
+			if v <= 0.02:
+				d.erase(k)
+			else:
+				d[k] = v
+		_trodden_dirty = true
+	if not _trodden_dirty or _trodden == null:
+		return
+	_trodden_dirty = false
+	var mm := _trodden.multimesh
+	var i := 0
+	for k: String in d.keys():
+		if i >= TREAD_MAX:
+			break
+		var v := float(d[k])
+		if v < 0.12:
+			continue
+		var parts := k.split("_")
+		var x := float(parts[0].to_int()) * TREAD_CELL
+		var z := float(parts[1].to_int()) * TREAD_CELL
+		var y := Terrain.height(x, z) if Terrain.ready() else 0.0
+		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, float(hash(k) % 628) * 0.01), Vector3(x, y + 0.04, z)))
+		mm.set_instance_color(i, Color(1, 1, 1, clampf((v - 0.12) * 1.4, 0.0, 0.8)))
+		i += 1
+	mm.visible_instance_count = i
+
+
 # --- Кадр ------------------------------------------------------------------------
 
 var _fade_t := 0.0
@@ -407,6 +497,11 @@ func _process(delta: float) -> void:
 	# Следы: только на снегу во дворе, не в доме и не в сарае
 	if outside and p.is_on_floor():
 		_step_print(p)
+		_tread(p.global_position)
+	_trodden_t += delta
+	if _trodden_t > 3.0:
+		_settle_trodden(_trodden_t, storm)
+		_trodden_t = 0.0
 	_fade_t += delta
 	if _fade_t > 0.5:
 		_fade_prints(_fade_t)

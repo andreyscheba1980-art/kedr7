@@ -9,6 +9,7 @@ const CovenantsClass = preload("res://scripts/data/covenants.gd")
 
 var root: Control
 var _prompt: Label
+var _hold_ring: _HoldRing
 var _clock: Label
 var _fps: Label
 var _objective: Label
@@ -30,6 +31,7 @@ var _red: ColorRect
 var _face: TextureRect
 var _screen: ColorRect
 var _screen_label: Label
+var _screen_tip: Label
 var _frost: TextureRect
 var _dark_vignette: TextureRect
 var _held_label: Label
@@ -44,6 +46,9 @@ var _tasks_tab := 0
 var _tasks_container: Control
 var _covenants_container: Control
 var _cov_vbox: VBoxContainer
+var _tab_btn_notes: Button
+var _notes_container: ScrollContainer
+var _notes_vbox: VBoxContainer
 var _tab_btn_tasks: Button
 var _tab_btn_cov: Button
 var _sub_token := 0
@@ -97,6 +102,9 @@ func _ready() -> void:
 
 	_prompt = UiKit.label("", 18, HORIZONTAL_ALIGNMENT_CENTER)
 	_place(_prompt, 0.5, 0.5, 0.5, 0.5, -420, 28, 420, 90)
+	_hold_ring = _HoldRing.new()
+	_hold_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(_hold_ring, 0.5, 0.5, 0.5, 0.5, -22, -22, 22, 22)
 
 	_subtitle = UiKit.label("", Settings.subtitle_size, HORIZONTAL_ALIGNMENT_CENTER)
 	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -145,6 +153,16 @@ func _ready() -> void:
 	_screen_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_screen_label.offset_left = 120
 	_screen_label.offset_right = -120
+	# Совет на карточке загрузки — внизу, мелко
+	_screen_tip = UiKit.label("", 15, HORIZONTAL_ALIGNMENT_CENTER)
+	_screen_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_screen_tip.modulate = Color(0.85, 0.8, 0.7, 0.75)
+	_screen.add_child(_screen_tip)
+	_screen_tip.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_screen_tip.offset_left = 160
+	_screen_tip.offset_right = -160
+	_screen_tip.offset_top = -110
+	_screen_tip.offset_bottom = -50
 	_screen.visible = false
 
 
@@ -199,6 +217,24 @@ func _process(delta: float) -> void:
 
 
 # --- Публичное API -----------------------------------------------------------
+
+## Удержание [E]: кольцо у прицела заполняется по часовой (0 — скрыто).
+func set_hold(k: float) -> void:
+	if _hold_ring != null:
+		_hold_ring.k = clampf(k, 0.0, 1.0)
+		_hold_ring.queue_redraw()
+
+
+class _HoldRing extends Control:
+	var k := 0.0
+
+	func _draw() -> void:
+		if k <= 0.001:
+			return
+		var c := size * 0.5
+		draw_arc(c, 17.0, 0.0, TAU, 40, Color(0, 0, 0, 0.45), 5.0, true)
+		draw_arc(c, 17.0, -PI * 0.5, -PI * 0.5 + TAU * k, 40, Color(0.95, 0.88, 0.7, 0.95), 3.0, true)
+
 
 func set_prompt(text: String) -> void:
 	if _modal != null:
@@ -260,9 +296,18 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 
 	_subtitle.text = text
 	_subtitle.add_theme_color_override("font_color", col)
+	if Settings.subtitle_bg:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0, 0, 0, 0.62)
+		sb.set_content_margin_all(10)
+		sb.set_corner_radius_all(4)
+		_subtitle.add_theme_stylebox_override("normal", sb)
+	else:
+		_subtitle.remove_theme_stylebox_override("normal")
 	await get_tree().create_timer(duration, false).timeout
 	if token == _sub_token:
 		_subtitle.text = ""
+		_subtitle.remove_theme_stylebox_override("normal")
 		_sub_priority = 0
 
 
@@ -281,6 +326,25 @@ func show_save_toast() -> void:
 	tw.tween_interval(2.2)
 	tw.tween_property(l, "modulate:a", 0.0, 0.7)
 	tw.tween_callback(l.queue_free)
+
+
+## Получено достижение: плашка справа сверху — бумажная бирка с названием.
+func achievement_toast(title: String) -> void:
+	var p := UiKit.panel(Color(0.86, 0.82, 0.7, 0.95))
+	var v := VBoxContainer.new()
+	p.add_child(v)
+	var head := UiKit.ink(UiKit.label(Loc.t(&"ach.toast"), 12))
+	head.add_theme_color_override("font_color", Color(0.55, 0.12, 0.08))
+	v.add_child(head)
+	v.add_child(UiKit.ink(UiKit.label(title, 16)))
+	p.modulate.a = 0.0
+	_place(p, 1, 0, 1, 0, -360, 120, -24, 190)
+	var tw := create_tween()
+	tw.tween_property(p, "modulate:a", 1.0, 0.3)
+	tw.tween_interval(3.6)
+	tw.tween_property(p, "modulate:a", 0.0, 0.8)
+	tw.tween_callback(p.queue_free)
+	Game.audio.play_2d("res://assets/audio/ui_tick.ogg", -6.0)
 
 
 func show_radio(on: bool) -> void:
@@ -341,6 +405,7 @@ var _doc: DocView
 
 
 func show_note(text: String) -> void:
+	_remember_note(text)
 	if _doc != null and is_instance_valid(_doc):
 		_doc.queue_free()
 	var low := text.to_lower()
@@ -439,6 +504,8 @@ func set_black(on: bool) -> void:
 
 ## Красная вспышка (удар, смерть). Корутина.
 func flash_red(peak := 0.6, time := 0.8) -> void:
+	if Settings.reduce_flashes:
+		peak *= 0.3
 	_red.color.a = peak
 	var tw := create_tween()
 	tw.tween_property(_red, "color:a", 0.0, time)
@@ -479,12 +546,19 @@ func flash_face(duration: float, tex: Texture2D = null) -> void:
 
 func show_screen(text: String) -> void:
 	_screen_label.text = text
+	if _screen_tip != null:
+		var n := 1
+		while Loc.has_key(StringName("tip.%d" % (n + 1))):
+			n += 1
+		_screen_tip.text = Loc.t(&"tip.head") + "  " + Loc.t(StringName("tip.%d" % (1 + randi() % n)))
 	_screen.modulate.a = 1.0
 	_screen.visible = true
 
 
 func fade_in_screen(text: String, time := 1.5) -> void:
 	_screen_label.text = text
+	if _screen_tip != null:
+		_screen_tip.text = ""
 	_screen.modulate.a = 0.0
 	_screen.visible = true
 	var tw := create_tween()
@@ -649,8 +723,10 @@ func _build_tasks() -> void:
 
 	_tab_btn_tasks = UiKit.button(Loc.t(&"cov.tab_tasks"), func() -> void: _switch_tasks_tab(0))
 	_tab_btn_cov = UiKit.button(Loc.t(&"cov.tab_covenants"), func() -> void: _switch_tasks_tab(1))
+	_tab_btn_notes = UiKit.button(Loc.t(&"cov.tab_notes"), func() -> void: _switch_tasks_tab(2))
 	tabs_row.add_child(_tab_btn_tasks)
 	tabs_row.add_child(_tab_btn_cov)
+	tabs_row.add_child(_tab_btn_notes)
 
 	_tasks_container = VBoxContainer.new()
 	main_vbox.add_child(_tasks_container)
@@ -669,6 +745,16 @@ func _build_tasks() -> void:
 	_cov_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_covenants_container.add_child(_cov_vbox)
 
+	_notes_container = ScrollContainer.new()
+	_notes_container.custom_minimum_size = Vector2(480, 440)
+	_notes_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_notes_container.follow_focus = true
+	main_vbox.add_child(_notes_container)
+	_notes_vbox = VBoxContainer.new()
+	_notes_vbox.add_theme_constant_override("separation", 6)
+	_notes_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_notes_container.add_child(_notes_vbox)
+
 	_switch_tasks_tab(0)
 	_tasks_panel.visible = false
 
@@ -679,12 +765,61 @@ func _switch_tasks_tab(tab: int) -> void:
 		_tasks_container.visible = (_tasks_tab == 0)
 	if _covenants_container != null:
 		_covenants_container.visible = (_tasks_tab == 1)
+	if _notes_container != null:
+		_notes_container.visible = (_tasks_tab == 2)
+	if _tab_btn_notes != null:
+		_tab_btn_notes.modulate = Color(1.2, 1.1, 0.8) if _tasks_tab == 2 else Color(0.85, 0.85, 0.85)
+	if _tasks_tab == 2:
+		_rebuild_notes_ui()
 	if _tab_btn_tasks != null:
 		_tab_btn_tasks.modulate = Color(1.2, 1.1, 0.8) if _tasks_tab == 0 else Color(0.85, 0.85, 0.85)
 	if _tab_btn_cov != null:
 		_tab_btn_cov.modulate = Color(1.2, 1.1, 0.8) if _tasks_tab == 1 else Color(0.85, 0.85, 0.85)
 	if _tasks_tab == 1:
 		_rebuild_covenants_ui()
+
+
+## Записки, письма, вырезки: всё, что прочитал, — в журнале по порядку; нажал — открылась снова.
+func _remember_note(text: String) -> void:
+	if text.strip_edges().is_empty():
+		return
+	var notes: Array = SaveGame.flags.get("notes_read", [])
+	if notes.has(text):
+		return
+	notes.append(text)
+	if notes.size() > 80:
+		notes.pop_front()
+	SaveGame.flags["notes_read"] = notes
+	if notes.size() >= 10:
+		Achievements.unlock(&"reader")
+
+
+func _rebuild_notes_ui() -> void:
+	if _notes_vbox == null:
+		return
+	for c in _notes_vbox.get_children():
+		c.queue_free()
+	var notes: Array = SaveGame.flags.get("notes_read", [])
+	if notes.is_empty():
+		var e := UiKit.ink(UiKit.label(Loc.t(&"cov.notes_empty"), 14))
+		e.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_notes_vbox.add_child(e)
+		return
+	for i in range(notes.size() - 1, -1, -1):
+		var t: String = notes[i]
+		var first := t.strip_edges().split("\n", false)
+		var title := (first[0] if not first.is_empty() else t).strip_edges()
+		if title.length() > 58:
+			title = title.substr(0, 56) + "…"
+		var b := Button.new()
+		b.text = "%d. %s" % [i + 1, title]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.clip_text = true
+		b.custom_minimum_size = Vector2(460, 30)
+		b.pressed.connect(func() -> void:
+			toggle_tasks()
+			show_note(t))
+		_notes_vbox.add_child(b)
 
 
 func _rebuild_covenants_ui() -> void:

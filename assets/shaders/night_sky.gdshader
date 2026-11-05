@@ -12,7 +12,10 @@ uniform vec3 moon_color : source_color = vec3(0.85, 0.92, 1.0);
 uniform float moon_size = 0.9991;      // косинус углового радиуса диска
 uniform float star_amount = 1.0;
 uniform float cloud_amount = 0.5;       // 1 — метель, неба почти не видно
-uniform float moon_cover = 0.0;         // туча на луне: диск и ореол гаснут, тучу видно силуэтом
+uniform float moon_cover = 0.0;
+uniform float sat_t = 0.0;              // где спутник на своей орбите (крутит Station; может «встать»)
+uniform float sat_on = 0.0;
+uniform float sat_alarm = 0.0;          // 1 — встал и мигает         // туча на луне: диск и ореол гаснут, тучу видно силуэтом
 uniform float aurora = 0.0;             // северное сияние: 0 — нет, 1 — во всё небо (ясные ночи)
 uniform vec3 aurora_tint : source_color = vec3(0.2, 0.95, 0.55);
 uniform vec3 aurora_top : source_color = vec3(0.45, 0.25, 0.6);   // верх шторы — лиловый
@@ -68,6 +71,31 @@ void sky() {
 		float tw = 0.6 + 0.4 * sin(TIME * (1.5 + h * 3.0) + h * 40.0);
 		col += vec3(0.55, 0.62, 0.75) * smoothstep(0.32, 0.0, dist) * tw * star_amount
 			* smoothstep(0.08, 0.35, el) * (1.0 - cloud_amount);
+	}
+
+	// Спутник: светлая точка медленно ползёт по дуге с запада на восток; падающие звёзды — изредка
+	if (sat_on > 0.5) {
+		float a = sat_t;
+		vec3 sd = normalize(vec3(cos(a), 0.15 + 0.85 * sin(a), 0.45 * sin(a) - 0.3));
+		float sv = smoothstep(0.999992, 1.0, dot(d, sd)) + pow(max(dot(d, sd), 0.0), 9000.0) * 0.6;
+		float blink = sat_alarm > 0.5 ? step(0.5, fract(TIME * 1.4)) : 0.85 + 0.15 * sin(TIME * 3.0);
+		vec3 sc = mix(vec3(0.85, 0.9, 1.0), vec3(1.0, 0.35, 0.25), sat_alarm);
+		col += sc * sv * blink * (1.0 - cloud_amount) * smoothstep(0.05, 0.2, sd.y) * star_amount;
+	}
+	{
+		float slot = floor(TIME / 9.0);
+		float hs = hash(vec3(slot, 3.1, 7.7));
+		float tt = fract(TIME / 9.0) * 9.0;
+		if (hs > 0.55 && tt < 0.7 && star_amount > 0.5) {
+			vec3 m0 = normalize(vec3(hash(vec3(slot, 1.0, 2.0)) - 0.5, 0.45 + hash(vec3(slot, 5.0, 1.0)) * 0.4, hash(vec3(slot, 9.0, 4.0)) - 0.5));
+			vec3 m1 = normalize(m0 + vec3(0.18, -0.12, 0.08));
+			vec3 mp = normalize(mix(m0, m1, tt / 0.7));
+			vec3 seg = m1 - m0;
+			float u = clamp(dot(d - m0, seg) / dot(seg, seg), 0.0, tt / 0.7);
+			float dl = length(d - normalize(mix(m0, m1, u)));
+			float tail = smoothstep(0.0025, 0.0, dl) * smoothstep(0.0, tt / 0.7, u) * (1.0 - tt / 0.7);
+			col += vec3(0.8, 0.88, 1.0) * tail * 1.4 * (1.0 - cloud_amount);
+		}
 	}
 
 	// Луна: диск + два ореола (узкий и широкий), видна сквозь лёгкую дымку.

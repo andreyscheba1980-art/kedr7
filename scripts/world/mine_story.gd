@@ -33,6 +33,7 @@ var _step_t := 0.0
 var _beacon: Node3D
 var _hint_t := 0.0
 var _grace := 0.0          ## после поимки: пока не видит (экран в затемнении, ты в забое)
+var _caught_n := 0
 var _heart: AudioStreamPlayer    ## сердце: чем ближе оно, тем громче и чаще
 var _listen: AudioStreamPlayer   ## тонкий звон, когда оно замерло и слушает
 var _breath_t := 0.0
@@ -580,6 +581,7 @@ func _build_lair() -> void:
 	var tape := Geo.block(root, Vector3(0.1, 0.02, 0.065), ROOT + FALL_LOCAL + Vector3(0.5, 0.02, 0.6), Palette.m(&"dark"), false)
 	var tit := Geo.interactable(root, Vector3(0.5, 0.4, 0.5), ROOT + FALL_LOCAL + Vector3(0.5, 0.2, 0.6), null, Loc.t(&"mst.it.tape"), func(_pl: Player) -> void:
 		Game.set_flag("mine_story_tape", true)
+		Achievements.unlock(&"tape")
 		tape.visible = false
 		Game.hud.subtitle(Loc.t(&"mst.tape"), 5.0))
 	tit.name = "DubovTape"
@@ -802,6 +804,7 @@ func _caught() -> void:
 	_chase = false
 	_sus = 0.0
 	_grace = 6.0
+	_caught_n += 1
 	stage = &"stealth"
 	var p := Game.player
 	Game.audio.play_2d(SHRIEK, 2.0)
@@ -938,6 +941,9 @@ func climb(p: Player) -> bool:
 		{"say": "mst.out.2", "t": 4.5, "hold": true},
 	])
 	Game.set_flag("mine_story_done", true)
+	Achievements.unlock(&"lair")
+	if _caught_n == 0:
+		Achievements.unlock(&"lair_clean")
 	for a in [_heart, _listen]:
 		if a != null:
 			a.queue_free()

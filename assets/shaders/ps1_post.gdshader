@@ -5,6 +5,7 @@ shader_type canvas_item;
 
 global uniform float ps1_post;
 global uniform float brightness;
+global uniform float film_fx;         // доступность: сила зерна, аберрации и виньетки
 uniform float levels = 32.0;
 uniform float dither_amount = 0.5;   // меньше — узор дизеринга не «едет» вместе с камерой
 uniform float grain = 0.045;
@@ -32,7 +33,7 @@ void fragment() {
 	float d2 = dot(q, q);
 
 	// Оптическая дисперсия линзы CRT: края кадра дают тонкую кайму без замыливания центра
-	float ca = chromatic * d2;
+	float ca = chromatic * d2 * film_fx;
 	float r = texture(TEXTURE, UV + q * ca).r;
 	float g = texture(TEXTURE, UV).g;
 	float b = texture(TEXTURE, UV - q * ca).b;
@@ -84,12 +85,12 @@ void fragment() {
 	col += streak * vec3(0.13, 0.16, 0.24);
 
 	// Виньетка: края кадра темнее — взгляд тянет в центр, углы комнаты тонут.
-	col *= 1.0 - vignette * smoothstep(0.25, 0.85, d2 * 2.2);
+	col *= 1.0 - vignette * film_fx * smoothstep(0.25, 0.85, d2 * 2.2);
 
 	// Зерно: сильнее в тенях, почти не видно на светлом снегу.
 	float n = hash12(FRAGCOORD.xy + fract(TIME * 7.13) * 977.0) - 0.5;
 	float lum = dot(col, vec3(0.299, 0.587, 0.114));
-	col += n * grain * (1.2 - lum);
+	col += n * grain * film_fx * (1.2 - lum);
 
 	if (ps1_post > 0.5) {
 		ivec2 p = ivec2(UV * vec2(textureSize(TEXTURE, 0))) % 4;

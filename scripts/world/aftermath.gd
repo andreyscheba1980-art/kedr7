@@ -36,6 +36,11 @@ func _ready() -> void:
 		return
 	day_index = Game.phase_index
 	_rng.seed = Game.run_seed + day_index * 317 + 89
+	# Утро после ночи: пережил; и — ни разу не включал фонарь
+	if Game.night >= 1:
+		Achievements.unlock(&"first_night")
+		if not SaveGame.flags.get("flash_used_%d" % Game.night, false):
+			Achievements.unlock(&"no_flash")
 	_generate_aftermath()
 
 

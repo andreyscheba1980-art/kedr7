@@ -3040,6 +3040,62 @@ func _tour(args: PackedStringArray) -> void:
 		print("[free] ", " ".join(out))
 		get_tree().quit()
 		return
+	if args.has("treadtest"):   # тропа: протоптать крыльцо → мачта и посмотреть
+		var atm: Atmosphere = get_tree().root.find_children("*", "Atmosphere", true, false)[0]
+		var a0 := Vector3(16.8, 0, 3.5)
+		var a1 := Yard.MAST
+		for k in 120:
+			var q := a0.lerp(a1, k / 119.0) + Vector3(sin(k * 0.3) * 0.4, 0, 0)
+			for r in 12:
+				atm._tread_last = Vector2i(1 << 20, 0)
+				atm._tread(q)
+		atm._settle_trodden(3.0, 0.0)
+		var p0 := a0.lerp(a1, 0.15) + Vector3(1.5, 0, 0)
+		p0.y = Terrain.height(p0.x, p0.z)
+		var tg := a0.lerp(a1, 0.45)
+		tg.y = Terrain.height(tg.x, tg.z)
+		_look(p0, tg)
+		await _wait(1.0)
+		await _shot("tread")
+		print("[tread] видно=", atm._trodden.multimesh.visible_instance_count, " первая=", atm._trodden.multimesh.get_instance_transform(0).origin if atm._trodden.multimesh.visible_instance_count > 0 else Vector3.ZERO, " a0=", a0, " a1=", a1, " cam=", Game.player.global_position, " vis=", atm._trodden.is_visible_in_tree())
+		print("[tread] клеток=", (SaveGame.flags.get("trodden", {}) as Dictionary).size(), " y=", Terrain.height(a0.x, a0.z))
+		get_tree().quit()
+		return
+	if args.has("fronttest"):   # буран стеной: стена встаёт на горизонте и накрывает
+		_tp(Vector3(20, 0.05, -20), 0.0)
+		var az: float = Game.synoptic.wind_azimuth_deg if Game.synoptic != null else 0.0
+		var d := Vector3(sin(deg_to_rad(az)), 0, -cos(deg_to_rad(az)))
+		var p0 := Vector3(20, 0, -20)
+		p0.y = Terrain.height(p0.x, p0.z)
+		_look(p0, p0 + d * 40.0 + Vector3(0, 6, 0))
+		Game.weather._start_front()
+		for k in 4:
+			await _wait(6.0)
+			_look(p0, p0 + d * 40.0 + Vector3(0, 6, 0))
+			await _shot("front_%d" % k)
+			print("[front] t=%.1f метель=%.2f" % [Game.weather._front, Game.weather.intensity])
+		await _wait(3.0)
+		await _shot("front_hit")
+		print("[front] после: метель=%s %.2f" % [Game.weather.blizzard, Game.weather.intensity])
+		get_tree().quit()
+		return
+	if args.has("refltest"):   # отражение в ночном окне: встать у стекла, смотреть, показать фигуру
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		var refl: WindowReflection = st.find_child("WindowReflection", true, false)
+		for w: Dictionary in st.window_spots:
+			var g: Vector3 = w["glass"]
+			var inw: Vector3 = w["inward"]
+			_tp(Vector3(g.x, 0.05, g.z) + inw * 1.1, 0.0)
+			await _wait(0.3)
+			_look(Vector3(g.x, 0.05, g.z) + inw * 1.1, g + Vector3(0, -0.1, 0))
+			await _wait(0.5)
+			print("[refl] окно %s в доме=%s" % [w["name"], Game.is_indoors()])
+			refl._show(w, Game.player.camera.global_position, -Game.player.camera.global_basis.z)
+			await _wait(1.6)
+			await _shot("refl_" + String(w["name"]))
+			refl._hide(true)
+		get_tree().quit()
+		return
 	if args.has("vistas"):   # красота: двор, дом, лес с фонарём, небо, озеро, мачта — для оценки картинки
 		Game.player.set_flashlight(true)
 		print("[vis] ясно=%.2f метель=%.2f фронт=%s ночь=%d мин=%.0f" % [Game.weather.clearness(), Game.weather.intensity, Game.synoptic.front_type if Game.synoptic != null else &"-", Game.night, Game.shift_minutes])

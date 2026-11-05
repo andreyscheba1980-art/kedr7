@@ -744,6 +744,7 @@ func play_ending(id: StringName) -> void:
 	if Net.role == "":
 		Epilogue.pages = ending_pages(id)
 		Epilogue.ending_id = id
+		Achievements.unlock(&"seven")
 		Game.audio.silence(true)
 		finished.emit("epilogue")
 		return

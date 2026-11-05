@@ -28,12 +28,36 @@ static func caused_chores() -> Array[StringName]:
 
 
 ## Вечером (конец дня): что не починено — переходит на ночь.
+## Если поломка висит уже вторую ночь подряд — она «застарелая» (damage_old): последствие сильнее.
 static func carry_unrepaired(active: Array[StringName], repaired: Dictionary) -> void:
+	var prev: Dictionary = SaveGame.flags.get("damage", {}) if SaveGame.flags.get("damage", {}) is Dictionary else {}
 	var dmg := {}
+	var old := {}
 	for c in active:
 		if not repaired.get(c, false) and c in [&"window_broken", &"generator_condensate", &"mast_loose_cable", &"chimney_ice", &"safety_rope_snap"]:
 			dmg[c] = true
+			if prev.get(c, false):
+				old[c] = true
 	SaveGame.flags["damage"] = dmg
+	SaveGame.flags["damage_old"] = old
+	if not active.is_empty() and dmg.is_empty():
+		Achievements.unlock(&"handy")      # всё, что сломала ночь, починено за день
+
+
+static func aged(id: StringName) -> bool:
+	var d: Variant = SaveGame.flags.get("damage_old", {})
+	return d is Dictionary and (d as Dictionary).get(id, false)
+
+
+## Тварь чует запущенную станцию: каждая неисправность ночью — она смелее (быстрее копит угрозу).
+static func boldness() -> float:
+	if not Game.is_night():
+		return 1.0
+	var d: Variant = SaveGame.flags.get("damage", {})
+	var n := (d as Dictionary).size() if d is Dictionary else 0
+	var o: Variant = SaveGame.flags.get("damage_old", {})
+	var m := (o as Dictionary).size() if o is Dictionary else 0
+	return (1.0 + n * 0.1 + m * 0.1) * (1.2 if SaveGame.flags.get("new_shift", false) else 1.0)   # «Новая смена»: она уже ждала
 
 
 static func damaged(id: StringName) -> bool:
@@ -59,18 +83,25 @@ static func apply_night() -> void:
 		lines.append(Loc.t(&"cons.mast"))
 	if damaged(&"safety_rope_snap"):
 		lines.append(Loc.t(&"cons.rope"))
+	var o: Variant = SaveGame.flags.get("damage_old", {})
+	if o is Dictionary and not (o as Dictionary).is_empty():
+		lines.append(Loc.t(&"cons.aged"))
 	if not lines.is_empty() and Game.hud != null:
 		Game.hud.subtitle.call_deferred("\n".join(lines), 8.0)
 
 
 ## Окно выбито — печь выстывает быстрее (тепло уходит в щель)
 static func stove_burn_k() -> float:
-	return 1.25 if Game.is_night() and damaged(&"window_broken") else 1.0
+	if not (Game.is_night() and damaged(&"window_broken")):
+		return 1.0
+	return 1.5 if aged(&"window_broken") else 1.25     # вторую ночь щель шире — изморозь по стене
 
 
 ## Оттяжка мачты ослабла — Большая Земля слышна хуже
 static func mainland_k() -> float:
-	return 0.8 if Game.is_night() and damaged(&"mast_loose_cable") else 1.0
+	if not (Game.is_night() and damaged(&"mast_loose_cable")):
+		return 1.0
+	return 0.6 if aged(&"mast_loose_cable") else 0.8
 
 
 static func rope_broken() -> bool:

@@ -14,6 +14,7 @@ const KEYS: Array[String] = [
 	"fullscreen", "resolution", "pixelation", "show_fps", "quality", "render_scale", "auto_tuned",
 	"rumble", "mic_enabled", "mic_sensitivity", "mic_threshold", "mic_device", "mic_consent", "mic_mimic",
 	"toggle_breath", "toggle_sprint", "keybinds", "padbinds", "calibrated", "lang_chosen", "warned",
+	"camera_shake", "reduce_flashes", "film_fx", "subtitle_bg",
 ]
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 ## Во сколько раз мир рисуется мельче окна: 1 — без пикселизации, 4 — сильная.
@@ -31,6 +32,10 @@ var head_bob := 1.0           ## интенсивность покачивани
 var fov := 72.0
 var brightness := 1.0
 var subtitle_size := 22
+var camera_shake := 1.0          ## доступность: сила тряски камеры (0 — без тряски)
+var reduce_flashes := false      ## доступность: красные и белые вспышки приглушены
+var film_fx := 1.0               ## доступность: зерно, аберрация, виньетка (0 — чистая картинка)
+var subtitle_bg := false         ## доступность: тёмная подложка под субтитрами
 var ps1_filter := false       ## дрожание вершин и дизеринг PS1 — по желанию, по умолчанию чистая картинка
 var language := "ru"
 var fullscreen := true
@@ -40,7 +45,7 @@ var show_fps := false
 var batching := true          ## склейка статичной геометрии (StaticBatch); выключается для сравнения в автотесте
 var render_scale := 1.0       ## доля разрешения 3D-рендера (0.6–1.0); на слабых видеокартах игра снижает сама
 var auto_tuned := false       ## автоподстройка под железо уже была (делается один раз, при первой ночи)
-var quality := 1             ## 0 — низкое, 1 — среднее, 2 — высокое (тени, сглаживание, густота леса, частицы)
+var quality := 1             ## 0 — низкое, 1 — среднее, 2 — высокое, 3 — ультра (тени дальше, 8× сглаживание, лес гуще)
 var rumble := true           ## виброотдача контроллера / геймпада
 var mic_enabled := false     ## захват микрофона и реакция игры на голос/шум игрока — только по явному согласию
 var mic_consent := false
@@ -86,6 +91,7 @@ func apply() -> void:
 	RenderingServer.global_shader_parameter_set(&"ps1_snap", PS1_SNAP if ps1_filter else 0.0)
 	RenderingServer.global_shader_parameter_set(&"ps1_post", 1.0 if ps1_filter else 0.0)
 	RenderingServer.global_shader_parameter_set(&"brightness", brightness)
+	RenderingServer.global_shader_parameter_set(&"film_fx", film_fx)
 	Loc.set_language(language)
 	_apply_window()
 	if not OS.has_feature("editor") and DisplayServer.get_name() != "headless":
@@ -95,11 +101,11 @@ func apply() -> void:
 
 ## Множитель «тяжёлых» вещей по пресету: густота леса, число частиц.
 func detail() -> float:
-	return [0.55, 0.8, 1.0][clampi(quality, 0, 2)]
+	return [0.55, 0.8, 1.0, 1.2][clampi(quality, 0, 3)]
 
 
 func msaa() -> Viewport.MSAA:
-	return [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][clampi(quality, 0, 2)]
+	return [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X, Viewport.MSAA_8X][clampi(quality, 0, 3)]
 
 
 ## Во сколько раз уменьшать рендер мира (SubViewportContainer.stretch_shrink).

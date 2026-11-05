@@ -62,6 +62,11 @@ var _baro_dead_said := false
 var _sky_light: DirectionalLight3D
 var _sky_mat: ShaderMaterial
 var _post: ShaderMaterial         ## постобработка кадра (лучи от солнца и луны сквозь ели)
+var _sat_t := 2.6                 ## спутник на орбите
+var _sat_stop := -1.0             ## > 0 — спутник «встал» (с 5-й ночи, один раз)
+var _sat_stop_at := -1.0
+var _sparks: CPUParticles3D
+var _wood_last := 0.0
 
 var _front_door_slit: MeshInstance3D
 var _front_door_slit_mat: StandardMaterial3D
@@ -146,6 +151,14 @@ static var _window_cross_tex: ImageTexture
 
 
 func _ready() -> void:
+	if SaveGame.flags.get("new_shift", false) and not SaveGame.flags.get("new_shift_intro", false):
+		SaveGame.flags["new_shift_intro"] = true
+		get_tree().create_timer(3.0, false).timeout.connect(func() -> void:
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"ns.intro"), 8.0))
+	var refl := WindowReflection.new()
+	refl.station = self
+	add_child(refl)
 	Game.level = self
 	_gen_stall_timer = Game.rng.randf_range(200.0, 320.0)
 	Perf.mark("station start")
@@ -446,6 +459,7 @@ func _process(delta: float) -> void:
 		_sky_light.rotation_degrees = Vector3(lerpf(-25.0, lerpf(-21.0, -6.0, t_dusk), clear), lerpf(40.0, 60.0, t_dusk), 0.0)
 
 	_update_rays()
+	_update_sky_life(delta)
 
 	# Медленное покачивание лунного света на ветру (±1–2°): тени вековых елей и построек тягуче ползут по снегу
 	if not Game.is_daylight() and _sky_light != null:
@@ -653,7 +667,7 @@ const LAYER_IN := 4       ## визуальный слой «внутри дом
 ## Живое применение пресета графики (без перестройки сцены): тени луны/солнца, свечение.
 func apply_quality() -> void:
 	if _sky_light != null:
-		_sky_light.shadow_enabled = Settings.quality >= (1 if Game.is_daylight() else 2)
+		_sky_light.shadow_enabled = Settings.quality >= 1
 	if env != null:
 		env.glow_enabled = Settings.quality >= 1
 
@@ -909,13 +923,79 @@ func _build_environment() -> void:
 	# предметов) шла в каскады теней, как только дом попадал в кадр: ~1100 лишних вызовов, просадка FPS
 	_sky_light.shadow_caster_mask = 1 | LAYER_OUT
 	_sky_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality < 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	_sky_light.directional_shadow_max_distance = 30.0 if Settings.quality < 2 else 80.0
+	_sky_light.directional_shadow_max_distance = 30.0 if Settings.quality < 2 else (80.0 if Settings.quality == 2 else 140.0)
 	_sky_light.shadow_bias = 0.04
 	add_child(_sky_light)
 
 	var weather := Weather.new()
 	add_child(weather)
 	weather.setup(env)
+
+
+## Ночное небо живёт: спутник ползёт по дуге; с 5-й ночи однажды встаёт посреди неба и мигает красным.
+## Труба: дым гуще, когда подкинул дров; в сильный огонь ночью — искры.
+func _update_sky_life(delta: float) -> void:
+	if _sky_mat != null:
+		var night := not Game.is_daylight()
+		_sky_mat.set_shader_parameter(&"sat_on", 1.0 if night else 0.0)
+		if night:
+			if _sat_stop_at < 0.0:
+				_sat_stop_at = randf_range(90.0, 400.0) if Game.night >= 5 and not Game.has_flag("sat_stopped_%d" % Game.night) else 1e9
+			_sat_stop_at -= delta
+			if _sat_stop_at <= 0.0 and _sat_stop < 0.0:
+				_sat_stop = 28.0
+				Game.set_flag("sat_stopped_%d" % Game.night, true)
+				if Game.is_outside():
+					Game.hud.subtitle(Loc.t(&"th.satellite"), 4.0)
+					Achievements.unlock(&"satellite")
+			if _sat_stop > 0.0:
+				_sat_stop -= delta
+				_sky_mat.set_shader_parameter(&"sat_alarm", 1.0)
+				if _sat_stop <= 0.0:
+					_sat_t += 1.6          # «пропал» — дальше уже на другом конце неба
+			else:
+				_sky_mat.set_shader_parameter(&"sat_alarm", 0.0)
+				_sat_t = wrapf(_sat_t + delta * 0.006, 0.25, 2.9)
+			_sky_mat.set_shader_parameter(&"sat_t", _sat_t)
+	# Дым и искры трубы
+	if _smoke != null:
+		var strength := clampf(Game.stove_wood / 40.0, 0.2, 1.0)
+		if Game.stove_wood > _wood_last + 4.0:
+			_smoke.scale_amount_max = 6.0      # подкинул — повалило густо
+			var q0 := _smoke.mesh as QuadMesh
+			if q0 != null and q0.material is StandardMaterial3D:
+				(q0.material as StandardMaterial3D).albedo_color.a = 0.5
+		_smoke.scale_amount_max = move_toward(_smoke.scale_amount_max, lerpf(2.0, 4.0, strength), delta * 0.4)
+		var qm := _smoke.mesh as QuadMesh
+		if qm != null and qm.material is StandardMaterial3D:
+			var m := qm.material as StandardMaterial3D
+			m.albedo_color.a = move_toward(m.albedo_color.a, lerpf(0.18, 0.34, strength), delta * 0.03)
+		_wood_last = Game.stove_wood
+		if _sparks == null:
+			_sparks = CPUParticles3D.new()
+			_sparks.amount = 10
+			_sparks.lifetime = 1.3
+			_sparks.local_coords = false
+			_sparks.position = _smoke.position + Vector3(0, -0.15, 0)
+			_sparks.direction = Vector3(0.2, 1, 0)
+			_sparks.spread = 25.0
+			_sparks.initial_velocity_min = 1.2
+			_sparks.initial_velocity_max = 2.4
+			_sparks.gravity = Vector3(0.3, -0.6, 0)
+			var sq := QuadMesh.new()
+			sq.size = Vector2(0.03, 0.03)
+			var spm := StandardMaterial3D.new()
+			spm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			spm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+			spm.albedo_color = Color(1.0, 0.55, 0.2)
+			spm.emission_enabled = true
+			spm.emission = Color(1.0, 0.5, 0.15)
+			spm.emission_energy_multiplier = 3.0
+			sq.material = spm
+			_sparks.mesh = sq
+			_sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(_sparks)
+		_sparks.emitting = _smoke.emitting and not Game.is_daylight() and strength > 0.6 and not Game.stove_damper
 
 
 ## Лучи сквозь ели: где на экране светило, насколько ясно и смотрим ли в его сторону. В доме — нет.
@@ -3739,6 +3819,7 @@ func _sleep_to_night1() -> void:
 
 	# Утро: та же фаза пролога, но уже при свете — обучение. Спать снова — и ночь 1.
 	Game.set_flag("prologue_arrived", true)
+	Achievements.unlock(&"hitchhiker")
 	SaveGame.write()
 	_bed_sleeping = false
 	var sess := get_tree().get_first_node_in_group(&"session")

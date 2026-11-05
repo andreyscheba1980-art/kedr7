@@ -182,3 +182,29 @@ lines = ImageChops.lighter(cr, glow.point(lambda v: v * 3 // 4))
 img = Image.merge("RGBA", [lines, tm, Image.new("L", (W, W), 0), lines])
 img.resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, "ice_cracks.png"))
 print("saved ice_cracks.png")
+
+
+# 5. Отражение в стекле: голова и плечи за спиной, бледное лицо, тёмные глазницы, края тают
+F = 1024
+fig = Image.new("L", (F, F), 0)
+fd = ImageDraw.Draw(fig)
+fd.ellipse([F * 0.36, F * 0.12, F * 0.64, F * 0.5], fill=255)                 # голова
+fd.polygon([(F * 0.42, F * 0.46), (F * 0.58, F * 0.46), (F * 0.62, F * 0.58), (F * 0.38, F * 0.58)], fill=255)   # шея
+fd.ellipse([F * 0.1, F * 0.55, F * 0.9, F * 1.25], fill=255)                  # плечи
+fig = fig.filter(ImageFilter.GaussianBlur(F * 0.03))
+face = Image.new("L", (F, F), 0)
+fcd = ImageDraw.Draw(face)
+fcd.ellipse([F * 0.4, F * 0.18, F * 0.6, F * 0.46], fill=255)
+face = face.filter(ImageFilter.GaussianBlur(F * 0.025))
+eyes = Image.new("L", (F, F), 0)
+ed = ImageDraw.Draw(eyes)
+for ex in (0.455, 0.545):
+    ed.ellipse([F * (ex - 0.025), F * 0.28, F * (ex + 0.025), F * 0.315], fill=255)
+eyes = eyes.filter(ImageFilter.GaussianBlur(F * 0.008))
+base = Image.new("L", (F, F), 40)
+lum = ImageChops.add(base, face.point(lambda v: v * 150 // 255))
+lum = ImageChops.subtract(lum, eyes.point(lambda v: v * 170 // 255))
+alpha = ImageChops.lighter(fig.point(lambda v: v * 150 // 255), face.point(lambda v: v * 200 // 255))
+img = Image.merge("RGBA", [lum.point(lambda v: v * 95 // 100), lum, lum.point(lambda v: min(255, v * 108 // 100)), alpha])
+img.resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, "reflection_figure.png"))
+print("saved reflection_figure.png")

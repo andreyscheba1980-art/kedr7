@@ -77,6 +77,14 @@ func _show_menu() -> void:
 	_menu.new_game.connect(func(diff: String) -> void:
 		SaveGame.new_game(diff)
 		_start_phase.call_deferred())
+	_menu.new_shift.connect(func() -> void:
+		# «Новая смена»: другой дежурный, сразу с первой ночи на станции; тварь уже знает дорогу
+		SaveGame.new_game("hard")
+		SaveGame.phase = {"kind": "night", "index": 1}
+		for f in ["new_shift", "prologue_arrived", "left_cabin", "has_trunk", "trunk_delivered", "has_fas4", "has_tablet"]:
+			SaveGame.flags[f] = true
+		SaveGame.write()
+		_start_phase.call_deferred())
 	_menu.quit_pressed.connect(func() -> void:
 		Settings.save()
 		get_tree().quit())
@@ -210,7 +218,11 @@ func _start_epilogue() -> void:
 		if _epilogue != null and is_instance_valid(_epilogue):
 			_epilogue.queue_free()
 		_epilogue = null
-		_show_menu.call_deferred(), CONNECT_DEFERRED)
+		_show_menu.call_deferred()
+		# После эпилога — титры
+		(func() -> void:
+			if _menu != null and is_instance_valid(_menu):
+				_menu.show_credits()).call_deferred(), CONNECT_DEFERRED)
 
 
 ## Убирает текущую сцену сразу (а не в конце кадра), чтобы старые узлы не успели сработать.

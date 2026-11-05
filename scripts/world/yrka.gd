@@ -570,6 +570,8 @@ func _compute_rate() -> float:
 		r *= 1.25          # сбалансировано, чтобы успевать делать ночные дела
 	if Game.after_hour(3):
 		r *= 1.18
+	if r > 0.0:
+		r *= Consequences.boldness()     # запущенная станция: чем больше неисправно, тем она смелее
 	return r
 
 

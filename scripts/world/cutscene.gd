@@ -125,7 +125,7 @@ func _step(st: Dictionary) -> void:
 			Game.audio.play_2d(String(st["sfx"]), float(st.get("vol", 0.0)))
 		return
 	if st.has("shake"):
-		_shake = float(st["shake"])
+		_shake = float(st["shake"]) * Settings.camera_shake
 		_shake_t = float(st.get("t", 0.6))
 		return
 	if st.has("call"):

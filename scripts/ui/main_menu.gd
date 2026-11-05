@@ -4,6 +4,7 @@ extends Control
 
 signal continue_pressed
 signal new_game(difficulty: String)
+signal new_shift
 signal quit_pressed
 
 const POST_SHADER := "res://assets/shaders/ps1_post.gdshader"
@@ -107,13 +108,31 @@ func _show_main() -> void:
 		_box.add_child(cont)
 		cont.grab_focus.call_deferred()
 	var new_btn := UiKit.button(Loc.t(&"menu.new"), _show_difficulty)
-	_box.add_child(new_btn)
+	if Achievements.has(&"seven"):
+		# После финала: «скоро прибудет новый сотрудник» — это ты. В одной строке с «Новой игрой».
+		var nrow := HBoxContainer.new()
+		nrow.add_theme_constant_override("separation", 8)
+		_box.add_child(nrow)
+		var ns := UiKit.button(Loc.t(&"menu.new_shift"), func() -> void:
+			stop_music()
+			new_shift.emit())
+		for bt: Button in [new_btn, ns]:
+			bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			nrow.add_child(bt)
+	else:
+		_box.add_child(new_btn)
 	if not SaveGame.has_save():
 		new_btn.grab_focus.call_deferred()
 	_box.add_child(UiKit.button(Loc.t(&"menu.coop"), _show_coop))
 	_box.add_child(UiKit.button(Loc.t(&"menu.settings"), _show_settings))
 	_box.add_child(UiKit.button(Loc.t(&"menu.controls"), _show_controls))
 	_box.add_child(UiKit.button(Loc.t(&"menu.archive"), _show_archive))
+	var row := HBoxContainer.new()   # две кнопки в строку — меню влезает в 720p
+	row.add_theme_constant_override("separation", 8)
+	_box.add_child(row)
+	for bt: Button in [UiKit.button(Loc.t(&"menu.achievements"), _show_achievements), UiKit.button(Loc.t(&"menu.credits"), show_credits)]:
+		bt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(bt)
 	_box.add_child(UiKit.button(Loc.t(&"menu.quit"), func() -> void: quit_pressed.emit()))
 	var warn := UiKit.label(Loc.t(&"menu.warning"), 13)
 	warn.modulate = Color(1, 1, 1, 0.5)
@@ -183,6 +202,28 @@ func _show_controls() -> void:
 	UiKit.place(_ui, c, 0, 0, 1, 1, 0, 0, 0, 0)
 	c.closed.connect(func() -> void:
 		c.queue_free()
+		_show_main())
+
+
+func show_credits() -> void:
+	if _box != null:
+		_box.queue_free()
+		_box = null
+	var c := CreditsUI.new()
+	UiKit.place(_ui, c, 0, 0, 1, 1, 0, 0, 0, 0)
+	c.closed.connect(func() -> void:
+		c.queue_free()
+		_show_main())
+
+
+func _show_achievements() -> void:
+	if _box != null:
+		_box.queue_free()
+		_box = null
+	var a := AchievementsUI.new()
+	UiKit.place(_ui, a, 0, 0, 1, 1, 0, 0, 0, 0)
+	a.closed.connect(func() -> void:
+		a.queue_free()
 		_show_main())
 
 

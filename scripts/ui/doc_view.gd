@@ -338,6 +338,8 @@ class _Deco extends Control:
 
 	func _draw() -> void:
 		var s := size
+		if s.y < 40.0:
+			return   # первый кадр: размер ещё не посчитан — шрифт вышел бы нулевым
 		var rng := RandomNumberGenerator.new()
 		rng.seed = int(doc._seed * 1000.0)
 		# дырки дырокола у левого края
@@ -380,6 +382,8 @@ class _CoverDeco extends Control:
 
 	func _draw() -> void:
 		var s := size
+		if s.y < 40.0:
+			return   # первый кадр: размер ещё не посчитан — шрифт вышел бы нулевым
 		var ink := Color(0.15, 0.12, 0.1)
 		var f := UiStyle.plate_font()
 		var tf := UiStyle.type_font()
@@ -414,6 +418,8 @@ class _CoverDeco extends Control:
 		draw_rect(Rect2(Vector2(s.x * 0.04, s.y * 0.1), Vector2(s.x * 0.012, s.y * 0.8)), Color(0.4, 0.3, 0.2, 0.25))
 
 	func _c(f: Font, t: String, p: Vector2, fs: int, col: Color) -> void:
+		if fs < 1:
+			return   # первый кадр: размер ещё не посчитан
 		var w := f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		draw_string(f, p - Vector2(w * 0.5, 0), t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
 
@@ -424,6 +430,8 @@ class _InsideDeco extends Control:
 
 	func _draw() -> void:
 		var s := size
+		if s.y < 40.0:
+			return   # первый кадр: размер ещё не посчитан — шрифт вышел бы нулевым
 		var ink := Color(0.15, 0.12, 0.1)
 		var tf := UiStyle.type_font()
 		# учётная карточка

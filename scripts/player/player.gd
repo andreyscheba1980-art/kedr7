@@ -573,9 +573,10 @@ func _update_focus(delta: float) -> void:
 		else:
 			Game.hud.set_prompt("")
 	elif _hold_target != null:
-		Game.hud.set_prompt(found.get_prompt() + "\n" + _progress_bar(_hold_t / found.hold_time))
+		Game.hud.set_prompt(found.get_prompt())
 	else:
 		Game.hud.set_prompt(found.get_prompt())
+	Game.hud.set_hold(_hold_t / found.hold_time if found != null and _hold_target != null else 0.0)
 
 
 func _update_steps(delta: float) -> void:
@@ -1063,6 +1064,8 @@ func toggle_flashlight() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.flash_dead"), 3.0)
 		return
 	flashlight.visible = not flashlight.visible
+	if flashlight.visible and Game.is_night():
+		SaveGame.flags["flash_used_%d" % Game.night] = true
 	if Game.profiler != null:
 		Game.profiler.call(&"record_flashlight_toggle")
 
@@ -1308,6 +1311,7 @@ func death_freeze() -> void:
 
 
 func shake(power: float, duration: float) -> void:
+	power *= Settings.camera_shake
 	_shake_power = power
 	_shake_left = duration
 	if Game != null:

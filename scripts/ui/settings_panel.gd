@@ -43,7 +43,7 @@ func _ready() -> void:
 		res_names.append("%d × %d" % [r.x, r.y])
 	_choice(box, &"set.resolution", res_names, Settings.resolution,
 		func(i: int) -> void: Settings.resolution = i)
-	_choice(box, &"set.quality", [&"set.q0", &"set.q1", &"set.q2"], Settings.quality,
+	_choice(box, &"set.quality", [&"set.q0", &"set.q1", &"set.q2", &"set.q3"], Settings.quality,
 		func(i: int) -> void: Settings.quality = i)
 	_slider(box, &"set.render_scale", "render_scale", 0.5, 1.0, 0.05)
 	_choice(box, &"set.pixel", [&"set.pixel0", &"set.pixel1", &"set.pixel2", &"set.pixel3"], Settings.pixelation,
@@ -104,6 +104,11 @@ func _ready() -> void:
 	_toggle(box, &"set.rumble", Settings.rumble, func(on: bool) -> void: Settings.rumble = on)
 	_toggle(box, &"set.toggle_breath", Settings.toggle_breath, func(on: bool) -> void: Settings.toggle_breath = on)
 	_toggle(box, &"set.toggle_sprint", Settings.toggle_sprint, func(on: bool) -> void: Settings.toggle_sprint = on)
+	_section(box, &"set.access")
+	_slider(box, &"set.camera_shake", "camera_shake", 0.0, 1.0, 0.1)
+	_toggle(box, &"set.reduce_flashes", Settings.reduce_flashes, func(on: bool) -> void: Settings.reduce_flashes = on)
+	_slider(box, &"set.film_fx", "film_fx", 0.0, 1.0, 0.1)
+	_toggle(box, &"set.subtitle_bg", Settings.subtitle_bg, func(on: bool) -> void: Settings.subtitle_bg = on)
 	_build_keys(box)
 	_build_pad(box)
 	var lang := HBoxContainer.new()

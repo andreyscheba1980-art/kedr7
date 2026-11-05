@@ -864,5 +864,6 @@ func _finish() -> void:
 	if stage == &"done":
 		return
 	stage = &"done"
+	Achievements.unlock(&"case_closed")
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	finished.emit()

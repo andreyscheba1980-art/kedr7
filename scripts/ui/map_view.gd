@@ -154,6 +154,22 @@ func _draw() -> void:
 			lab_col = Color(0.62, 0.08, 0.06)
 		draw_string(font, c + Vector2(r.x * 0.5 + 6, 5), Loc.t(site["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, lab_col)
 
+	# Где ты сейчас: красный карандашный треугольник носом по взгляду, подпись «Я»
+	if Game.player != null:
+		var pc: Vector2 = to_map.call(Game.player.global_position)
+		if area.has_point(pc):
+			var fw := -Game.player.global_basis.z
+			var dir2 := Vector2(fw.x, fw.z).normalized()
+			var sd := Vector2(-dir2.y, dir2.x)
+			var tri := PackedVector2Array([pc + dir2 * 13.0, pc - dir2 * 7.0 + sd * 7.0, pc - dir2 * 7.0 - sd * 7.0])
+			draw_colored_polygon(tri, Color(0.72, 0.1, 0.08))
+			draw_polyline(tri + PackedVector2Array([tri[0]]), Color(0.3, 0.05, 0.03), 1.5)
+			draw_string(font, pc + Vector2(12, -10), Loc.t(&"map.you"), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.62, 0.08, 0.06))
+			# Далеко от дома — пунктир к крыльцу: не заблудиться в тайге
+			var home: Vector2 = to_map.call(Station.SPAWN)
+			if pc.distance_to(home) > 40.0:
+				draw_dashed_line(pc, home, Color(0.62, 0.08, 0.06, 0.55), 1.4, 6.0)
+
 	# Стрелка севера.
 	var n := sheet.position + Vector2(sheet.size.x - 70, 70)
 	draw_line(n + Vector2(0, 26), n + Vector2(0, -26), ink, 2.0)
