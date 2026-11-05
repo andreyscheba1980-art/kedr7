@@ -56,6 +56,7 @@ func _ready() -> void:
 				_done[key] = true
 	orders = RadioOrders.new()
 	add_child(orders)
+	add_child(RadioTalks.new())          # сеансы связи с выбором реплик (Зоя, Михалыч)
 	Net.remote_ending.connect(_on_remote_ending)
 	if Game.is_day() and not Game.is_prologue():
 		_morning_call()
@@ -945,7 +946,36 @@ func _lights() -> void:
 		Game.audio.play_3d(horn, LIGHTS_POS + Vector3(0, 1, 0), 6.0, 20.0)
 	Game.hud.subtitle(Loc.t(&"scene.lights"), 5.0, 2)
 	await _wait(4.0)
+	# Михалыч дал контрольный вопрос (сеанс ночи 4/6) — можно проверить, кто зовёт из метели.
+	var asked := false
+	if RadioTalks.knows_question() and not Game.dead and not _ending:
+		asked = true
+		var first := Game.audio.say(&"drv_night_1", LIGHTS_POS + Vector3(0, 1.6, 0), 8.0, 16.0)
+		Game.hud.subtitle(Loc.t(&"drv.night1"), maxf(first, 4.0), 2)
+		await _wait(maxf(first, 3.0))
+		var pick: int = await TalkChoiceUI.ask([Loc.t(&"talk.ask_dog")], 10.0)
+		if pick == 0 and not Game.dead:
+			Game.hud.subtitle(Loc.t(&"talk.you", [Loc.t(&"talk.ask_dog")]), 3.0, 2)
+			await _wait(3.2)
+			Game.hud.subtitle(Loc.t(&"talk.dog_wrong"), 3.5, 2)
+			await _wait(4.0)
+			Game.hud.subtitle(Loc.t(&"talk.dog_after"), 5.0, 2)
+			await _wait(4.5)
+			if is_instance_valid(engine_p):
+				engine_p.queue_free()
+			if is_instance_valid(_lights_node):
+				_lights_node.queue_free()
+			_lights_node = null
+			Game.audio.play_3d(SCREAM, LIGHTS_POS + Vector3(0, 1, 0), -6.0, 20.0)
+			Game.hud.subtitle(Loc.t(&"talk.dog_gone"), 4.5, 2)
+			SaveGame.flags["double_exposed"] = 1
+			Achievements.unlock(&"pirat")
+			Director.add_tension(-12.0, "двойник разоблачён")
+			Director.hold = false
+			return
 	var lines := [[&"drv_night_1", &"drv.night1"], [&"drv_night_2", &"drv.night2"], [&"drv_night_3", &"drv.night3"]]
+	if asked:
+		lines.pop_front()            # первую реплику уже сказал до вопроса
 	var near := false
 	for l: Array in lines:
 		if Game.dead or _ending:

@@ -61,6 +61,7 @@ func _fullrun() -> void:
 	while _app.get("_menu") == null:
 		await get_tree().process_frame
 	SaveGame.new_game("story")
+	Flashback.autopilot = true            # флешбэки Семёнова после ночей проходят сами
 	Game.set_flag("left_cabin", true)     # кабину и просеку гоняет --prologue_b; здесь — от станции
 	SaveGame.write()
 	_app.call(&"_start_phase")
@@ -112,7 +113,7 @@ func _fullrun() -> void:
 			Game.day_goal_done = true
 			Game.end_shift()
 		var w := 0.0
-		while w < 40.0 and ("%s/%d%s" % [SaveGame.phase["kind"], int(SaveGame.phase["index"]), "+" if Game.has_flag("prologue_arrived") else ""]) == ph:
+		while w < 240.0 and ("%s/%d%s" % [SaveGame.phase["kind"], int(SaveGame.phase["index"]), "+" if Game.has_flag("prologue_arrived") else ""]) == ph:
 			await _wait(0.5)
 			w += 0.5
 		if _app.get("_menu") != null and is_instance_valid(_app.get("_menu")) and (_app.get("_menu") as Node).is_inside_tree():
@@ -3358,6 +3359,68 @@ func _tour(args: PackedStringArray) -> void:
 		await _wait(3.0)
 		await _shot("front_hit")
 		print("[front] после: метель=%s %.2f" % [Game.weather.blizzard, Game.weather.intensity])
+		get_tree().quit()
+		return
+	if args.has("story154"):   # сюжетный патч: заветы, сеанс связи с выбором, вступление ночи, флешбэк Семёнова
+		var nn := Game.night
+		print("[s154] ночь %d · заветов видно %d, ловушек %d" % [nn, CovenantsClass.ENTRIES.filter(func(e: Dictionary) -> bool: return CovenantsClass.visible(e)).size(), CovenantsClass.traps_total()])
+		for e: Dictionary in CovenantsClass.ENTRIES:
+			if CovenantsClass.visible(e) and (CovenantsClass.is_new(e) or CovenantsClass.rewritten(e)):
+				print("[s154]   новое/правка: ", e["id"], " ловушка=", CovenantsClass.is_trap(e), " → ", CovenantsClass.text(e).left(60))
+		Game.hud.toggle_tasks()
+		Game.hud._switch_tasks_tab(1)
+		await _wait(0.8)
+		await _shot("s154_n%d_covenants" % nn)
+		Game.hud.toggle_tasks()
+		SaveGame.flags.erase("cov_seen_night")
+		CovenantsClass.announce()
+		# Сеанс связи
+		var talks: RadioTalks = Game.events.find_children("*", "RadioTalks", true, false)[0] if Game.events != null and not Game.events.find_children("*", "RadioTalks", true, false).is_empty() else null
+		if talks != null and not talks._talk.is_empty():
+			_tp(Vector3(9.2, 0.05, -0.5), 0.0)
+			Game.shift_minutes = float(talks._talk["min"])
+			talks._on_minute(int(talks._talk["min"]))
+			print("[s154] сеанс: state=%d who=%s goal=%s" % [talks._state, talks._talk["who"], Game.objective_text()])
+			var t := 0.0
+			var ui: TalkChoiceUI = null
+			while t < 60.0 and ui == null:
+				await _wait(0.5)
+				t += 0.5
+				var found := Game.hud.find_children("*", "TalkChoiceUI", true, false)
+				if not found.is_empty():
+					ui = found[0]
+			if ui != null:
+				await _wait(1.0)
+				await _shot("s154_n%d_talk" % nn)
+				ui._pick(0)
+				await _wait(12.0)
+				print("[s154] после выбора: trust=%d honest=%d quiet=%d question=%d" % [RadioTalks.flag("talk_trust"), RadioTalks.flag("talk_honest"), RadioTalks.flag("talk_quiet"), RadioTalks.flag("mikh_question")])
+			else:
+				print("[s154] ОШИБКА: выбор реплик не появился, state=", talks._state)
+		else:
+			print("[s154] сеанса в эту ночь нет")
+		# Вступление ночи
+		if nn >= 2:
+			var title := "НОЧЬ %d" % nn
+			var shots_t := func() -> void:
+				for k in 4:
+					await _wait(1.9)
+					await _shot("s154_n%d_intro_%d" % [nn, k])
+			shots_t.call()
+			await NightIntro.play(nn, title)
+			Game.hud.fade_out_screen(0.2)
+			print("[s154] вступление ночи %d сыграно" % nn)
+		# Флешбэк
+		if nn <= 6:
+			Flashback.autopilot = true
+			var fb_shots := func() -> void:
+				for k in 7:
+					await _wait(4.5)
+					if Flashback.active:
+						await _shot("s154_n%d_fb_%d" % [nn, k])
+			fb_shots.call()
+			await Flashback.play(nn)
+			print("[s154] флешбэк %d пройден, fb_done=%s" % [nn, SaveGame.flags.get("fb_done_%d" % nn, false)])
 		get_tree().quit()
 		return
 	if args.has("refltest"):   # отражение в ночном окне: встать у стекла, смотреть, показать фигуру

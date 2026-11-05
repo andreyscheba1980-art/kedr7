@@ -127,7 +127,9 @@ func _build_covenants_section(parent: VBoxContainer) -> void:
 	parent.add_child(box)
 
 	for entry: Dictionary in CovenantsClass.ENTRIES:
-		var st: String = CovenantsClass.get_state(entry.id)
+		if not CovenantsClass.visible(entry):
+			continue
+		var st: String = CovenantsClass.get_state(CovenantsClass.eid(entry))
 		var st_label := Loc.p("Не проверено", "Unchecked")
 		var st_color := Color(0.4, 0.4, 0.4)
 		if st == "true":
@@ -136,7 +138,7 @@ func _build_covenants_section(parent: VBoxContainer) -> void:
 		elif st == "false":
 			st_label = Loc.p("✗ ЛОЖЬ", "✗ FALSE")
 			st_color = Color(0.65, 0.22, 0.12)
-		elif st == "sabotage":
+		elif st == "sabotage" or st == "danger":
 			st_label = Loc.p("⚠ ДИВЕРСИЯ", "⚠ SABOTAGE")
 			st_color = Color(0.72, 0.42, 0.08)
 

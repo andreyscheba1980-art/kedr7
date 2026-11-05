@@ -212,6 +212,8 @@ func _begin() -> void:
 	if _needs_cold_open():
 		await _cold_open(title)
 	_ensure_player_safe_spawn()
+	if NightIntro.wants():
+		await NightIntro.play(Game.night, title)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_player.mode = Player.Mode.WALK
 	Game.start_shift()
@@ -231,6 +233,11 @@ func _begin() -> void:
 		Game.hud.subtitle(Loc.t(StringName("day%d.start" % Game.phase_index)), 6.0)
 	elif Loc.has_key(StringName("n%d.start" % Game.night)):
 		Game.hud.subtitle(Loc.t(StringName("n%d.start" % Game.night)), 7.0)
+	if Game.is_night() and Net.role == "":
+		# Тетрадь дежурных переписывается: через полминуты — «новая запись, вчера её не было»
+		get_tree().create_timer(28.0, false).timeout.connect(func() -> void:
+			if is_inside_tree() and not Game.shift_over:
+				Covenants.announce())
 
 
 func _ensure_player_safe_spawn() -> void:
@@ -695,6 +702,9 @@ func _on_shift_ended() -> void:
 		Game.hud.open_modal(dr)
 		await dr.closed
 		Game.hud.close_modal()
+	# Флешбэк «Семёнов, 1982»: та же изба год назад — до утренней карточки (ночи 1–6).
+	if Game.is_night() and Flashback.wants(Game.night):
+		await Flashback.play(Game.night)
 	var text := Loc.t(&"card.morning") if Game.is_night() else (Loc.t(&"card.prologue_night1") if Game.is_prologue() else Loc.t(&"card.dusk"))
 	if Game.anomalies != null:
 		var t := Game.anomalies.tally()
@@ -891,6 +901,22 @@ func _case_file(id: StringName) -> String:
 	for k in Efir.FINDS:
 		if Efir.has_find(k):
 			lines.append(Loc.t(StringName("case.find." + String(k))))
+	# Сеансы связи и тетрадь дежурных (1.54)
+	var honest := RadioTalks.flag("talk_honest")
+	var quiet := RadioTalks.flag("talk_quiet")
+	if honest > 0:
+		lines.append(Loc.t(&"case.talk_honest", [honest]))
+	if quiet > 0:
+		lines.append(Loc.t(&"case.talk_quiet", [quiet]))
+	if RadioTalks.flag("talk_missed") > 0:
+		lines.append(Loc.t(&"case.talk_missed", [RadioTalks.flag("talk_missed")]))
+	if RadioTalks.flag("heli_asked") > 0:
+		lines.append(Loc.t(&"case.heli"))
+	if RadioTalks.flag("double_exposed") > 0:
+		lines.append(Loc.t(&"case.double"))
+	var traps := Covenants.traps_total()
+	if traps > 0 and Covenants.traps_marked() > 0:
+		lines.append(Loc.t(&"case.covenants", [Covenants.traps_marked(), traps]))
 	if Dog.is_home():
 		lines.append(Loc.t(&"case.dog_ok") if Dog.health() >= 60.0 else Loc.t(&"case.dog_weak"))
 	elif SaveGame.flags.get("dog_found", false):

@@ -15,6 +15,9 @@ extends Node
 
 static var active := false
 
+var skippable := false             ## [Esc] — пропустить: дальше выполняются только шаги «call» (уборка)
+var _skip := false
+
 var _cam: Camera3D
 var _layer: CanvasLayer
 var _top: ColorRect
@@ -25,8 +28,9 @@ var _shake_t := 0.0
 var _base := Transform3D.IDENTITY
 
 
-static func play(steps: Array) -> void:
+static func play(steps: Array, can_skip := false) -> void:
 	var c := Cutscene.new()
+	c.skippable = can_skip
 	Game.level.add_child(c)
 	await c._run(steps)
 	c.queue_free()
@@ -89,7 +93,15 @@ func _bar(top: bool) -> ColorRect:
 	return r
 
 
+func _input(event: InputEvent) -> void:
+	if skippable and not _skip and (event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause")):
+		_skip = true
+		get_viewport().set_input_as_handled()
+
+
 func _step(st: Dictionary) -> void:
+	if _skip and not st.has("call"):
+		return
 	if st.has("cam"):
 		var a: Array = st["cam"]
 		_place(a[0], a[1])
@@ -102,7 +114,7 @@ func _step(st: Dictionary) -> void:
 		var off: Vector3 = st.get("off", Vector3(0, 1.5, 3.0))
 		var t := 0.0
 		var dur := float(st.get("t", 2.0))
-		while t < dur and is_instance_valid(n):
+		while t < dur and is_instance_valid(n) and not _skip:
 			_place(n.global_position + off, n.global_position + Vector3(0, 1.0, 0))
 			await get_tree().process_frame
 			t += get_process_delta_time()
@@ -135,7 +147,10 @@ func _step(st: Dictionary) -> void:
 			await r
 		return
 	if st.has("wait"):
-		await get_tree().create_timer(float(st["wait"]), false).timeout
+		var w := 0.0
+		while w < float(st["wait"]) and not _skip:
+			await get_tree().process_frame
+			w += get_process_delta_time()
 
 
 func _place(pos: Vector3, look: Vector3) -> void:
@@ -149,7 +164,7 @@ func _move(pos: Vector3, look: Vector3, dur: float) -> void:
 	var p0 := _base.origin
 	var l0 := p0 - _base.basis.z * 4.0
 	var t := 0.0
-	while t < dur:
+	while t < dur and not _skip:
 		var k := smoothstep(0.0, 1.0, t / dur)
 		_place(p0.lerp(pos, k), l0.lerp(look, k))
 		await get_tree().process_frame

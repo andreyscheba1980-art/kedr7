@@ -23,6 +23,8 @@ func set_language(l: String) -> void:
 func t(key: StringName, args: Array = []) -> String:
 	var entry: Variant = StringsClass.S.get(key)
 	if entry == null:
+		entry = StoryStrings.S.get(key)   # сюжетный патч 1.54 — отдельным словарём
+	if entry == null:
 		push_warning("Loc: нет строки '%s'" % key)
 		return String(key)
 	var pair: Array = entry
@@ -60,7 +62,7 @@ func _real_keys(s: String) -> String:
 
 
 func has_key(key: StringName) -> bool:
-	return StringsClass.S.has(key)
+	return StringsClass.S.has(key) or StoryStrings.S.has(key)
 
 
 ## Пара прямо в коде: Loc.p("Закрыть", "Close"). Для разовых строк интерфейса, которым не нужен ключ.

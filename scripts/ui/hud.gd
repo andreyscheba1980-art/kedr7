@@ -170,7 +170,7 @@ func _process(delta: float) -> void:
 	if not is_inside_tree() or Game == null or _clock == null or _held_label == null:
 		return
 	var phase := Loc.t(&"hud.night", [Game.night]) if Game.is_night() else (Loc.t(&"hud.day", [Game.phase_index]) if not Game.is_prologue() else (Loc.t(&"hud.morning") if Game.has_flag("prologue_arrived") else Loc.t(&"hud.prologue")))
-	_clock.text = "%s   %s" % [phase, Game.clock_text()]
+	_clock.text = "%s   %s" % [phase, Game.clock_text()] if not Flashback.active else Loc.t(&"fb.clock")
 	var show_fps_flag: bool = (Settings != null and is_instance_valid(Settings) and Settings.show_fps) or (_debug_panel != null and _debug_panel.visible)
 	if _fps != null:
 		_fps.visible = show_fps_flag
@@ -179,7 +179,7 @@ func _process(delta: float) -> void:
 			if _fps_timer <= 0.0:
 				_fps_timer = 0.25
 				_fps.text = "FPS %d" % Engine.get_frames_per_second()
-	_clock.visible = not cinematic and _modal == null
+	_clock.visible = (not cinematic and _modal == null) or Flashback.active
 	# Книга в руках закрывает центр: субтитр торчал из-за листа по краям — пока читаешь, он ждёт
 	if _subtitle != null:
 		var m := modal()
@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 	if _objective != null:
 		_objective.visible = not cinematic and _modal == null
 		# Сюжетный режим ведёт за руку; на обычной и сложной — только аварии (их нельзя пропустить).
-		_objective.text = Game.objective_text() if Game.is_story() or Game.is_prologue() else Game.alarm_text()
+		_objective.text = Game.objective_text() if Game.is_story() or Game.is_prologue() or Game.story_goal != "" or Game.memory_goal != "" else Game.alarm_text()
 	if _frost != null:
 		var frost := clampf((65.0 - Game.warmth) / 55.0, 0.0, 1.0)
 		if Game.mirror_covered:
@@ -828,27 +828,47 @@ func _rebuild_covenants_ui() -> void:
 	for c in _cov_vbox.get_children():
 		c.queue_free()
 
-	for entry in CovenantsClass.ENTRIES:
-		var min_n: int = entry.get("min_night", 1)
-		if Game.night < min_n:
+	for entry: Dictionary in CovenantsClass.ENTRIES:
+		if not CovenantsClass.visible(entry):
 			continue
 		var item_box := VBoxContainer.new()
 		item_box.add_theme_constant_override("separation", 4)
 		_cov_vbox.add_child(item_box)
 
-		var author := UiKit.ink(UiKit.label(CovenantsClass.author(entry), 13))
+		var head := CovenantsClass.author(entry)
+		if CovenantsClass.is_new(entry):
+			head += "   " + Loc.t(&"cov.new_tag")
+		var author := UiKit.ink(UiKit.label(head, 13))
 		author.add_theme_color_override("font_color", Color(0.42, 0.22, 0.12))
 		item_box.add_child(author)
 
+		if CovenantsClass.rewritten(entry):
+			# Старый текст — зачёркнут; поверх — чужой, неровный почерк другими чернилами.
+			var old := RichTextLabel.new()
+			old.bbcode_enabled = true
+			old.fit_content = true
+			old.scroll_active = false
+			old.custom_minimum_size = Vector2(600, 0)
+			old.add_theme_color_override("default_color", Color(0.35, 0.3, 0.28, 0.75))
+			old.add_theme_font_size_override("normal_font_size", 13)
+			old.text = "[s]" + CovenantsClass.original_text(entry) + "[/s]"
+			item_box.add_child(old)
 		var rule := UiKit.ink(UiKit.label(CovenantsClass.text(entry), 14))
 		rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if CovenantsClass.rewritten(entry) or String(entry.get("author", "")).begins_with("Орехов"):
+			rule.add_theme_color_override("font_color", Color(0.38, 0.06, 0.05))
 		item_box.add_child(rule)
+		if CovenantsClass.rewritten(entry):
+			var tag := UiKit.ink(UiKit.label(Loc.t(&"cov.edited_tag"), 11))
+			tag.add_theme_color_override("font_color", Color(0.38, 0.06, 0.05))
+			item_box.add_child(tag)
 
 		var btn_row := HBoxContainer.new()
 		btn_row.add_theme_constant_override("separation", 6)
 		item_box.add_child(btn_row)
 
-		var cur_state: String = CovenantsClass.get_state(entry.id)
+		var key := CovenantsClass.eid(entry)
+		var cur_state: String = CovenantsClass.get_state(key)
 		var states := ["true", "false", "danger"]
 		var labels := [Loc.t(&"cov.true"), Loc.t(&"cov.false"), Loc.t(&"cov.danger")]
 		for i in range(3):
@@ -859,10 +879,13 @@ func _rebuild_covenants_ui() -> void:
 			b.text = prefix + lbl
 			b.custom_minimum_size = Vector2(130, 26)
 			b.pressed.connect(func():
-				CovenantsClass.set_state(entry.id, s)
+				var was := CovenantsClass.get_state(key)
+				CovenantsClass.set_state(key, s)
 				if entry.id == "night5_delusion" and (s == "false" or s == "danger"):
 					subtitle(Loc.t(&"cov.sanity_boost"), 3.5)
 					Director.add_tension(-20.0, "морок зачеркнут")
+				elif was != s:
+					CovenantsClass.on_marked(entry, s)
 				_rebuild_covenants_ui()
 			)
 			btn_row.add_child(b)

@@ -18,7 +18,8 @@ uniform vec2 ray_uv = vec2(0.5, -1.0);
 uniform float ray_amount = 0.0;
 uniform float ray_thresh = 0.75;
 uniform vec3 ray_color : source_color = vec3(1.0, 0.85, 0.6);
-uniform float warm = 0.0;          // солнечный день: светлое чуть теплее, тени остаются синими
+uniform float warm = 0.0;
+uniform float memory = 0.0;        // флешбэк Семёнова (1982): выцветшая плёнка, тяжёлая виньетка, царапины          // солнечный день: светлое чуть теплее, тени остаются синими
 
 const float BAYER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
@@ -61,6 +62,15 @@ void fragment() {
 	if (warm > 0.001) {
 		float lw = dot(col, vec3(0.299, 0.587, 0.114));
 		col = mix(col, col * vec3(1.08, 1.0, 0.9), warm * smoothstep(0.35, 0.85, lw));
+	}
+
+	if (memory > 0.001) {
+		float lm = dot(col, vec3(0.299, 0.587, 0.114));
+		col = mix(col, vec3(lm) * vec3(1.14, 0.98, 0.76) * 1.08, memory * 0.86);
+		col *= 1.0 - memory * 0.5 * smoothstep(0.12, 0.7, d2 * 2.2);
+		col *= 1.0 + memory * 0.05 * sin(TIME * 21.0) * sin(TIME * 3.7);
+		float scr = step(0.9965, hash12(vec2(floor(UV.x * 260.0), floor(TIME * 11.0))));
+		col += vec3(scr * memory * 0.1);
 	}
 
 	// Мягкое свечение (halation) ярких огней (фонарь, окно, пламя, маяк)

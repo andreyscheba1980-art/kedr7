@@ -18,6 +18,7 @@ static func _testing() -> bool:
 const LIST := [
 	&"hitchhiker", &"first_night", &"no_flash", &"reader", &"handy", &"tape",
 	&"lair", &"lair_clean", &"satellite", &"turned", &"seven", &"case_closed",
+	&"semenov", &"pirat", &"liar_book",
 ]
 
 static var _cfg: ConfigFile

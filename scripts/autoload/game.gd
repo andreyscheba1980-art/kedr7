@@ -76,6 +76,7 @@ var stove_damper := false               ## поддувало прикрыто
 var stove_flue := false                 ## вьюшка закрыта (с огнём — угар; без огня — жар держится дольше)
 var house_switch_off := false           ## рубильник у двери: свет в доме погашен, дизель на холостом
 var warmth := 100.0
+var memory_goal := ""           ## цель во флешбэке Семёнова (смена уже кончилась — обычных целей нет)
 var story_goal := ""            ## сюжетная цель (вылазка в шахту и т. п.) — поверх обычных
 var flash_charge := 100.0
 var fatigue := 0.0                  ## скрытая усталость: ложные звуки и галлюцинации
@@ -1057,6 +1058,8 @@ func clock_text() -> String:
 
 ## Самая срочная задача — одна строка в углу экрана.
 func objective_text() -> String:
+	if memory_goal != "":
+		return memory_goal
 	if shift_over or dead:
 		return ""
 	if is_prologue():
