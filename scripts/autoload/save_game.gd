@@ -2,7 +2,17 @@ extends Node
 ## Сохранение прогресса между фазами (пролог → ночь 1 → день 1 → ...). Одна ячейка, user://save.json.
 ## Сохраняем в начале каждой фазы: смерть ночью откатывает к началу этой же ночи.
 
-const PATH := "user://save.json"
+## Автотесты и туры пишут в отдельный файл — сохранение игрока не трогают.
+var PATH := "user://save_test.json" if _testing() else "user://save.json"
+
+
+static func _testing() -> bool:
+	var a := OS.get_cmdline_user_args()
+	for k in ["--tour", "--autotest", "--test_cabin", "--epilogue", "--prologue_review", "--deathtest", "--stage", "--film", "--probe", "--probe2", "--polish_test", "--joypad_test", "--menushot"]:
+		if a.has(k):
+			return true
+	return false
+
 
 ## Фаза: {"kind": "day"|"night", "index": int}. День 0 — пролог.
 var phase := {"kind": "day", "index": 0}
@@ -142,9 +152,8 @@ func _sanitize_data(d: Dictionary) -> void:
 		fld["in_cabin"] = false
 		fld.erase("cp")
 		fld.erase("temp_pos")
-		# Если в прологе уже дошли до станции:
-		if fld.get("prologue_arrived", false) and int(d.get("phase", {}).get("index", 0)) == 0:
-			d["phase"] = {"kind": "night", "index": 1}
+		# (Раньше «дошёл до станции в прологе» здесь превращалось в ночь 1 — и «следующее утро» с обучением,
+		#  которое как раз начинается перезагрузкой сохранения после сна, пропадало. Пролог-утро — законная фаза.)
 
 	var ph: Variant = d.get("phase", {})
 	if ph is Dictionary:
@@ -152,7 +161,7 @@ func _sanitize_data(d: Dictionary) -> void:
 		var kind := String(phd.get("kind", "day"))
 		if kind != "day" and kind != "night":
 			kind = "day"
-		var idx := clampi(int(phd.get("index", 0)), 0, 4)
+		var idx := clampi(int(phd.get("index", 0)), 0, Phases.LAST_NIGHT)   # было 0..4: ночи 5–7 при загрузке откатывались на 4-ю
 		d["phase"] = {"kind": kind, "index": idx}
 
 

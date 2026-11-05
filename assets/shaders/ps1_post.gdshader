@@ -44,19 +44,19 @@ void fragment() {
 	col = mix(col, col * vec3(0.82, 0.94, 1.16), cold * (1.0 - smoothstep(0.05, 0.5, l0)));
 
 	if (ray_amount > 0.001) {
-		vec2 dv = (ray_uv - UV) / 28.0 * 0.85;
+		vec2 dv = (ray_uv - UV) / 18.0 * 0.85;
 		vec2 p = UV;
 		float acc = 0.0;
 		float w = 1.0;
-		for (int i = 0; i < 28; i++) {
+		for (int i = 0; i < 18; i++) {
 			p += dv;
 			vec2 pc = clamp(p, vec2(0.001), vec2(0.999));
 			float l = dot(texture(TEXTURE, pc).rgb, vec3(0.333)) * brightness;
 			acc += smoothstep(ray_thresh, ray_thresh + 0.25, l) * w;
-			w *= 0.94;
+			w *= 0.91;
 		}
 		float near = exp(-length((UV - ray_uv) * vec2(1.6, 1.0)) * 2.2);
-		col += ray_color * (acc / 14.0) * ray_amount * (0.35 + near);
+		col += ray_color * (acc / 10.0) * ray_amount * (0.35 + near);
 	}
 	if (warm > 0.001) {
 		float lw = dot(col, vec3(0.299, 0.587, 0.114));

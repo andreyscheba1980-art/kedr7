@@ -47,6 +47,7 @@ func _ready() -> void:
 		mm.instance_count = 0
 		var mi := MultiMeshInstance3D.new()
 		mi.multimesh = mm
+		mi.layers = Station.LAYER_OUT   # см. Terrain: в тени домашних ламп лес не попадает
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		add_child(mi)
 		_mmi.append(mi)
@@ -61,7 +62,8 @@ func _apply_quality() -> void:
 	visible = on
 	set_process(on)
 	SpruceMesh.set_near_cut(on)
-	var shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Settings.quality >= 2 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Тени лап-карточек (альфа-срез в каждом каскаде) — дорого: только на «Ультра»; на «Высоком» тень дают гранёные двойники
+	var shadow := GeometryInstance3D.SHADOW_CASTING_SETTING_ON if Settings.quality >= 3 else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for mi in _mmi:
 		mi.cast_shadow = shadow
 	if on:
@@ -118,6 +120,24 @@ func _rebuild(p: Vector3) -> void:
 			mm.buffer = b
 
 
+static var _puff: GradientTexture2D
+
+
+static func _puff_tex() -> GradientTexture2D:
+	if _puff == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		_puff = GradientTexture2D.new()
+		_puff.gradient = g
+		_puff.fill = GradientTexture2D.FILL_RADIAL
+		_puff.fill_from = Vector2(0.5, 0.5)
+		_puff.fill_to = Vector2(1.0, 0.5)
+		_puff.width = 32
+		_puff.height = 32
+	return _puff
+
+
 ## С ели рядом срывается пласт снега: шорох, белое облачко, сыплется с лапы на лапу. Чаще в ветер.
 func _snow_drops(p: Vector3, delta: float) -> void:
 	_drop_t -= delta
@@ -127,8 +147,8 @@ func _snow_drops(p: Vector3, delta: float) -> void:
 	_drop_t = randf_range(4.0, 11.0) / (0.5 + w)
 	var o: Vector3 = _near_pos[randi() % _near_pos.size()]
 	var d := Vector2(o.x - p.x, o.z - p.z).length()
-	if d < 4.0 or d > 20.0:
-		return
+	if d < 7.0 or d > 20.0:
+		return      # вплотную облачко закрывает полэкрана
 	var a := randf() * TAU
 	var at := o + Vector3(cos(a) * randf_range(0.6, 1.4), randf_range(1.6, 4.2), sin(a) * randf_range(0.6, 1.4))
 	var burst := CPUParticles3D.new()
@@ -155,6 +175,7 @@ func _snow_drops(p: Vector3, delta: float) -> void:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.albedo_color = Color(0.85, 0.9, 0.98, 0.7)
+	m.albedo_texture = _puff_tex()   # круглое мягкое облачко, а не квадрат
 	burst.material_override = m
 	add_child(burst)
 	burst.global_position = at

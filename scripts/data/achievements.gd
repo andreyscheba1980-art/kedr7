@@ -4,7 +4,16 @@ extends RefCounted
 ## Получил — плашка в углу экрана. Список — в главном меню («Достижения»): неполученные — под замком,
 ## с намёком, но без разгадки.
 
-const PATH := "user://achievements.cfg"
+## Автотесты — в отдельный файл: достижения игрока не засчитываются тестами.
+static var PATH := "user://achievements_test.cfg" if _testing() else "user://achievements.cfg"
+
+
+static func _testing() -> bool:
+	var a := OS.get_cmdline_user_args()
+	for k in ["--tour", "--autotest", "--test_cabin", "--epilogue", "--prologue_review", "--deathtest", "--stage", "--film", "--probe", "--probe2", "--polish_test", "--joypad_test", "--menushot"]:
+		if a.has(k):
+			return true
+	return false
 ## id → [ключ названия, ключ описания/намёка]
 const LIST := [
 	&"hitchhiker", &"first_night", &"no_flash", &"reader", &"handy", &"tape",

@@ -95,7 +95,7 @@ func apply() -> void:
 	Loc.set_language(language)
 	_apply_window()
 	if not OS.has_feature("editor") and DisplayServer.get_name() != "headless":
-		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED if OS.get_cmdline_user_args().has("--novsync") else DisplayServer.VSYNC_ENABLED)
 	changed.emit()
 
 
@@ -105,7 +105,7 @@ func detail() -> float:
 
 
 func msaa() -> Viewport.MSAA:
-	return [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X, Viewport.MSAA_8X][clampi(quality, 0, 3)]
+	return [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_2X, Viewport.MSAA_4X][clampi(quality, 0, 3)]   # 4× на ноутбуках съедал до трети кадра
 
 
 ## Во сколько раз уменьшать рендер мира (SubViewportContainer.stretch_shrink).

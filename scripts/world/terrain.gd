@@ -505,6 +505,7 @@ static func build_forest(parent: Node3D, far: float, inner_center: Vector3, inne
 				mmi.position = cc
 				mmi.visibility_range_end = far + 40.0
 				mmi.visibility_range_end_margin = 8.0
+				mmi.layers = Station.LAYER_OUT   # лес — только «снаружи»: лампы в доме не рисуют его в свои тени
 				parent.add_child(mmi)
 	# Стволы: один статический «корпус» на клетку, формы добавлены в сервер напрямую.
 	var trunk := PhysicsServer3D.cylinder_shape_create()

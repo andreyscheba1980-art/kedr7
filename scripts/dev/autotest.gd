@@ -139,6 +139,15 @@ func _prologue_b() -> void:
 				await _shot("trail_%03d" % int(walked))
 	print("[pb] дошёл за %.0f с, дома=%s, события=%s" % [t, Game.is_home(), pt._done.keys() if pt != null else "?"])
 	await _wait(9.0)
+	if args.has("sleep"):   # лечь спать: должно наступить «следующее утро» (пролог при свете), а не ночь 1
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		st.door_open = false
+		print("[pb] перед сном: фаза=%s/%s прибыл=%s дверь=%s" % [Game.phase_kind, Game.phase_index, Game.has_flag("prologue_arrived"), st.door_open])
+		st._on_bed_used(Game.player)
+		await _wait(16.0)
+		var st2: Array = get_tree().root.find_children("*", "Station", true, false)
+		print("[pb] после сна: фаза=%s/%s прибыл=%s светло=%s время=%.0f карточка=«%s»" % [Game.phase_kind, Game.phase_index, Game.has_flag("prologue_arrived"), Game.is_daylight(), Game.shift_minutes, Game.hud._screen_label.text.left(40) if Game.hud != null else "?"])
+		await _shot("pb_after_sleep")
 	get_tree().quit()
 
 
@@ -2892,6 +2901,162 @@ func _tour(args: PackedStringArray) -> void:
 		for z: Array in [["дом", Vector3(6, 1, 1), 13.0], ["двор", Vector3(20, 0, -5), 70.0], ["корпус", Vector3(110, 0, -32), 30.0]]:
 			print("[ovl] === ", z[0])
 			OverlapAudit.run(Game.level, z[1], z[2], 50)
+		get_tree().quit()
+		return
+	if args.has("treeprof"):   # чья логика ест кадр: выключаем поддеревья (process_mode DISABLED) и меряем
+		_tp(Vector3(20, 0, -20), 200.0)
+		await _wait(3.0)
+		var ft := func() -> float:
+			var f0 := Engine.get_frames_drawn()
+			var t0 := Time.get_ticks_usec()
+			await _wait(0.7)
+			return float(Time.get_ticks_usec() - t0) / 1000.0 / maxf(float(Engine.get_frames_drawn() - f0), 1.0)
+		var cands: Array = []
+		if args.has("scripted"):   # только узлы со скриптом, где угодно в дереве (кроме самих Session/Station/Yard)
+			for nd in get_tree().root.find_children("*", "", true, false):
+				if nd.get_script() != null and nd != self and (nd.is_processing() or nd.is_physics_processing()) and not (nd is Session) and nd != Game.level and nd != Game.yard:
+					cands.append(nd)
+			cands = cands.slice(0, 70)
+		var depth: int = 2 if not args.has("deep") else 3
+		var walk: Array = [[get_tree().root, 0]] if not args.has("scripted") else []
+		while not walk.is_empty():
+			var it: Array = walk.pop_back()
+			var nd: Node = it[0]
+			for c in nd.get_children():
+				if c == self or c is Viewport and not (c is SubViewport) or c.get_child_count() == 0 and c.get_script() == null:
+					continue
+				var cnt := c.find_children("*", "", true, false).size() + 1
+				if cnt >= 3 or c.get_script() != null:
+					cands.append(c)
+				if cnt > 60 and int(it[1]) < 7:
+					walk.append([c, int(it[1]) + 1])
+		var res := []
+		for c: Node in cands:
+			if not is_instance_valid(c) or c is SubViewport or c is SubViewportContainer or c.is_ancestor_of(self) or c.find_children("*", "", true, false).size() > 60 and c.get_script() == null:
+				continue
+			var on: float = await ft.call()
+			var pm := c.process_mode
+			c.process_mode = Node.PROCESS_MODE_DISABLED
+			var off: float = await ft.call()
+			c.process_mode = pm
+			res.append([on - off, "%s (%s) узлов %d" % [c.name, (c.get_script() as Script).resource_path.get_file() if c.get_script() != null else c.get_class(), c.find_children("*", "", true, false).size()]])
+		res.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
+		for r: Array in res.slice(0, 22):
+			print("[tree] %5.2f мс  %s" % [r[0], r[1]])
+		get_tree().quit()
+		return
+	if args.has("procprof"):   # кто ест _process: выключаем по одному скрипту и смотрим TIME_PROCESS
+		_tp(Vector3(20, 0, -20), 200.0)
+		await _wait(3.0)
+		var groups := {}
+		for n in get_tree().root.find_children("*", "", true, false):
+			if (n.is_processing() or n.is_physics_processing()) and n.get_script() != null and n != self:
+				var sp: String = (n.get_script() as Script).resource_path.get_file()
+				if sp == "":
+					sp = "<inline>"
+				if not groups.has(sp):
+					groups[sp] = []
+				(groups[sp] as Array).append(n)
+		var ft := func() -> float:   # средняя длительность кадра за 1.2 с, мс
+			var f0 := Engine.get_frames_drawn()
+			var t0 := Time.get_ticks_usec()
+			await _wait(1.2)
+			return float(Time.get_ticks_usec() - t0) / 1000.0 / maxf(float(Engine.get_frames_drawn() - f0), 1.0)
+		print("[prof] групп %d" % groups.size())
+		var res := []
+		for sp: String in groups:
+			var arr: Array = groups[sp]
+			var on: float = await ft.call()
+			for n in arr:
+				if is_instance_valid(n):
+					n.set_process(false)
+					n.set_physics_process(false)
+			var off: float = await ft.call()
+			for n in arr:
+				if is_instance_valid(n):
+					n.set_process(true)
+					n.set_physics_process(true)
+			res.append([on - off, sp, arr.size(), on])
+		res.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
+		for r: Array in res.slice(0, 18):
+			print("[prof] %-34s %5.2f мс  (%d узлов, кадр %.1f мс)" % [r[1], r[0], r[2], r[3]])
+		get_tree().quit()
+		return
+	if args.has("fpsab"):   # что ест кадр: замер без vsync с поочерёдным выключением подозреваемых
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		var ses := get_tree().get_first_node_in_group(&"session")
+		var cont: SubViewportContainer = ses.get("_container") if ses != null else null
+		var vp: SubViewport = ses.get("_vp") if ses != null else null
+		var post_mat: Material = cont.material if cont != null else null
+		print("[fpsab] окно ", DisplayServer.window_get_size(), " msaa=", vp.msaa_3d if vp != null else -1, " качество=", Settings.quality)
+		var sn: Node3D = get_tree().root.find_children("*", "SpruceNear", true, false)[0] if not get_tree().root.find_children("*", "SpruceNear", true, false).is_empty() else null
+		var measure := func(tag: String) -> void:
+			await _wait(1.5)
+			var f0 := Engine.get_frames_drawn()
+			var t0 := Time.get_ticks_msec()
+			await _wait(2.5)
+			var vr := get_tree().get_first_node_in_group(&"session").get("_vp") as SubViewport
+			RenderingServer.viewport_set_measure_render_time(vr.get_viewport_rid(), true)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			print("[fpsab] %-22s %5.0f  draw=%d  скрипты %.1f мс  физика %.1f мс  рендер CPU %.1f / GPU %.1f мс  узлов %d" % [tag, float(Engine.get_frames_drawn() - f0) / (float(Time.get_ticks_msec() - t0) / 1000.0), RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+				Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+				RenderingServer.viewport_get_measured_render_time_cpu(vr.get_viewport_rid()), RenderingServer.viewport_get_measured_render_time_gpu(vr.get_viewport_rid()), int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))])
+		for v: Array in [["house", Station.SPAWN + Vector3(0, 0, 0), 0.0], ["yard", Vector3(20, 0, -20), 200.0]]:
+			_tp(v[1], v[2])
+			await measure.call(v[0] + " база")
+			process_mode = Node.PROCESS_MODE_ALWAYS
+			get_tree().paused = true
+			await measure.call(v[0] + " пауза (без скриптов)")
+			get_tree().paused = false
+			Station.dbg_no_rays = true
+			await measure.call(v[0] + " -лучи")
+			Station.dbg_no_rays = false
+			st._sky_light.shadow_enabled = false
+			await measure.call(v[0] + " -тени неба")
+			st._sky_light.shadow_enabled = true
+			if sn != null:
+				sn.visible = false
+				await measure.call(v[0] + " -ели вблизи")
+				sn.visible = true
+			var lights: Array = []
+			for l in get_tree().root.find_children("*", "Light3D", true, false):
+				if not (l is DirectionalLight3D) and (l as Light3D).shadow_enabled:
+					lights.append(l)
+					(l as Light3D).shadow_enabled = false
+			await measure.call(v[0] + " -тени ламп(%d)" % lights.size())
+			for l in lights:
+				(l as Light3D).shadow_enabled = true
+			if cont != null:
+				cont.material = null
+				await measure.call(v[0] + " -постобработка")
+				cont.material = post_mat
+			if vp != null:
+				var ms := vp.msaa_3d
+				vp.msaa_3d = Viewport.MSAA_DISABLED
+				await measure.call(v[0] + " -MSAA")
+				vp.msaa_3d = ms
+				vp.scaling_3d_scale = 0.7
+				await measure.call(v[0] + " рендер 70%")
+				vp.scaling_3d_scale = 1.0
+			var snow: Array = get_tree().root.find_children("*", "CPUParticles3D", true, false)
+			var tot := 0
+			for e in snow:
+				tot += (e as CPUParticles3D).amount if (e as CPUParticles3D).emitting else 0
+				(e as Node3D).process_mode = Node.PROCESS_MODE_DISABLED
+				(e as Node3D).visible = false
+			await measure.call(v[0] + " -частицы(%d, %d шт)" % [snow.size(), tot])
+			for e in snow:
+				(e as Node3D).process_mode = Node.PROCESS_MODE_INHERIT
+				(e as Node3D).visible = true
+			var big := []
+			for e in snow:
+				var c := e as CPUParticles3D
+				if c.emitting and c.amount >= 60:
+					big.append("%s:%d" % [c.get_parent().name + "/" + c.name, c.amount])
+			print("[fpsab] крупные эмиттеры: ", big)
+			var areas: Array = get_tree().root.find_children("*", "Area3D", true, false)
+			print("[fpsab] Area3D: %d, Interactable: %d, MeshInstance3D: %d" % [areas.size(), get_tree().root.find_children("*", "Interactable", true, false).size(), get_tree().root.find_children("*", "MeshInstance3D", true, false).size()])
 		get_tree().quit()
 		return
 	if args.has("fpsprobe"):   # FPS в трёх точках (сравнить с --nolandscape и т.п.)

@@ -1462,7 +1462,7 @@ func _build_flashlight_beam() -> void:
 static func make_snow(amount := -1, extents := Vector3(12.0, 0.5, 12.0), height := 6.0, life := 4.0) -> CPUParticles3D:
 	var ps := CPUParticles3D.new()
 	ps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	ps.amount = maxi(amount if amount > 0 else int(600 * Settings.detail()), 16)
+	ps.amount = maxi(amount if amount > 0 else int(440 * Settings.detail()), 16)
 	ps.lifetime = life
 	ps.preprocess = life
 	ps.local_coords = false

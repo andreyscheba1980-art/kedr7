@@ -712,7 +712,7 @@ func _build_note() -> void:
 
 func _build_tasks() -> void:
 	_tasks_panel = UiKit.panel(Color(0.86, 0.82, 0.7, 0.96))
-	_place(_tasks_panel, 1, 0, 1, 0, -520, 50, -20, 560)
+	_place(_tasks_panel, 1, 0, 1, 0, -680, 50, -20, 560)   # три вкладки в ряд: «Задачи», «Заветы», «Записки»
 	var main_vbox := VBoxContainer.new()
 	main_vbox.add_theme_constant_override("separation", 8)
 	_tasks_panel.add_child(main_vbox)
@@ -735,7 +735,7 @@ func _build_tasks() -> void:
 	_tasks_container.add_child(_tasks_label)
 
 	_covenants_container = ScrollContainer.new()
-	_covenants_container.custom_minimum_size = Vector2(480, 440)
+	_covenants_container.custom_minimum_size = Vector2(640, 440)
 	_covenants_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_covenants_container.follow_focus = true
 	main_vbox.add_child(_covenants_container)
@@ -746,7 +746,7 @@ func _build_tasks() -> void:
 	_covenants_container.add_child(_cov_vbox)
 
 	_notes_container = ScrollContainer.new()
-	_notes_container.custom_minimum_size = Vector2(480, 440)
+	_notes_container.custom_minimum_size = Vector2(640, 440)
 	_notes_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_notes_container.follow_focus = true
 	main_vbox.add_child(_notes_container)
@@ -815,7 +815,7 @@ func _rebuild_notes_ui() -> void:
 		b.text = "%d. %s" % [i + 1, title]
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.clip_text = true
-		b.custom_minimum_size = Vector2(460, 30)
+		b.custom_minimum_size = Vector2(620, 30)
 		b.pressed.connect(func() -> void:
 			toggle_tasks()
 			show_note(t))

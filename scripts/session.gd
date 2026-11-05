@@ -174,6 +174,8 @@ func _begin() -> void:
 	await _prewarm_assets(title)
 	if Game.level != null and Settings.batching:
 		StaticBatch.build(Game.level)   # склейка неподвижной геометрии: в разы меньше вызовов отрисовки
+	if Game.level != null:
+		_cull_small(Game.level)
 	for i in range(3):
 		await get_tree().process_frame
 		Perf.mark("first frame %d" % i)
@@ -366,6 +368,38 @@ func _cold_open(title: String) -> void:
 	Game.hud.cinematic = false
 	Vehicle.hold = false
 	await get_tree().create_timer(2.5, false).timeout
+
+
+## Мелочь (кружки, банки, болты, щепки) не рисуем дальше 30–50 м — ни в кадре, ни в каскадах теней:
+## в GL-рендере каждый такой предмет — отдельный вызов отрисовки, и во дворе их тысячи.
+## Снег вокруг игрока считается 40 раз в секунду, а не каждый кадр (CPU-частицы — на процессоре).
+func _cull_small(root: Node) -> void:
+	var n := 0
+	for g in root.find_children("*", "GeometryInstance3D", true, false):
+		var gi := g as GeometryInstance3D
+		if gi is MultiMeshInstance3D or gi.visibility_range_end > 0.0 or not gi.visible and gi.layers == 0:
+			continue
+		if Game.player != null and Game.player.is_ancestor_of(gi):
+			continue
+		var sz := gi.get_aabb().size * gi.global_basis.get_scale()
+		var m := maxf(sz.x, maxf(sz.y, sz.z))
+		if m <= 0.0:
+			continue
+		if m < 0.6:
+			gi.visibility_range_end = 28.0
+			gi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF   # тень кружки от луны не видна, а проход стоит
+		elif m < 1.6:
+			gi.visibility_range_end = 50.0
+		else:
+			continue
+		gi.visibility_range_end_margin = 4.0
+		n += 1
+	for e in root.get_tree().root.find_children("*", "CPUParticles3D", true, false):
+		var c := e as CPUParticles3D
+		if c.amount >= 100 and c.fixed_fps == 0:
+			c.fixed_fps = 40
+			c.fract_delta = true
+	Perf.mark("cull_small: %d мелких предметов с дальностью" % n)
 
 
 func _prewarm_assets(title: String) -> void:

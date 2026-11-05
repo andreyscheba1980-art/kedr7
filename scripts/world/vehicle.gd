@@ -554,7 +554,8 @@ func _hook_figure() -> bool:
 	dir = dir.normalized()
 	var right := Vector3(-dir.z, 0, dir.x)
 	var at := Terrain.at(p + right * 2.7)
-	var fig := Creatures.make_human(&"hunter")
+	# Человек в старом пальто и шапке (модели «hunter» в игре нет — была болванка-силуэт, в фарах не читалась)
+	var fig := Creatures.make_human(&"civil")
 	fig.name = "RoadsideMan"
 	add_child(fig)
 	fig.global_position = at

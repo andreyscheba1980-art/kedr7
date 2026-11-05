@@ -2810,6 +2810,7 @@ func _build_forest() -> void:
 				mmi.position = cc
 				mmi.visibility_range_end = far
 				mmi.visibility_range_end_margin = 6.0
+				mmi.layers = Station.LAYER_OUT   # лес — только «снаружи»: лампы в доме не рисуют его в свои тени
 				add_child(mmi)
 	# Дальняя тайга до краёв карты и зимники к дальним точкам
 	Terrain.build_forest(self, far, Vector3(25.0, 0.0, -8.0), 97.0)

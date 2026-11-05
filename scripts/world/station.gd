@@ -62,6 +62,7 @@ var _baro_dead_said := false
 var _sky_light: DirectionalLight3D
 var _sky_mat: ShaderMaterial
 var _post: ShaderMaterial         ## постобработка кадра (лучи от солнца и луны сквозь ели)
+static var dbg_no_rays := false   ## замер FPS: лучи выключены
 var _sat_t := 2.6                 ## спутник на орбите
 var _sat_stop := -1.0             ## > 0 — спутник «встал» (с 5-й ночи, один раз)
 var _sat_stop_at := -1.0
@@ -282,7 +283,7 @@ func _process(delta: float) -> void:
 			strength *= 0.45   # прикрыто — огонь тлеет, топка светит тускло
 		var flick := sin(_t * 7.3) * 0.18 + sin(_t * 14.9) * 0.10 + sin(_t * 23.1) * 0.06 + (randf() - 0.5) * 0.08
 		_fire.light_energy = clampf((0.72 + flick) * strength, 0.12, 1.35)
-		_fire.omni_range = (3.4 + sin(_t * 4.7) * 0.45) * clampf(strength, 0.7, 1.15)
+		_fire.omni_range = 3.6 * clampf(strength, 0.7, 1.15)   # дрожит яркость, не радиус: смена радиуса заново строила тени
 		_fire.light_color = Color(1.0, 0.46 + sin(_t * 3.8) * 0.07, 0.14)
 		if _fire_glow != null and _fire_glow.get_child_count() > 0:
 			var mi := _fire_glow.get_child(0) as MeshInstance3D
@@ -922,8 +923,9 @@ func _build_environment() -> void:
 	# И тени солнца/луны отбрасывает только наружная геометрия. Раньше вся обстановка дома (сотни
 	# предметов) шла в каскады теней, как только дом попадал в кадр: ~1100 лишних вызовов, просадка FPS
 	_sky_light.shadow_caster_mask = 1 | LAYER_OUT
-	_sky_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality < 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	_sky_light.directional_shadow_max_distance = 30.0 if Settings.quality < 2 else (80.0 if Settings.quality == 2 else 140.0)
+	# 4 каскада — только «Ультра»: каждый каскад — ещё один проход всей наружной сцены
+	_sky_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality < 3 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	_sky_light.directional_shadow_max_distance = 30.0 if Settings.quality < 2 else (40.0 if Settings.quality == 2 else 140.0)
 	_sky_light.shadow_bias = 0.04
 	add_child(_sky_light)
 
@@ -1006,7 +1008,7 @@ func _update_rays() -> void:
 			return
 		_post = c.material as ShaderMaterial
 	var cam := get_viewport().get_camera_3d()
-	if cam == null or _sky_light == null or Game.is_indoors() or Game.is_prologue_trail():
+	if cam == null or _sky_light == null or Game.is_indoors() or Game.is_prologue_trail() or dbg_no_rays:
 		_post.set_shader_parameter(&"ray_amount", 0.0)
 		_post.set_shader_parameter(&"warm", 0.0)
 		return
@@ -2408,7 +2410,7 @@ func _build_corridor() -> void:
 	Geo.cylinder(_swinging_bulb, 0.007, 0.58, Vector3(0.0, -0.29, 0.0), Palette.m(&"dark"), false)
 	var socket := Geo.cylinder(_swinging_bulb, 0.022, 0.06, Vector3(0.0, -0.58, 0.0), Palette.m(&"metal"), false)
 	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.64, 0.0), 7.5, 0.9, Color(1.0, 0.86, 0.68))
-	bulb_omni.shadow_enabled = Settings.quality >= 1   # скользящие тени по коридору на среднем и высоком пресетах
+	bulb_omni.shadow_enabled = Settings.quality >= 2   # скользящие тени по коридору — с высокого пресета
 	bulb_omni.shadow_bias = 0.12
 	bulb_omni.shadow_normal_bias = 2.0
 	Geo.bulb(bulb_omni, &"bulb", 0.065)
@@ -2704,7 +2706,8 @@ func _build_front_door() -> void:
 	var porch := Geo.omni(_porch_bulb, Vector3(0.0, -0.28, 0.0), 9.5, 1.8, Color(1.0, 0.58, 0.26))
 	Atmosphere.add_halo(porch, 1.3)
 	Atmosphere.add_halo(porch, 4.0, Color(1.0, 0.68, 0.42, 0.13))
-	porch.shadow_enabled = Settings.quality >= 1 and not is_backdrop   # живые тени от перил и лееров на среднем и высоком пресетах
+	# Точечный свет с тенями — шесть проходов всего двора за кадр: на «Ультра»; ниже двор тенит луна/солнце
+	porch.shadow_enabled = Settings.quality >= 3 and not is_backdrop
 	porch.shadow_bias = 0.14
 	porch.shadow_normal_bias = 2.0
 	Geo.bulb(porch, &"bulb", 0.07)
@@ -3804,7 +3807,7 @@ func _sleep_to_night1() -> void:
 			Game.set_flag("trunk_delivered", true)
 			Game.set_flag("trunk_unpacked", true)
 			_update_living_trunk_visibility()
-	Game.hud.show_modal_hint("")
+	Game.hud.set_prompt("")   # был вызов несуществующего show_modal_hint — сон обрывался, утро не наступало
 	Game.audio.play_2d("res://assets/audio/breath_loop.ogg", -12.0, 1.5)
 	# Плавное затемнение: станция затихает, потрескивают угли в печи
 	await Game.hud.fade_in_screen("", 2.2)
