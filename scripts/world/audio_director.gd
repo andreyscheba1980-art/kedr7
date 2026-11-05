@@ -566,6 +566,9 @@ func bug_report() -> void:
 	if FileAccess.file_exists(log_path):
 		var lines := FileAccess.get_file_as_string(log_path).split("\n")
 		_write(dir.path_join("log_tail.txt"), "\n".join(lines.slice(maxi(lines.size() - 120, 0))))
+	if SessionLog.instance != null and SessionLog.instance._path != "" and FileAccess.file_exists(SessionLog.instance._path):
+		SessionLog.note("F9-отчёт: " + stamp)
+		_write(dir.path_join("session.txt"), FileAccess.get_file_as_string(SessionLog.instance._path))
 	print("[report] ", dir)
 	if Game.hud != null:
 		Game.hud.subtitle(Loc.t(&"sub.report_saved") + dir, 6.0)

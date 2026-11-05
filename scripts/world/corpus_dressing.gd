@@ -493,8 +493,17 @@ func _build_dust() -> void:
 	add_child(_dust)
 
 
+var _far_t := 0.0
+
+
 func _process(delta: float) -> void:
 	_t += delta
+	# Пульт, самописцы, лампы — внутри корпуса: игрок дальше 45 м их не видит — раз в полсекунды
+	if Game.player != null and Game.zone != &"corpus" and Game.player.global_position.distance_to(Yard.CORPUS_PORCH) > 45.0:
+		_far_t -= delta
+		if _far_t > 0.0:
+			return
+		_far_t = 0.5
 	var c := MeteoCorpus.instance
 	var on := c != null and c.powered
 	_dust.emitting = on

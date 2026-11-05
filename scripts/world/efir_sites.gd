@@ -172,8 +172,15 @@ func _pool_bonus() -> void:
 		Game.hud.toast(Loc.t(&"efir.bonus_battery"), 3.5)
 
 
+var _tick := 0.0
+
+
 func _process(delta: float) -> void:
 	_t += delta
+	_tick -= delta
+	if _tick > 0.0:
+		return
+	_tick = 0.08   # ~12 раз в секунду: мигание ламп и проверка эфира — не каждый кадр
 	var on_air: Array[StringName] = []
 	if Game.radio != null:
 		on_air = Game.radio.signals_on_air()

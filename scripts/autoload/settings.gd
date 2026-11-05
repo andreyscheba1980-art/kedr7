@@ -14,7 +14,7 @@ const KEYS: Array[String] = [
 	"fullscreen", "resolution", "pixelation", "show_fps", "quality", "render_scale", "auto_tuned",
 	"rumble", "mic_enabled", "mic_sensitivity", "mic_threshold", "mic_device", "mic_consent", "mic_mimic",
 	"toggle_breath", "toggle_sprint", "keybinds", "padbinds", "calibrated", "lang_chosen", "warned",
-	"camera_shake", "reduce_flashes", "film_fx", "subtitle_bg",
+	"camera_shake", "reduce_flashes", "film_fx", "subtitle_bg", "auto_res", "fps_limit",
 ]
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 ## Во сколько раз мир рисуется мельче окна: 1 — без пикселизации, 4 — сильная.
@@ -36,6 +36,8 @@ var camera_shake := 1.0          ## доступность: сила тряск�
 var reduce_flashes := false      ## доступность: красные и белые вспышки приглушены
 var film_fx := 1.0               ## доступность: зерно, аберрация, виньетка (0 — чистая картинка)
 var subtitle_bg := false         ## доступность: тёмная подложка под субтитрами
+var auto_res := true             ## динамическое разрешение: просел кадр — 3D-рендер мельче, запас — обратно
+var fps_limit := 0               ## 0 — без ограничения, иначе потолок кадров (ноутбук не греется)
 var ps1_filter := false       ## дрожание вершин и дизеринг PS1 — по желанию, по умолчанию чистая картинка
 var language := "ru"
 var fullscreen := true
@@ -92,6 +94,7 @@ func apply() -> void:
 	RenderingServer.global_shader_parameter_set(&"ps1_post", 1.0 if ps1_filter else 0.0)
 	RenderingServer.global_shader_parameter_set(&"brightness", brightness)
 	RenderingServer.global_shader_parameter_set(&"film_fx", film_fx)
+	Engine.max_fps = fps_limit
 	Loc.set_language(language)
 	_apply_window()
 	if not OS.has_feature("editor") and DisplayServer.get_name() != "headless":

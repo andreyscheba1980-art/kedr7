@@ -37,6 +37,7 @@ static func _mi(kit: MeshKit, key: StringName, tex := "") -> MeshInstance3D:
 		mesh = _mesh_cache[key]
 	else:
 		mesh = kit.commit()
+		mesh.resource_name = String(key)   # для аудита: какой предмет собран из примитивов
 		_mesh_cache[key] = mesh
 	mi.mesh = mesh
 	mi.material_override = _prop_mat(key, tex)
@@ -305,6 +306,9 @@ static func generator() -> Node3D:
 
 ## Бочка 200 л: обручи, пробка. Начало — пол.
 static func barrel() -> Node3D:
+	var glb := _kedr_model("soviet_barrel")   # модель из Блендера: рёбра, кромки, пробки, облезлая краска
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"barrel", "tex_metal.png")
 	if cached != null:
 		return cached
@@ -2110,6 +2114,11 @@ static func guy_wire_ice(length := 2.2) -> Node3D:
 
 ## Деревянный кол путеводного леера с крепежной скобой и красным флажком
 static func rope_post(has_flag := false, flag_col := Color(0.82, 0.14, 0.12), shape := 0) -> Node3D:
+	var glb := _kedr_model("rope_post", {"bright": 1.1})   # тёсаный кол со скобой и снегом (tools/blender/rope_post.py)
+	if glb != null:
+		if has_flag:
+			glb.add_child(_rope_flag(flag_col, shape))
+		return glb
 	var key := StringName("rope_post_%s" % (("flag_%s_%d" % [flag_col.to_html(false), shape]) if has_flag else "bare"))
 	var cached := _instance_from_cache(key, "tex_wood.png")
 	if cached != null:
@@ -2160,6 +2169,46 @@ static func rope_post(has_flag := false, flag_col := Color(0.82, 0.14, 0.12), sh
 				k.spike(Vector3(0.27, 1.20, 0), Vector3(0.44, 1.20, 0.02), 0.055, red_flag, 4)
 
 	return _mi(k, key, "tex_wood.png")
+
+
+## Флажок маршрута на леерном столбике (цвет и форма — у каждого маршрута свои, см. Yard.ROUTES).
+static func _rope_flag(flag_col: Color, shape: int) -> Node3D:
+	var key := StringName("rope_flag_%s_%d" % [flag_col.to_html(false), shape])
+	var cached := _instance_from_cache(key, "tex_cloth.png")
+	if cached != null:
+		return cached
+	var k := _kit(98, 0.04)
+	var red_flag := flag_col
+	# Красный треугольный сигнальный вымпел на ветру
+	var flag_slant := Basis(Vector3.UP, deg_to_rad(15.0)) * Basis(Vector3.FORWARD, deg_to_rad(-8.0))
+	# Ткань флажка — изломами (складки на ветру), а не плоская пластина
+	var cloth := func(c: Vector3, sz: Vector3) -> void:
+		var n := 3
+		for j in n:
+			var seg_w := sz.x / n
+			var bend := Basis(Vector3.UP, deg_to_rad(18.0 if j % 2 == 0 else -18.0))
+			k.box(c + Vector3(-sz.x * 0.5 + seg_w * (j + 0.5), 0, 0.012 * (j % 2)), Vector3(seg_w + 0.01, sz.y - 0.012 * j, sz.z), red_flag, flag_slant * bend)
+	# Флажок покрупнее: по нему теперь читают маршрут (щитов-указателей больше нет).
+	# Форма — для тех, кто не различает цвета (см. Yard.ROUTES).
+	match shape:
+		1:   # прямоугольник
+			cloth.call(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015))
+		2:   # «ласточкин хвост»: два языка
+			k.box(Vector3(0.13, 1.2, 0), Vector3(0.2, 0.2, 0.015), red_flag, flag_slant)
+			k.spike(Vector3(0.23, 1.25, 0), Vector3(0.4, 1.27, 0.02), 0.045, red_flag, 4)
+			k.spike(Vector3(0.23, 1.15, 0), Vector3(0.4, 1.13, 0.02), 0.045, red_flag, 4)
+		3:   # два вымпела один над другим
+			for fy: float in [1.27, 1.1]:
+				k.box(Vector3(0.12, fy, 0), Vector3(0.18, 0.1, 0.015), red_flag, flag_slant)
+				k.spike(Vector3(0.21, fy, 0), Vector3(0.34, fy, 0.02), 0.04, red_flag, 4)
+		4:   # прямоугольник с белой полосой
+			cloth.call(Vector3(0.2, 1.2, 0), Vector3(0.34, 0.2, 0.015))
+			k.box(Vector3(0.2, 1.2, 0.009), Vector3(0.34, 0.06, 0.004), Color(0.92, 0.92, 0.9), flag_slant)
+		_:   # вымпел
+			cloth.call(Vector3(0.15, 1.20, 0), Vector3(0.24, 0.15, 0.015))
+			k.spike(Vector3(0.27, 1.20, 0), Vector3(0.44, 1.20, 0.02), 0.055, red_flag, 4)
+
+	return _mi(k, key, "tex_cloth.png")
 
 
 ## Дощатый деревянный настил мостков с поперечными досками и зазорами

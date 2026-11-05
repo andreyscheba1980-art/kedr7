@@ -40,6 +40,8 @@ func _ready() -> void:
 		_polish_test.call_deferred()
 	elif args.has("--joypad_test"):
 		_joypad_test.call_deferred()
+	elif args.has("--fullrun"):
+		_fullrun.call_deferred()
 	elif args.has("--prologue_b"):
 		_prologue_b.call_deferred()
 	elif args.has("--prologue_review"):
@@ -48,6 +50,81 @@ func _ready() -> void:
 		_test_cabin.call_deferred()
 	else:
 		_run.call_deferred()
+
+
+## Сквозной прогон всей кампании: пролог → утро → ночь 1 → день 1 → … → ночь 7. На каждой фазе:
+## карточка ушла, игрок на земле и в своём месте, цель не пустая, сохранение → загрузка возвращает ту же
+## фазу и флаги, «Продолжить» в той же фазе поднимает ту же сессию. Потом смена кончается — следующая фаза.
+## Итог: [full] строки и [full] ИТОГ с числом проблем (ошибки скриптов смотреть в логе рядом).
+func _fullrun() -> void:
+	var problems: PackedStringArray = []
+	while _app.get("_menu") == null:
+		await get_tree().process_frame
+	SaveGame.new_game("story")
+	Game.set_flag("left_cabin", true)     # кабину и просеку гоняет --prologue_b; здесь — от станции
+	SaveGame.write()
+	_app.call(&"_start_phase")
+	var seen := 0
+	var last := ""
+	var t_all := Time.get_ticks_msec()
+	while seen < 20:
+		# ждём, пока сессия поднимется и карточка уйдёт
+		var t := 0.0
+		while t < 60.0 and (Game.hud == null or Game.hud.is_screen_shown() or Game.player == null):
+			await _wait(0.5)
+			t += 0.5
+		var ph := "%s/%d%s" % [SaveGame.phase["kind"], int(SaveGame.phase["index"]), "+" if Game.has_flag("prologue_arrived") else ""]
+		if ph == last:
+			problems.append("фаза %s повторилась (не продвинулась)" % ph)
+			break
+		last = ph
+		seen += 1
+		await _wait(4.0)
+		var p := Game.player
+		var pos := p.global_position
+		var ground := Terrain.height(pos.x, pos.z)
+		var obj := Game.objective_text()
+		var line := "[full] %-12s старт %.0f с  зона=%s  поз=%s  цель=«%s»" % [ph, t, Game.zone, pos.snapped(Vector3.ONE * 0.1), obj.left(60)]
+		print(line)
+		if t >= 60.0:
+			problems.append("%s: карточка не ушла за 60 с" % ph)
+		if not pos.is_finite() or (Game.is_outside() and pos.y < ground - 1.0):
+			problems.append("%s: игрок под землёй/вне мира %s" % [ph, pos])
+		if obj.strip_edges() == "" and not Game.shift_over:
+			problems.append("%s: пустая цель — непонятно, что делать" % ph)
+		# сохранение → загрузка
+		var before := SaveGame.phase.duplicate()
+		var nflags := SaveGame.flags.size()
+		SaveGame.write()
+		SaveGame.read()
+		if SaveGame.phase != before:
+			problems.append("%s: загрузка сменила фазу на %s" % [ph, SaveGame.phase])
+		if absi(SaveGame.flags.size() - nflags) > 3:
+			problems.append("%s: после загрузки флагов %d вместо %d" % [ph, SaveGame.flags.size(), nflags])
+		# конец смены → следующая фаза
+		if Game.is_prologue() and not Game.has_flag("prologue_arrived"):
+			var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+			st.door_open = false
+			st._on_bed_used(p)               # сон в прологе → «следующее утро»
+		else:
+			for s in Game.TUTORIAL_STEPS:
+				Game.complete_step(s)
+			Game.day_goal_done = true
+			Game.end_shift()
+		var w := 0.0
+		while w < 40.0 and ("%s/%d%s" % [SaveGame.phase["kind"], int(SaveGame.phase["index"]), "+" if Game.has_flag("prologue_arrived") else ""]) == ph:
+			await _wait(0.5)
+			w += 0.5
+		if _app.get("_menu") != null and is_instance_valid(_app.get("_menu")) and (_app.get("_menu") as Node).is_inside_tree():
+			print("[full] после %s — главное меню (кампания кончилась)" % ph)
+			break
+		if Epilogue.ending_id != &"" or get_tree().root.find_children("*", "Epilogue", true, false).size() > 0:
+			print("[full] после %s — эпилог" % ph)
+			break
+	print("[full] ИТОГ: фаз %d за %.0f с, проблем %d" % [seen, (Time.get_ticks_msec() - t_all) / 1000.0, problems.size()])
+	for pr in problems:
+		print("[full] ПРОБЛЕМА: ", pr)
+	get_tree().quit()
 
 
 ## Пролог «застряли на зимнике» целиком: кабина → перемёт → откопать → «дальше пешком» → просека → дом.
@@ -2903,6 +2980,45 @@ func _tour(args: PackedStringArray) -> void:
 			OverlapAudit.run(Game.level, z[1], z[2], 50)
 		get_tree().quit()
 		return
+	if args.has("propaudit"):   # что во дворе собрано из примитивов: крупное и у троп — первым в очередь на модель
+		await _wait(2.0)
+		var rows := {}
+		for g in Game.level.find_children("*", "MeshInstance3D", true, false):
+			var mi := g as MeshInstance3D
+			if mi.mesh == null or not mi.is_visible_in_tree() or mi.layers == 0:
+				continue
+			var path := mi.mesh.resource_path
+			var prim := mi.mesh is PrimitiveMesh
+			var kitm := mi.mesh is ArrayMesh and (path == "" or not path.contains(".glb"))
+			if not prim and not kitm:
+				continue
+			var gp := mi.global_position
+			if Game.yard == null or Game.yard.distance_to_path(gp) > 18.0 or gp.y < -5.0 or (Game.level as Station).is_pos_inside_house(gp):
+				continue
+			var sz := mi.get_aabb().size * mi.global_basis.get_scale()
+			var big := sz.x * sz.y + sz.y * sz.z + sz.x * sz.z
+			if big < 0.15:
+				continue
+			# имя владельца: ближайший предок с осмысленным именем
+			var owner_n: Node = mi
+			while owner_n != null and String(owner_n.name).begins_with("@"):
+				owner_n = owner_n.get_parent()
+			if big > 400.0:
+				continue   # горы, небо, земля
+			var mname := mi.mesh.resource_name if mi.mesh.resource_name != "" else String(mi.name)
+			var key := "%s / %s [%s]" % [String(owner_n.name) if owner_n != null else "?", mname, "примитив " + mi.mesh.get_class() if prim else "MeshKit"]
+			if not rows.has(key):
+				rows[key] = [0.0, 0, gp]
+			rows[key][0] += big
+			rows[key][1] += 1
+		var arr := []
+		for k: String in rows:
+			arr.append([rows[k][0], k, rows[k][1], rows[k][2]])
+		arr.sort_custom(func(x: Array, y: Array) -> bool: return x[0] > y[0])
+		for r: Array in arr.slice(0, 45):
+			print("[prop] %6.1f м²  ×%-3d %s  @%s" % [r[0], r[2], r[1], (r[3] as Vector3).snapped(Vector3.ONE)])
+		get_tree().quit()
+		return
 	if args.has("treeprof"):   # чья логика ест кадр: выключаем поддеревья (process_mode DISABLED) и меряем
 		_tp(Vector3(20, 0, -20), 200.0)
 		await _wait(3.0)
@@ -3264,7 +3380,7 @@ func _tour(args: PackedStringArray) -> void:
 	if args.has("vistas"):   # красота: двор, дом, лес с фонарём, небо, озеро, мачта — для оценки картинки
 		Game.player.set_flashlight(true)
 		print("[vis] ясно=%.2f метель=%.2f фронт=%s ночь=%d мин=%.0f" % [Game.weather.clearness(), Game.weather.intensity, Game.synoptic.front_type if Game.synoptic != null else &"-", Game.night, Game.shift_minutes])
-		for v: Array in [["house", Vector3(26, 0, 14), Vector3(12, 2.5, 3)], ["forest", Vector3(-20, 0, -48), Vector3(-34, 1.5, -62)],
+		for v: Array in [["house", Vector3(26, 0, 14), Vector3(12, 2.5, 3)], ["ropes", Vector3(22, 0, -2), Vector3(26, 0.6, -14)], ["forest", Vector3(-20, 0, -48), Vector3(-34, 1.5, -62)],
 				["sky", Vector3(10, 0, -10), Vector3(10, 30, -60)], ["lake", Yard.LAKE + Vector3(12, 0, 10), Yard.LAKE],
 				["mast", Yard.MAST + Vector3(14, 0, 12), Yard.MAST + Vector3(0, 8, 0)], ["trail", Vector3(-9.4, 0, -35), Vector3(-2, 1.4, -28)]]:
 			var p0: Vector3 = v[1]

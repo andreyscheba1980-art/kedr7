@@ -29,6 +29,7 @@ func _ready() -> void:
 	add_to_group(&"session")
 	add_child(Hud.new())
 	add_child(AudioDirector.new())
+	add_child(SessionLog.new())   # журнал для плейтеста: цели, тупики, смерти — sessions/ рядом с игрой
 
 	var container := SubViewportContainer.new()
 	_container = container
@@ -102,6 +103,34 @@ func _ready() -> void:
 	_begin()
 
 
+## Динамическое разрешение: раз в 2 с смотрим средний кадр. Ниже 52 FPS — 3D-рендер мельче на 7 %
+## (до 60 %), выше 72 — обратно к настройке. Только если упираемся в видеокарту — на процессоре не поможет,
+## но и не вредит. Отключается в настройках.
+var _dyn_t := 0.0
+var _dyn_f0 := 0
+var _dyn_scale := 1.0
+
+
+func _tick_dynamic_res(delta: float) -> void:
+	_dyn_t += delta
+	if _dyn_t < 2.0 or _vp == null:
+		return
+	var frames := Engine.get_frames_drawn() - _dyn_f0
+	var fps := float(frames) / _dyn_t
+	_dyn_f0 = Engine.get_frames_drawn()
+	_dyn_t = 0.0
+	var top := clampf(Settings.render_scale, 0.5, 1.0)
+	if not Settings.auto_res:
+		_dyn_scale = top
+	elif fps < 52.0 and (Settings.fps_limit == 0 or Settings.fps_limit > 55):
+		_dyn_scale = maxf(_dyn_scale - 0.07, 0.6)
+	elif fps > 72.0:
+		_dyn_scale = minf(_dyn_scale + 0.05, top)
+	_dyn_scale = minf(_dyn_scale, top)
+	if absf(_vp.scaling_3d_scale - _dyn_scale) > 0.001:
+		_vp.scaling_3d_scale = _dyn_scale
+
+
 func _apply_settings() -> void:
 	if _container != null and _container.stretch_shrink != Settings.render_shrink():
 		_container.stretch_shrink = Settings.render_shrink()
@@ -110,7 +139,8 @@ func _apply_settings() -> void:
 	if _vp != null:
 		_vp.msaa_3d = Settings.msaa()
 		_vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-		_vp.scaling_3d_scale = clampf(Settings.render_scale, 0.5, 1.0)
+		_dyn_scale = clampf(Settings.render_scale, 0.5, 1.0)
+		_vp.scaling_3d_scale = _dyn_scale
 	if _player != null and _player.flashlight != null:
 		_player.flashlight.shadow_enabled = Settings.quality >= 1
 	if Game.level != null and Game.level.has_method(&"apply_quality"):
@@ -895,3 +925,7 @@ func _notification(what: int) -> void:
 func _exit_tree() -> void:
 	if get_tree() != null:
 		get_tree().paused = false
+
+
+func _process(delta: float) -> void:
+	_tick_dynamic_res(delta)

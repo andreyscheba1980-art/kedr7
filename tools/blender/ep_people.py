@@ -526,6 +526,8 @@ for o in kit.objs:
     vg.add(list(range(len(o.data.vertices))), 1.0, "REPLACE")
 NAME = f"human_ep_{VAR}"
 body, img, tris = kit.finish(NAME, OUT, res=1024, origin="keep", samples=20, ao_min=0.55)
+import skin
+print("[skin] плавных вершин у суставов:", skin.smooth_joints(body, BONES))
 
 arm_data = bpy.data.armatures.new(NAME + "_arm")
 arm = bpy.data.objects.new("Armature", arm_data)

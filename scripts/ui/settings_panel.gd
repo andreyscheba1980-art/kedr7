@@ -50,6 +50,9 @@ func _ready() -> void:
 		func(i: int) -> void: Settings.pixelation = i)
 	_toggle(box, &"set.ps1", Settings.ps1_filter, func(on: bool) -> void: Settings.ps1_filter = on)
 	_toggle(box, &"set.fps", Settings.show_fps, func(on: bool) -> void: Settings.show_fps = on)
+	_toggle(box, &"set.auto_res", Settings.auto_res, func(on: bool) -> void: Settings.auto_res = on)
+	_choice(box, &"set.fps_limit", [&"set.fps_lim0", &"set.fps_lim60", &"set.fps_lim30"], [0, 60, 30].find(Settings.fps_limit) if [0, 60, 30].has(Settings.fps_limit) else 0,
+		func(i: int) -> void: Settings.fps_limit = [0, 60, 30][i])
 	_slider(box, &"set.brightness", "brightness", 0.7, 1.5, 0.05)
 	box.add_child(UiKit.button(Loc.t(&"calib.open"), func() -> void:
 		var layer := CanvasLayer.new()
