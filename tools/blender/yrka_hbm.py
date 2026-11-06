@@ -101,10 +101,18 @@ for v in me.vertices:
         axis_pt = a + (b - a) * tt
         p = axis_pt + (p - axis_pt) * 0.82
     elif p.z > 0.95 and p.z < 1.42:
-        # Туловище: впалый живот, острые рёбра, сутулые узкие плечи
-        p.x *= 0.9
+        # Туловище: впалый живот, впалая грудина, рёбра проступают, плечи узкие, костлявые и задраны
+        p.x *= 0.88
         if p.y > 0.02 and p.z < 1.2:
-            p.y -= 0.025 * (1.0 - abs(p.z - 1.07) / 0.15)
+            p.y -= 0.03 * (1.0 - abs(p.z - 1.07) / 0.15)
+        if p.y > 0.04 and 1.05 < p.z < 1.36:
+            sternum = max(0.0, 1.0 - abs(p.x) / 0.07)
+            p.y -= 0.03 * sternum * (1.0 - abs(p.z - 1.22) / 0.17)
+            if abs(p.x) < 0.14:
+                p.y += 0.005 * math.sin((p.z - 1.05) * math.pi / 0.045)   # рёбра: полосы через каждые 4,5 см
+        if p.z > 1.33 and abs(p.x) > 0.11:
+            p.z += 0.03 * min(1.0, (abs(p.x) - 0.11) / 0.08)               # плечи вверх — к ушам
+            p.x *= 0.96
     elif p.z <= 0.95:
         # Ноги: тоньше к оси
         _, kn = B[f"thigh.{n}"]
@@ -205,13 +213,90 @@ for v in hat.data.vertices:
     v.co = Matrix.Rotation(math.radians(9), 3, "Y") @ (v.co - Vector((0, 0, 1.62))) + Vector((0.01, 0, 1.63))
 hat.data.update()
 
+# --- 1.56: лохмотья, иней, сосульки — силуэт перестаёт быть гладким ------------------------
+import random
+rnd = random.Random(310)
+RAG = frosted("y3_rag", (0.06, 0.05, 0.045), amount=0.18, top_bias=0.9)
+FROST = kit.mat("y3_frostcrust", (0.62, 0.68, 0.76), rough=0.5, noise=0.25, noise_scale=90)
+ICE = kit.mat("y3_ice", (0.7, 0.78, 0.86), rough=0.15)
+rags = []
+
+
+def rag(top, down, width, length, curl):
+    """Полоса рваной ткани: свисает от top вниз (down — куда), конец сужен и закручен."""
+    m = bpy.data.meshes.new("rag")
+    bm = bmesh.new()
+    side = down.cross(Vector((0, 0, 1)))
+    side = side.normalized() if side.length > 1e-4 else Vector((1, 0, 0))
+    rows = []
+    n = 5
+    for i in range(n):
+        t = i / (n - 1)
+        w = width * (1.0 - 0.75 * t) * (0.8 + 0.4 * rnd.random())
+        c = top + down * (length * t) + side * math.sin(t * 2.2) * curl
+        rows.append([bm.verts.new(c - side * w / 2), bm.verts.new(c + side * w / 2)])
+    for i in range(n - 1):
+        bm.faces.new((rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]))
+    bm.to_mesh(m); bm.free()
+    o = bpy.data.objects.new("rag", m)
+    bpy.context.collection.objects.link(o)
+    m.materials.append(RAG)
+    sol = o.modifiers.new("sol", "SOLIDIFY"); sol.thickness = 0.006
+    kit.objs.append(o)
+    rags.append(o)
+
+
+# с подола тулупа — по кругу, длинные
+for k in range(22):
+    a = k / 22 * math.tau + rnd.uniform(-0.1, 0.1)
+    top = Vector((math.cos(a) * 0.21, math.sin(a) * 0.17, 0.67 + rnd.uniform(-0.03, 0.03)))
+    out = Vector((math.cos(a), math.sin(a), 0)) * 0.12
+    rag(top, (Vector((0, 0, -1)) + out).normalized(), rnd.uniform(0.03, 0.07), rnd.uniform(0.14, 0.38), rnd.uniform(-0.03, 0.03))
+# с обшлагов рукавов
+for n_ in ("L", "R"):
+    el = B[f"upper_arm.{n_}"][1]
+    wr = B[f"forearm.{n_}"][1]
+    fa = (wr - el).normalized()
+    cuff = el + (wr - el) * 0.3
+    for k in range(5):
+        off = Vector((rnd.uniform(-0.03, 0.03), rnd.uniform(-0.03, 0.03), 0))
+        rag(cuff + off, (fa + Vector((0, 0, -0.6))).normalized(), rnd.uniform(0.02, 0.05), rnd.uniform(0.1, 0.24), 0.02)
+# со спины и из прорехи на груди
+for k in range(6):
+    rag(Vector((rnd.uniform(-0.15, 0.15), -0.16, rnd.uniform(1.0, 1.3))), Vector((0, -0.25, -1)).normalized(), rnd.uniform(0.03, 0.06), rnd.uniform(0.12, 0.3), 0.02)
+for k in range(4):
+    rag(Vector((rnd.uniform(-0.07, 0.07), 0.12, rnd.uniform(1.05, 1.3))), Vector((0, 0.15, -1)).normalized(), rnd.uniform(0.02, 0.04), rnd.uniform(0.08, 0.18), 0.015)
+
+# корка инея на плечах, загривке и макушке шапки
+crust = shell("crust", lambda c: (c.z > 1.36 and abs(c.x) < 0.24 and c.y < 0.08 and not (abs(c.x) < 0.06 and c.y > 0.0 and c.z < 1.5)) or c.z > 1.66, 0.05, FROST, 0.01, 35.0)
+bm = bmesh.new(); bm.from_mesh(crust.data)
+kill = [f for f in bm.faces if noise.noise(f.calc_center_median() * 18.0) < -0.05]
+bmesh.ops.delete(bm, geom=kill, context="FACES"); bm.to_mesh(crust.data); bm.free()
+# сосульки: с подбородка и с края ушанки
+icicles = []
+for k in range(7):
+    x = rnd.uniform(-0.03, 0.03)
+    ln = rnd.uniform(0.02, 0.05)
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.004, radius2=0.0, depth=ln, location=(x, 0.1, MOUTH_Z - 0.045 - ln / 2), rotation=(math.pi, 0, 0))
+    o = bpy.context.object; o.data.materials.append(ICE); kit.objs.append(o); icicles.append(o)
+for k in range(12):
+    a = rnd.uniform(0, math.tau)
+    ln = rnd.uniform(0.02, 0.07)
+    bpy.ops.mesh.primitive_cone_add(vertices=4, radius1=0.005, radius2=0.0, depth=ln, location=(math.cos(a) * 0.12, math.sin(a) * 0.13 + 0.01, 1.58 - ln / 2), rotation=(math.pi, 0, 0))
+    o = bpy.context.object; o.data.materials.append(ICE); kit.objs.append(o); icicles.append(o)
+
 # --- Скелет, веса, сутулая поза покоя ----------------------------------------------------
 arm = an.armature(BONES, "YrkaArm")
 bpy.ops.object.select_all(action="DESELECT")
 body.select_set(True); arm.select_set(True)
 bpy.context.view_layer.objects.active = arm
 bpy.ops.object.parent_set(type="ARMATURE_AUTO")
-for o in [coat, pants, boots, hat, throat] + list(eyes):
+for o in [coat, pants, boots, hat, throat, crust] + list(eyes) + rags + icicles:
+    for mod in list(o.modifiers):
+        if mod.type == "SOLIDIFY":
+            bpy.ops.object.select_all(action="DESELECT")
+            o.select_set(True); bpy.context.view_layer.objects.active = o
+            bpy.ops.object.modifier_apply(modifier=mod.name)
     dt = o.modifiers.new("dt", "DATA_TRANSFER")
     dt.object = body
     dt.use_vert_data = True
@@ -254,7 +339,7 @@ for n, s in (("L", -1), ("R", 1)):
     aim(P[f"shin.{n}"], (0.0, -0.18, -1))
 bpy.ops.object.mode_set(mode="OBJECT")
 # Поза → меш и покой скелета
-for o in [body, coat, pants, boots, hat, throat] + list(eyes):
+for o in [body, coat, pants, boots, hat, throat, crust] + list(eyes) + rags + icicles:
     bpy.ops.object.select_all(action="DESELECT")
     o.select_set(True); bpy.context.view_layer.objects.active = o
     for mod in list(o.modifiers):
@@ -334,7 +419,7 @@ clip("pin", 21, {1: PI_A, 11: PI_B, 21: PI_A})
 
 # --- 1.55: на четырёх, рывок, замирание в луче -------------------------------------------
 # crawl — бег на четырёх: тело горизонтально, руки — передние лапы, диагональный аллюр (левая рука с правой ногой)
-ROOT_UP = float(os.environ.get("ROOT_UP", "0.36"))
+ROOT_UP = float(os.environ.get("ROOT_UP", "0.58"))   # на четырёх — руки и ноги на снегу, не в нём
 CR_BASE = {"root": (-76, 0, 0), "root@loc": (0, ROOT_UP, 0), "spine": (-4, 0, 0), "chest": (-6, 0, 0), "neck": (48, 0, 0), "head": (34, 0, 0), "jaw": (16, 0, 0)}
 CR_A = dict(CR_BASE, **{"thigh.L": (98, 0, 0), "shin.L": (-58, 0, 0), "foot.L": (-30, 0, 0), "thigh.R": (52, 0, 0), "shin.R": (-20, 0, 0), "foot.R": (10, 0, 0),
                         "upper_arm.L": (58, 0, 6), "forearm.L": (8, 0, 0), "hand.L": (-46, 0, 0), "upper_arm.R": (104, 0, -6), "forearm.R": (-14, 0, 0), "hand.R": (-60, 0, 0),

@@ -111,36 +111,30 @@ def valenki(body, mat):
 
 
 def ushanka(body, name, ne, mat, flaps_down=True):
-    """Ушанка: меховая тулья, отворот надо лбом, уши вниз (flaps_down) или подвязаны и не видны."""
+    """Ушанка по форме черепа (1.56): тулья — оболочка головы, толстый меховой отворот надо лбом,
+    затыльник, уши вниз (flaps_down) или подняты и подвязаны на макушке. Раньше — купол шире головы («гриб»)."""
     hz = lambda z: z + ne
-    c = (0.0, 0.022, hz(1.635))
-    crown = dome(name, c, (0.1, 0.12, 0.085), hz(1.6), 0.03, mat, segs=24, rings=14)
-    an.sculpt(crown, amp=0.01, scale=26.0, seed=3.0)
-    rim = band(name + "_band", c, (0.112, 0.134), hz(1.596), hz(1.652), 0.03, mat, n=36)
-    # мех отворота: толще надо лбом, неровный
-    for v in rim.data.vertices:
-        front = max(0.0, (v.co.y - c[1]) / 0.134)
-        v.co.z += 0.018 * front * front * (1.0 if v.co.z > hz(1.62) else 0.0)
-    rim.data.update()
-    an.sculpt(rim, amp=0.009, scale=30.0, seed=4.0)
-    parts = [crown, rim]
-    for s in (-1, 1):
-        if flaps_down:
-            kit.box(name + "_flap", (0.035, 0.1, 0.13), (0.088 * s, 0.01, hz(1.535)), mat, bevel=0.015, rot=(0.0, -0.12 * s, 0.0))
+    def crown_pred(c):
+        if abs(c.x) > 0.105:
+            return False
+        if c.y > 0.07:                     # лоб: край чуть выше бровей
+            return c.z > hz(1.612)
+        if c.y > 0.0:                      # виски — до верха ушей
+            return c.z > hz(1.572)
+        return c.z > hz(1.535)             # затылок — низко
+    crown = hbm.shell(body, name + "_crown", crown_pred, 0.026, mat, 0.006, 22.0, smooth=6)
+    # отворот надо лбом: мех валиком
+    front = hbm.shell(body, name + "_front", lambda c: hz(1.607) < c.z < hz(1.652) and c.y > 0.065 and abs(c.x) < 0.078, 0.032, mat, 0.006, 30.0, smooth=10)
+    back = hbm.shell(body, name + "_back", lambda c: hz(1.53) < c.z < hz(1.57) and c.y < -0.04 and abs(c.x) < 0.07, 0.03, mat, 0.006, 30.0, smooth=10)
+    parts = [crown, front, back]
+    if flaps_down:
+        for s in (-1, 1):
+            kit.box(name + "_flap", (0.03, 0.095, 0.125), (0.092 * s, 0.008, hz(1.545)), mat, bevel=0.014, rot=(0.0, -0.1 * s, 0.0))
             parts.append(kit.objs[-1])
-        else:
-            # уши подняты и подвязаны на макушке: два меховых клапана вдоль тульи, сверху — шнурок
-            kit.box(name + "_flapup", (0.024, 0.1, 0.095), (0.058 * s, 0.014, hz(1.698)), mat, bevel=0.012, rot=(0.0, 1.18 * s, 0.0))
-            parts.append(kit.objs[-1])
-    if not flaps_down:
-        kit.box(name + "_tie", (0.04, 0.006, 0.006), (0.0, 0.014, hz(1.722)), mat, bevel=0.0)
-        parts.append(kit.objs[-1])
-    for p in parts[2:]:
-        bpy.ops.object.select_all(action="DESELECT")
-        p.select_set(True); bpy.context.view_layer.objects.active = p
-        for mod in list(p.modifiers):
-            bpy.ops.object.modifier_apply(modifier=mod.name)
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    else:
+        # уши подняты: меховые клапаны лежат на тулье по бокам, сверху шнурок
+        up = hbm.shell(body, name + "_flapsup", lambda c: c.z > hz(1.66) and 0.03 < abs(c.x) < 0.085 and -0.035 < c.y < 0.055, 0.044, mat, 0.005, 28.0, smooth=12)
+        parts.append(up)
     return parts
 
 
@@ -295,11 +289,8 @@ def build(variant):
         pants = hbm.shell(body, "pants", lambda c: 0.3 < c.z < 0.98 and abs(c.x) < 0.22, 0.024, PANTS, 0.01, 7.0, smooth=12)
         quilt(pants, 0.09, 0.005)
         boots = valenki(body, FELT)
-        cc = (0.0, 0.025, head_z(1.625))
-        cap = dome("cap", cc, (0.088, 0.12, 0.09), head_z(1.612), 0.04, CAP)
-        an.sculpt(cap, amp=0.003, scale=60.0, seed=6.0)
-        cband = band("capband", cc, (0.094, 0.126), head_z(1.6), head_z(1.64), 0.04, CAP)
-        quilt(cband, 0.012, 0.003)
+        cap = hbm.shell(body, "cap", lambda c: abs(c.x) < 0.1 and (c.z > head_z(1.62) if c.y > 0.06 else c.z > head_z(1.585)), 0.014, CAP, 0.003, 60.0, smooth=10)
+        cband = hbm.shell(body, "capband", lambda c: abs(c.x) < 0.085 and (head_z(1.62) < c.z < head_z(1.652) if c.y > 0.04 else head_z(1.59) < c.z < head_z(1.622)), 0.02, CAP, 0.002, 80.0, smooth=12)
         g = [torus("lens", 0.0175, 0.0017, (EYE_C[0] * s, 0.15, ez + 0.002), METAL) for s in (-1, 1)]
         kit.box("bridge", (0.018, 0.003, 0.003), (0, 0.153, ez + 0.006), METAL, bevel=0.0)
         g.append(kit.objs[-1])

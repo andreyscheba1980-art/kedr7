@@ -767,6 +767,7 @@ func _update_chase(delta: float) -> void:
 			crig.pose_override = &""
 		if crig.has_clip(&"crawl"):
 			crig.clip_run = &"crawl" if dist > 10.0 else (&"dash" if dist < 5.0 and crig.has_clip(&"dash") else &"run")
+		_tick_gait_sound(delta, crig.clip_run)
 
 	var top := CHASE_SPEED * (0.85 if Game.is_story() else 1.12 if Game.is_hard() else 1.0)
 	var speed := lerpf(2.2, top, clampf(_chase_t / 2.5, 0.0, 1.0))
@@ -788,6 +789,41 @@ func _update_chase(delta: float) -> void:
 	_update_flashlight_eyeshine()
 	if dist < CATCH_DIST:
 		_catch()
+
+
+## Звук аллюра (1.56): на четырёх — четыре удара за шаг (руки, руки, ноги, ноги), под руками — скрежет
+## когтей по насту; в рывке — два тяжёлых удара; в обычном беге — прежняя петля шагов.
+const CLAWS := ["res://assets/sfx/cc0/claw_scrape_1.wav", "res://assets/sfx/cc0/claw_scrape_2.wav",
+	"res://assets/sfx/cc0/claw_scrape_3.wav", "res://assets/sfx/cc0/claw_scrape_4.wav"]
+const CRUST := ["res://assets/sfx/cc0/step_crust_1.ogg", "res://assets/sfx/cc0/step_crust_2.ogg", "res://assets/sfx/cc0/step_crust_3.ogg"]
+const CRAWL_BEATS := [0.12, 0.24, 0.11, 0.24]   ## аллюр 17 кадров (0,71 с): рука-рука … нога-нога
+const DASH_BEATS := [0.23, 0.23]
+var _gait_t := 0.0
+var _gait_i := 0
+
+
+func _tick_gait_sound(delta: float, clip: StringName) -> void:
+	var quad := clip == &"crawl" or clip == &"dash"
+	if _run_player != null:
+		_run_player.volume_db = -30.0 if quad else 2.0
+	if not quad:
+		_gait_t = 0.0
+		return
+	_gait_t -= delta
+	if _gait_t > 0.0:
+		return
+	var beats: Array = CRAWL_BEATS if clip == &"crawl" else DASH_BEATS
+	_gait_i = (_gait_i + 1) % beats.size()
+	_gait_t = float(beats[_gait_i]) * randf_range(0.92, 1.08)
+	var pos := _creature.global_position + Vector3(0, 0.2, 0)
+	var hands := clip == &"crawl" and _gait_i < 2
+	var thump := Game.audio.play_3d(CRUST[randi() % CRUST.size()], pos, 0.0 if clip == &"dash" else -3.0, 6.0)
+	if thump != null:
+		thump.pitch_scale = randf_range(0.7, 0.82) if clip == &"dash" else randf_range(0.85, 1.0)
+	if hands or clip == &"dash":
+		var cl := Game.audio.play_3d(CLAWS[randi() % CLAWS.size()], pos, -4.0 if hands else -8.0, 5.0)
+		if cl != null:
+			cl.pitch_scale = randf_range(0.9, 1.15)
 
 
 func _end_chase(how: String) -> void:

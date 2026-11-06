@@ -12,9 +12,11 @@ EYE = (0.033, 0.098, 1.574)
 MOUTH_Z = 1.497
 
 
-def load_body(bundle, mat):
+def load_body(bundle, mat, fem=False):
+    """fem — женская болванка (та же топология, на 2,6 % ниже): масштабируем под мужские ориентиры —
+    кости, роспись лица и одежда по высотам годятся без изменений."""
     with bpy.data.libraries.load(bundle, link=False) as (src, dst):
-        dst.objects = ["GEO-body_male_realistic"]
+        dst.objects = ["GEO-body_female_realistic" if fem else "GEO-body_male_realistic"]
     body = dst.objects[0]
     bpy.context.collection.objects.link(body)
     for m in list(body.modifiers):
@@ -24,9 +26,10 @@ def load_body(bundle, mat):
     cx = sum((body.matrix_world @ v.co).x for v in body.data.vertices) / len(body.data.vertices)
     mw = body.matrix_world.copy()
     rot = Matrix.Rotation(math.pi, 4, "Z")
+    k = 1.684 / 1.641 if fem else 1.0
     for v in body.data.vertices:
         w = mw @ v.co
-        v.co = rot @ Vector((w.x - cx, w.y, w.z))
+        v.co = rot @ Vector((w.x - cx, w.y, w.z)) * k
     body.matrix_world = Matrix.Identity(4)
     body.data.update()
     body.name = "body"
