@@ -626,9 +626,11 @@ func _process(delta: float) -> void:
 		if door_open:
 			var storm_factor := 1.0 + (Game.weather.intensity if Game.weather != null else 0.0) * 1.8
 			sway_base += sin(_t * 4.2) * 0.16 * storm_factor + (randf() * 0.02)
+		# Только от стены в комнату (отрицательный угол): иначе низ шторы уходил в раму и стену
+		var sway := -clampf(absf(sway_base), 0.0, 0.22)
 		for panel: Node3D in _curtain_panels:
 			if is_instance_valid(panel):
-				panel.rotation.x = sway_base
+				panel.rotation.x = sway
 
 	# Мерцание керосиновой лампы
 	if _kerosene_lit and _kerosene_light != null:
@@ -3976,28 +3978,29 @@ func _csg(parent: Node, size: Vector3, pos: Vector3, mat: Material, subtract := 
 
 func _build_curtains() -> void:
 	# 1. Северное окно радиорубки
-	var c_north := Props.curtains(1.15, 0.95)
-	c_north.position = Vector3(9.2, 1.85, -1.92)
+	# Карниз шире окна на ~0,5 м и на 13–15 см от стены — шторы висят перед рамой, а не в проёме
+	var c_north := Props.curtains(1.6, 0.95)
+	c_north.position = Vector3(9.2, 1.415, -1.87)     # карниз над рамой (1,93), низ у подоконника
 	add_child(c_north)
 	_register_curtain_panels(c_north)
 
 	# 2. Западное окно жилой комнаты
-	var c_west := Props.curtains(1.05, 0.95)
-	c_west.position = Vector3(-2.45, 1.85, 3.3)
+	var c_west := Props.curtains(1.5, 0.95)
+	c_west.position = Vector3(-2.37, 1.415, 3.3)
 	c_west.rotation.y = deg_to_rad(90.0)
 	add_child(c_west)
 	_register_curtain_panels(c_west)
 
 	# 3. Южное окно жилой комнаты
-	var c_south_l := Props.curtains(0.95, 0.95)
-	c_south_l.position = Vector3(0.5, 1.85, 6.55)
+	var c_south_l := Props.curtains(1.4, 0.95)
+	c_south_l.position = Vector3(0.5, 1.415, 6.47)
 	c_south_l.rotation.y = deg_to_rad(180.0)
 	add_child(c_south_l)
 	_register_curtain_panels(c_south_l)
 
 	# 4. Южное окно коридора
-	var c_south_c := Props.curtains(0.75, 0.75)
-	c_south_c.position = Vector3(7.5, 1.85, 6.55)
+	var c_south_c := Props.curtains(1.15, 0.7)
+	c_south_c.position = Vector3(7.5, 1.49, 6.47)
 	c_south_c.rotation.y = deg_to_rad(180.0)
 	add_child(c_south_c)
 	_register_curtain_panels(c_south_c)

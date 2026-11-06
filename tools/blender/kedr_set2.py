@@ -201,11 +201,11 @@ elif PART == "books":
     # Журнал «Метеорология и гидрология» сверху, раскрытый блокнот рядом
     jm = mat("journal", (0.62, 0.6, 0.5), rough=1.0, noise=0.15, noise_scale=30)
     box("journal", (0.2, 0.27, 0.006), (0.0, 0.0, z + 0.003), jm, 0.0, rot=(0, 0, 0.3))
-    text("МиГ", 0.04, (0.02, -0.04, z + 0.0065), INK, rot=(0, 0, 0.3))
-    box("note_l", (0.1, 0.15, 0.008), (0.24, 0.02, 0.004), PAGES, 0.0, rot=(0, math.radians(4), 0.1))
-    box("note_r", (0.1, 0.15, 0.008), (0.34, 0.03, 0.004), PAGES, 0.0, rot=(0, math.radians(-4), 0.1))
-    for k in range(5):
-        box(f"line{k}", (0.07, 0.002, 0.001), (0.34, 0.0 + k * 0.02, 0.009), INK, 0.0, rot=(0, 0, 0.1))
+    # обложка журнала: тёмная плашка-шапка вместо объёмных букв
+    box("journal_band", (0.2, 0.05, 0.001), (0.0 - 0.105 * math.sin(0.3), 0.105 * math.cos(0.3), z + 0.0065), mat("jband", (0.32, 0.12, 0.1), rough=0.9), 0.0, rot=(0, 0, 0.3))
+    NOTE = mat("note", (0.6, 0.56, 0.46), rough=1.0, noise=0.12, noise_scale=60)
+    box("note_l", (0.1, 0.15, 0.003), (0.24, 0.02, 0.0015), NOTE, 0.0, rot=(0, 0, 0.1))
+    box("note_r", (0.1, 0.15, 0.003), (0.34, 0.03, 0.0015), NOTE, 0.0, rot=(0, 0, 0.1))
     NAME = "books"
 elif PART == "table_clutter":
     ENAM = mat("enamel_w", (0.78, 0.76, 0.7), rough=0.3, wear=0.7, wear_col=(0.1, 0.1, 0.1))
@@ -213,8 +213,9 @@ elif PART == "table_clutter":
     GLASS = mat("ashtray", (0.3, 0.38, 0.36), rough=0.2)
     BUTT = mat("butt", (0.75, 0.7, 0.6), rough=1.0)
     ASH = mat("ash", (0.3, 0.3, 0.3), rough=1.0)
-    PAPER = mat("paper", (0.7, 0.66, 0.55), rough=1.0, noise=0.2, noise_scale=40)
-    NEWS = mat("news", (0.6, 0.58, 0.52), rough=1.0, noise=0.35, noise_scale=200)
+    PAPER = mat("paper", (0.6, 0.56, 0.46), rough=1.0, noise=0.12, noise_scale=40)
+    NEWS = mat("news", (0.52, 0.5, 0.46), rough=1.0, noise=0.18, noise_scale=120)
+    COLS = mat("newscols", (0.42, 0.41, 0.39), rough=1.0, noise=0.25, noise_scale=300)
     MATCH = mat("match", (0.55, 0.42, 0.2), rough=0.9)
     TEA = mat("tea", (0.18, 0.08, 0.03), rough=0.1)
     vcyl("mug", 0.045, 0.09, (0, 0, 0), ENAM, 16)
@@ -229,10 +230,13 @@ elif PART == "table_clutter":
     box("matchbox", (0.05, 0.035, 0.015), (0.12, -0.08, 0.0075), MATCH, 0.001, rot=(0, 0, 0.4))
     box("paper1", (0.21, 0.297, 0.002), (-0.2, 0.05, 0.001), PAPER, 0.0, rot=(0, 0, -0.2))
     box("paper2", (0.21, 0.297, 0.002), (-0.17, 0.08, 0.003), PAPER, 0.0, rot=(0, 0, 0.15))
-    for k in range(8):
-        box(f"pl{k}", (0.15, 0.003, 0.001), (-0.17, -0.02 + k * 0.025, 0.0045), INK, 0.0, rot=(0, 0, 0.15))
     box("news", (0.3, 0.42, 0.004), (0.05, 0.22, 0.002), NEWS, 0.0, rot=(0, 0, 0.6))
-    text("ПРАВДА", 0.045, (0.03, 0.15, 0.0045), INK, rot=(0, 0, 0.6))
+    # газетные колонки — серые полосы шрифта, едва темнее бумаги (не чёрные каракули)
+    ca, sa = math.cos(0.6), math.sin(0.6)
+    for k in range(3):
+        lx = -0.09 + k * 0.09
+        box(f"col{k}", (0.075, 0.3, 0.0008), (0.05 + lx * ca - (-0.03) * sa, 0.22 + lx * sa + (-0.03) * ca, 0.0044), COLS, 0.0, rot=(0, 0, 0.6))
+    box("masthead", (0.26, 0.05, 0.0008), (0.05 - 0.17 * sa, 0.22 + 0.17 * ca, 0.0044), mat("mast", (0.3, 0.29, 0.28), rough=1.0), 0.0, rot=(0, 0, 0.6))
     rod("pencil", (-0.08, -0.12, 0.004), (0.06, -0.15, 0.004), 0.004, mat("pencil", (0.2, 0.35, 0.2), rough=0.6), 6)
     NAME = "table_clutter"
 elif PART == "laundry_line":

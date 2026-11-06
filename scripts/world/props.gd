@@ -2561,12 +2561,13 @@ static func curtains(width := 1.2, height := 1.35) -> Node3D:
 	Geo.block(root, Vector3(0.06, 0.06, 0.06), Vector3(-width * 0.5 - 0.08, height * 0.5 + 0.04, 0), rod_mat, false)
 	Geo.block(root, Vector3(0.06, 0.06, 0.06), Vector3(width * 0.5 + 0.08, height * 0.5 + 0.04, 0), rod_mat, false)
 
-	# Левая и правая свисающие шторы со складками
-	var half_w := width * 0.26   # шторы подвязаны по краям: окно открыто, в нём видно, кто стоит снаружи
+	# Левая и правая свисающие шторы со складками. width — ширина карниза (шире окна): шторы висят
+	# по бокам на стене и лишь чуть заходят на раму — окно открыто, в нём видно, кто стоит снаружи.
+	var half_w := width * 0.2
 	for side: float in [-1.0, 1.0]:
 		var panel := Node3D.new()
 		panel.name = "PanelL" if side < 0 else "PanelR"
-		panel.position = Vector3((width * 0.5 - half_w * 0.5) * side, height * 0.5, 0.02)
+		panel.position = Vector3((width * 0.5 - half_w * 0.5) * side, height * 0.5, 0.035)
 		root.add_child(panel)
 
 		# Вертикальные драпированные складки

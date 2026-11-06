@@ -3361,6 +3361,44 @@ func _tour(args: PackedStringArray) -> void:
 		print("[front] после: метель=%s %.2f" % [Game.weather.blizzard, Game.weather.intensity])
 		get_tree().quit()
 		return
+	if args.has("tables"):   # столы и окна крупно: бумаги на столах, занавески у окон
+		Game.player.set_flashlight(false)
+		var lamp := OmniLight3D.new()
+		lamp.light_energy = 1.2
+		lamp.omni_range = 6.0
+		Game.level.add_child(lamp)
+		for v: Array in [["dining", Vector3(1.7, 0.0, 3.4), Vector3(1.7, 0.78, 4.3)], ["radio", Vector3(9.1, 0.0, 0.1), Vector3(9.1, 0.78, -1.1)],
+				["dark", Vector3(5.7, 0.0, -4.1), Vector3(5.7, 0.85, -5.2)], ["win_n", Vector3(9.2, 0.0, 0.6), Vector3(9.2, 1.5, -2.0)],
+				["win_w", Vector3(-0.6, 0.0, 3.3), Vector3(-2.5, 1.5, 3.3)], ["win_s", Vector3(0.5, 0.0, 4.6), Vector3(0.5, 1.5, 6.6)],
+				["win_sc", Vector3(7.5, 0.0, 4.8), Vector3(7.5, 1.5, 6.6)]]:
+			_tp(v[1], 0.0)
+			lamp.global_position = (v[1] as Vector3) + Vector3(0, 2.0, 0)
+			await _wait(0.4)
+			_look(v[1], v[2])
+			await _wait(0.6)
+			await _shot("tbl_" + String(v[0]))
+		get_tree().quit()
+		return
+	if args.has("voicecheck"):   # озвучка 1.54+: каждая реплика из tools/voice_jobs_156.csv находится и грузится
+		var txt := FileAccess.get_file_as_string("res://tools/voice_jobs_156.csv")
+		var ok := 0
+		var bad: PackedStringArray = []
+		var total := 0.0
+		for ln in txt.split("
+").slice(1):
+			var id := ln.get_slice(";", 0).strip_edges()
+			if id == "":
+				continue
+			var pth := Voice.path(StringName(id))
+			var st: AudioStream = load(pth) if pth != "" else null
+			if st == null or st.get_length() < 0.3:
+				bad.append(id)
+			else:
+				ok += 1
+				total += st.get_length()
+		print("[voice] найдено %d, проблемных %d %s, всего %.0f с" % [ok, bad.size(), bad, total])
+		get_tree().quit()
+		return
 	if args.has("talk0"):   # пролог: Михалыч выходит на связь, когда Виктор в доме
 		await _wait(8.0)
 		Game.set_flag("in_cabin", false)

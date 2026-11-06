@@ -57,16 +57,29 @@ bar_beats=4
 """
 
 
+def known_ids():
+    """Имена реплик из списков озвучки (tools/voice_jobs_*.csv): у некоторых «_a»/«_b» — часть имени
+    (v_th_find1_a — первая мысль находки дня 1), это не дубль."""
+    ids = set()
+    for f in glob.glob(os.path.join(ROOT, "tools", "voice_jobs_*.csv")):
+        for line in open(f, encoding="utf-8").read().splitlines()[1:]:
+            if line:
+                ids.add(line.split(";", 1)[0].strip().lower())
+    return ids
+
+
 def pick_sources(folder):
-    """id → исходный файл; из дублей id_a / id_b берём первый."""
+    """id → исходный файл; из дублей id_a / id_b берём первый. Если имя с суффиксом само есть
+    в списке реплик (v_th_find1_a), суффикс не срезаем: дубли такой реплики — v_th_find1_a_a, _b."""
     by_id = {}
+    known = known_ids()
     for f in sorted(glob.glob(os.path.join(folder, "*"))):
         if not f.lower().endswith(EXT):
             continue
         base = os.path.splitext(os.path.basename(f))[0].strip().lower()
         if not re.fullmatch(r"[a-z0-9_]+", base):
             continue   # неназванные файлы (ElevenLabs_…) пропускаем — их сначала нужно назвать по списку
-        vid = re.sub(r"_[a-z]$", "", base)
+        vid = base if base in known else re.sub(r"_[a-z]$", "", base)
         by_id.setdefault(vid, f)
     return by_id
 
