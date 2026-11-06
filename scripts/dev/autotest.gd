@@ -71,6 +71,72 @@ func _loadsave() -> void:
 	await _wait(3.0)
 	print("[load] в игре: фаза=%s%d зона=%s цель=«%s»" % [Game.phase_kind, Game.phase_index, Game.zone, Game.objective_text()])
 	await _shot("loadsave")
+	if OS.get_cmdline_user_args().has("houseshots"):
+		for v: Array in [["room_e", Vector3(-1.5, 0.05, 2.0), Vector3(4.0, 1.3, 3.0)], ["room_w", Vector3(3.2, 0.05, 3.0), Vector3(-2.5, 1.2, 3.3)],
+				["room_s", Vector3(1.0, 0.05, 1.0), Vector3(0.8, 1.2, 6.6)], ["radio", Vector3(9.0, 0.05, 1.8), Vector3(9.2, 1.2, -2.0)],
+				["corridor", Vector3(4.0, 0.05, 3.2), Vector3(13.0, 1.3, 3.1)], ["vest", Vector3(11.8, 0.05, 3.1), Vector3(14.6, 1.3, 3.1)],
+				["outside", Vector3(24.0, 0.05, 10.0), Vector3(10.0, 2.0, 2.0)], ["outside_s", Vector3(4.0, 0.05, 16.0), Vector3(5.0, 2.0, 3.0)]]:
+			var pp: Vector3 = v[1]
+			if v[0].begins_with("outside"):
+				pp.y = Terrain.height(pp.x, pp.z)
+			_tp(pp, 0.0)
+			await _wait(0.5)
+			_look(pp, v[2])
+			await _wait(0.7)
+			await _shot("house_" + String(v[0]))
+	if OS.get_cmdline_user_args().has("layerdump"):   # что с центром в доме числится «снаружи» (его освещает солнце)
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		var cnt := 0
+		for g in st.find_children("*", "GeometryInstance3D", true, false):
+			var gi := g as GeometryInstance3D
+			var bb := gi.global_transform * gi.get_aabb()
+			var c := bb.get_center()
+			if st.is_pos_inside_house(c) and (gi.layers & Station.LAYER_OUT) != 0 and gi.visible:
+				cnt += 1
+				if cnt <= 40:
+					print("[lay] OUT в доме: %s (%s) центр=%s размер=%s" % [gi.name, gi.get_parent().name, c.snapped(Vector3.ONE * 0.01), bb.size.snapped(Vector3.ONE * 0.01)])
+		print("[lay] всего OUT с центром в доме: ", cnt)
+	if OS.get_cmdline_user_args().has("gapshots"):   # стыки каркаса: проём двери, углы, стены снаружи
+		for v: Array in [["door_in", Vector3(13.2, 0.05, 3.1), Vector3(14.6, 1.4, 3.1)], ["door_in_up", Vector3(13.6, 0.05, 3.1), Vector3(14.6, 2.3, 3.1)],
+				["door_out", Vector3(17.2, 0.05, 3.1), Vector3(14.6, 1.3, 3.1)], ["door_out_up", Vector3(15.6, 0.05, 3.1), Vector3(14.6, 2.6, 3.1)],
+				["vest_corner", Vector3(12.6, 0.05, 4.2), Vector3(14.5, 1.5, 1.0)], ["room_corner", Vector3(1.5, 0.05, 1.5), Vector3(-2.5, 2.0, 6.6)],
+				["room_corner2", Vector3(1.0, 0.05, 4.5), Vector3(-2.5, 2.2, 0.0)], ["corr_ceiling", Vector3(8.0, 0.05, 3.0), Vector3(12.0, 2.7, 3.0)],
+				["ext_e", Vector3(21.0, 0.05, -1.0), Vector3(14.0, 2.0, 2.0)], ["ext_ne", Vector3(20.0, 0.05, -8.0), Vector3(12.0, 2.0, -1.0)]]:
+			var pp: Vector3 = v[1]
+			if v[0].begins_with("ext") or v[0] == "door_out":
+				pp.y = Terrain.height(pp.x, pp.z)
+			_tp(pp, 0.0)
+			await _wait(0.4)
+			_look(pp, v[2])
+			await _wait(0.6)
+			await _shot("gap_" + String(v[0]))
+	if OS.get_cmdline_user_args().has("doorwalk"):
+		var st: Station = get_tree().root.find_children("*", "Station", true, false)[0]
+		st.set_door_open(true)
+		await _wait(1.0)
+		_tp(Vector3(13.4, 0.05, 3.1), -90.0)
+		await _wait(0.5)
+		Input.action_press(&"move_forward")
+		for i in 8:
+			await _wait(0.4)
+			print("[door] t=%.1f поз=%s зона=%s" % [i * 0.4, Game.player.global_position.snapped(Vector3.ONE * 0.01), Game.zone])
+		Input.action_release(&"move_forward")
+		await _shot("door_stuck")
+		# что твёрдое в проёме и на крыльце
+		var space := Game.player.get_world_3d().direct_space_state
+		for pt: Vector3 in [Vector3(14.55, 0.9, 3.1), Vector3(15.0, 0.9, 3.1), Vector3(15.4, 0.9, 3.1), Vector3(15.0, 0.3, 3.1), Vector3(15.0, 1.6, 3.1)]:
+			var q := PhysicsShapeQueryParameters3D.new()
+			var sh := SphereShape3D.new()
+			sh.radius = 0.25
+			q.shape = sh
+			q.transform = Transform3D(Basis.IDENTITY, pt)
+			q.collision_mask = Geo.LAYER_WORLD
+			q.exclude = [Game.player.get_rid()]
+			var names: PackedStringArray = []
+			for h in space.intersect_shape(q, 16):
+				var c: Node = h["collider"]
+				names.append("%s(%s) @%s" % [c.name, c.get_parent().name if c.get_parent() else "", (c as Node3D).global_position.snapped(Vector3.ONE * 0.01) if c is Node3D else ""])
+			print("[door] у ", pt, ": ", names)
 	get_tree().quit()
 
 

@@ -3549,6 +3549,7 @@ func _build_backyard_features() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.window_tracks"), 4.5)
 		Director.add_tension(8.0, "следы под окном")
 	)
+	tracks_it.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 	tracks_it.name = "WindowTracks"
 	tracks_it.collision_layer = Geo.LAYER_INTERACT
 
@@ -3852,6 +3853,7 @@ func _build_frozen_hunter() -> void:
 			Game.hud.subtitle(Loc.t(&"sub.hunter_pose_3"), 5.0)
 			Director.add_tension(14.0, "следы пропавшего охотника")
 		)
+		tr_it.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 		tr_it.name = "HunterTracks"
 
 

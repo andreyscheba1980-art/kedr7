@@ -306,6 +306,7 @@ func _build_bear() -> void:
 	Footprints.trail(node, &"paw", route, route[0].y, 0.9, 0.22)
 	var look := Geo.interactable(node, Vector3(1.6, 1.0, 1.6), route[3] + Vector3(0, 0.5, 0), null, Loc.t(&"tr.look.bear"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"tr.hint.bear"), 6.0))
+	look.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 	look.name = "BearTracksLook"
 	# Где бродит днём: одна из дальних точек
 	var far: Array = []

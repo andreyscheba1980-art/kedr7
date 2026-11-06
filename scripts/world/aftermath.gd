@@ -73,6 +73,7 @@ func _spawn_waited_tracks(yard: Node3D) -> void:
 		var it := Geo.interactable(node, Vector3(3.0, 1.2, 3.0), Vector3(c.x, cy + 0.6, c.z), null, Loc.t(&"it.footprints"), func(_p: Player) -> void:
 			Game.hud.subtitle(Loc.t(&"cons.waited"), 6.0)
 			Director.add_tension(5.0, "следы на привычной тропе"))
+		it.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 		it.name = "WaitedTracksInteract"
 
 
@@ -136,6 +137,7 @@ func _spawn_footprints(yard: Yard) -> void:
 
 	# Интерактивная зона осмотра следов
 	var it := Geo.interactable(_footprints_node, Vector3(2.5, 1.2, 2.5), Vector3(16.2, 0.6, 2.5), null, Loc.t(&"it.footprints"), Callable())
+	it.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 	it.name = "FootprintsInteract"
 	it.used.connect(func(p: Player) -> void:
 		it.enabled = false
@@ -223,6 +225,7 @@ func _setup_chore(chore: StringName, station: Station, yard: Yard) -> void:
 			it = Geo.interactable(yard, Vector3(1.8, 1.0, 1.8), snap_pos, null, Loc.t(&"it.splice_rope"), func(p: Player) -> void:
 				RepairUI.open(&"sequence", &"rep.t.rope", func() -> void: _repair_rope(p, snap_pos, it), 4, ["rep.s.untie", "rep.s.splice", "rep.s.wrap", "rep.s.tie"])
 			)
+			it.collision_layer = Geo.LAYER_INTERACT   # зона «осмотреть» на тропе — не стена: [E] видит, игрок проходит
 
 
 # --- Обработчики ремонта ---

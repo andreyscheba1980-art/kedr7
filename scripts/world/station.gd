@@ -202,6 +202,7 @@ func _ready() -> void:
 		pt.name = "PrologueTrail"
 		add_child(pt)
 	_split_light_layers()
+	_build_sun_blockers()
 	Perf.mark("station _split_light_layers()")
 	var amb := Ambience.new()
 	amb.setup(self)
@@ -678,6 +679,35 @@ func is_pos_inside_house(pos: Vector3) -> bool:
 	if pos.x >= 11.4 and pos.x <= 14.6 and pos.z >= 1.4 and pos.z <= 6.7:
 		return true
 	return false
+
+
+## Солнце и луна в дом не светят (у них слой «снаружи»), но стены сруба — общие коробки на обе стороны и
+## живут в слое «снаружи». На стыках стен и под кровлей тень «пробивала», и ясным днём по стенам и потолку
+## изнутри шли оранжевые клинья — дом казался собранным со щелями. Внутри каждой комнаты — невидимый короб,
+## который только отбрасывает тень (слой «снаружи» — его видит лишь небесный свет): внутрь солнце не попадёт.
+const SUN_BLOCK_ROOMS := [
+	[Vector3(-2.6, 0.0, -0.1), Vector3(3.6, 0.0, 6.7)],      # жилая
+	[Vector3(3.4, 0.0, -2.1), Vector3(11.6, 0.0, 2.3)],      # рубка
+	[Vector3(3.4, 0.0, -5.6), Vector3(7.1, 0.0, -1.9)],      # кладовая
+	[Vector3(3.4, 0.0, 2.1), Vector3(11.6, 0.0, 6.7)],       # коридор
+	[Vector3(11.4, 0.0, 1.4), Vector3(14.6, 0.0, 6.7)],      # сени
+]
+
+
+func _build_sun_blockers() -> void:
+	for r: Array in SUN_BLOCK_ROOMS:
+		var a: Vector3 = r[0]
+		var b: Vector3 = r[1]
+		var size := Vector3(b.x - a.x - 0.24, ROOM_H - 0.08, b.z - a.z - 0.24)
+		var bm := BoxMesh.new()
+		bm.size = size
+		var mi := MeshInstance3D.new()
+		mi.name = "SunBlocker"
+		mi.mesh = bm
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+		mi.layers = LAYER_OUT
+		add_child(mi)
+		mi.position = Vector3((a.x + b.x) * 0.5, 0.04 + size.y * 0.5, (a.z + b.z) * 0.5)
 
 
 const LAYER_OUT := 2      ## визуальный слой «снаружи дома»
@@ -2675,6 +2705,10 @@ func _build_corridor_footprints() -> void:
 
 func _build_front_door() -> void:
 	Geo.block(self, Vector3(0.3, 0.06, 1.1), Vector3(14.5, 0.03, 3.1), Palette.m(&"plank"), false)
+	# Притолока: полотно — 2,0 м, проём сруба выше; над закрытой дверью светилась щель на улицу
+	# две половины: внутренняя светится лампами дома, наружная — фонарём крыльца и небом
+	Geo.block(self, Vector3(0.16, 0.3, 1.16), Vector3(14.42, 2.15, 3.1), Palette.m(&"plank"), false)
+	Geo.block(self, Vector3(0.12, 0.3, 1.16), Vector3(14.6, 2.15, 3.1), Palette.m(&"wood"), false)
 	_door_hinge = Node3D.new()
 	_door_hinge.position = Vector3(14.5, 0.0, 2.6)
 	add_child(_door_hinge)
