@@ -23,6 +23,10 @@ var decoded: Array[StringName] = []
 var tapes: Array[StringName] = []
 var flags: Dictionary = {}
 var memory_only := false         ## кооп: состояние живёт только в памяти, файл сохранения не пишется
+## Запись разрешена, только когда в памяти настоящая игра: после read() («Продолжить») или new_game().
+## Фон главного меню — та же станция ночи 1 — сам пишет сохранение (раскладка находок и т. п.), а в памяти
+## в этот момент пустая игра: без этой защиты просто открыть меню = затереть прогресс прологом.
+var armed := false
 
 
 func has_save() -> bool:
@@ -32,6 +36,7 @@ func has_save() -> bool:
 
 
 func new_game(diff: String) -> void:
+	armed = true
 	difficulty = diff
 	phase = {"kind": "day", "index": 0}
 	items.clear()
@@ -45,6 +50,8 @@ func new_game(diff: String) -> void:
 func write() -> void:
 	if memory_only:
 		return   # кооп-ночь не трогает сохранение одиночной кампании
+	if not armed:
+		return   # меню / фон: в памяти не игра игрока — файл не трогаем
 	var data := {
 		"version": 2,
 		"phase": phase,
@@ -84,6 +91,7 @@ func read() -> bool:
 	_fill(tapes, d.get("tapes", []))
 	var fl: Variant = d.get("flags", {})
 	flags = fl if fl is Dictionary else {}
+	armed = true
 	# Обновляем очищенное состояние обратно в файл
 	write()
 	return true

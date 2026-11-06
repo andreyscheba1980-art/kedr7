@@ -3384,6 +3384,20 @@ func _tour(args: PackedStringArray) -> void:
 		var ok := 0
 		var bad: PackedStringArray = []
 		var total := 0.0
+		if txt == "":   # в собранной игре tools/ нет — проверяем по выборке имён
+			txt = "file
+rt_t0_l1
+rt_t1_l1
+v_t1_c1
+rt_t7_r2
+v_th_fb1_t1
+ml_fb3_t1
+door_fb2_v1
+yrka_fb4_v1
+v_th_find1_a
+v_th_find6_b
+call_talk_dog_wrong
+v_th_cov_trap_seen"
 		for ln in txt.split("
 ").slice(1):
 			var id := ln.get_slice(";", 0).strip_edges()

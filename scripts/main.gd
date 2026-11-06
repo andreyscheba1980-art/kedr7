@@ -65,6 +65,7 @@ func _test_join_room() -> void:
 func _show_menu() -> void:
 	_clear()
 	get_tree().paused = false
+	SaveGame.armed = false   # фон меню не пишет сохранение (см. SaveGame.armed)
 	Director.reset()
 	# Фон меню — станция ночью; её системы читают конфиг ночи 1.
 	Game.setup_phase(&"night", 1)
