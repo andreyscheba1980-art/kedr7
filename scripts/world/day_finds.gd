@@ -39,6 +39,9 @@ func _process(_delta: float) -> void:
 func _think(key: StringName, wait := 0.0) -> void:
 	var text := Loc.t(key)
 	var d := clampf(text.length() * 0.055, 3.0, 7.0)
+	var vl := Voice.line(key, ["v_th_"])
+	if vl > 0.0:
+		d = maxf(d * 0.6, vl + 0.4)
 	Game.hud.subtitle(text, d, 2)
 	await get_tree().create_timer(d + 0.3 + wait, false).timeout
 

@@ -4,7 +4,7 @@
   python3 tools/process_voice.py            # из корня проекта; нужен ffmpeg
 
 Обработка зависит от префикса имени файла (см. docs/ОЗВУЧКА_и_ЗВУКИ.md):
-  ml_*, st_*, sem_log_*, num_*  — радио: полоса 300–3200 Гц, компрессия, лёгкий перегруз, шипение эфира
+  rt_*, ml_*, st_*, sem_log_*, num_*  — радио: полоса 300–3200 Гц, компрессия, лёгкий перегруз, шипение эфира
   call_*                        — то же радио, но голос ниже и медленнее: «это уже не они»
   door_*                        — из-за двери: глухо (НЧ-фильтр), короткое отражение сеней
   yrka_*                        — шёпот со спины: срез низа, двойное эхо тайги
@@ -27,7 +27,9 @@ RADIO = ("highpass=f=300,lowpass=f=3200,acompressor=threshold=-20dB:ratio=4:atta
          "asoftclip=type=tanh:param=1.2,volume=2dB")
 FILTERS = [
     ("call_", "asetrate=44100*0.94,aresample=44100," + RADIO, True),
+    ("rt_", RADIO, True),                      # 1.54: сеансы связи — Зоя и Михалыч в эфире
     ("ml_", RADIO, True), ("st_", RADIO, True), ("sem_log_", RADIO, True), ("num_", RADIO, True),
+    ("door_fb2", "asetrate=44100*1.06,aresample=44100,lowpass=f=1500,highpass=f=90,aecho=0.8:0.5:35:0.25", False),   # Брагин — не Михалыч
     ("door_", "lowpass=f=1500,highpass=f=90,aecho=0.8:0.5:35:0.25", False),
     ("yrka_", "highpass=f=220,lowpass=f=6500,aecho=0.7:0.45:70|140:0.3|0.18", False),
     ("drv_", "highpass=f=80", False),

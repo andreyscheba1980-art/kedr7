@@ -46,6 +46,22 @@ static func sfx_or(id: StringName, fallback: String) -> String:
 
 ## Реплика с голосом: субтитр + файл v_<ключ> (точки → подчёркивания), если он уже записан.
 ## Возвращает, сколько ждать до следующей реплики (не меньше wait и не меньше длины записи).
+## Голос к строке сюжета (1.54+): первый найденный файл из prefixes + ключ (точки → «_»).
+## pos — где звучит (Vector3.INF — «в голове», 2D). Возвращает длину записи или 0, если файла нет.
+static func line(key: StringName, prefixes: Array, pos := Vector3.INF, vol := 0.0) -> float:
+	if Game.audio == null:
+		return 0.0
+	var k := String(key).replace(".", "_")
+	for pre: String in prefixes:
+		var p := path(StringName(pre + k))
+		if p == "":
+			continue
+		var pl: Node = Game.audio.play_2d(p, vol) if pos == Vector3.INF else Game.audio.play_3d(p, pos, vol, 6.0)
+		var st: AudioStream = pl.get(&"stream") if pl != null else null
+		return st.get_length() if st != null else 0.0
+	return 0.0
+
+
 static func say(key: StringName, wait: float, priority := 1, args: Array = []) -> float:
 	var vid := StringName("v_" + String(key).replace(".", "_"))
 	var dur := wait

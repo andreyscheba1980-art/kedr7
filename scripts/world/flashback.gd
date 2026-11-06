@@ -185,6 +185,9 @@ func _think(key: StringName, t := 0.0, col := Color.TRANSPARENT) -> void:
 		return
 	var text := Loc.t(key)
 	var d := t if t > 0.0 else clampf(text.length() * 0.055, 3.2, 7.5)
+	var vl := Voice.line(key, ["v_th_", "ml_", "door_", "yrka_"])   # Семёнов, эфир, за дверью, шёпот
+	if vl > 0.0:
+		d = maxf(d * 0.6, vl + 0.4)
 	Game.hud.subtitle(text, d, 2, col)
 	await _wait(d + 0.3)
 

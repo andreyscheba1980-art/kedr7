@@ -185,6 +185,7 @@ static func on_marked(e: Dictionary, st: String) -> void:
 		return
 	if Game.hud != null:
 		Game.hud.subtitle(Loc.t(&"cov.trap_seen"), 3.5)
+		Voice.line(&"cov.trap_seen", ["v_th_"])
 	Director.add_tension(-8.0, "ложный завет зачёркнут")
 	if _night_now() >= 7 and traps_marked() >= traps_total() and traps_total() >= 5:
 		Achievements.unlock(&"liar_book")

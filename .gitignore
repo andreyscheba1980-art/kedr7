@@ -31,3 +31,6 @@ tools/blender/out_lo/
 tools/blender/out_int/
 tools/blender/out_corpus/
 tools/blender/out_house/
+
+# Ключи API (озвучка) — не в репозиторий
+.secrets/

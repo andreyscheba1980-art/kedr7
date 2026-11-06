@@ -157,6 +157,9 @@ func _say(key: StringName) -> void:
 	var text := Loc.t(key)
 	var dur := clampf(text.length() * 0.06, 3.5, 8.5)
 	Game.audio.play_3d(STATIC, RADIO_POS, -12.0, 4.0, 0.6)
+	var vl := Voice.line(key, ["rt_"], RADIO_POS, 2.0)   # голос в эфире, если записан
+	if vl > 0.0:
+		dur = vl + 0.3
 	Game.hud.subtitle(text, dur, 2)
 	await get_tree().create_timer(dur + 0.35, false).timeout
 
@@ -187,7 +190,8 @@ func _conversation() -> void:
 			SaveGame.flags[k] = flag(k) + int(eff[k])
 		reply = ch[2]
 		Game.hud.subtitle(Loc.t(&"talk.you", [opts[pick]]), 3.0, 2)
-		await get_tree().create_timer(2.6, false).timeout
+		var said := Voice.line(ch[0], ["v_"])
+		await get_tree().create_timer(maxf(2.6, said + 0.3), false).timeout
 	for k: StringName in reply:
 		if Game.shift_over or Game.dead:
 			break

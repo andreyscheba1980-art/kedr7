@@ -956,10 +956,13 @@ func _lights() -> void:
 		var pick: int = await TalkChoiceUI.ask([Loc.t(&"talk.ask_dog")], 10.0)
 		if pick == 0 and not Game.dead:
 			Game.hud.subtitle(Loc.t(&"talk.you", [Loc.t(&"talk.ask_dog")]), 3.0, 2)
+			Voice.line(&"talk.ask_dog", ["v_"])
 			await _wait(3.2)
 			Game.hud.subtitle(Loc.t(&"talk.dog_wrong"), 3.5, 2)
+			Voice.line(&"talk.dog_wrong", ["call_"], LIGHTS_POS + Vector3(0, 1.6, 0), 6.0)
 			await _wait(4.0)
 			Game.hud.subtitle(Loc.t(&"talk.dog_after"), 5.0, 2)
+			Voice.line(&"talk.dog_after", ["v_th_"])
 			await _wait(4.5)
 			if is_instance_valid(engine_p):
 				engine_p.queue_free()
