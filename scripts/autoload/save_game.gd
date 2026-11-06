@@ -8,7 +8,7 @@ var PATH := "user://save_test.json" if _testing() else "user://save.json"
 
 static func _testing() -> bool:
 	var a := OS.get_cmdline_user_args()
-	for k in ["--tour", "--autotest", "--test_cabin", "--epilogue", "--prologue_review", "--deathtest", "--stage", "--film", "--probe", "--probe2", "--polish_test", "--joypad_test", "--menushot"]:
+	for k in ["--tour", "--autotest", "--test_cabin", "--epilogue", "--prologue_review", "--deathtest", "--stage", "--film", "--probe", "--probe2", "--polish_test", "--joypad_test", "--menushot", "--loadsave"]:
 		if a.has(k):
 			return true
 	return false

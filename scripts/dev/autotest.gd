@@ -40,6 +40,8 @@ func _ready() -> void:
 		_polish_test.call_deferred()
 	elif args.has("--joypad_test"):
 		_joypad_test.call_deferred()
+	elif args.has("--loadsave"):   # как «Продолжить»: прочитать save_test.json и начать фазу
+		_loadsave.call_deferred()
 	elif args.has("--fullrun"):
 		_fullrun.call_deferred()
 	elif args.has("--prologue_b"):
@@ -56,6 +58,22 @@ func _ready() -> void:
 ## карточка ушла, игрок на земле и в своём месте, цель не пустая, сохранение → загрузка возвращает ту же
 ## фазу и флаги, «Продолжить» в той же фазе поднимает ту же сессию. Потом смена кончается — следующая фаза.
 ## Итог: [full] строки и [full] ИТОГ с числом проблем (ошибки скриптов смотреть в логе рядом).
+func _loadsave() -> void:
+	while _app.get("_menu") == null:
+		await get_tree().process_frame
+	await _wait(1.0)
+	print("[load] read=", SaveGame.read(), " фаза=", SaveGame.phase)
+	_app.call(&"_start_phase")
+	var t := 0.0
+	while t < 60.0 and (Game.hud == null or Game.hud.is_screen_shown()):
+		await _wait(0.5)
+		t += 0.5
+	await _wait(3.0)
+	print("[load] в игре: фаза=%s%d зона=%s цель=«%s»" % [Game.phase_kind, Game.phase_index, Game.zone, Game.objective_text()])
+	await _shot("loadsave")
+	get_tree().quit()
+
+
 func _fullrun() -> void:
 	var problems: PackedStringArray = []
 	while _app.get("_menu") == null:
@@ -75,6 +93,12 @@ func _fullrun() -> void:
 			await _wait(0.5)
 			t += 0.5
 		var ph := "%s/%d%s" % [SaveGame.phase["kind"], int(SaveGame.phase["index"]), "+" if Game.has_flag("prologue_arrived") else ""]
+		if OS.get_cmdline_user_args().has("stop_day1") and ph == "day/1+":
+			await _wait(3.0)
+			SaveGame.write()
+			print("[full] остановка на дне 1, сохранено")
+			get_tree().quit()
+			return
 		if ph == last:
 			problems.append("фаза %s повторилась (не продвинулась)" % ph)
 			break

@@ -47,7 +47,7 @@ func _ready() -> void:
 		Net.host_room(1)
 	elif args.has("--coop-join-room"):
 		_test_join_room()
-	if args.has("--autotest") or args.has("--deathtest") or args.has("--stage") or args.has("--inspect_fixes") or args.has("--tour") or args.has("--film") or args.has("--probe") or args.has("--probe2") or args.has("--polish_test") or all_cmd_args.has("--polish_test") or all_cmd_args.has("--autotest") or args.has("--joypad_test") or all_cmd_args.has("--joypad_test") or args.has("--test_cabin"):
+	if args.has("--autotest") or args.has("--deathtest") or args.has("--stage") or args.has("--inspect_fixes") or args.has("--tour") or args.has("--film") or args.has("--probe") or args.has("--probe2") or args.has("--polish_test") or all_cmd_args.has("--polish_test") or all_cmd_args.has("--autotest") or args.has("--joypad_test") or all_cmd_args.has("--joypad_test") or args.has("--loadsave") or args.has("--test_cabin"):
 		add_child(AutoTest.new())
 
 
