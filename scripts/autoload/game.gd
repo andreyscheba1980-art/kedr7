@@ -7,13 +7,13 @@ const DAY_BASE_HOUR := 14
 const PROLOGUE_BASE_HOUR := 21
 const NIGHT_END_MIN := 600.0                ## 06:00
 const READING_KEYS: Array[StringName] = [&"temp", &"wind", &"snow", &"baro"]
-const FUEL_DRAIN_PER_SEC := 100.0 / 480.0
-const STOVE_BURN_PER_SEC := 100.0 / 420.0
+const FUEL_DRAIN_PER_SEC := 100.0 / 1500.0  ## ~25 мин на баке при полной нагрузке
+const STOVE_BURN_PER_SEC := 100.0 / 1200.0  ## ~20 мин горения (с поддувалом до 50 мин)
 const WOOD_PER_ARMFUL := 50.0
-## Жар кладки: пока горит, русская печь копит тепло (~2.5 мин до полного), прогорела — отдаёт ~5 мин
-## (вдвое дольше при закрытой вьюшке). Дом после прогорания остывает не сразу.
+## Жар кладки: пока горит, печь копит тепло, прогорела — отдаёт ~10 мин
+## (вдвое дольше при закрытой вьюшке). Дом после прогорания остывает плавно.
 const HEAT_CHARGE_PER_SEC := 100.0 / 150.0
-const HEAT_DECAY_PER_SEC := 100.0 / 300.0
+const HEAT_DECAY_PER_SEC := 100.0 / 600.0
 const DAMPER_BURN_K := 0.4             ## прикрытое поддувало: дрова тлеют в 2.5 раза дольше
 const DAMPER_WARM_K := 0.6             ## …и греют слабее
 const IDLE_FUEL_K := 0.35              ## рубильник выключен: дизель на холостом

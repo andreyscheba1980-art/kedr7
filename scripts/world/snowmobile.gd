@@ -49,6 +49,13 @@ var _ark_gauge: Node3D
 var _ark_needle: Node3D
 var _ark_eye_mat: StandardMaterial3D
 var _ark_angle := 0.0
+var _rpm_factor := 0.0               ## 0.0 (заглушен), 0.08 (холостые), 1.0 (полный газ)
+var _primer_pumps := 0              ## подкачка топлива карбюратора
+var _plugs_flooded := false         ## свечи залиты
+var _starter_pull_t := 0.0
+var _sled: Node3D                   ## нарты-волокуши сзади снегохода
+var _sled_anomaly_t := 140.0        ## таймер редкого рывка нарт
+var _sled_shadow: MeshInstance3D    ## призрачная тень на санях
 var _trail_mmi: MultiMeshInstance3D
 var _trail_mm: MultiMesh
 var _trail_idx := 0
@@ -77,6 +84,7 @@ func _exit_tree() -> void:
 		instance = null
 	if riding:
 		Game.set_flag("riding", false)
+	_reset_audio_buses()
 	if _trail_mmi != null and is_instance_valid(_trail_mmi):
 		_trail_mmi.queue_free()
 		_trail_mmi = null
@@ -120,6 +128,7 @@ func _build() -> void:
 	_body.add_child(_light)
 	apply_upgrades()
 	_build_ark_gauge(_body)
+	_build_sled()
 	# Чехол — тот же брезент, что в гараже
 	_tarp = Node3D.new()
 	_body.add_child(_tarp)
@@ -219,7 +228,10 @@ func _mount(p: Player) -> void:
 	p.head.rotation.x = deg_to_rad(-6.0)
 	_player_yaw_prev = _yaw
 	_seat_player(p)
-	Game.hud.subtitle(Loc.t(&"sub.buran_controls2"), 6.0)
+	if not engine_on:
+		Game.hud.subtitle(Loc.t(&"sub.buran_controls2") + "\n[F] — праймер | [Пробел/W] — трос стартера", 7.0)
+	else:
+		Game.hud.subtitle(Loc.t(&"sub.buran_controls2"), 6.0)
 	_try_start()
 
 
@@ -237,6 +249,7 @@ func _dismount() -> void:
 	speed = 0.0
 	Game.set_flag("riding", false)
 	_set_engine(false)
+	_reset_audio_buses()
 	Game.set_flag("buran_pos", [global_position.x, global_position.z, _yaw])
 	Game.set_flag("buran_fuel", fuel)
 	var p := Game.player
@@ -254,27 +267,61 @@ func _seat_player(p: Player) -> void:
 	p.global_position = _body.to_global(Vector3(0, 0.15, 0.72))
 
 
-func _try_start() -> void:
-	if engine_on:
+func pump_primer() -> void:
+	_primer_pumps += 1
+	Game.audio.play_3d(Voice.sfx_or(&"primer_squish", CLANK), global_position, -2.0)
+	if _primer_pumps <= 3:
+		Game.hud.subtitle(Loc.t(&"sub.buran_primed", [_primer_pumps]), 2.0)
+	elif _primer_pumps >= 5:
+		_plugs_flooded = true
+		Game.hud.subtitle(Loc.t(&"sub.buran_flooded"), 3.5)
+
+
+func pull_starter() -> void:
+	if engine_on or _starter_pull_t > 0.0:
 		return
 	if fuel <= 0.0:
 		Game.hud.subtitle(Loc.t(&"sub.buran_empty"), 3.0)
 		return
-	if Troubles.blocks(&"buran_cold"):   # масло загустело — стартер еле крутит
+	if Troubles.blocks(&"buran_cold"):
 		Game.audio.play_3d(Voice.sfx_or(&"buran_fail", CLANK), global_position, -2.0)
 		Game.hud.subtitle(Loc.t(&"tr.block.buran_cold"), 3.5)
 		return
-	_start_t = 1.1
-	var chance := 0.9 if Game.is_daylight() else 0.6
-	if SaveGame.flags.get("buran_started_once", false) == false or SaveGame.flags.get("buran_plug", false) or Gear.has(&"spark_plug"):
+	_starter_pull_t = 0.8
+	Game.audio.play_3d(Voice.sfx_or(&"buran_start", CLANK), global_position, -1.0)
+	if Game.is_night() and randf() < 0.35:
+		Game.audio.play_3d(Voice.sfx_or(&"footstep_snow", CLANK), _body.to_global(Vector3(0, 0.2, 2.8)), -4.0)
+
+	if _plugs_flooded:
+		var clearing := Input.is_action_pressed(&"move_forward")
+		if clearing:
+			_primer_pumps = max(_primer_pumps - 2, 0)
+			if _primer_pumps <= 2:
+				_plugs_flooded = false
+				Game.hud.subtitle(Loc.t(&"sub.buran_started"), 3.0)
+				_set_engine(true)
+			else:
+				Game.hud.subtitle(Loc.t(&"sub.buran_flooded_hint"), 2.5)
+		else:
+			Game.audio.play_3d(Voice.sfx_or(&"buran_fail", CLANK), global_position, -2.0)
+			Game.hud.subtitle(Loc.t(&"sub.buran_flooded_hint"), 3.0)
+		return
+
+	var chance := 0.9 if Game.is_daylight() else 0.65
+	if SaveGame.flags.get("buran_plug", false) or Gear.has(&"spark_plug") or _primer_pumps >= 1:
 		chance = 1.0
-	if randf() < chance:
+	if randf() <= chance:
 		Game.set_flag("buran_started_once", true)
-		Game.audio.play_3d(Voice.sfx_or(&"buran_start", CLANK), global_position, -2.0)
+		_primer_pumps = 0
 		_set_engine(true)
+		Game.hud.subtitle(Loc.t(&"sub.buran_started"), 2.5)
 	else:
 		Game.audio.play_3d(Voice.sfx_or(&"buran_fail", CLANK), global_position, -2.0)
 		Game.hud.subtitle(Loc.t(&"sub.buran_nostart"), 2.5)
+
+
+func _try_start() -> void:
+	pull_starter()
 
 
 func _set_engine(on: bool) -> void:
@@ -296,6 +343,7 @@ func _set_engine(on: bool) -> void:
 func _physics_process(delta: float) -> void:
 	_mount_guard = maxf(_mount_guard - delta, 0.0)
 	_start_t = maxf(_start_t - delta, 0.0)
+	_starter_pull_t = maxf(_starter_pull_t - delta, 0.0)
 	if not riding:
 		if absf(speed) > 0.05:
 			speed = move_toward(speed, 0.0, BRAKE * delta)
@@ -352,8 +400,29 @@ func _physics_process(delta: float) -> void:
 	_move(delta)
 	_seat_player(p)
 	_tick_ark(delta)
-	# Топливо, звук, шум для Ырки
+	# Дилемма «Свет против Слуха»:
 	if engine_on:
+		var moving := absf(speed) > 0.4 or throttle != 0.0
+		var target_rpm := 1.0 if moving else 0.08
+		_rpm_factor = move_toward(_rpm_factor, target_rpm, delta * (3.5 if moving else 1.2))
+
+		# Фара ФГ-122: на холостых едва тлеет оранжевым, на ходу заливает ярким лучом
+		_light.visible = true
+		_light.light_energy = lerpf(0.38, 3.5, _rpm_factor)
+		_light.spot_range = lerpf(7.5, 38.0, _rpm_factor)
+		_light.light_color = Color(1.0, 0.62, 0.28).lerp(Color(1.0, 0.94, 0.85), _rpm_factor)
+		_lamp_mat.emission = Color(1.0, 0.5, 0.18).lerp(Color(1.0, 0.9, 0.7), _rpm_factor)
+		_lamp_mat.emission_energy_multiplier = lerpf(0.5, 2.8, _rpm_factor)
+
+		# Оглушение аудио-шин: ревущий мотор глушит звуки тайги
+		var amb_idx := AudioServer.get_bus_index(&"Ambient")
+		var wth_idx := AudioServer.get_bus_index(&"Weather")
+		var deaf_db: float = lerpf(-3.0, -22.0, _rpm_factor)
+		if amb_idx >= 0:
+			AudioServer.set_bus_volume_db(amb_idx, deaf_db)
+		if wth_idx >= 0:
+			AudioServer.set_bus_volume_db(wth_idx, deaf_db)
+
 		fuel = maxf(fuel - (FUEL_IDLE * delta + absf(speed) * delta * FUEL_RUN * lerpf(1.0, 1.7, _deep)), 0.0)
 		var load := clampf(absf(speed) / MAX_SPEED, 0.0, 1.0)
 		_engine.pitch_scale = 0.75 + load * 0.75
@@ -379,6 +448,22 @@ func _physics_process(delta: float) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.buran_empty"), 3.0)
 		if absf(speed) > 6.0:
 			p.shake(0.012 * load, 0.15)
+	else:
+		_rpm_factor = move_toward(_rpm_factor, 0.0, delta * 3.0)
+		_reset_audio_buses()
+
+	# Паранойя нарт: редкий рывок саней ночью в буран
+	if riding and engine_on and Game.is_night() and absf(speed) > 4.0:
+		_sled_anomaly_t -= delta
+		if _sled_anomaly_t <= 0.0:
+			_sled_anomaly_t = randf_range(110.0, 220.0)
+			speed *= 0.82
+			Game.audio.play_3d(CLANK, _sled.global_position if _sled != null else global_position, -2.0)
+			if _sled_shadow != null and _sled_shadow.material_override != null:
+				var sm := _sled_shadow.material_override as StandardMaterial3D
+				sm.albedo_color = Color(0.04, 0.01, 0.01, 0.75)
+				var tw := create_tween()
+				tw.tween_property(sm, "albedo_color:a", 0.0, 0.65)
 
 
 func _move(delta: float) -> void:
@@ -644,3 +729,61 @@ func _spawn_trail_segment(p0: Vector3, p1: Vector3) -> void:
 	var t := Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(1.0, 1.0, scale_z)), mid)
 	_trail_mm.set_instance_transform(_trail_idx, t)
 	_trail_idx = (_trail_idx + 1) % MAX_TRAIL_SEGMENTS
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not riding:
+		return
+	if not engine_on:
+		if event.is_action_pressed(&"flashlight"):
+			pump_primer()
+			get_viewport().set_input_as_handled()
+		elif event.is_action_pressed(&"jump"):
+			pull_starter()
+			get_viewport().set_input_as_handled()
+		elif event is InputEventMouseMotion and (event as InputEventMouseMotion).relative.y > 28.0:
+			pull_starter()
+			get_viewport().set_input_as_handled()
+
+
+func _reset_audio_buses() -> void:
+	var amb_idx := AudioServer.get_bus_index(&"Ambient")
+	var wth_idx := AudioServer.get_bus_index(&"Weather")
+	if amb_idx >= 0:
+		AudioServer.set_bus_volume_db(amb_idx, 0.0)
+	if wth_idx >= 0:
+		AudioServer.set_bus_volume_db(wth_idx, 0.0)
+
+
+func _build_sled() -> void:
+	_sled = Node3D.new()
+	_sled.name = "CargoSled"
+	_sled.position = Vector3(0.0, 0.05, 2.3)
+	_body.add_child(_sled)
+	var wood_mat := Palette.m(&"wood")
+	var dark_mat := Palette.m(&"dark")
+	var s_l := Geo.block(_sled, Vector3(0.08, 0.08, 1.6), Vector3(-0.42, 0.04, 0.0), wood_mat, false)
+	var s_r := Geo.block(_sled, Vector3(0.08, 0.08, 1.6), Vector3(0.42, 0.04, 0.0), wood_mat, false)
+	var n_l := Geo.cylinder(_sled, 0.04, 0.3, Vector3(-0.42, 0.12, -0.85), dark_mat, false)
+	n_l.rotation.x = deg_to_rad(-45.0)
+	var n_r := Geo.cylinder(_sled, 0.04, 0.3, Vector3(0.42, 0.12, -0.85), dark_mat, false)
+	n_r.rotation.x = deg_to_rad(-45.0)
+	for i in range(5):
+		var z_off: float = -0.6 + float(i) * 0.3
+		Geo.block(_sled, Vector3(0.88, 0.03, 0.12), Vector3(0.0, 0.1, z_off), wood_mat, false)
+	Geo.block(_sled, Vector3(0.04, 0.18, 1.4), Vector3(-0.42, 0.18, 0.0), dark_mat, false)
+	Geo.block(_sled, Vector3(0.04, 0.18, 1.4), Vector3(0.42, 0.18, 0.0), dark_mat, false)
+	var hitch := Geo.cylinder(_sled, 0.02, 0.75, Vector3(0.0, 0.18, -1.25), dark_mat, false)
+	hitch.rotation.x = deg_to_rad(90.0)
+	_sled_shadow = MeshInstance3D.new()
+	var cap_m := CapsuleMesh.new()
+	cap_m.radius = 0.22
+	cap_m.height = 0.7
+	_sled_shadow.mesh = cap_m
+	_sled_shadow.position = Vector3(0.0, 0.45, 0.1)
+	var s_mat := StandardMaterial3D.new()
+	s_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	s_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	s_mat.albedo_color = Color(0.05, 0.02, 0.02, 0.0)
+	_sled_shadow.material_override = s_mat
+	_sled.add_child(_sled_shadow)

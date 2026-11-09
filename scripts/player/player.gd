@@ -104,8 +104,13 @@ var _hold_breath_hint_timer := 0.0
 var _heartbeat_haptic_timer := 0.0
 
 var compass_glitch := 0.0           ## отклонение стрелки компаса при «Белой тьме»
+var compass_stuck := 0.0            ## угол залипания стрелки компаса (радиан)
 var whiteout_panic := 0.0          ## дезориентация и паника без леера (0..1)
+var whiteout_intensity := 0.0      ## оптическая белая мгла для экранного шейдера
 var _whiteout_warned := false
+var _drift_no_anchor_t := 0.0      ## время без ориентиров для вестибулярного сноса
+var _drift_dir := 1.0              ## направление увода по кругу (+1 / -1)
+var _circle_warned := false
 var kettle_heat_timer := 0.0       ## таймер тепла чайника на морозе (секунды)
 
 # Динамические психосоматические модификаторы (Deep Phobia Engine)
@@ -279,6 +284,9 @@ func handle_input(event: InputEvent) -> void:
 	if Game.zenit != null and Game.zenit.raised:
 		return   # у глаза «Зенит»: RT/ЛКМ — затвор, ракетница не стреляет
 	if event.is_action_pressed(&"flare") or (event is InputEventMouseButton and event.is_pressed() and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_RIGHT):
+		if _hands != null and _hands.is_tablet_up():
+			tap_compass()
+			return
 		fire_flare()
 		return
 	if event.is_action_pressed(&"interact"):
@@ -485,6 +493,22 @@ func _update_whiteout_disorientation(delta: float) -> void:
 	var outside := Game.is_outside()
 	var in_whiteout: bool = outside and Game.weather != null and bool(Game.weather.get("is_whiteout"))
 
+	# Оптическая плотность белой мглы (для шейдера ps1_post)
+	var target_whiteout := 0.0
+	if in_whiteout:
+		target_whiteout = 0.92
+	elif outside and Game.weather != null and Game.weather.intensity > 0.6:
+		target_whiteout = clampf((Game.weather.intensity - 0.6) * 1.5, 0.0, 0.65)
+	whiteout_intensity = move_toward(whiteout_intensity, target_whiteout, delta * 0.35)
+
+	# Залипание стрелки компаса Адрианова на морозе без встряхивания
+	if outside and Game.temp < -20.0:
+		if absf(compass_stuck) < 0.05 and randf() < delta * 0.035:
+			_drift_dir = -1.0 if randf() > 0.5 else 1.0
+			compass_stuck = _drift_dir * randf_range(0.35, 0.85)
+	elif not outside:
+		compass_stuck = move_toward(compass_stuck, 0.0, delta * 0.25)
+
 	if Game.leer_attached:
 		if not outside or _cached_off_path > 2.8:
 			Game.leer_attached = false
@@ -494,6 +518,7 @@ func _update_whiteout_disorientation(delta: float) -> void:
 		else:
 			whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 1.5)
 			compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.5)
+			_drift_no_anchor_t = maxf(0.0, _drift_no_anchor_t - delta * 3.0)
 			return
 
 	if in_whiteout and _cached_off_path > 3.2:
@@ -507,11 +532,24 @@ func _update_whiteout_disorientation(delta: float) -> void:
 			Director.add_tension(15.0, "потерян леер в белой тьме")
 		if Game.audio != null and is_instance_valid(Game.audio._heart):
 			Game.audio._heart.volume_db = maxf(Game.audio._heart.volume_db, lerpf(-22.0, -3.0, whiteout_panic))
+
+		# Вестибулярный снос: человек без ориентиров неизбежно описывает круг
+		if not Game.has_flag("riding") and Vector2(velocity.x, velocity.z).length() > 0.4:
+			rotate_y(_drift_dir * 0.012 * delta)
+			_drift_no_anchor_t += delta
+			if _drift_no_anchor_t >= 40.0 and not _circle_warned:
+				_circle_warned = true
+				if Game.hud != null:
+					Game.hud.subtitle(Loc.t(&"sub.whiteout_circle"), 5.0)
+				Director.add_tension(20.0, "циркуляция в белой мгле")
 	else:
 		whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 0.8)
 		compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.0)
 		if camera != null and absf(camera.rotation.z) > 0.001:
 			camera.rotation.z = move_toward(camera.rotation.z, 0.0, delta * 0.1)
+		_drift_no_anchor_t = maxf(0.0, _drift_no_anchor_t - delta * 2.5)
+		if _drift_no_anchor_t <= 0.0:
+			_circle_warned = false
 
 
 ## Механика гипноза/наваждения Ырки: мягкий дрейф взгляда назад, преодолеваемый мышью.
@@ -1248,6 +1286,18 @@ func toggle_tablet() -> void:
 		var state := _hands.toggle_tablet()
 		if state:
 			Game.audio.play_2d("res://assets/audio/clank.ogg", -12.0)
+
+
+## Постукивание по стеклу компаса Адрианова: стряхивает налипшую от мороза стрелку
+func tap_compass() -> void:
+	if _hands != null:
+		_hands.reach()
+		_hands.tap_compass()
+	compass_stuck = move_toward(compass_stuck, 0.0, 0.7)
+	compass_glitch = move_toward(compass_glitch, 0.0, 0.9)
+	Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0, randf_range(1.15, 1.35))
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.compass_tapped"), 2.2)
 
 
 ## Сцена смерти от существа: разворот к нему, падение на снег, существо нависает, удары — темнота.

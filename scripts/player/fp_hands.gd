@@ -50,6 +50,7 @@ var tablet_model: Node3D
 var compass_needle: Node3D
 var _tablet_up := false
 var _tablet_pos := Vector3(-0.06, -0.65, -0.32)
+var _compass_tap_wobble := 0.0
 
 
 func _ready() -> void:
@@ -262,7 +263,9 @@ func _process(delta: float) -> void:
 		tablet_root.position = _tablet_pos + lag3 * 0.35 + breathe
 		tablet_root.visible = _tablet_up or _tablet_pos.y > -0.60
 		if compass_needle != null and player != null:
-			compass_needle.rotation.y = -player.global_rotation.y + player.compass_glitch
+			var stuck: float = player.compass_stuck if "compass_stuck" in player else 0.0
+			compass_needle.rotation.y = -player.global_rotation.y + player.compass_glitch + stuck + _compass_tap_wobble
+	_compass_tap_wobble = move_toward(_compass_tap_wobble, 0.0, delta * 6.0)
 
 
 ## Сюжетные сцены от первого лица: падение (руки хватают воздух) и подъём по лестнице (перехват).
@@ -338,6 +341,10 @@ func toggle_tablet(force := -1) -> bool:
 
 func is_tablet_up() -> bool:
 	return _tablet_up
+
+
+func tap_compass() -> void:
+	_compass_tap_wobble = randf_range(0.25, 0.45) * (-1.0 if randf() > 0.5 else 1.0)
 
 
 ## Хват для переносимого предмета: позиция и поворот кисти в координатах держателя предмета.

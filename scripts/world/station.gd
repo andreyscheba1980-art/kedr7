@@ -1058,6 +1058,8 @@ func _update_rays() -> void:
 		if c == null or not (c.material is ShaderMaterial):
 			return
 		_post = c.material as ShaderMaterial
+	var w_intensity: float = Game.player.whiteout_intensity if Game.player != null and "whiteout_intensity" in Game.player else 0.0
+	_post.set_shader_parameter(&"whiteout", w_intensity)
 	var cam := get_viewport().get_camera_3d()
 	if cam == null or _sky_light == null or Game.is_indoors() or Game.is_prologue_trail() or dbg_no_rays:
 		_post.set_shader_parameter(&"ray_amount", 0.0)
