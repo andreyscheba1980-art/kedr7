@@ -2704,11 +2704,14 @@ func _build_corridor_footprints() -> void:
 
 
 func _build_front_door() -> void:
-	Geo.block(self, Vector3(0.3, 0.06, 1.1), Vector3(14.5, 0.03, 3.1), Palette.m(&"plank"), false)
-	# Притолока: полотно — 2,0 м, проём сруба выше; над закрытой дверью светилась щель на улицу
-	# две половины: внутренняя светится лампами дома, наружная — фонарём крыльца и небом
-	Geo.block(self, Vector3(0.16, 0.3, 1.16), Vector3(14.42, 2.15, 3.1), Palette.m(&"plank"), false)
-	Geo.block(self, Vector3(0.12, 0.3, 1.16), Vector3(14.6, 2.15, 3.1), Palette.m(&"wood"), false)
+	# Порог дверного проёма: сплошной настил от внутреннего тамбура (14.35) до наружной грани сруба (14.89)
+	Geo.block(self, Vector3(0.55, 0.08, 1.14), Vector3(14.62, 0.02, 3.1), Palette.m(&"plank"), false)
+	# Боковые откосы (косяки двери), закрывающие пустоту между внутренней и наружной стеной:
+	Geo.block(self, Vector3(0.48, 2.20, 0.12), Vector3(14.63, 1.10, 2.54), Palette.m(&"wood"), false)
+	Geo.block(self, Vector3(0.48, 2.20, 0.12), Vector3(14.63, 1.10, 3.66), Palette.m(&"wood"), false)
+	# Притолока и глухое перекрытие над проёмом до свеса крыши (от 2.05 до 2.80 м):
+	Geo.block(self, Vector3(0.24, 0.75, 1.16), Vector3(14.44, 2.425, 3.1), Palette.m(&"plank"), false)
+	Geo.block(self, Vector3(0.26, 0.75, 1.16), Vector3(14.68, 2.425, 3.1), Palette.m(&"wood"), false)
 	_door_hinge = Node3D.new()
 	_door_hinge.position = Vector3(14.5, 0.0, 2.6)
 	add_child(_door_hinge)
@@ -2920,31 +2923,7 @@ func _build_generator_shack() -> void:
 	Geo.block(self, Vector3(2.0, 0.08, 1.3), shack_center + Vector3(0.0, 0.01, 2.0), Palette.m(&"plank"), true)
 	Geo.block(self, Vector3(1.3, 0.06, 0.28), shack_center + Vector3(0.0, 0.045, 1.36), Palette.m(&"plank"), true)
 
-	# 2. Вешки с путеводным леером (трос с флажками, чтобы не заблудиться в буран)
-	var rope_stakes: Array[Vector3] = [
-		Vector3(16.9, 0.0, 3.0),
-		Vector3(16.9, 0.0, 0.2),
-		Vector3(16.5, 0.0, -2.8),
-		Vector3(16.5, 0.0, -6.5),
-		Vector3(15.8, 0.0, -9.8),
-		Vector3(15.8, 0.0, -12.5),
-	]
-	var post_mat := Palette.m(&"wood")
-	var flag_mat := Palette.m(&"red")
-	var rope_mat := Palette.m(&"dark")
-	for i in range(rope_stakes.size()):
-		var sp := rope_stakes[i]
-		Geo.cylinder(self, 0.035, 1.3, sp + Vector3(0, 0.65, 0), post_mat, false)
-		# Флажок на колышке
-		var flag := Geo.block(self, Vector3(0.02, 0.14, 0.08), sp + Vector3(0, 1.15, 0), flag_mat, false)
-		flag.rotation.y = deg_to_rad(25.0)
-		if i + 1 < rope_stakes.size():
-			var nxt := rope_stakes[i + 1]
-			var mid := (sp + nxt) * 0.5 + Vector3(0, 0.9, 0)
-			var rope_len := sp.distance_to(nxt)
-			var rope := Geo.cylinder(self, 0.012, rope_len, mid, rope_mat, false)
-			rope.rotation.x = PI / 2.0
-			rope.rotation.z = atan2(nxt.x - sp.x, nxt.z - sp.z)
+	# 2. Путеводный леер к дизельной строится централизованно в Yard._build_rope_lines()
 
 	# 3. Фундамент и дощатый пол будки (x: 12.9..16.1, z: -14.9..-12.1)
 	Geo.block(self, Vector3(3.2, 0.1, 2.8), shack_center, Palette.m(&"plank"), true)

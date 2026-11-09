@@ -1137,8 +1137,8 @@ func set_held(item: StringName) -> void:
 		if _held_models.has(&"oil"):
 			_held_models[&"oil"].visible = true
 	elif item == &"shovel":
-		_held_base_pos = Vector3(0.25, -0.58, -1.17)   # черенок назад к плечу, совок впереди внизу
-		_held_base_rot = Vector3(70.0, 0.0, 0.0)
+		_held_base_pos = Vector3(0.24, -0.42, -0.48)
+		_held_base_rot = Vector3(45.0, -15.0, 5.0)
 		if _held_models.has(&"shovel"):
 			_held_models[&"shovel"].visible = true
 	elif item == &"dog":

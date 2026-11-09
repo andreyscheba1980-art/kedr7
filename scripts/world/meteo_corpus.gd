@@ -102,11 +102,31 @@ func _seal_walls_and_fix_geometry() -> void:
 	if south_wall != null:
 		_set_layers(south_wall, LAYER_IN | LAYER_OUT)
 
-	# 2. Потолочное перекрытие стыка крыла корпуса и шахты башни на y = 3.6:
+	# 2. Потолочное перекрытие стыка крыла корпуса и шахты башни на y = 3.65 (закрывает щель в небо над маршем и площадкой):
 	var ceil_mat := Palette.m(&"ceiling")
-	var ceil_cap := Geo.block(self, Vector3(4.35, 0.25, 1.2), Vector3(96.75, 3.65, -34.3), ceil_mat, true)
+	var ceil_cap := Geo.block(self, Vector3(4.35, 0.28, 2.4), Vector3(96.75, 3.65, -34.9), ceil_mat, true)
 	if ceil_cap != null:
 		_set_layers(ceil_cap, LAYER_IN | LAYER_OUT)
+
+	# 3. Порог и коробка балконной двери на вышке — закрывают щель между полом башни и настилом балкона:
+	var wood_mat := Palette.m(&"wood")
+	var threshold := Geo.block(self, Vector3(1.15, 0.12, 0.35), Vector3(95.5, CAB + 0.04, -39.0), wood_mat, true)
+	if threshold != null:
+		_set_layers(threshold, LAYER_IN | LAYER_OUT)
+	var jamb_l := Geo.block(self, Vector3(0.12, 2.15, 0.35), Vector3(95.0, CAB + 1.05, -39.0), wood_mat, true)
+	if jamb_l != null:
+		_set_layers(jamb_l, LAYER_IN | LAYER_OUT)
+	var jamb_r := Geo.block(self, Vector3(0.12, 2.15, 0.35), Vector3(96.0, CAB + 1.05, -39.0), wood_mat, true)
+	if jamb_r != null:
+		_set_layers(jamb_r, LAYER_IN | LAYER_OUT)
+	var lintel := Geo.block(self, Vector3(1.15, 0.20, 0.35), Vector3(95.5, CAB + 2.12, -39.0), wood_mat, true)
+	if lintel != null:
+		_set_layers(lintel, LAYER_IN | LAYER_OUT)
+
+	# 4. Настенная консоль под красный фонарь фотолаборатории (устраняет эффект висения фонаря в воздухе):
+	var lamp_shelf := Geo.block(self, Vector3(0.24, 0.06, 0.30), Vector3(97.05, FL + 1.86, -25.04), wood_mat, false)
+	if lamp_shelf != null:
+		_set_layers(lamp_shelf, LAYER_IN)
 
 
 func _set_layers(root: Node, layer: int) -> void:

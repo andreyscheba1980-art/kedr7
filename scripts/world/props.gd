@@ -1602,8 +1602,7 @@ static func snow_shovel(is_held := false) -> Node3D:
 	if is_held:
 		var root := Node3D.new()
 		var m := snow_shovel(false)
-		m.position = Vector3(0.24, -0.58, -0.65)
-		m.rotation_degrees = Vector3(-65.0, 25.0, -15.0)
+		m.position = Vector3(0.0, -0.75, 0.0)
 		m.scale = Vector3(0.72, 0.72, 0.72)
 		root.add_child(m)
 		return root

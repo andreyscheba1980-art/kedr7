@@ -211,14 +211,17 @@ func _process(delta: float) -> void:
 		var torch_on := player.flashlight_on()
 		torch_lens.material_override = _lens_on if torch_on else _lens_off
 		var left_up := torch_on or player.cranking
-		_left_pos = _left_pos.lerp(L_ON if left_up else L_OFF, k * 0.8)
+		var pitch_x: float = player.head.rotation.x
+		var down_k := clampf(-pitch_x / 1.0, 0.0, 1.0)
+		var l_target := (L_ON + Vector3(-0.03, -0.16, 0.08) * down_k) if left_up else L_OFF
+		_left_pos = _left_pos.lerp(l_target, k * 0.8)
 		var squeeze := 0.0
 		if player.cranking:
 			_crank_t += delta * 11.0
 			squeeze = absf(sin(_crank_t))
 		_lever.rotation.x = deg_to_rad(lerpf(16.0, 1.0, squeeze))
 		left.position = _left_pos + Vector3(-sway.x, sway.y, 0) + lag3 + breathe + Vector3(0, -0.006 * squeeze, 0)
-		left.rotation_degrees = Vector3(2.0 + sway.y * 200.0, 3.0, -squeeze * 4.0)
+		left.rotation_degrees = Vector3(2.0 + sway.y * 200.0 - down_k * 15.0, 3.0, -squeeze * 4.0)
 		left.visible = left_up or _left_pos.distance_to(L_OFF) > 0.04
 
 	# Правая: в предмете — едет с ним; иначе тянется, крутит динамо, стреляет или убрана вниз
@@ -292,15 +295,19 @@ func _ride_hands(delta: float) -> void:
 	var load := clampf(absf(sm.speed) / Snowmobile.MAX_SPEED, 0.0, 1.0)
 	var buzz := (0.002 + load * 0.004) if sm.engine_on else 0.0
 	var k := minf(delta * 12.0, 1.0)
+	var pitch: float = player.head.rotation.x
+	# Компенсируем наклон головы, чтобы варежки оставались на руле снегохода, а не взлетали в небо
+	var pitch_offset := Vector3(0.0, -pitch * 0.42, pitch * 0.18)
+	var pitch_rot := -rad_to_deg(pitch) * 0.65
 	for side: float in [-1.0, 1.0]:
 		var h := left if side < 0.0 else right
 		h.visible = true
 		# Поворот руля: одна рука уходит вперёд-вниз, другая — к себе и вверх
 		var push := -steer * side
-		var lp := Vector3(0.23 * side, -0.29 + push * 0.035, -0.46 - push * 0.05)
+		var lp := Vector3(0.23 * side, -0.29 + push * 0.035, -0.46 - push * 0.05) + pitch_offset
 		lp += Vector3(randf_range(-buzz, buzz), randf_range(-buzz, buzz), 0.0)
 		h.position = h.position.lerp(lp, k)
-		h.rotation_degrees = h.rotation_degrees.lerp(Vector3(-8.0, side * -6.0 + steer * 10.0, side * 78.0 + steer * 8.0), k)
+		h.rotation_degrees = h.rotation_degrees.lerp(Vector3(-12.0 + pitch_rot, side * -10.0 + steer * 10.0, side * 28.0 + steer * 6.0), k)
 	torch_lens.material_override = _lens_off
 	_left_pos = left.position
 	_right_pos = right.position
@@ -341,9 +348,13 @@ static func _grip(item: StringName) -> Array:
 		&"oil":
 			return [Vector3(0.1, 0.11, 0.0), Vector3(0.0, 0.0, 0.0)]       # обхват сбоку
 		&"shovel":
-			return [Vector3(0.0, 0.85, 0.06), Vector3(-90.0, 0.0, 0.0)]    # за черенок
+			return [Vector3(0.0, 0.0, 0.0), Vector3(0.0, 0.0, 0.0)]         # за черенок ровно по центру хвата
 		&"trunk":
-			return [Vector3(0.24, -0.05, 0.0), Vector3(0.0, 15.0, -40.0)] # хват за правую ручку рундука
+			return [Vector3(0.24, -0.05, 0.0), Vector3(0.0, 15.0, -40.0)]  # хват за правую ручку рундука
+		&"kettle":
+			return [Vector3(0.0, 0.17, 0.0), Vector3(-10.0, 0.0, 90.0)]     # за верхнюю дужку чайника
+		&"blowtorch":
+			return [Vector3(0.0, 0.08, 0.10), Vector3(15.0, 0.0, 0.0)]      # за заднюю рукоять паяльной лампы
 		_:
 			return [Vector3(0.12, -0.03, 0.02), Vector3(0.0, 10.0, -70.0)]  # охапка снизу
 
