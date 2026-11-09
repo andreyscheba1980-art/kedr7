@@ -100,20 +100,23 @@ static func ensure() -> void:
 	print("[terrain] сетка %d×%d за %d мс" % [N, N, Time.get_ticks_msec() - t0])
 
 
-## Рельеф без дорог: сопки + хребты у краёв, двор — ровный.
+## Рельеф без дорог: 3-ярусный Уральский цирк (дно, моренное плато, скальный венец гольцов).
 static func _base(x: float, z: float, detail: FastNoiseLite) -> float:
 	var d := Vector2(x, z).distance_to(CENTER)
 	var w := smoothstep(FLAT_R, FLAT_R + BLEND, d)
 	if w <= 0.0:
 		return 0.0
 	var n := _noise.get_noise_2d(x, z)
-	var hills := (n * 0.5 + 0.5) * 30.0 + detail.get_noise_2d(x, z) * 1.6
-	# Гребни сопок: острый перегиб там, где шум переходит через ноль — каменистые увалы, а не блин
-	hills += pow(1.0 - absf(_noise.get_noise_2d(z * 0.7 + 400.0, x * 0.7)), 4.0) * 12.0
-	hills -= _ravine_cut(x, z)
+	# Ярус 2: моренные гряды и холмы плато (+15..+50 м)
+	var tier2 := (n * 0.5 + 0.5) * 36.0 + detail.get_noise_2d(x, z) * 2.0
+	tier2 += pow(1.0 - absf(_noise.get_noise_2d(z * 0.7 + 400.0, x * 0.7)), 4.0) * 14.0
+	tier2 -= _ravine_cut(x, z)
+
+	# Ярус 3: скальный венец Уральского цирка (гольцы и курумники до +115 м)
 	var edge := maxf(absf(x - CENTER.x), absf(z - CENTER.y))
-	var ridge := smoothstep(400.0, 505.0, edge) * 46.0
-	return (hills + ridge) * w
+	var tier3 := smoothstep(330.0, 490.0, maxf(d * 0.88, edge)) * 68.0
+
+	return (tier2 + tier3) * w
 
 
 ## Насколько опустить рельеф оврагом в точке: гладкий профиль «корыта» с крутыми бортами.

@@ -4773,3 +4773,202 @@ static func borehole_sg4() -> Node3D:
 
 	return _mi(k, key, "tex_metal.png")
 
+
+## Разбившийся в 1979 году советский вертолёт Ми-4 (СССР-31415):
+## фюзеляж, погнутые лопасти несущего винта, остекление кабины, разломленная хвостовая балка.
+static func soviet_mi4_helicopter() -> Node3D:
+	var glb := _kedr_model("soviet_mi4_helicopter", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
+	var key := &"mi4_helicopter_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(401, 0.06)
+	var fuselage := Color(0.26, 0.30, 0.24)
+	var belly := Color(0.38, 0.44, 0.50)
+	var cockpit_top := Color(0.68, 0.70, 0.66)
+	var glass := Color(0.65, 0.76, 0.84)
+	var steel := Color(0.20, 0.22, 0.24)
+	var red_star := Color(0.75, 0.12, 0.10)
+	var rust := Color(0.35, 0.18, 0.12)
+	var snow := Color(0.85, 0.89, 0.94)
+
+	# 1. Основной фюзеляж вертолёта (длина 9.5 м, высота 2.8 м)
+	k.box(Vector3(0, 1.4, 0.5), Vector3(2.2, 2.4, 6.8), fuselage)
+	k.box(Vector3(0, 0.35, 0.5), Vector3(2.0, 0.5, 6.4), belly)
+	# Красная звезда на борту
+	k.box(Vector3(1.11, 1.6, 0.8), Vector3(0.02, 0.6, 0.6), red_star)
+	k.box(Vector3(-1.11, 1.6, 0.8), Vector3(0.02, 0.6, 0.6), red_star)
+
+	# 2. Носовая кабина пилотов со скошенным остеклением
+	k.box(Vector3(0, 1.8, 3.4), Vector3(1.8, 1.6, 1.6), cockpit_top)
+	# Остекление фонаря кабины
+	k.box(Vector3(0, 1.95, 4.0), Vector3(1.6, 0.8, 0.4), glass, Basis(Vector3.RIGHT, deg_to_rad(-25.0)))
+	k.box(Vector3(0.91, 1.95, 3.3), Vector3(0.04, 0.7, 1.1), glass)
+	k.box(Vector3(-0.91, 1.95, 3.3), Vector3(0.04, 0.7, 1.1), glass)
+
+	# 3. Втулка несущего винта и погнутые лопасти
+	k.tube([Vector3(0, 2.6, 1.2), Vector3(0, 3.4, 1.2)], [0.22, 0.22], steel, 8, true, true)
+	k.tube([Vector3(0, 3.4, 1.2), Vector3(0, 3.65, 1.2)], [0.38, 0.38], steel, 10, true, true)
+	# Лопасти: одна зарыта в снег, три погнуты от удара
+	k.box(Vector3(2.6, 2.5, 1.2), Vector3(5.0, 0.06, 0.45), steel, Basis(Vector3.FORWARD, deg_to_rad(-18.0)))
+	k.box(Vector3(-2.6, 2.3, 1.2), Vector3(5.0, 0.06, 0.45), steel, Basis(Vector3.FORWARD, deg_to_rad(22.0)))
+	k.box(Vector3(0, 1.3, 4.8), Vector3(0.45, 0.06, 5.2), steel, Basis(Vector3.RIGHT, deg_to_rad(35.0))) # в наст
+	k.box(Vector3(0, 2.8, -2.4), Vector3(0.45, 0.06, 4.8), steel, Basis(Vector3.RIGHT, deg_to_rad(-12.0)))
+
+	# 4. Разломленная хвостовая балка (угол 28 градусов)
+	var boom_b := Basis(Vector3.UP, deg_to_rad(28.0)) * Basis(Vector3.RIGHT, deg_to_rad(-12.0))
+	k.tube([Vector3(0, 1.6, -2.9), Vector3(0, 1.6, -2.9) + boom_b * Vector3(0, 0, -4.8)], [0.45, 0.22], fuselage, 8)
+	var fin_p := Vector3(0, 1.6, -2.9) + boom_b * Vector3(0, 0.8, -4.8)
+	k.box(fin_p, Vector3(0.08, 1.4, 0.9), fuselage, boom_b)
+	# Рулевой винт
+	k.tube([fin_p + boom_b * Vector3(0.12, 0.4, 0), fin_p + boom_b * Vector3(0.24, 0.4, 0)], [0.08], steel, 6)
+
+	# 5. Задние грузовые створки (приоткрыты)
+	k.box(Vector3(-0.55, 1.3, -2.85), Vector3(0.9, 1.9, 0.08), fuselage, Basis(Vector3.UP, deg_to_rad(-35.0)))
+	k.box(Vector3(0.55, 1.3, -2.85), Vector3(0.9, 1.9, 0.08), fuselage, Basis(Vector3.UP, deg_to_rad(25.0)))
+
+	# 6. Сугробы и заносы вокруг фюзеляжа
+	k.blob(Vector3(-1.2, 0.6, 0.5), Vector3(1.1, 0.8, 6.2), snow, 3, 7)
+	k.blob(Vector3(1.1, 0.4, -1.0), Vector3(0.9, 0.6, 4.8), snow, 3, 6)
+
+	return _mi(k, key, "tex_metal.png")
+
+
+## 24-метровая деревянная триангуляционная вышка геодезистов (Уральский цирк, гребень):
+## 4 массивных наклонных бревна-пилона, 5 ярусов раскосов, лестница, верхняя смотровая площадка.
+static func triangulation_tower_24m() -> Node3D:
+	var glb := _kedr_model("triangulation_tower_24m", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
+	var key := &"tri_tower_24m_v1"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(402, 0.08)
+	var timber := Color(0.34, 0.25, 0.16)
+	var timber_dark := Color(0.22, 0.16, 0.10)
+	var steel := Color(0.28, 0.30, 0.32)
+	var snow := Color(0.85, 0.89, 0.94)
+
+	# Основание 7.5x7.5 м, верхняя площадка на высоте 20 м (2.8x2.8 м), шпиль до 24 м
+	var h_top := 20.0
+	var r_base := 3.75
+	var r_top := 1.4
+
+	# 1. Четыре главных наклонных пилона
+	var signs := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
+	for s in signs:
+		var p_bot := Vector3(s.x * r_base, 0.0, s.y * r_base)
+		var p_up := Vector3(s.x * r_top, h_top, s.y * r_top)
+		k.tube([p_bot, p_up], [0.26, 0.18], timber_dark, 8)
+		# Бетонный башмак в основании
+		k.box(p_bot + Vector3(0, 0.35, 0), Vector3(0.9, 0.7, 0.9), Color(0.42, 0.44, 0.42))
+
+	# 2. Пять ярусов горизонтальных поясов и крестообразных раскосов
+	var tiers := 5
+	for t in range(tiers):
+		var y0 := float(t) * (h_top / float(tiers))
+		var y1 := float(t + 1) * (h_top / float(tiers))
+		var r0 := lerpf(r_base, r_top, y0 / h_top)
+		var r1 := lerpf(r_base, r_top, y1 / h_top)
+		# Горизонтальные пояса
+		for i in 4:
+			var s0: Vector2 = signs[i]
+			var s1: Vector2 = signs[(i + 1) % 4]
+			var a := Vector3(s0.x * r1, y1, s0.y * r1)
+			var b := Vector3(s1.x * r1, y1, s1.y * r1)
+			k.tube([a, b], [0.12, 0.12], timber, 6)
+			# Крестовые раскосы (X)
+			var a0 := Vector3(s0.x * r0, y0, s0.y * r0)
+			var b0 := Vector3(s1.x * r0, y0, s1.y * r0)
+			k.tube([a0, b], [0.08, 0.08], timber, 5)
+			k.tube([b0, a], [0.08, 0.08], timber, 5)
+
+	# 3. Верхняя смотровая площадка с перилами
+	k.box(Vector3(0, h_top, 0), Vector3(3.2, 0.16, 3.2), timber)
+	for s in signs:
+		k.tube([Vector3(s.x * 1.5, h_top, s.y * 1.5), Vector3(s.x * 1.5, h_top + 1.1, s.y * 1.5)], [0.06], steel, 5)
+	for i in 4:
+		var s0: Vector2 = signs[i]
+		var s1: Vector2 = signs[(i + 1) % 4]
+		k.tube([Vector3(s0.x * 1.5, h_top + 1.1, s0.y * 1.5), Vector3(s1.x * 1.5, h_top + 1.1, s1.y * 1.5)], [0.05], steel, 5)
+
+	# 4. Центральная визирная пирамида и секторная антенна до 24 м
+	k.tube([Vector3(0, h_top, 0), Vector3(0, h_top + 4.2, 0)], [0.12, 0.05], steel, 6)
+	k.box(Vector3(0, h_top + 4.2, 0), Vector3(0.2, 0.2, 0.2), Color(0.8, 0.1, 0.1)) # сигнальный шар/фонарь
+
+	# 5. Вертикальная лестница с защитными кольцами
+	for step in range(int(h_top * 3)):
+		var y := float(step) * 0.33
+		var r_cur := lerpf(r_base, r_top, y / h_top)
+		k.tube([Vector3(-0.25, y, r_cur - 0.12), Vector3(0.25, y, r_cur - 0.12)], [0.02], steel, 4)
+
+	return _mi(k, key, "tex_wood.png")
+
+
+## Мансийский радио-тотем: портативный приемник «Спидола-231»,
+## вросший в священную лиственницу и обмотанный жилами.
+static func mansi_radio_spidola() -> Node3D:
+	var key := &"spidola_radio_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(403, 0.04)
+	var case_black := Color(0.08, 0.08, 0.09)
+	var grill_cream := Color(0.72, 0.68, 0.58)
+	var scale_glass := Color(0.35, 0.45, 0.40)
+	var sinew := Color(0.42, 0.32, 0.20)
+	var bronze := Color(0.62, 0.52, 0.28)
+
+	# Корпус «Спидолы»
+	k.box(Vector3(0, 0.2, 0), Vector3(0.32, 0.26, 0.11), case_black)
+	# Решетка динамика
+	k.box(Vector3(-0.04, 0.16, 0.056), Vector3(0.20, 0.15, 0.01), grill_cream)
+	# Окно шкалы диапазонов КВ/СВ/ДВ
+	k.box(Vector3(0.0, 0.26, 0.056), Vector3(0.28, 0.06, 0.01), scale_glass)
+	# Ручки настройки
+	k.tube([Vector3(0.12, 0.18, 0.056), Vector3(0.12, 0.18, 0.08)], [0.022], bronze, 8, true, true)
+	k.tube([Vector3(0.12, 0.12, 0.056), Vector3(0.12, 0.12, 0.08)], [0.022], bronze, 8, true, true)
+
+	# Обмотка оленьими сухожилиями и берестяными полосами крест-накрест
+	for i in range(5):
+		var a := float(i) * 0.4
+		k.tube([Vector3(-0.18, 0.08 + float(i) * 0.05, -0.06), Vector3(0.18, 0.12 + float(i) * 0.04, 0.06)], [0.008], sinew, 4)
+		k.tube([Vector3(0.18, 0.08 + float(i) * 0.05, -0.06), Vector3(-0.18, 0.12 + float(i) * 0.04, 0.06)], [0.008], sinew, 4)
+
+	return _mi(k, key, "tex_metal.png")
+
+
+## Сейсмический геофонный пост штольни (СВ-30 в скальном монолите):
+## чугунный корпус, фланец анкеровки, экранированный кабель передачи импульсов.
+static func seismic_geophone_box() -> Node3D:
+	var key := &"geophone_box_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(404, 0.04)
+	var iron := Color(0.18, 0.20, 0.22)
+	var brass := Color(0.60, 0.48, 0.22)
+	var rubber := Color(0.06, 0.06, 0.07)
+	var red_mark := Color(0.75, 0.14, 0.10)
+
+	# Цилиндрический корпус геофона СВ-30
+	k.tube([Vector3(0, 0.0, 0), Vector3(0, 0.32, 0)], [0.12, 0.12], iron, 10, true, true)
+	# Анкерный фланец со шпильками в гранит
+	k.tube([Vector3(0, 0.0, 0), Vector3(0, 0.05, 0)], [0.18, 0.18], iron, 12, true, true)
+	for i in range(4):
+		var ang := float(i) * (TAU / 4.0)
+		k.tube([Vector3(cos(ang) * 0.15, 0.05, sin(ang) * 0.15), Vector3(cos(ang) * 0.15, 0.09, sin(ang) * 0.15)], [0.015], brass, 5)
+
+	# Красная маркировка «СВ-30 №4-1959»
+	k.box(Vector3(0, 0.22, 0.121), Vector3(0.12, 0.05, 0.005), red_mark)
+
+	# Кабельный гермоввод и бронированный провод
+	k.tube([Vector3(0, 0.32, 0), Vector3(0, 0.38, 0)], [0.04], brass, 6)
+	k.tube([Vector3(0, 0.38, 0), Vector3(0.15, 0.35, 0.1), Vector3(0.45, 0.04, 0.25), Vector3(1.2, 0.02, 0.5)], [0.02], rubber, 4)
+
+	return _mi(k, key, "tex_metal.png")
+
+

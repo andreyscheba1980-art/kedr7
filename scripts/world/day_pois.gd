@@ -18,6 +18,7 @@ const POI_TARGETS := {
 	&"poi_trelevochnik": {"pos": Vector3(-150.0, 0.0, 45.0), "radius": 8.0},
 	&"poi_radar_dome": {"pos": Vector3(-140.0, 0.0, -135.0), "radius": 10.0},
 	&"poi_deep_borehole": {"pos": Vector3(55.0, 0.0, 195.0), "radius": 8.0},
+	&"poi_mi4": {"pos": Vector3(-165.0, 0.0, -175.0), "radius": 12.0},
 }
 
 var _yard: Yard
@@ -30,6 +31,9 @@ var _mine_hum_player: AudioStreamPlayer3D
 var _tractor_radio_player: AudioStreamPlayer3D
 var _radar_whisper_player: AudioStreamPlayer3D
 var _borehole_drone_player: AudioStreamPlayer3D
+var _tower_wind_player: AudioStreamPlayer3D
+var _shrine_whisper_player: AudioStreamPlayer3D
+var _mi4_wind_player: AudioStreamPlayer3D
 var _solar_halo: Node3D = null
 
 
@@ -71,6 +75,7 @@ func _build_all_pois() -> void:
 	_build_trelevochnik(POI_TARGETS[&"poi_trelevochnik"]["pos"])
 	_build_radar_dome(POI_TARGETS[&"poi_radar_dome"]["pos"])
 	_build_deep_borehole(POI_TARGETS[&"poi_deep_borehole"]["pos"])
+	_build_mi4_crash(POI_TARGETS[&"poi_mi4"]["pos"])
 	_build_labaz()
 
 
@@ -202,6 +207,20 @@ func _build_shrine(base_pos: Vector3) -> void:
 		return Loc.t(&"it.shrine_offer") if Supply.rations() > 0 else Loc.t(&"it.shrine_no_offer")
 	shrine_it.name = "MansiShrine"
 
+	# Радиоприёмник «Спидола», обмотанный жилами
+	var spidola := Props.mansi_radio_spidola()
+	if spidola != null:
+		spidola.position = p + Vector3(-0.55, 0.72, -0.2)
+		spidola.rotation.y = deg_to_rad(25.0)
+		add_child(spidola)
+
+	var radio_it := Geo.interactable(self, Vector3(0.7, 0.6, 0.7), p + Vector3(-0.55, 0.75, -0.2), null, Loc.t(&"it.poi_shrine_radio"), func(_pl: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/whisper.ogg", 0.0)
+		Game.hud.subtitle(Loc.t(&"sub.shrine_radio_chant"), 6.0)
+		Director.add_tension(8.0, "радио Спидола у идолов")
+	)
+	radio_it.name = "ShrineRadioSpidola"
+
 
 const LABAZ := Vector3(-200.0, 0.0, -40.0)   ## шаманский лабаз на сваях — в лесу за Чёрным логом
 
@@ -310,18 +329,48 @@ func _build_finger(base_pos: Vector3) -> void:
 	marker_it.name = "ChertovFingerMarker"
 
 
-# 6. Деревянная триангуляционная вышка
+# 6. 24-метровая деревянная триангуляционная вышка геодезистов
 func _build_tower(base_pos: Vector3) -> void:
 	var p := _place_ground_y(base_pos)
-	var model := Props.triangulation_tower()
+	var model := Props.triangulation_tower_24m()
 	if model != null:
 		model.position = p
 		model.rotation.y = deg_to_rad(40.0)
 		add_child(model)
 
-	_solid(p + Vector3(0, 3.0, 0), Vector3(3.2, 6.0, 3.2), deg_to_rad(40.0))
+	# Опоры у основания
+	_solid(p + Vector3(0, 2.0, 0), Vector3(3.6, 4.0, 3.6), deg_to_rad(40.0))
 
-	var ammo_it := Geo.interactable(self, Vector3(1.0, 0.8, 1.0), p + Vector3(0.8, 0.4, 0.6), null, Loc.t(&"it.poi_tower"), func(_pl: Player) -> void:
+	# Верхняя смотровая площадка на высоте 19.8 м
+	_solid(p + Vector3(0, 19.7, 0), Vector3(3.4, 0.2, 3.4))
+	_solid(p + Vector3(1.65, 20.4, 0), Vector3(0.15, 1.2, 3.4))
+	_solid(p + Vector3(-1.65, 20.4, 0), Vector3(0.15, 1.2, 3.4))
+	_solid(p + Vector3(0, 20.4, 1.65), Vector3(3.4, 1.2, 0.15))
+	_solid(p + Vector3(0, 20.4, -1.65), Vector3(3.4, 1.2, 0.15))
+
+	# Лестница наверх (подъём на смотровую площадку 24м)
+	var ladder_up := Geo.interactable(self, Vector3(1.2, 2.0, 1.2), p + Vector3(0, 1.0, 3.2), null, Loc.t(&"it.poi_tower_ladder"), func(pl: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/clank.ogg", -1.0)
+		if pl != null:
+			pl.global_position = p + Vector3(0, 20.2, 0)
+			pl.velocity = Vector3.ZERO
+		Game.hud.subtitle(Loc.t(&"sub.tower_climbed"), 5.5)
+		Director.add_tension(7.0, "подъём на вышку 24м")
+	)
+	ladder_up.name = "TowerLadderUp"
+
+	# Лестница вниз (спуск со смотровой площадки)
+	var ladder_down := Geo.interactable(self, Vector3(1.2, 1.8, 1.2), p + Vector3(0, 20.5, 1.1), null, Loc.t(&"it.poi_tower_ladder_down"), func(pl: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/clank.ogg", -1.0)
+		if pl != null:
+			pl.global_position = p + Vector3(0, 0.2, 3.4)
+			pl.velocity = Vector3.ZERO
+		Game.hud.subtitle(Loc.t(&"sub.tower_descended"), 3.0)
+	)
+	ladder_down.name = "TowerLadderDown"
+
+	# Ящик геодезистов с сигнальными ракетами и спиртовкой
+	var ammo_it := Geo.interactable(self, Vector3(1.0, 0.8, 1.0), p + Vector3(1.6, 0.4, 1.2), null, Loc.t(&"it.poi_tower"), func(_pl: Player) -> void:
 		if not Game.has_flag("tower_flares_looted"):
 			Game.set_flag("tower_flares_looted", true)
 			Game.flares = minf(Game.flares + 2, 8)
@@ -441,6 +490,25 @@ func _build_ice_mine(base_pos: Vector3) -> void:
 		Game.hud.show_note(Loc.t(&"note.ice_mine_log"))
 	)
 	board_it.name = "IceMineLogBoard"
+
+	# Сейсмический геофонный пост СВ-30 в скальном монолите
+	var geo_box := Props.seismic_geophone_box()
+	if geo_box != null:
+		geo_box.position = p + Vector3(2.1, 0.35, 1.7)
+		geo_box.rotation.y = deg_to_rad(30.0)
+		add_child(geo_box)
+
+	var geo_it := Geo.interactable(self, Vector3(0.9, 0.8, 0.9), p + Vector3(2.1, 0.45, 1.7), null, Loc.t(&"it.poi_geophone"), func(_pl: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/sub_drop.ogg", 1.0)
+		Game.audio.play_2d("res://assets/audio/drone_loop.ogg", -2.0)
+		if Game.player != null:
+			Game.player.shake(0.05, 0.8)
+		Game.hud.subtitle(Loc.t(&"sub.geophone_pulse"), 6.5)
+		Game.hud.show_note(Loc.t(&"note.adit4_geology"))
+		Director.add_tension(10.0, "сейсмо-геофон штольни №4")
+	)
+	geo_it.hold_time = 2.0
+	geo_it.name = "AditGeophoneBox"
 
 
 # 12. Вмерзший трелёвочник ТДТ-55 в Чёртовой пади
@@ -571,6 +639,40 @@ func _build_deep_borehole(base_pos: Vector3) -> void:
 	report_it.name = "BoreholeReport"
 
 
+# 15. Место крушения вертолёта Ми-4 (СССР-31415)
+func _build_mi4_crash(base_pos: Vector3) -> void:
+	var p := _place_ground_y(base_pos)
+	var model := Props.soviet_mi4_helicopter()
+	if model != null:
+		model.position = p
+		model.rotation.y = deg_to_rad(-45.0)
+		model.rotation.z = deg_to_rad(10.0) # завалился на левый борт в сугроб
+		add_child(model)
+
+	# Коллизия корпуса и разломленной хвостовой балки
+	_solid(p + Vector3(0, 1.3, 0.3), Vector3(2.6, 2.5, 7.2), deg_to_rad(-45.0))
+	_solid(p + Vector3(-1.8, 1.2, -3.2), Vector3(1.4, 1.6, 4.4), deg_to_rad(-17.0))
+
+	# Кабина пилотов: бортовой журнал борта 31415
+	var cockpit_it := Geo.interactable(self, Vector3(1.8, 1.8, 1.8), p + Vector3(2.2, 1.5, 2.2), null, Loc.t(&"it.poi_mi4_cockpit"), func(_pl: Player) -> void:
+		Game.hud.show_note(Loc.t(&"note.mi4_log"))
+		Director.add_tension(8.0, "бортовой журнал Ми-4")
+	)
+	cockpit_it.name = "Mi4CockpitIt"
+
+	# Аккумуляторный отсек / моторама: авиационный кабель и медные клеммы
+	var batt_it := Geo.interactable(self, Vector3(1.2, 1.0, 1.2), p + Vector3(-0.9, 0.8, -0.6), null, Loc.t(&"it.poi_mi4_battery"), func(_pl: Player) -> void:
+		if not Game.has_flag("mi4_battery_looted"):
+			Game.set_flag("mi4_battery_looted", true)
+			AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
+			Game.hud.subtitle(Loc.t(&"sub.mi4_battery_taken"), 4.5)
+			Director.add_tension(5.0, "авиационный аккумулятор Ми-4")
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.mi4_battery_empty"), 2.0)
+	)
+	batt_it.name = "Mi4BatteryIt"
+
+
 # --- 2. Звуковые эмбиент-источники POI ---
 
 func _setup_audio_emitters() -> void:
@@ -641,6 +743,40 @@ func _setup_audio_emitters() -> void:
 	_borehole_drone_player.bus = &"SFX"
 	add_child(_borehole_drone_player)
 	_borehole_drone_player.play()
+
+	# Ветер в металлических вантах триангуляционной вышки 24м
+	_tower_wind_player = AudioStreamPlayer3D.new()
+	_tower_wind_player.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/wind_whistle_loop.ogg")
+	_tower_wind_player.position = _place_ground_y(POI_TARGETS[&"poi_tower"]["pos"]) + Vector3(0, 19.8, 0)
+	_tower_wind_player.unit_size = 5.0
+	_tower_wind_player.max_distance = 35.0
+	_tower_wind_player.volume_db = -8.0
+	_tower_wind_player.bus = &"SFX"
+	add_child(_tower_wind_player)
+	_tower_wind_player.play()
+
+	# Шёпот и потрескивание у мансийского радио-тотема
+	_shrine_whisper_player = AudioStreamPlayer3D.new()
+	_shrine_whisper_player.stream = AudioDirector.cached_stream("res://assets/audio/whisper.ogg")
+	_shrine_whisper_player.position = _place_ground_y(POI_TARGETS[&"poi_shrine"]["pos"]) + Vector3(0, 1.0, 0)
+	_shrine_whisper_player.unit_size = 3.2
+	_shrine_whisper_player.max_distance = 18.0
+	_shrine_whisper_player.volume_db = -14.0
+	_shrine_whisper_player.bus = &"SFX"
+	add_child(_shrine_whisper_player)
+	_shrine_whisper_player.play()
+
+	# Свист ветра в разломанном фюзеляже вертолёта Ми-4
+	_mi4_wind_player = AudioStreamPlayer3D.new()
+	_mi4_wind_player.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/wind_whistle_loop.ogg")
+	_mi4_wind_player.pitch_scale = 0.72
+	_mi4_wind_player.position = _place_ground_y(POI_TARGETS[&"poi_mi4"]["pos"]) + Vector3(0, 1.8, 0)
+	_mi4_wind_player.unit_size = 4.8
+	_mi4_wind_player.max_distance = 30.0
+	_mi4_wind_player.volume_db = -10.0
+	_mi4_wind_player.bus = &"SFX"
+	add_child(_mi4_wind_player)
+	_mi4_wind_player.play()
 
 
 # --- 3. Аномалии POI: сбой компаса, временная деформация и акустика ---

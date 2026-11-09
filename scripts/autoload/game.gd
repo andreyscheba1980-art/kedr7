@@ -894,7 +894,8 @@ func _tick_heat(delta: float) -> void:
 				coat *= 0.65
 			if Dog.is_near_player():
 				coat *= 0.85     # Найда жмётся к ногам — теплее
-			warmth -= WARMTH_LOSS_OUTSIDE * (1.0 + storm * 1.2) * cold * coat * delta
+			var ridge_wind := 1.45 if (player != null and player.global_position.y > 70.0) else 1.0
+			warmth -= WARMTH_LOSS_OUTSIDE * (1.0 + storm * 1.2) * cold * coat * ridge_wind * delta
 			Consequences.note_cold(warmth)
 			if warmth < 28.0 and Gear.thermos_ready():
 				Gear.use_thermos()

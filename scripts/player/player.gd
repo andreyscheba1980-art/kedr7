@@ -407,6 +407,8 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.72 if shoes else 0.55
 	elif not Game.skis_equipped and _cached_off_path > 6.0:
 		speed *= 0.9 if shoes else 0.75
+	if Game.is_outside() and global_position.y > 70.0 and not Game.skis_equipped:
+		speed *= 0.78   # крутой каменистый курумник венца цирка: без лыж ноги проваливаются меж валунов
 	speed *= speed_mult
 
 	var target := dir * speed

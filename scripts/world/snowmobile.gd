@@ -374,6 +374,12 @@ func _physics_process(delta: float) -> void:
 	var slope := -Terrain.normal(pos.x, pos.z).dot(fwd)   # > 0 — в гору
 	var deep_cap: float = DEEP_SPEED * (1.35 if (Game.has_item(&"belt_variator") or Game.has_flag("buran_belt")) else 1.0)
 	var cap := lerpf(MAX_SPEED, deep_cap, _deep) * clampf(1.0 - maxf(slope, 0.0) * (1.6 + _deep * 2.0), 0.25, 1.0)
+	# Ярус 3 (гольцы и курумники > 72 м): крутизна и каменные россыпи не пускают тяжелый снегоход
+	if pos.y > 72.0:
+		var kurumnik := clampf((pos.y - 72.0) / 18.0, 0.0, 1.0)
+		cap *= (1.0 - kurumnik * 0.85)
+		if kurumnik > 0.4 and absf(speed) > 0.4 and randf() < delta * 0.35:
+			Game.hud.subtitle(Loc.t(&"sub.buran_kurumnik_slip"), 3.0)
 	var acc := ACCEL * lerpf(1.0, 0.55, _deep)
 	if throttle > 0.0:
 		speed = move_toward(speed, cap * throttle, acc * delta)

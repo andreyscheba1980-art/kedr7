@@ -2702,6 +2702,26 @@ The operator is not to be informed about the object.
 	&"poi.poi_radar_dome.loupe": ["Сквозь пролом в геодезическом куполе видно, как металлическая решетка антенны оплетена живой черной органической тканью с пульсирующими жилами.", "Through the breach in the geodesic dome, the antenna's metal lattice is seen overrun by living black organic tissue with pulsing veins."],
 	&"poi.poi_deep_borehole.cap": ["Дневная съемка: устье сверхглубокой скважины СГ-4", "Daytime shot: SG-4 superdeep borehole wellhead"],
 	&"poi.poi_deep_borehole.loupe": ["На манометре скважины стрелка загнута вокруг ограничителя на давлении 400 атмосфер, а металл фланца покрыт глубокими бороздами от зубов.", "On the wellhead gauge, the needle is bent around the stop peg past 400 atm, and the steel flange is scarred with deep bite marks."],
+
+	# --- Этап 2: Уральский цирк и 4 ключевые точки интереса ---
+	&"it.poi_mi4_cockpit": ["[E] Осмотреть кабину вертолёта Ми-4", "[E] Inspect Mi-4 cockpit"],
+	&"it.poi_mi4_log": ["[E] Читать бортовой журнал борта СССР-31415", "[E] Read USSR-31415 flight log"],
+	&"it.poi_mi4_battery": ["[E] Осмотреть авиационный аккумулятор 12САМ-28", "[E] Inspect 12SAM-28 aircraft battery"],
+	&"sub.mi4_battery_taken": ["Снят исправный авиационный кабель и медные клеммы", "Salvaged aviation wiring and copper terminals"],
+	&"sub.mi4_battery_empty": ["Аккумуляторный отсек пуст", "Battery compartment is empty"],
+	&"note.mi4_log": ["БОРТОВОЙ ЖУРНАЛ МИ-4 (СССР-31415)\n14 ноября 1979 г. Рейс Ивдель — Свердловск-44.\nКомандир: к-н Ильин В. М., бортрадист: л-т Гусев.\n\n16:40 — Отказ рулевого винта над хребтом Чистоп. Сильная вибрация.\n16:44 — Потеря высоты. Пытаемся сесть на морену в цирке.\n16:48 — В наушниках радиста чужой голос на 3140 кГц при ВЫКЛЮЧЕННОЙ станции.\nКто-то повторяет наши позывные и зовёт по именам.\nВ тайге внизу между елями стоят длинные тени. Они не убегают от шума винтов. Они ждут.", "MI-4 FLIGHT LOG (USSR-31415)\nNov 14, 1979. Flight Ivdel — Sverdlovsk-44.\nCommander: Capt. Ilyin, Radio Op: Lt. Gusev.\n\n16:40 — Tail rotor failure over Chistop ridge. Severe vibration.\n16:44 — Altitude loss. Attempting forced landing on moraine.\n16:48 — Radio op hears voice on 3140 kHz with radio powered OFF.\nSomeone repeats our callsigns and calls us by name.\nDown in the taiga between spruces, tall shadows stand still. They don't run from the rotor roar. They wait."],
+	&"it.poi_tower_ladder": ["[E] Подняться на смотровую площадку вышки (24 м)", "[E] Climb triangulation tower platform (24m)"],
+	&"it.poi_tower_ladder_down": ["[E] Спуститься с вышки на землю", "[E] Climb down tower to the ground"],
+	&"sub.tower_climbed": ["Высота 105 метров над уровнем моря. Ледяной ветер свистит в вантах. Отсюда виден весь Уральский цирк.", "Elevation 105m above sea level. Freezing gale howls through guy wires. The entire Ural Cirque opens below."],
+	&"sub.tower_descended": ["Спуск на наст у подножия вышки.", "Descended back to the snow."],
+	&"it.poi_shrine_radio": ["[E] Осмотреть приёмник «Спидола», обмотанный жилами", "[E] Inspect sinew-bound 'Spidola' radio"],
+	&"sub.shrine_radio_chant": ["Из динамика сквозь треск помех доносится мерный шаманский речитатив на языке манси...", "From the speaker, through crackling static, an ancient Mansi incantation chants steadily..."],
+	&"it.poi_geophone": ["[Зажать E] Прильнуть к сейсмо-геофону штольни", "[Hold E] Listen to adit geophone"],
+	&"sub.geophone_pulse": ["В наушниках геофона отчетливо слышен глубокий ритмичный гул из недр горы — ровно 3.14 Гц, с периодом нарастания в 19 секунд...", "In the geophone headset, a deep rhythmic pulse thumps from the mountain interior — exactly 3.14 Hz, swelling every 19 seconds..."],
+	&"note.adit4_geology": ["ГЕОЛОГОРАЗВЕДОЧНАЯ ПАРТИЯ №8 (ДЕКАБРЬ 1959)\nШурф №4. Горизонт -40 м.\nВскрыта карстовая полость на контакте известняков и диабазов.\nСтены оплавлены неизвестным термическим процессом до стекловидного блеска.\nСейсмо-датчик СВ-30 фиксирует постоянные колебания 3.14 Гц.\nЦикл нарастания и спада — ровно 19 секунд, что соответствует ритму дыхания.\nРабочие отказываются спускаться в забой: слышат удары сердца из глубины породы.", "GEOLOGICAL EXPEDITION #8 (DEC 1959)\nAdit #4. Horizon -40m.\nKarst void penetrated at limestone-diabase contact.\nWalls fused to a vitreous glaze by unknown thermal process.\nSV-30 geophone registers steady 3.14 Hz oscillations.\nRise and fall cycle is exactly 19 seconds, matching a breathing pattern.\nMiners refuse to enter the drift: they hear a heartbeat echoing from the rock depth."],
+	&"sub.buran_kurumnik_slip": ["Гусеницы «Бурана» буксуют на курумнике — венец цирка доступен только на лыжах или пешком", "Buran tracks slip on the scree rocks — cirque crest is accessible only on skis or foot"],
+	&"poi.poi_mi4.cap": ["Дневная съемка: разбившийся вертолёт Ми-4", "Daytime shot: crashed Mi-4 helicopter"],
+	&"poi.poi_mi4.loupe": ["Сквозь разбитое стекло пилотской кабины видно, что кресло командира завалено не снегом, а спутанными черными волосами.", "Through the shattered cockpit window, the captain's seat is seen piled not with snow, but with tangled black hair."],
 }
 
 
