@@ -79,12 +79,17 @@ func _ready() -> void:
 	var has_photos := z != null and not z.photos.is_empty()
 
 	if has_photos:
-		_film(list, z.photos, Loc.t(&"zenit.dr_title", [Game.night]))
+		var shots: Array[Dictionary] = z.photos.duplicate()
+		if Game.night >= 4:
+			shots.append(_create_paradox_shot())
+		_film(list, shots, Loc.t(&"zenit.dr_title", [Game.night]))
 		if not z.partner_photos.is_empty():
 			_film(list, z.partner_photos, Loc.t(&"zenit.dr_partner"))
 	else:
 		# Архивная плёнка Семёнова №3 из кладовой
 		var sem_shots: Array[Dictionary] = _get_semenov_archive_shots()
+		if Game.night >= 4:
+			sem_shots.append(_create_paradox_shot())
 		_film(list, sem_shots, Loc.t(&"darkroom.semenov_film"))
 
 	var row := HBoxContainer.new()
@@ -185,11 +190,18 @@ func _film(list: VBoxContainer, shots: Array[Dictionary], head: String) -> void:
 		var tw := create_tween()
 		tw.tween_interval(0.2 + _n * 0.35)
 		tw.tween_property(frame, "modulate:a", 1.0, 0.25)
+		if ph.get("paradox", false):
+			tw.tween_callback(func() -> void:
+				AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
+				Director.add_tension(12.0, "хронологический парадокс")
+			)
 		tw.tween_method(func(val: float) -> void: mat.set_shader_parameter(&"develop_progress", val), 0.0, 1.0, 1.4)
 		_n += 1
 
 
 func _caption(ph: Dictionary) -> String:
+	if ph.get("paradox", false):
+		return Loc.t(&"darkroom.paradox_title")
 	var t := Game.minutes_to_clock(int(ph.get("min", 0))) + " — "
 	var img: Image = ph.get("img")
 	if ph.get("archive_title", "") != "":
@@ -291,6 +303,13 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 	var img: Image = ph.get("img")
 	if img != null and not img.is_empty():
 		_loupe_img.texture = ImageTexture.create_from_image(img)
+	if ph.get("paradox", false):
+		_loupe_title.text = Loc.t(&"darkroom.paradox_title")
+		_loupe_desc.text = Loc.t(&"darkroom.paradox_desc")
+		Director.add_tension(15.0, "осознание хронологического парадокса")
+		Game.paradox_photo_seen = true
+		_loupe_overlay.visible = true
+		return
 	var poi_tag: StringName = &""
 	for t in ph.get("tags", []):
 		if String(t).begins_with("poi_"):
@@ -304,6 +323,54 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 		_loupe_title.text = Loc.t(&"darkroom.loupe_active")
 		_loupe_desc.text = ph.get("detail", _caption(ph))
 	_loupe_overlay.visible = true
+
+
+func _create_paradox_shot() -> Dictionary:
+	var img := _create_paradox_image()
+	return {
+		"img": img,
+		"paradox": true,
+		"archive_title": Loc.t(&"darkroom.paradox_title"),
+		"detail": Loc.t(&"darkroom.paradox_desc"),
+		"ghost": true
+	}
+
+
+func _create_paradox_image() -> Image:
+	var img := Image.create(160, 100, false, Image.FORMAT_RGB8)
+	for y in range(100):
+		for x in range(160):
+			var nx := float(x) / 160.0
+			var ny := float(y) / 100.0
+			# Темная комната, неактиничный красный свет сверху
+			var red_light := exp(-((nx - 0.5) * (nx - 0.5) * 4.0 + (ny - 0.2) * (ny - 0.2) * 8.0)) * 0.4
+			var col := Color(red_light * 0.8 + 0.04, red_light * 0.15 + 0.02, red_light * 0.1 + 0.02)
+			
+			# Стол проявки впереди (ny > 0.65)
+			if ny > 0.65:
+				col = col.lerp(Color(0.12, 0.04, 0.03), 0.7)
+				# Ванночки с раствором
+				if absf(nx - 0.3) < 0.12 and absf(ny - 0.75) < 0.06:
+					col = Color(0.25, 0.06, 0.04)
+				elif absf(nx - 0.65) < 0.12 and absf(ny - 0.75) < 0.06:
+					col = Color(0.2, 0.08, 0.05)
+
+			# Фотоувеличитель Ленинград-4 слева на столе (штанга и фонарь)
+			if absf(nx - 0.22) < 0.02 and ny > 0.25 and ny < 0.7:
+				col = Color(0.18, 0.05, 0.04)
+			if absf(nx - 0.22) < 0.06 and absf(ny - 0.35) < 0.07:
+				col = Color(0.35, 0.08, 0.05)
+
+			# Силуэт человека в ватнике со спины (по центру)
+			var head_dist := ((nx - 0.5) * (nx - 0.5) * 3.5 + (ny - 0.42) * (ny - 0.42) * 2.5)
+			if head_dist < 0.015:
+				col = Color(0.02, 0.01, 0.01)
+			var body_dist := ((nx - 0.5) * (nx - 0.5) * 1.5 + (ny - 0.68) * (ny - 0.68) * 1.2)
+			if body_dist < 0.065 and ny >= 0.42:
+				col = Color(0.01, 0.01, 0.01)
+
+			img.set_pixel(x, y, col)
+	return img
 
 
 func handle_input(event: InputEvent) -> bool:

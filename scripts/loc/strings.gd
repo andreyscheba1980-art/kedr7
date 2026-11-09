@@ -2731,6 +2731,12 @@ The operator is not to be informed about the object.
 	&"sub.mimicry_footsteps": ["В тишине за спиной раздался тяжелый чужой шаг по насту...", "In the silence behind your back, a heavy footstep crunched in the crust..."],
 	&"it.stake_inspect": ["[E] Осмотреть сдвинутую вешку леера", "[E] Inspect displaced trail stake"],
 	&"sub.stake_shifted": ["Вешка вырвана и вбита заново на 5 метров в сторону оврага... Трос натянут в глухой сугроб. На дереве видны свежие борозды от когтей. Сверяйся с компасом!", "The stake was uprooted and driven 5 metres toward the ravine... The rope leads into a blind snowdrift. Fresh claw marks scar the wood. Check your compass!"],
+
+	# --- Этап 4: Кульминация и аналоговая рутина ---
+	&"darkroom.paradox_title": ["Кадр №?: Фотоловушка №2 (15 мин назад)", "Frame #?: Trail camera #2 (15 min ago)"],
+	&"darkroom.paradox_desc": ["Кадр с автоматической фотоловушки у метеомачты... Но на снимке запечатлена эта самая фотолаборатория под красным фонарём. Человек в ватнике стоит спиной у увеличителя прямо сейчас. Объектив направлен из темного угла под потолком ровно тебе в затылок.", "Shot from the automated trail camera at the mast... But the film reveals this exact darkroom under the red safelight. A figure in a quilted jacket stands with their back to the lens at the enlarger right now. The camera is pointing from the dark ceiling corner directly at the back of your head."],
+	&"sub.barometric_bottom": ["Стрелка барографа соскользнула ниже 700 мм рт. ст. — атмосферное давление рухнуло за пределы шкалы. В воздухе звенит ледяной вакуум...", "The barograph needle slipped below 700 mmHg — atmospheric pressure plummeted off the chart. The room hums with an icy vacuum..."],
+	&"call.mainland_denial": ["«Кедр-7, прекратите выход в эфир. Станция снята с дежурства ГУГМС в 1974 году. Все операторы списаны. Кто выходит на связь из этой точки?..»", "«Kedr-7, cease radio broadcast. The station was decommissioned by GUGMS in 1974. All personnel accounted for. Who is transmitting from this coordinate?..»"],
 }
 
 

@@ -1194,9 +1194,25 @@ func _paralysis() -> void:
 
 func _start_final_call() -> void:
 	Game.final_call = true
-	_call_t = 2.0
+	_call_t = 20.0
 	Director.add_tension(40.0, "последний зов")
+	Game.hud.subtitle(Loc.t(&"sub.barometric_bottom"), 7.5)
+	if Game.audio != null:
+		Game.audio.play_2d("res://assets/audio/drone_loop.ogg", -4.0, 18.0)
+	await _wait(8.0)
+	if _ending or Game.dead:
+		return
+	if Game.radio != null:
+		Game.radio.play_transmission("res://assets/audio/radio_anomaly.ogg", 0.0)
+	if Game.is_home():
+		Game.hud.subtitle(Loc.t(&"call.mainland_denial"), 8.5)
+	else:
+		Game.hud.subtitle(Loc.t(&"hal.radio_far"), 5.0)
+	await _wait(9.0)
+	if _ending or Game.dead:
+		return
 	Game.hud.subtitle(Loc.t(&"call.start"), 7.0)
+	_call_t = 2.0
 
 
 func _on_radio_locked(id: StringName) -> void:

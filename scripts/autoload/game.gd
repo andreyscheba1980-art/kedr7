@@ -128,6 +128,7 @@ var countersign_known: bool:
 var skis_equipped := false          ## надеты ли охотничьи лыжи Семёнова (+40% скорость по снегу)
 var leer_attached := false          ## защёлкнут ли карабин на натяжном леере (иммунитет к Белой Тьме)
 var sv20_active := false            ## надеты ли наушники ТА-56М от геофона СВ-20 («Слухач»)
+var paradox_photo_seen := false     ## проявлен ли снимок-парадокс в фотолаборатории
 var sv20_rumble_player: AudioStreamPlayer
 
 var salt_on_threshold: bool:
@@ -271,6 +272,7 @@ func setup_phase(kind: StringName, index: int) -> void:
 	phase_index = index
 	skis_equipped = false
 	leer_attached = false
+	paradox_photo_seen = false
 	set_sv20(false)
 
 	run_seed = forced_seed if forced_seed != 0 else randi()   # в коопе оба игрока строят одну и ту же ночь
@@ -663,6 +665,9 @@ func air_temp() -> Vector2:
 	var drift := -0.3 * shift_minutes / 60.0 if is_night() else 0.0
 	if weather != null:
 		drift += weather.intensity * 0.8
+	if is_night() and night >= 7:
+		# Ночь барометрического дна: аномальное падение температуры до -48..-54°C
+		drift -= 18.0 * clampf(shift_minutes / 360.0, 0.0, 1.0)
 	return Vector2(dry + drift, wet + drift)
 
 
@@ -672,7 +677,12 @@ func pressure_at(h: float) -> float:
 	var p0 := synoptic.pressure if synoptic != null else 746.0
 	var rate := synoptic.pressure_rate if synoptic != null else -0.4
 	var ph := float(phase_index) * 1.7
-	return p0 + rate * h + sin(h * 0.9 + ph) * 0.6 + sin(h * 2.3 + ph * 2.0) * 0.25
+	var base_p := p0 + rate * h + sin(h * 0.9 + ph) * 0.6 + sin(h * 2.3 + ph * 2.0) * 0.25
+	if is_night() and night >= 7:
+		# Ночь барометрического дна: обвал давления ниже 700 мм рт. ст. к кульминации ночи
+		var progress := clampf(h / 7.0, 0.0, 1.0)
+		base_p = lerpf(738.0, 688.0, progress) + sin(h * 3.5) * 0.4
+	return base_p
 
 
 func write_reading(key: StringName, value: float, truth: float) -> void:
