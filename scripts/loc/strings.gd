@@ -901,6 +901,7 @@ If a voice on the air calls you by name — don't answer. It isn't me. — S.\""
 	&"it.pick_wood": ["[E] Подобрать дрова", "[E] Pick up the firewood"],
 	&"it.pick_shovel": ["[E] Взять снеговую лопату", "[E] Pick up the snow shovel"],
 	&"it.pick_blowtorch": ["[E] Взять паяльную лампу", "[E] Pick up the blowtorch"],
+	&"it.pick_kettle": ["[E] Взять чайник", "[E] Pick up the kettle"],
 	&"it.pick_trunk": ["[E] Поднять экспедиционный рундук", "[E] Pick up expedition trunk"],
 	&"held.trunk": ["Рундук экспедиционный · [G] Поставить на снег", "Expedition trunk · [G] Put down on snow"],
 	&"it.open_trunk": ["[E] Распаковать экспедиционный рундук", "[E] Unpack expedition trunk"],

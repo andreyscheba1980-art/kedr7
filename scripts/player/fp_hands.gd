@@ -199,9 +199,9 @@ func _process(delta: float) -> void:
 		if _mats.has(key):
 			(_mats[key] as ShaderMaterial).set_shader_parameter(&"albedo", Color(1, 1, 1).lerp(Color(1.9, 2.0, 2.2), _frost))
 
-	# Левая рука: если держим рундук обеими руками — левая варежка на левой ручке
-	if player.held == &"trunk" and _flare_t <= 0.0:
-		var gl := [Vector3(-0.24, -0.05, 0.0), Vector3(0.0, -15.0, 40.0)]
+	# Левая рука: если держим рундук или собаку (при выключенном фонаре) — левая варежка поддерживает предмет
+	if (player.held == &"trunk" or (player.held == &"dog" and not player.flashlight_on())) and _flare_t <= 0.0:
+		var gl: Array = [Vector3(-0.24, -0.05, 0.0), Vector3(0.0, -15.0, 40.0)] if player.held == &"trunk" else [Vector3(-0.18, -0.08, 0.0), Vector3(-10.0, -15.0, 50.0)]
 		var xfl := player.held_root().transform * Transform3D(Basis.from_euler(gl[1] * (PI / 180.0)), gl[0])
 		left.visible = true
 		left.transform = left.transform.interpolate_with(xfl, minf(k * 1.4, 1.0))
@@ -355,6 +355,8 @@ static func _grip(item: StringName) -> Array:
 			return [Vector3(0.0, 0.17, 0.0), Vector3(-10.0, 0.0, 90.0)]     # за верхнюю дужку чайника
 		&"blowtorch":
 			return [Vector3(0.0, 0.08, 0.10), Vector3(15.0, 0.0, 0.0)]      # за заднюю рукоять паяльной лампы
+		&"dog":
+			return [Vector3(0.18, -0.08, 0.0), Vector3(-10.0, 15.0, -50.0)] # поддержка собаки справа снизу
 		_:
 			return [Vector3(0.12, -0.03, 0.02), Vector3(0.0, 10.0, -70.0)]  # охапка снизу
 

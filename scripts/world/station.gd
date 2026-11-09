@@ -1986,6 +1986,12 @@ func _build_living_quarters() -> void:
 	# Интерактив — дочерний к чайнику: когда «чайник переедет на стол», переедет и он.
 	var kettle_it := Geo.interactable(_kettle, Vector3(0.5, 0.5, 0.5), Vector3.ZERO, null, Loc.t(&"it.kettle"), _on_kettle_used)
 	kettle_it.name = "StoveKettle"
+	kettle_it.prompt_provider = func() -> String:
+		if Game.player != null and Game.player.held == &"kettle":
+			return Loc.t(&"it.kettle_return")
+		if _kettle != null and not _kettle.visible:
+			return ""
+		return Loc.t(&"it.kettle")
 
 	# Войлочные валенки у чугунной печки
 	var valenki_prop := Props.valenki()
@@ -2540,9 +2546,17 @@ func _build_storage() -> void:
 	torch.position = Vector3(6.65, 0.82, -3.4)
 	torch.rotation.y = deg_to_rad(-90.0)
 	add_child(torch)
-	var torch_it := Geo.interactable(self, Vector3(0.35, 0.35, 0.35), Vector3(6.65, 0.95, -3.4), null, Loc.t(&"it.blowtorch"), func(p: Player) -> void:
+	var torch_it: Interactable = null
+	torch_it = Geo.interactable(self, Vector3(0.35, 0.35, 0.35), Vector3(6.65, 0.95, -3.4), null, Loc.t(&"it.blowtorch"), func(p: Player) -> void:
 		if p != null:
+			if p.held != &"":
+				Game.hud.subtitle(Loc.t(&"sub.hands_full"), 2.0)
+				return
 			p.set_held(&"blowtorch")
+			torch.visible = false
+			if torch_it != null:
+				torch_it.visible = false
+				torch_it.collision_layer = 0
 			Game.hud.subtitle(Loc.t(&"sub.got_blowtorch"), 4.0)
 	)
 	torch_it.name = "BlowtorchProp"
@@ -3644,12 +3658,21 @@ func _open_darkroom() -> void:
 func _on_kettle_used(p: Player) -> void:
 	if p != null and p.held == &"kettle":
 		p.set_held(&"")
+		if _kettle != null:
+			_kettle.visible = true
 		Game.hud.subtitle(Loc.t(&"it.kettle_return"), 3.0)
+		return
+	if p != null and p.held != &"" and (Input.is_physical_key_pressed(KEY_F) or Input.is_physical_key_pressed(KEY_SHIFT)):
+		Game.hud.subtitle(Loc.t(&"sub.hands_full"), 2.0)
 		return
 	if p != null and p.held == &"" and (Input.is_physical_key_pressed(KEY_F) or Input.is_physical_key_pressed(KEY_SHIFT)):
 		p.set_held(&"kettle")
 		p.kettle_heat_timer = 90.0
+		if _kettle != null:
+			_kettle.visible = false
 		Game.hud.subtitle(Loc.t(&"sub.kettle_taken"), 4.0)
+		return
+	if _kettle != null and not _kettle.visible:
 		return
 	if prop_changed("teapot"):
 		Game.hud.subtitle(Loc.t(&"sub.kettle_table"), 3.0)

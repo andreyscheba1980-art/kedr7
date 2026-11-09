@@ -58,7 +58,7 @@ func write(text: String) -> void:
 		return
 	f.seek_end()
 	var p := Game.player
-	var where := " @%s %s" % [Game.zone, p.global_position.snapped(Vector3.ONE)] if p != null else ""
+	var where := " @%s %s" % [Game.zone, p.global_position.snapped(Vector3.ONE)] if (p != null and p.is_inside_tree()) else ""
 	f.store_line("[%s | игра %s%s] %s" % [Time.get_time_string_from_system(), Game.clock_text(), where, text])
 
 

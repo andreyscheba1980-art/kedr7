@@ -65,6 +65,7 @@ var _shed_doors_busy := false
 var _shed_drift: Interactable
 var _shed_padlock: Node3D
 var _shed_padlock_it: Interactable
+var _oil_can_it: Interactable
 var izba_door_open := false
 var _izba_door_hinge: Node3D
 var _izba_door_busy := false
@@ -390,7 +391,7 @@ func map_sites() -> Array[Dictionary]:
 
 ## record_key: "placed_cans" — вынесены из сарая (вычитаются из его запаса), "site_cans" — лежат на дальних точках.
 func spawn_pickup(item: StringName, pos: Vector3, record := true, record_key := "placed_cans") -> void:
-	var size := Vector3(0.85, 0.45, 0.52) if item == &"trunk" else (Vector3(0.35, 0.45, 0.2) if item == &"canister" else Vector3(0.25, 0.35, 0.18) if item == &"oil" else Vector3(0.5, 0.85, 0.35) if item == &"shovel" else Vector3(0.5, 0.28, 0.35))
+	var size := Vector3(0.85, 0.45, 0.52) if item == &"trunk" else (Vector3(0.35, 0.45, 0.2) if item == &"canister" else Vector3(0.25, 0.35, 0.18) if item == &"oil" else Vector3(0.5, 0.85, 0.35) if item == &"shovel" else Vector3(0.35, 0.35, 0.35) if (item == &"kettle" or item == &"blowtorch") else Vector3(0.5, 0.28, 0.35))
 	var it := Geo.interactable(self, size, Vector3(pos.x, pos.y + size.y / 2.0, pos.z), null, Loc.t(StringName("it.pick_" + String(item))), Callable())
 	var model: Node3D = null
 	if item == &"trunk":
@@ -416,6 +417,12 @@ func spawn_pickup(item: StringName, pos: Vector3, record := true, record_key := 
 		model = Props.snow_shovel()
 		model.position.y = -size.y * 0.5
 		model.rotation.x = deg_to_rad(85.0)
+	elif item == &"kettle":
+		model = Props.kettle()
+		model.position.y = -size.y * 0.5
+	elif item == &"blowtorch":
+		model = Props.blowtorch()
+		model.position.y = -size.y * 0.5
 	else:
 		model = Props.firewood_bundle(false)
 		model.position.y = -size.y * 0.5
@@ -1380,6 +1387,7 @@ func _build_shed() -> void:
 
 	# Масло для генератора — банка МС-20
 	var oil := Geo.interactable(self, Vector3(0.25, 0.35, 0.18), SHED + Vector3(-1.8, 0.17, 2.4), null, "", _on_oil_taken)
+	_oil_can_it = oil
 	var oil_model := Props.oil_can(false)
 	oil_model.position.y = -0.17
 	oil.add_child(oil_model)
@@ -1501,6 +1509,9 @@ func _on_oil_taken(p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.hands_full"), 2.0)
 		return
 	p.set_held(&"oil")
+	if _oil_can_it != null:
+		_oil_can_it.visible = false
+		_oil_can_it.collision_layer = 0
 	Game.audio.play_3d(CLANK_SOUND, SHED + Vector3(-0.4, 0.4, 1.3), -6.0)
 	_check_routine_scare_shed()
 
