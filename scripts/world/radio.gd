@@ -548,6 +548,7 @@ func transmit() -> void:
 		return
 	var check := Game.report_check()   # книжку сверяем до того, как замеры сброшены
 	_busy = true
+	EventBus.radio_transmitted.emit(freq)
 	Game.coop_report_ok = false
 	Game.clear_readings()
 	Net.on_report_sent()

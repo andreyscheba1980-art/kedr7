@@ -3370,6 +3370,8 @@ func set_door_open(open: bool) -> void:
 	door_open = open
 	if open:
 		EventBus.door_opened.emit()
+	else:
+		EventBus.door_closed.emit()
 	Game.audio.play_3d(DOOR_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -7.0)
 	var tw := create_tween()
 	tw.tween_property(_door_hinge, "rotation:y", deg_to_rad(105.0) if open else 0.0, 0.45).set_trans(Tween.TRANS_SINE)

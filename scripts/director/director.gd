@@ -46,9 +46,13 @@ var _ambient_left := AMBIENT_PER_NIGHT
 var _ambient_wait := 20.0
 
 
+const CausalMimicryClass = preload("res://scripts/director/causal_mimicry.gd")
+
+
 func _ready() -> void:
 	_load_pool()
 	EventBus.radio_locked.connect(_on_radio_locked)
+	add_child(CausalMimicryClass.new())
 
 
 func start(cfg: Dictionary = {}) -> void:
@@ -245,6 +249,15 @@ func _try_pool(ctx: ScareContext) -> void:
 			w *= 0.3
 		if def.creature != &"none" and def.creature == _last_creature:
 			w *= 0.4
+		if Game.profiler != null and Game.night >= 2:
+			var prof: PlayerProfiler = Game.profiler as PlayerProfiler
+			if prof != null:
+				if prof.spatial_axis < -0.2 and def.id in [&"house_guest", &"house_change", &"knock_wall"]:
+					w *= 1.8
+				elif prof.spatial_axis > 0.2 and def.id in [&"peripheral_figure", &"window_watcher"]:
+					w *= 1.8
+				if prof.sensory_axis < -0.2 and def.id in [&"radio_scream", &"fake_radio_call", &"fake_knock_door"]:
+					w *= 1.7
 		candidates.append(def)
 		weights.append(w)
 

@@ -681,13 +681,26 @@ func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(absf(line[0].x * 31.0 + line[0].z * 17.0)) + posts.size()
 	var tops: Array[Vector3] = []
+	var is_disoriented := Game.is_night() and Game.night >= 4 and Game.weather != null and Game.weather.blizzard
 	for i in range(posts.size()):
 		var p := posts[i]
+		var shifted := false
+		if is_disoriented and i >= 3 and i <= 6 and posts.size() > 8:
+			var p_next: Vector3 = posts[mini(i + 1, posts.size() - 1)]
+			var p_prev: Vector3 = posts[maxi(i - 1, 0)]
+			var tangent := (p_next - p_prev).normalized()
+			var normal := Vector3(-tangent.z, 0, tangent.x)
+			var offset_val := sin(float(i - 3) / 3.0 * PI) * 5.5
+			p = Terrain.at(p + normal * offset_val)
+			shifted = true
 		var post := Props.rope_post(i % 2 == 0 and flag_col.a > 0.0, flag_col, flag_shape)
 		post.position = p
 		var sy := rng.randf_range(0.92, 1.06)
 		post.scale = Vector3(1.0, sy, 1.0)
 		post.rotation = Vector3(rng.randf_range(-0.05, 0.05), rng.randf_range(-PI, PI), rng.randf_range(-0.05, 0.05))
+		if shifted:
+			post.rotation.z += 0.22 # наклонена от натяжения троса в сугроб
+			post.set_meta(&"shifted", true)
 		add_child(post)
 		_rope_nodes.append(post)
 		var it_post := Interactable.new()
@@ -695,8 +708,16 @@ func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
 		it_post.position = Vector3(0, 0.9, 0)
 		it_post.add_child(Geo.box_shape(Vector3(0.55, 1.3, 0.55)))
 		it_post.prompt_provider = func() -> String:
+			if post.has_meta(&"shifted"):
+				return Loc.t(&"it.stake_inspect")
 			return Loc.t(&"it.leer_detach") if Game.leer_attached else Loc.t(&"it.leer_attach")
-		it_post.used.connect(_on_leer_post_used)
+		it_post.used.connect(func(pl: Player) -> void:
+			if post.has_meta(&"shifted"):
+				Game.hud.subtitle(Loc.t(&"sub.stake_shifted"), 6.0)
+				Director.add_tension(8.0, "смещенная вешка леера")
+				return
+			_on_leer_post_used(pl)
+		)
 		post.add_child(it_post)
 		tops.append(post.transform * Vector3(0, 1.05, 0))
 		if i > 0 and not _near_fork((posts[i - 1] + p) * 0.5):

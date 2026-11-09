@@ -218,6 +218,17 @@ func _recalculate_archetype() -> void:
 	var toggle_panic := minf(float(_flashlight_toggles) * 2.0, 20.0)
 	panic_score = clampf(sprint_panic + jerk_panic + toggle_panic, 0.0, 100.0)
 
+	# В прологе и в 1-ю ночь игрок знакомится со станцией и механикой (исследует сруб, фотолабораторию).
+	# Преждевременное профилирование принимало любопытство за агорафобию/клаустрофобию.
+	# Настоящий 4-осевой профиль страхов активируется со 2-й ночи, когда проявляется Сущность.
+	if Game.is_prologue() or Game.night < 2:
+		current_archetype = Archetype.BALANCED
+		spatial_axis = 0.0
+		sensory_axis = 0.0
+		autonomy_axis = 0.0
+		isolation_axis = 0.0
+		return
+
 	# Определение доминирующего психотипа
 	# Затворник — не «много сидит дома» (ночь так и устроена: рация, печь), а пропустил сводку
 	# и за ночь почти не выходил. Иначе осада включалась почти у каждого игрока.

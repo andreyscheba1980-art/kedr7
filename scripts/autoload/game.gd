@@ -598,6 +598,7 @@ func set_power(on: bool) -> void:
 func add_wood() -> void:
 	stove_wood = minf(stove_wood + WOOD_PER_ARMFUL, 100.0)
 	complete_step(&"wood")
+	EventBus.stove_fed.emit()
 
 
 func set_antenna_iced(iced: bool) -> void:

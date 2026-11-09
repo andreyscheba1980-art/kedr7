@@ -45,6 +45,10 @@ var _lost_sight_t := 0.0
 var _pet_cd := 0.0
 var _on_buran := false
 var _bolted_tonight := false
+var _uncanny := false
+var _uncanny_t := 0.0
+var _uncanny_cooldown := 90.0
+var _uncanny_eyes: Node3D = null
 
 
 static func health() -> float:
@@ -172,6 +176,23 @@ func _build() -> void:
 	_model = mm[0]
 	_anim = mm[1]
 	add_child(_model)
+
+	_uncanny_eyes = Node3D.new()
+	_uncanny_eyes.name = "UncannyEyes"
+	_uncanny_eyes.visible = false
+	var eye_mat := StandardMaterial3D.new()
+	eye_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	eye_mat.albedo_color = Color(0.92, 0.96, 0.45, 0.9)
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.025, 0.025)
+	for eye_x in [-0.045, 0.045]:
+		var eye := MeshInstance3D.new()
+		eye.mesh = qm
+		eye.material_override = eye_mat
+		eye.position = Vector3(eye_x, 0.38, 0.32)
+		_uncanny_eyes.add_child(eye)
+	add_child(_uncanny_eyes)
+
 	_play(&"lie_shiver")
 
 
@@ -264,6 +285,11 @@ func put_down(at: Vector3) -> void:
 
 
 func _pet() -> void:
+	if _uncanny:
+		Game.hud.subtitle(Loc.t(&"dog.uncanny_stare" if randf() < 0.5 else &"dog.uncanny_breath"), 4.5)
+		Game.audio.play_3d("res://assets/audio/whisper.ogg", global_position + Vector3(0, 0.3, 0), -16.0)
+		Director.add_tension(6.0, "оцепенение Найды")
+		return
 	if _busy_t > 0.0:
 		return
 	var h := health()
@@ -378,6 +404,7 @@ func _update_hunger() -> void:
 
 func _process(delta: float) -> void:
 	_pet_cd = maxf(_pet_cd - delta, 0.0)
+	_uncanny_cooldown = maxf(_uncanny_cooldown - delta, 0.0)
 	_read_whistle(delta)
 	if where == Where.HELD:
 		return
@@ -409,6 +436,17 @@ func _home(delta: float) -> void:
 	var h := health()
 	if Game.is_home():
 		set_health(h + delta * 0.02)          # в тепле понемногу оживает
+
+	# Синдром Найды: Uncanny Valley оцепенение
+	if not _uncanny and _uncanny_cooldown <= 0.0 and Game.is_night() and Game.night >= 3 and Game.is_home():
+		var tension_high := Director.tension > 45.0 or (Game.yrka != null and Game.yrka.stage >= YrkaThreat.Stage.PRESSURE)
+		if tension_high and randf() < delta * 0.05:
+			_start_uncanny()
+
+	if _uncanny:
+		_tick_uncanny(delta)
+		return
+
 	if h < 40.0:
 		if _target == Vector3.INF:
 			_play(&"lie_shiver")
@@ -429,6 +467,44 @@ func _home(delta: float) -> void:
 		_think_t = randf_range(4.0, 9.0)
 		_choose()
 	_walk(delta, WALK)
+
+
+func _start_uncanny() -> void:
+	_uncanny = true
+	_uncanny_t = randf_range(12.0, 18.0)
+	_target = Vector3.INF
+	_face(Vector3(-2.4, 0.0, 0.8)) # глухой темный угол за печью
+	_play(&"sit")
+	if _anim != null:
+		_anim.speed_scale = 0.0
+	if _uncanny_eyes != null:
+		_uncanny_eyes.visible = true
+
+
+func _tick_uncanny(delta: float) -> void:
+	_uncanny_t -= delta
+	var p := Game.player
+	if p == null:
+		return
+	var to_dog := global_position - p.global_position
+	var look_dir := -p.camera.global_basis.z if p.camera != null else Vector3.FORWARD
+	look_dir.y = 0.0
+	var dot := look_dir.normalized().dot(to_dog.normalized())
+	if _uncanny_t <= 0.0 or (_uncanny_t < 9.0 and dot < 0.25):
+		_exit_uncanny()
+
+
+func _exit_uncanny() -> void:
+	_uncanny = false
+	_uncanny_cooldown = randf_range(110.0, 220.0)
+	if _anim != null:
+		_anim.speed_scale = 1.0
+	if _uncanny_eyes != null:
+		_uncanny_eyes.visible = false
+	_play(&"sit")
+	if Game.player != null and global_position.distance_to(Game.player.global_position) < 3.8:
+		Game.hud.subtitle(Loc.t(&"dog.uncanny_snapped"), 3.5)
+		Game.audio.play_3d(Voice.sfx_or(&"dog_whine", "res://assets/audio/whisper.ogg"), global_position + Vector3(0, 0.3, 0), -6.0)
 
 
 func _choose() -> void:

@@ -2722,6 +2722,15 @@ The operator is not to be informed about the object.
 	&"sub.buran_kurumnik_slip": ["Гусеницы «Бурана» буксуют на курумнике — венец цирка доступен только на лыжах или пешком", "Buran tracks slip on the scree rocks — cirque crest is accessible only on skis or foot"],
 	&"poi.poi_mi4.cap": ["Дневная съемка: разбившийся вертолёт Ми-4", "Daytime shot: crashed Mi-4 helicopter"],
 	&"poi.poi_mi4.loupe": ["Сквозь разбитое стекло пилотской кабины видно, что кресло командира завалено не снегом, а спутанными черными волосами.", "Through the shattered cockpit window, the captain's seat is seen piled not with snow, but with tangled black hair."],
+
+	# --- Этап 3: Системная паранойя и поведение Сущности ---
+	&"dog.uncanny_stare": ["Найда не реагирует на зов. Мышцы окаменели, а немигающий взгляд устремлен в глухой угол за печью...", "Naida does not respond. Her muscles are stone-rigid, unblinking eyes locked on the dark dead corner behind the stove..."],
+	&"dog.uncanny_breath": ["Из приоткрытой пасти доносится ледяное прерывистое дыхание, не совпадающее с ритмом её груди...", "A freezing, disjointed breath rasps from her jaw, out of sync with her chest..."],
+	&"dog.uncanny_snapped": ["Найда вздрогнула всем телом, часто заморгала и жалобно заскулила, прижав уши.", "Naida shuddered, blinked rapidly, and whined softly, flattening her ears."],
+	&"sub.mimicry_door": ["Вдали за метелью глухо хлопнула вторая дверь...", "Far out through the blizzard, a second door thumped shut..."],
+	&"sub.mimicry_footsteps": ["В тишине за спиной раздался тяжелый чужой шаг по насту...", "In the silence behind your back, a heavy footstep crunched in the crust..."],
+	&"it.stake_inspect": ["[E] Осмотреть сдвинутую вешку леера", "[E] Inspect displaced trail stake"],
+	&"sub.stake_shifted": ["Вешка вырвана и вбита заново на 5 метров в сторону оврага... Трос натянут в глухой сугроб. На дереве видны свежие борозды от когтей. Сверяйся с компасом!", "The stake was uprooted and driven 5 metres toward the ravine... The rope leads into a blind snowdrift. Fresh claw marks scar the wood. Check your compass!"],
 }
 
 

@@ -12,6 +12,9 @@ signal scare_finished(id: StringName)
 signal blizzard_changed(on: bool)
 signal antenna_iced_changed(iced: bool)
 signal door_opened
+signal door_closed
+signal stove_fed
+signal radio_transmitted(freq: float)
 signal ui_requested(id: StringName)
 signal player_died(reason: StringName)
 signal shift_ended
