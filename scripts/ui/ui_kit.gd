@@ -187,11 +187,45 @@ static func panel(color := DARK) -> PanelContainer:
 	return p
 
 
+static var _tick_player: AudioStreamPlayer
+static var _tick_stream: AudioStream = preload("res://assets/audio/ui_tick.ogg")
+
+
+static func play_tick(vol_db := -8.0, pitch := 1.0) -> void:
+	if _tick_stream == null:
+		return
+	var main_loop := Engine.get_main_loop() as SceneTree
+	if main_loop == null or main_loop.root == null:
+		return
+	if _tick_player == null or not is_instance_valid(_tick_player):
+		_tick_player = AudioStreamPlayer.new()
+		_tick_player.stream = _tick_stream
+		_tick_player.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
+	if not _tick_player.is_inside_tree():
+		if _tick_player.get_parent() == null:
+			main_loop.root.add_child.call_deferred(_tick_player)
+		return
+	_tick_player.volume_db = vol_db
+	_tick_player.pitch_scale = pitch * randf_range(0.97, 1.03)
+	_tick_player.play()
+
+
 static func button(text: String, on_press: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_ALL
-	b.pressed.connect(on_press)
+	b.pressed.connect(func() -> void:
+		play_tick(-6.0, 1.0)
+		on_press.call()
+	)
+	b.mouse_entered.connect(func() -> void:
+		if b.is_inside_tree():
+			play_tick(-14.0, 1.35)
+	)
+	b.focus_entered.connect(func() -> void:
+		if b.is_inside_tree():
+			play_tick(-14.0, 1.35)
+	)
 	return b
 
 

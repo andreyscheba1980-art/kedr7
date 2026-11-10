@@ -7,10 +7,10 @@ const CENTER := Vector3(6.0, 1.5, 2.5)
 const RADIUS := 26.0
 # Камера стоит на тропе к дровам (там лес вырублен): дом с юго-востока, окна и фонарь крыльца к нам,
 # сияние — на севере, за крышей.
-const CAM_FAR := Vector3(10.2, 1.85, 17.5)
-const CAM_NEAR := Vector3(12.2, 1.65, 12.5)
-const LOOK_FAR := Vector3(2.0, 2.2, 0.0)   # дом — в правой половине кадра, слева колонка меню
-const LOOK_NEAR := Vector3(3.0, 1.9, 0.8)
+const CAM_FAR := Vector3(21.5, 1.70, 7.5)
+const CAM_NEAR := Vector3(19.8, 1.60, 5.8)
+const LOOK_FAR := Vector3(14.0, 1.75, 3.2)   # крыльцо, мостки и дом — в правой части кадра, слева меню
+const LOOK_NEAR := Vector3(13.5, 1.68, 3.0)
 const DOLLY_S := 60.0
 
 var _cam: Camera3D
@@ -29,10 +29,10 @@ func _ready() -> void:
 	
 	# Тёплый свет окон и крыльца на снегу в кадре меню
 	var warm_fill := OmniLight3D.new()
-	warm_fill.position = Vector3(6.5, 2.5, 6.0)
-	warm_fill.omni_range = 18.0
-	warm_fill.light_energy = 1.5
-	warm_fill.light_color = Color(1.0, 0.84, 0.62)
+	warm_fill.position = Vector3(15.2, 2.4, 3.8)
+	warm_fill.omni_range = 14.0
+	warm_fill.light_energy = 1.6
+	warm_fill.light_color = Color(1.0, 0.82, 0.58)
 	warm_fill.shadow_enabled = false
 	add_child(warm_fill)
 

@@ -23,6 +23,8 @@ var _tracked: Node3D              ## модель ГТ-Т с поворотом 
 var _exterior_mesh: Node3D
 var _cabin_root: Node3D
 var _wipers: Array[Node3D] = []
+var _wiper_sfx_t := 0.0
+var _speedo_needle: Node3D
 var _frost_tex: Array[GradientTexture2D] = []
 var _bump_t := 3.0
 var _jolt := 0.0
@@ -228,6 +230,11 @@ func _build_cabin() -> void:
 	for d: Array in [[-0.40, 0.86, 0.06], [-0.56, 0.86, 0.05], [-0.26, 0.87, 0.035], [-0.26, 0.79, 0.035], [0.22, 0.86, 0.04]]:
 		var g := Geo.cylinder(c, d[2], 0.02, Vector3(d[0], d[1], -1.535), dial_m, false)
 		g.rotation.x = deg_to_rad(90.0 - 25.0)
+	_speedo_needle = Node3D.new()
+	_speedo_needle.position = Vector3(-0.40, 0.86, -1.52)
+	_speedo_needle.rotation.x = deg_to_rad(90.0 - 25.0)
+	c.add_child(_speedo_needle)
+	Geo.cylinder(_speedo_needle, 0.002, 0.035, Vector3(0, 0.018, 0), Palette.glow(&"amber"), false)
 	for k in 4:
 		Geo.cylinder(c, 0.005, 0.03, Vector3(-0.12 + k * 0.035, 0.83, -1.54), metal, false)
 	var grab := Geo.cylinder(c, 0.014, 0.36, Vector3(0.50, 0.92, -1.55), metal, false)
@@ -347,6 +354,16 @@ func _cabin_life(delta: float) -> void:
 			w.rotation.z = deg_to_rad(62.0) - (0.5 - 0.5 * cos(t * 2.6)) * deg_to_rad(100.0)
 		else:
 			w.rotation.z = lerp_angle(w.rotation.z, deg_to_rad(62.0), minf(delta * 2.0, 1.0))
+	if _driving and _in_cabin:
+		_wiper_sfx_t -= delta
+		if _wiper_sfx_t <= 0.0:
+			_wiper_sfx_t = 1.20
+			var wp := Game.audio.play_2d("res://assets/audio/clank_v2.ogg", -24.0)
+			if wp != null:
+				wp.pitch_scale = randf_range(1.7, 2.1)
+	if _speedo_needle != null:
+		var target_angle := deg_to_rad(38.0 + sin(t * 14.0) * 4.5) if _driving else deg_to_rad(-45.0)
+		_speedo_needle.rotation.z = lerp_angle(_speedo_needle.rotation.z, target_angle, minf(delta * 8.0, 1.0))
 	if _cab_snow != null:
 		_cab_snow.emitting = _driving
 	if _driving:
@@ -431,7 +448,12 @@ func _run_cabin() -> void:
 		_talking = false
 		return
 	# Виктор заговаривает о другом — лишь бы не молчать
-	for ln: Array in [[&"cab.4", -10.0, 2.6], [&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4]]:
+	for ln: Array in [
+		[&"cab.4", -10.0, 2.6], [&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4],
+		[&"cab.11", -38.0, 3.5], [&"cab.12", -10.0, 3.2], [&"cab.13", -40.0, 3.0],
+		[&"cab.14", -10.0, 2.2], [&"cab.15", -36.0, 3.8], [&"cab.16", -10.0, 2.0],
+		[&"cab.17", -42.0, 4.2], [&"cab.18", -46.0, 4.4]
+	]:
 		if not await _say(ln[0], ln[1], ln[2]):
 			_talking = false
 			return
@@ -456,6 +478,8 @@ func _run_cabin() -> void:
 	await get_tree().create_timer(0.8, false).timeout
 	_can_exit = true
 	if not await _say(&"cab.stuck", -48.0, 3.6):
+		return
+	if not await _say(&"cab.10", -36.0, 3.8):
 		return
 	if Game.hud != null and _in_cabin:
 		Game.hud.set_prompt(Loc.t(&"cab.exit"))

@@ -58,6 +58,7 @@ func _ready() -> void:
 
 
 var _music: AudioStreamPlayer
+var _menu_wind: AudioStreamPlayer
 
 func _start_menu_music() -> void:
 	if _music != null:
@@ -71,6 +72,16 @@ func _start_menu_music() -> void:
 		add_child(_music)
 		_music.finished.connect(_music.play)
 		_music.play()
+	if _menu_wind == null:
+		_menu_wind = AudioStreamPlayer.new()
+		var ws := load("res://assets/audio/wind_loop.ogg") as AudioStream
+		if ws != null:
+			_menu_wind.stream = ws
+			_menu_wind.volume_db = -22.0
+			_menu_wind.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
+			add_child(_menu_wind)
+			_menu_wind.finished.connect(_menu_wind.play)
+			_menu_wind.play()
 
 
 func _exit_tree() -> void:
@@ -78,6 +89,10 @@ func _exit_tree() -> void:
 		_music.stop()
 		_music.queue_free()
 		_music = null
+	if _menu_wind != null:
+		_menu_wind.stop()
+		_menu_wind.queue_free()
+		_menu_wind = null
 
 
 
