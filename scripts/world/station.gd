@@ -161,6 +161,7 @@ func _ready() -> void:
 	refl.station = self
 	add_child(refl)
 	Game.level = self
+	_extra_walk_segments.clear()
 	_gen_stall_timer = Game.rng.randf_range(200.0, 320.0)
 	Perf.mark("station start")
 	_build_environment()
@@ -2878,11 +2879,25 @@ static func _make_door_slit_texture() -> ImageTexture:
 ## Мостки по ломаной: доски поперёк хода (с лёгким разбросом длины и поворота), под ними две лаги,
 ## на стыках отрезков — доски веером, по краям кое-где наметён снег.
 var _walk_pts: Array = []
+static var _extra_walk_segments: Array = []
+
+
+static func register_boardwalk_segment(p0: Vector3, p1: Vector3) -> void:
+	_extra_walk_segments.append([p0, p1])
+
 
 ## Стоит ли точка на мостках или крыльце — для гулких шагов по доскам.
 func on_boardwalk(pos: Vector3) -> bool:
 	if pos.x > 14.8 and pos.x < 16.7 and pos.z > 2.0 and pos.z < 4.2 and pos.y < 0.6:
 		return true
+	for seg: Array in _extra_walk_segments:
+		var a: Vector3 = seg[0]
+		var b: Vector3 = seg[1]
+		var ab := Vector2(b.x - a.x, b.z - a.z)
+		var ap := Vector2(pos.x - a.x, pos.z - a.z)
+		var t := clampf(ap.dot(ab) / maxf(ab.length_squared(), 0.0001), 0.0, 1.0)
+		if (ap - ab * t).length() < 0.78:
+			return true
 	for i in range(_walk_pts.size() - 1):
 		var a: Vector3 = _walk_pts[i]
 		var b: Vector3 = _walk_pts[i + 1]

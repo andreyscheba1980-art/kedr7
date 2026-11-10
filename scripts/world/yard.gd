@@ -4142,6 +4142,7 @@ func _build_station_road_dressing() -> void:
 	for seg: Array in trail_segments:
 		var p0: Vector3 = seg[0]
 		var p1: Vector3 = seg[1]
+		Station.register_boardwalk_segment(p0, p1)
 		var d := p1 - p0
 		d.y = 0.0
 		var len := d.length()
@@ -4153,6 +4154,17 @@ func _build_station_road_dressing() -> void:
 		walkway.position = mid
 		walkway.rotation.y = atan2(d.x, d.z)
 		add_child(walkway)
+
+	# Поющий провод ЛЭП на ветру
+	var wire_sing := AudioStreamPlayer3D.new()
+	wire_sing.stream = AudioDirector.cached_stream("res://assets/audio/echo_loop.ogg")
+	wire_sing.volume_db = -20.0
+	wire_sing.unit_size = 6.0
+	wire_sing.max_distance = 28.0
+	wire_sing.bus = &"SFX"
+	wire_sing.position = Vector3(56.0, 4.5, -18.0)
+	add_child(wire_sing)
+	wire_sing.play()
 
 	# 2. Воздушная линия ЛЭП к метеокорпусу
 	var pole_m1_pos := Vector3(36.0, 0.0, -9.0)
@@ -4262,6 +4274,7 @@ func _build_yard_clutter() -> void:
 	outhouse_walk.position = Vector3(15.2, Terrain.height(15.2, 19.5) + 0.02, 19.5)
 	outhouse_walk.rotation.y = deg_to_rad(90.0)
 	add_child(outhouse_walk)
+	Station.register_boardwalk_segment(Vector3(14.0, 0.0, 19.5), Vector3(16.4, 0.0, 19.5))
 
 	# Лопата у стены уборной
 	var shovel := Props.snow_shovel()
