@@ -91,7 +91,21 @@ func _start() -> void:
 
 
 func _knock() -> void:
-	Game.audio.play_3d(KNOCK, DOOR, 2.0 if real else -1.0, 5.0)
+	var count := 3 if real else (2 if _rng.randf() < 0.5 else 4)
+	for i in count:
+		get_tree().create_timer(i * 0.45, false).timeout.connect(func() -> void:
+			if state != &"knocking":
+				return
+			var sfx_path := KNOCK
+			if not real and i == count - 1 and _rng.randf() < 0.6:
+				sfx_path = "res://assets/audio/clank.ogg"
+			Game.audio.play_3d(sfx_path, DOOR, (2.0 if real else 0.0) + randf_range(-0.5, 0.5), 6.0)
+		)
+	if not real and _rng.randf() < 0.5:
+		get_tree().create_timer(float(count) * 0.45 + 0.5, false).timeout.connect(func() -> void:
+			if state == &"knocking":
+				Game.audio.play_3d("res://assets/audio/tree_creak.ogg", DOOR + Vector3(randf_range(-1.5, 1.5), 0, 0), -4.0, 6.0)
+		)
 
 
 func _ask() -> void:
@@ -160,6 +174,11 @@ func _gone() -> void:
 	SaveGame.flags["guest_result"] = "real_out" if real else "mimic_out"
 	Game.audio.play_3d("res://assets/sfx/snow_steps_walk.ogg", DOOR + Vector3(2.0, -1.2, 0), -4.0, 8.0)
 	Game.hud.subtitle(Loc.t(&"guest.gone_real" if real else &"guest.gone_mimic"), 6.0)
+	if not real and Game.level != null:
+		var retreat_path := PackedVector3Array([
+			DOOR, DOOR + Vector3(2.0, 0, 2.0), Vector3(20.0, 0, 8.0), Vector3(28.0, 0, 16.0)
+		])
+		Footprints.trail(Game.level, &"bare", retreat_path, 0.0, 0.5)
 	SaveGame.write()
 
 

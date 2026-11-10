@@ -221,8 +221,7 @@ func _ready() -> void:
 	_build_frozen_hunter()
 	_build_station_road_dressing()
 	_build_yard_clutter()
-	if Game.is_day() and Game.phase_index == 1:
-
+	if (Game.is_day() and Game.phase_index == 1) or (Game.is_night() and Game.night >= 2):
 		_build_footprints()
 	EventBus.antenna_iced_changed.connect(_on_antenna_iced)
 	_on_antenna_iced(Game.antenna_iced)
@@ -2721,6 +2720,12 @@ func _build_footprints() -> void:
 		Vector3(-4.3, 0, 7.6), Vector3(-4.4, 0, -1.7), Vector3(1.9, 0, -2.0), Vector3(2.0, 0, -7.4),
 		Vector3(8.4, 0, -7.4), Vector3(9.0, 0, -3.8), Vector3(9.2, 0, -2.9)])
 	Footprints.trail(self, &"bare", route, 0.0, 0.5)
+	if Game.is_night():
+		var outhouse_tracks := PackedVector3Array([
+			Vector3(14.0, 0, 32.0), Vector3(15.0, 0, 25.0), Vector3(16.0, 0, 20.5),
+			Vector3(17.2, 0, 19.5), Vector3(19.0, 0, 22.0), Vector3(23.0, 0, 28.0)
+		])
+		Footprints.trail(self, &"bare", outhouse_tracks, 0.0, 0.5)
 	# Лиса прошла от опушки вдоль двора, обнюхала поленницу и ушла обратно в лес — цепочка «в строчку».
 	var fox := PackedVector3Array([Vector3(-14, 0, 22), Vector3(-6, 0, 18), Vector3(2, 0, 16.5), Vector3(5, 0, 21),
 		Vector3(3.5, 0, 30), Vector3(-2, 0, 36), Vector3(-9, 0, 41)])
