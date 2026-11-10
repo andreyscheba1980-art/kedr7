@@ -11,6 +11,7 @@ extends Node
 const RADIO_POS := Vector3(9.2, 1.0, -1.4)
 const STATIC := "res://assets/audio/radio_anomaly.ogg"
 const CLICK := "res://assets/audio/ui_tick.ogg"
+const ZasAudioClass = preload("res://scripts/data/zas_audio.gd")
 const WAIT_REAL := 75.0          ## сколько секунд рация зовёт, пока не сдастся
 const CHOICE_TIME := 14.0
 
@@ -155,13 +156,14 @@ func _process(delta: float) -> void:
 
 func _say(key: StringName) -> void:
 	var text := Loc.t(key)
-	var dur := clampf(text.length() * 0.06, 3.5, 8.5)
+	var dur := clampf(text.length() * 0.065, 3.5, 8.5)
 	Game.audio.play_3d(STATIC, RADIO_POS, -12.0, 4.0, 0.6)
-	var vl := Voice.line(key, ["rt_"], RADIO_POS, 2.0)   # голос в эфире, если записан
+	var vl := Voice.line(key, ["rt_"], RADIO_POS, 2.0)   # голос в эфире или шифр ЗАС
 	if vl > 0.0:
 		dur = vl + 0.3
 	Game.hud.subtitle(text, dur, 2)
 	await get_tree().create_timer(dur + 0.35, false).timeout
+	ZasAudioClass.play_relay_click(false, RADIO_POS)
 
 
 func _conversation() -> void:

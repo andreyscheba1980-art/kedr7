@@ -18,6 +18,7 @@ const ACTIVE_DB := -5.0
 const ICED_FACTOR := 0.45
 const RECORD_TIME := 5.0
 const MAINLAND_VOICE := "res://assets/audio/voice_mainland.ogg"
+const ZasAudioClass = preload("res://scripts/data/zas_audio.gd")
 
 ## Чья передача. Настоящая Большая Земля в конце связи называет пароль «Бирюса» (правило 2),
 ## ложная — молчит про пароль, путает его («Бирюза») или говорит верно, но в мёртвой тишине эфира.
@@ -72,10 +73,12 @@ func play_transmission(stream_path: String, volume_offset_db := 0.0, pass_kind :
 	var p := AudioStreamPlayer3D.new()
 	var generic := stream_path.ends_with("voice_mainland.ogg") or stream_path.ends_with("voice_loop.ogg")
 	var line := AudioDirector.cached_stream(stream_path)
+	var line_len := 7.0 if generic or line == null else line.get_length()
+	if Settings.voice_mode == "zas" and not _fake_voice and (generic or stream_path.contains("ml_") or stream_path.contains("st_")):
+		line = ZasAudioClass.get_scramble_stream(line_len)
 	p.stream = line
 	var pass_vid := _pass_voice(pass_kind, stream_path.get_file().get_basename() in OPERATOR_A)
-	var line_len := 7.0 if generic or line == null else line.get_length()
-	if pass_vid != &"" and Voice.has(pass_vid) and not generic and line != null:
+	if pass_vid != &"" and Voice.has(pass_vid) and not generic and line != null and Settings.voice_mode != "zas":
 		p.stream = _with_tail(line, load(Voice.path(pass_vid)) as AudioStream)
 	_show_pass(pass_kind, line_len)
 	p.unit_size = 3.5
@@ -84,6 +87,7 @@ func play_transmission(stream_path: String, volume_offset_db := 0.0, pass_kind :
 	p.bus = &"Radio"
 	add_child(p)
 	_active_voice_player = p
+	ZasAudioClass.play_relay_click(true, global_position)
 	# Общий «голос в эфире» (заглушка, пока реплика не озвучена отдельно) длинный — 30 с.
 	# Не держим им рацию: 7 с бормотания, затухание, и эфир снова свободен.
 	if generic:
@@ -98,6 +102,7 @@ func play_transmission(stream_path: String, volume_offset_db := 0.0, pass_kind :
 			tw.tween_callback(p.stop)
 			tw.tween_callback(func() -> void: p.finished.emit()))
 	p.finished.connect(func() -> void:
+		ZasAudioClass.play_relay_click(false, global_position)
 		if _active_voice_player == p:
 			_active_voice_player = null
 			_busy = false

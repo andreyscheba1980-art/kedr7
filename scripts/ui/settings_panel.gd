@@ -70,6 +70,8 @@ func _ready() -> void:
 	_slider(box, &"set.music", "music_volume", 0.0, 1.0, 0.05)
 	_slider(box, &"set.ambient", "ambient_volume", 0.0, 1.0, 0.05)
 	_slider(box, &"set.radio", "radio_volume", 0.0, 1.0, 0.05)
+	_choice(box, &"set.voice_mode", [&"set.voice_zas", &"set.voice_classic"], 0 if Settings.voice_mode == "zas" else 1,
+		func(i: int) -> void: Settings.voice_mode = "zas" if i == 0 else "classic")
 
 	_section(box, &"set.mic")
 	_toggle(box, &"set.mic_enabled", Settings.mic_enabled, func(on: bool) -> void:

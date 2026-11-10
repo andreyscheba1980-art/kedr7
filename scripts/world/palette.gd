@@ -28,7 +28,7 @@ const COLORS := {
 	&"red": Color(0.5, 0.06, 0.04),
 	&"cloth": Color(0.28, 0.3, 0.38),
 	&"stove": Color(0.56, 0.53, 0.49),
-	&"rope": Color(0.45, 0.4, 0.3),
+	&"rope": Color(0.22, 0.23, 0.25),
 	&"ice": Color(0.7, 0.8, 0.88),
 	&"canister": Color(0.25, 0.32, 0.18),
 	&"paper": Color(0.82, 0.78, 0.66),

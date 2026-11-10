@@ -7,20 +7,21 @@ extends RefCounted
 
 const VOICE_DIR := "res://assets/voice/"
 const SFX_DIR := "res://assets/sfx/"
+const ZasAudioClass = preload("res://scripts/data/zas_audio.gd")
 
 static var _cache: Dictionary = {}
 
 
-static func path(id: StringName) -> String:
-	return _find(VOICE_DIR, id)
+static func path(_id: StringName) -> String:
+	return ""
 
 
 static func sfx(id: StringName) -> String:
 	return _find(SFX_DIR, id)
 
 
-static func has(id: StringName) -> bool:
-	return path(id) != ""
+static func has(_id: StringName) -> bool:
+	return false
 
 
 static func _find(dir: String, id: StringName) -> String:
@@ -33,10 +34,9 @@ static func _find(dir: String, id: StringName) -> String:
 	return found
 
 
-## Путь к озвучке реплики или запасной звук (общий «голос в эфире»), если реплика ещё не записана.
-static func or_fallback(id: StringName, fallback: String) -> String:
-	var p := path(id)
-	return p if p != "" else fallback
+## Запасной звук (общий «голос в эфире» / шум), если файла нет.
+static func or_fallback(_id: StringName, fallback: String) -> String:
+	return fallback
 
 
 static func sfx_or(id: StringName, fallback: String) -> String:
@@ -44,32 +44,33 @@ static func sfx_or(id: StringName, fallback: String) -> String:
 	return p if p != "" else fallback
 
 
-## Реплика с голосом: субтитр + файл v_<ключ> (точки → подчёркивания), если он уже записан.
-## Возвращает, сколько ждать до следующей реплики (не меньше wait и не меньше длины записи).
-## Голос к строке сюжета (1.54+): первый найденный файл из prefixes + ключ (точки → «_»).
-## pos — где звучит (Vector3.INF — «в голове», 2D). Возвращает длину записи или 0, если файла нет.
+## Радиопереговоры и сюжетные сигналы: радиошум / ЗАС шифр и вычисление времени чтения.
 static func line(key: StringName, prefixes: Array, pos := Vector3.INF, vol := 0.0) -> float:
 	if Game.audio == null:
 		return 0.0
-	var k := String(key).replace(".", "_")
+	var is_radio := false
 	for pre: String in prefixes:
-		var p := path(StringName(pre + k))
-		if p == "":
-			continue
-		var pl: Node = Game.audio.play_2d(p, vol) if pos == Vector3.INF else Game.audio.play_3d(p, pos, vol, 6.0)
-		var st: AudioStream = pl.get(&"stream") if pl != null else null
-		return st.get_length() if st != null else 0.0
-	return 0.0
-
-
-static func say(key: StringName, wait: float, priority := 1, args: Array = []) -> float:
-	var vid := StringName("v_" + String(key).replace(".", "_"))
-	var dur := wait
-	var p := path(vid)
-	if p != "" and Game.audio != null:
-		var pl := Game.audio.play_2d(p, 0.0)
-		if pl != null and pl.stream != null:
-			dur = maxf(wait, pl.stream.get_length() + 0.4)
-	if Game.hud != null:
-		Game.hud.subtitle(Loc.t(key, args), dur - 0.2, priority)
+		if pre in ["rt_", "ml_", "st_", "num_"]:
+			is_radio = true
+			break
+	var text := Loc.t(key)
+	var dur := clampf(float(text.length()) * 0.055, 2.2, 6.0)
+	if is_radio:
+		ZasAudioClass.play_relay_click(true, pos)
+		ZasAudioClass.play_telemetry(dur, pos, vol)
 	return dur
+
+
+## Реплика персонажа: кинематографичный субтитр без синтетической озвучки + расчёт времени чтения.
+static func say(key: StringName, wait: float, priority := 1, args: Array = [], pos := Vector3.INF) -> float:
+	var text := Loc.t(key, args)
+	var read_dur := clampf(float(text.length()) * 0.055, 2.0, 5.0)
+	var dur := maxf(wait, read_dur)
+	var is_radio := String(key).begins_with("rt.") or String(key).begins_with("sig.")
+	if is_radio and Game.audio != null:
+		ZasAudioClass.play_relay_click(true, pos)
+		ZasAudioClass.play_telemetry(dur, pos, -4.0 if pos != Vector3.INF else -6.0)
+	if Game.hud != null:
+		Game.hud.subtitle(text, dur - 0.2, priority)
+	return dur
+

@@ -70,7 +70,8 @@ void fragment() {
 }
 
 void light() {
-	DIFFUSE_LIGHT += clamp(dot(NORMAL, LIGHT), 0.0, 1.0) * ATTENUATION * LIGHT_COLOR / PI;
+	float NdotL = clamp((dot(NORMAL, LIGHT) + 0.25) / 1.25, 0.0, 1.0);
+	DIFFUSE_LIGHT += NdotL * ATTENUATION * LIGHT_COLOR / PI;
 	if (v_is_spark > 0.5) {
 		float s = pow(max(dot(reflect(-LIGHT, v_spark), VIEW), 0.0), 140.0);
 		SPECULAR_LIGHT += s * 5.0 * ATTENUATION * LIGHT_COLOR;

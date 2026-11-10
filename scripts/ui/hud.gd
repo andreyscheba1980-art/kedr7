@@ -280,21 +280,28 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 	_sub_token += 1
 	var token := _sub_token
 
+	var low := text.to_lower()
+	var is_radio := low.contains("3820") or low.contains("угмс") or low.contains("радио") or low.contains("эфир") or low.contains("диспетчер") or low.contains("семенов") or low.contains("семёнов") or text.begins_with("«")
+	var is_whisper := low.contains("шёпот") or low.contains("шепот") or low.contains("тайг") or low.contains("выдох") or low.contains("урман") or low.contains("ырк") or low.contains("шаг")
+
 	var col: Color = custom_color
 	if col == Color.TRANSPARENT:
-		var low := text.to_lower()
 		if text.begins_with("(") or text.begins_with("（"):
 			col = Color(0.88, 0.85, 0.78, 0.92) # Внутренний голос / осмотр
-		elif low.contains("3820") or low.contains("угмс") or low.contains("радио") or low.contains("эфир") or low.contains("диспетчер") or low.contains("семенов") or low.contains("семёнов"):
+		elif is_radio:
 			col = Color(1.0, 0.82, 0.38, 0.98) # Радиоэфир и архив
-		elif low.contains("шёпот") or low.contains("шепот") or low.contains("тайг") or low.contains("выдох") or low.contains("урман") or low.contains("ырк") or low.contains("шаг"):
+		elif is_whisper:
 			col = Color(0.68, 0.88, 1.0, 0.98) # Мистический шёпот тайги
 		elif priority >= 2:
 			col = Color(1.0, 0.45, 0.35, 0.98) # Тревога / авария
 		else:
 			col = Color(0.96, 0.96, 0.96, 0.96) # Обычная речь
 
-	_subtitle.text = text
+	var display_text := text
+	if is_radio and Settings.voice_mode == "zas" and not text.begins_with("•") and not text.begins_with("("):
+		display_text = "• ЗАС «ЭЛЬБРУС» 3820 кГц •\n" + text
+
+	_subtitle.text = display_text
 	_subtitle.add_theme_color_override("font_color", col)
 	if Settings.subtitle_bg:
 		var sb := StyleBoxFlat.new()
@@ -304,9 +311,30 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 		_subtitle.add_theme_stylebox_override("normal", sb)
 	else:
 		_subtitle.remove_theme_stylebox_override("normal")
+
+	# Телетайпная дешифрация (машинопись текста)
+	var total_chars := display_text.length()
+	if total_chars <= 4 or OS.get_name() == "headless":
+		_subtitle.visible_characters = -1
+	else:
+		_subtitle.visible_characters = 0
+		var type_speed := 40.0
+		var type_dur := clampf(float(total_chars) / type_speed, 0.35, minf(duration * 0.75, 4.0))
+		var tw := create_tween()
+		tw.tween_property(_subtitle, "visible_characters", total_chars, type_dur)
+		if is_radio:
+			var ticks := mini(total_chars / 4, 18)
+			var tick_step := type_dur / float(maxi(ticks, 1))
+			for k in range(ticks):
+				tw.parallel().tween_callback(func() -> void:
+					if token == _sub_token and _subtitle.visible_characters < total_chars:
+						AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -22.0)
+				).set_delay(float(k) * tick_step)
+
 	await get_tree().create_timer(duration, false).timeout
 	if token == _sub_token:
 		_subtitle.text = ""
+		_subtitle.visible_characters = -1
 		_subtitle.remove_theme_stylebox_override("normal")
 		_sub_priority = 0
 

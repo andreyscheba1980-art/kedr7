@@ -14,7 +14,7 @@ const KEYS: Array[String] = [
 	"fullscreen", "resolution", "pixelation", "show_fps", "quality", "render_scale", "auto_tuned",
 	"rumble", "mic_enabled", "mic_sensitivity", "mic_threshold", "mic_device", "mic_consent", "mic_mimic",
 	"toggle_breath", "toggle_sprint", "keybinds", "padbinds", "calibrated", "lang_chosen", "warned",
-	"camera_shake", "reduce_flashes", "film_fx", "subtitle_bg", "auto_res", "fps_limit",
+	"camera_shake", "reduce_flashes", "film_fx", "subtitle_bg", "auto_res", "fps_limit", "voice_mode",
 ]
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080), Vector2i(2560, 1440)]
 ## Во сколько раз мир рисуется мельче окна: 1 — без пикселизации, 4 — сильная.
@@ -62,6 +62,7 @@ var keybinds := {}               ## переназначенные клавиш�
 var mic_sensitivity := 1.0   ## множитель чувствительности микрофона (0.2–5.0)
 var mic_threshold := 0.16    ## порог срабатывания (шумоподавление): 0.04..0.50
 var mic_device := "Default"  ## выбранное устройство записи
+var voice_mode := "zas"       ## "zas" (ЗАС-шифратор «Эльбрус» и телетайп) или "classic" (голос)
 
 
 

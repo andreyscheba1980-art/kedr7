@@ -518,7 +518,7 @@ func _build_dig_spots() -> void:
 		add_child(m)
 		_dig_nodes.append(m)
 		var it := Geo.interactable(self, Vector3(1.6, 1.0, 2.0), at + Vector3(0, 0.45, 0), null, "", Callable())
-		it.hold_time = 2.8
+		it.hold_time = 1.0
 		it.hold_sound = "res://assets/audio/step_snow_3.ogg"
 		it.prompt_provider = func() -> String: return Loc.t(&"cab.dig") if m.visible else ""
 		it.used.connect(func(_p: Player) -> void:
@@ -727,43 +727,31 @@ func _build_evidence() -> void:
 	pr.rotation.y = PI * 0.5        # лицом наружу (+X)
 
 
-## Пока Виктор копает — Михалыч из кабины: про Свердловск, про Семёнова, про ырку и три гудка.
+## Пока Виктор копает — Михалыч из кабины коротко подсказывает.
 func _talk_while_digging() -> void:
-	await get_tree().create_timer(0.9, false).timeout
-	if _door_print != Vector3.ZERO:
-		Game.hud.subtitle(Loc.t(&"hk.th_tracks"), 4.0)
-		await get_tree().create_timer(4.4, false).timeout
-	for ln: Array in [[&"cab.dig_hint", 3.4], [&"cab.11", 5.0], [&"cab.12", 5.0], [&"cab.13", 3.4], [&"cab.14", 2.6],
-			[&"cab.15", 6.0], [&"cab.16", 2.0], [&"cab.17", 7.5], [&"cab.18", 6.5]]:
-		if not is_inside_tree():
-			return
-		await get_tree().create_timer(Voice.say(ln[0], ln[1]), false).timeout
-		await get_tree().create_timer(0.4, false).timeout
-	_talk_done = true
-	_maybe_try()
+	await get_tree().create_timer(0.4, false).timeout
+	if not is_inside_tree() or _leaving:
+		return
+	Voice.say(&"cab.dig_hint", 2.6, 1, [], _tracked.global_position)
 
 
-## Откопано и договорили (или Виктор ушёл, не докопав) — газует. Трак лопается: дальше пешком.
+## Откопано — Михалыч сразу пробует газовать, трак лопается, дальше пешком.
 func _maybe_try() -> void:
-	if _leaving or not _talk_done:
+	if _leaving:
 		return
-	Game.set_flag("dig_pending", false)
-	if _gave_up:
-		_leaving = true
-		_finish_talk(false)    # ушёл, не докопав: газовать некому помогать — Михалыч кричит остальное вслед
-		return
-	if _dug < DIG_SPOTS.size():
+	if _dug < DIG_SPOTS.size() and not _gave_up:
 		return
 	_leaving = true
-	await get_tree().create_timer(Voice.say(&"cab.try", 2.6), false).timeout
+	Game.set_flag("dig_pending", false)
+	Voice.say(&"cab.try", 2.0, 1, [], _tracked.global_position)
 	_exhaust.amount = 40
 	_exhaust.initial_velocity_max = 5.0
 	create_tween().tween_property(_engine, "pitch_scale", 1.6, 0.8)
-	_spray(2.4)
+	_spray(2.0)
 	var tw := create_tween()
 	for k in 4:
-		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.5), 0.3)
-	await get_tree().create_timer(2.2, false).timeout
+		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.5), 0.25)
+	await get_tree().create_timer(1.8, false).timeout
 	if not is_inside_tree():
 		return
 	AudioDirector.play_raw("res://assets/audio/clank.ogg", 4.0)
@@ -773,19 +761,15 @@ func _maybe_try() -> void:
 	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.4)
 	_exhaust.amount = 16
 	_exhaust.initial_velocity_max = 2.0
-	await get_tree().create_timer(1.4, false).timeout
+	await get_tree().create_timer(0.8, false).timeout
 	_finish_talk(true)
 
 
 func _finish_talk(tried: bool) -> void:
-	var lines: Array = [[&"cab.8", 3.4], [&"cab.10", 6.5], [&"cab.stay", 4.6], [&"driver.farewell_3b", 3.5]]
 	if tried:
-		lines.push_front([&"cab.track", 3.2])
-	for ln: Array in lines:
-		if not is_inside_tree():
-			return
-		await get_tree().create_timer(Voice.say(ln[0], ln[1]), false).timeout
-		await get_tree().create_timer(0.3, false).timeout
+		Voice.say(&"cab.track", 2.8, 1, [], _tracked.global_position)
+		await get_tree().create_timer(2.6, false).timeout
+	Voice.say(&"cab.stay", 3.4, 1, [], _tracked.global_position)
 	_talk_over = true
 
 
@@ -844,20 +828,7 @@ static func engine_die() -> void:
 ## Мягкий поводок: игрок, ушедший раньше, чем Михалыч договорил, упирается в 30 м от тягача. Без него
 ## быстрый игрок доходил до дома под разговор — и события просеки (ждущие конца разговора) пропадали.
 func _leash() -> void:
-	var c := _body.global_position
-	var off := Game.player.global_position - c
-	off.y = 0.0
-	if off.length() <= LEASH_M:
-		return
-	var out := off.normalized()
-	var p := c + out * LEASH_M
-	Game.player.global_position = Vector3(p.x, Game.player.global_position.y, p.z)
-	var vo := Game.player.velocity.dot(out)
-	if vo > 0.0:
-		Game.player.velocity -= out * vo
-	if not _leash_hinted:
-		_leash_hinted = true
-		Game.hud.hint(Loc.t(&"cab.wait_hint"), 6.0)
+	pass
 
 
 func _process(delta: float) -> void:
@@ -866,10 +837,8 @@ func _process(delta: float) -> void:
 	if not _in_cabin and Game.has_flag("left_cabin") and _body != null:
 		var far := Game.player.global_position.distance_to(_body.global_position)
 		if not _leaving and _dug < DIG_SPOTS.size() and far > 26.0 and not _gave_up:
-			_gave_up = true       # ушёл, не докопав: договорят вслед, без попытки газовать
+			_gave_up = true       # ушёл, не докопав: газовать некому помогать
 			_maybe_try()
-		if not _talk_over and not _leaving:
-			_leash()
 		if far > 26.0 and _talk_over and not _alone_said:
 			_alone_said = true
 			var pt := get_tree().root.find_child("PrologueTrail", true, false)

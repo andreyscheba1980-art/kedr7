@@ -142,7 +142,7 @@ func _ready() -> void:
 	camera = Camera3D.new()
 	camera.fov = Settings.fov
 	camera.near = 0.05
-	camera.far = 85.0
+	camera.far = 250.0
 	head.add_child(camera)
 
 	flashlight = SpotLight3D.new()

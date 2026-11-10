@@ -712,7 +712,7 @@ If a voice on the air calls you by name — don't answer. It isn't me. — S.\""
 	&"tut.rest": ["Всё готово. Кровать — отдохнуть до ночи", "All set. Use the bed to rest until night"],
 	&"tutg.done": ["✓  %s", "✓  %s"],
 	&"tutg.readings.title": ["Снять показания: площадка и корпус", "Take readings: the plot and the building"],
-	&"tutg.readings.how": ["Корпус с башней — в ста метрах к востоку, по лееру с красными флажками. По пути — огороженная площадка. В будке два термометра: найди верх красного столбика (колёсико — вдоль шкалы, ночью свети фонарём [F], иней стирай ЛКМ) и впиши цифры в книжку. На рейке читай высоту там, где снег сходится с рейкой. Давление — барограф у рации: где перо сейчас и насколько изменилось за три часа. Ветер — в корпусе: заведи дизель в пристройке, потом пульт в аппаратной — стрелки считывай сам. Огонёк покажет, что осталось.", "The building with the tower is a hundred metres east, along the rope with red flags. On the way is a fenced plot. The screen holds two thermometers: find the top of the red column (wheel moves along the scale, use the flashlight [F] at night, wipe frost with LMB) and write the numbers in the book. At the snow stake, read the depth where the snow meets the stake. Pressure — the barograph by the radio: where the pen is now and how much it changed in three hours. Wind is inside: start the diesel in the annex, then the panel in the instrument room — read the needles yourself. The light shows what is left."],
+	&"tutg.readings.how": ["Термометры и рейка — на площадке по лееру. Барограф — в рубке у рации.", "Thermometers and snow stake on the plot along the rope. Barograph by the radio."],
 	&"tutg.test_report.title": ["Передать пробную сводку", "Send a test report"],
 	&"tutg.test_report.how": ["Рация — в рубке. Сядь за неё [E], поймай Большую Землю на 6880 кГц и нажми [R]: замеры уйдут в Свердловск.", "The radio is in the radio room. Sit at it [E], find the Mainland at 6880 kHz and press [R]: the readings go to Sverdlovsk."],
 	&"tutg.refuel.title": ["Залить солярку в генератор", "Refuel the generator"],
@@ -2737,6 +2737,11 @@ The operator is not to be informed about the object.
 	&"darkroom.paradox_desc": ["Кадр с автоматической фотоловушки у метеомачты... Но на снимке запечатлена эта самая фотолаборатория под красным фонарём. Человек в ватнике стоит спиной у увеличителя прямо сейчас. Объектив направлен из темного угла под потолком ровно тебе в затылок.", "Shot from the automated trail camera at the mast... But the film reveals this exact darkroom under the red safelight. A figure in a quilted jacket stands with their back to the lens at the enlarger right now. The camera is pointing from the dark ceiling corner directly at the back of your head."],
 	&"sub.barometric_bottom": ["Стрелка барографа соскользнула ниже 700 мм рт. ст. — атмосферное давление рухнуло за пределы шкалы. В воздухе звенит ледяной вакуум...", "The barograph needle slipped below 700 mmHg — atmospheric pressure plummeted off the chart. The room hums with an icy vacuum..."],
 	&"call.mainland_denial": ["«Кедр-7, прекратите выход в эфир. Станция снята с дежурства ГУГМС в 1974 году. Все операторы списаны. Кто выходит на связь из этой точки?..»", "«Kedr-7, cease radio broadcast. The station was decommissioned by GUGMS in 1974. All personnel accounted for. Who is transmitting from this coordinate?..»"],
+
+	# --- ЗАС-Эльбрус и радиорежим ---
+	&"set.voice_mode": ["Режим радиосвязи и озвучки", "Radio & Voice mode"],
+	&"set.voice_zas": ["Шифр ЗАС «Эльбрус» (Рекомендуется)", "ZAS Scrambler 'Elbrus' (Recommended)"],
+	&"set.voice_classic": ["Классический голос в эфире", "Classic Voice Broadcast"],
 }
 
 

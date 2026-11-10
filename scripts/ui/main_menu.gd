@@ -22,8 +22,8 @@ func _ready() -> void:
 	var container := SubViewportContainer.new()
 	_container = container
 	container.stretch = true
-	container.stretch_shrink = Settings.render_shrink()
-	container.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	container.stretch_shrink = 1
+	container.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var post := ShaderMaterial.new()
 	post.shader = load(POST_SHADER)
@@ -34,10 +34,20 @@ func _ready() -> void:
 	_backdrop = MenuBackdrop.new()
 	vp.add_child(_backdrop)
 
-	var shade := ColorRect.new()
-	shade.color = Color(0, 0, 0, 0.35)
+	var grad := Gradient.new()
+	grad.colors = PackedColorArray([Color(0.02, 0.03, 0.05, 0.90), Color(0.02, 0.03, 0.05, 0.65), Color(0.02, 0.03, 0.05, 0.0)])
+	grad.offsets = PackedFloat32Array([0.0, 0.42, 0.78])
+	var gtex := GradientTexture2D.new()
+	gtex.gradient = grad
+	gtex.fill = GradientTexture2D.FILL_LINEAR
+	gtex.fill_from = Vector2(0.0, 0.5)
+	gtex.fill_to = Vector2(1.0, 0.5)
+
+	var shade := TextureRect.new()
+	shade.texture = gtex
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	UiKit.place(self, shade, 0, 0, 0.45, 1, 0, 0, 0, 0)
+	UiKit.place(self, shade, 0, 0, 1, 1, 0, 0, 0, 0)
 
 	_ui = Control.new()
 	_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE

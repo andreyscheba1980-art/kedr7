@@ -91,7 +91,7 @@ static func _mountains(parent: Node3D, radius: float, peak: float, haze_k: float
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.extra_cull_margin = 2000.0
 	mi.custom_aabb = AABB(Vector3(-2000, -100, -2000), Vector3(4000, 800, 4000))
-	mi.set_meta(&"sky_scale", (83.4 if radius < 1000.0 else 84.4) / radius)
+	mi.set_meta(&"sky_scale", (140.0 if radius < 1000.0 else 155.0) / radius)
 	parent.add_child(mi)
 	_mats.append(m)
 	_rings.append(mi)

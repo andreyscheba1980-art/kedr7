@@ -85,10 +85,10 @@ func _card_show(title: String, how: String, dur: float) -> void:
 	if how != "":
 		var h := UiKit.label(how, 13, HORIZONTAL_ALIGNMENT_LEFT)
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		h.custom_minimum_size = Vector2(380, 0)
+		h.custom_minimum_size = Vector2(280, 0)
 		h.modulate = Color(0.9, 0.9, 0.86)
 		box.add_child(h)
-	Game.hud._place(card, 1.0, 0.0, 1.0, 0.0, -430, 78, -20, 78)   # HUD — CanvasLayer, у него свой корневой контейнер
+	Game.hud._place(card, 1.0, 0.0, 1.0, 0.0, -320, 78, -20, 78)   # HUD — CanvasLayer, у него свой корневой контейнер
 	card.visible = Game.hud.modal() == null
 	card.modulate.a = 0.0
 	_card = card
