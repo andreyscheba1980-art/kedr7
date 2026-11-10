@@ -75,9 +75,31 @@ func _trail() -> void:
 ## Мелочи вдоль просеки пролога: [что, метров от высадки, вбок (+ вправо), поворот]. Без звука и мыслей —
 ## просто живая обочина: столбик, бочка, палки, варежка, бревно, пень с топором, указатель, ворона.
 const TRAIL_SMALL := [
-	["km", 7.0, 3.3, 0.0], ["barrel", 24.0, -3.8, 30.0], ["poles", 48.0, 3.4, 0.0], ["mitten", 66.0, -3.1, 0.0],
-	["log", 82.0, 4.6, 70.0], ["bucket", 104.0, -3.5, 0.0], ["axe", 122.0, 4.2, 0.0], ["sign", -40.0, 3.2, 0.0],
+	["km", 6.0, 3.3, 0.0],
+	["marker", 12.0, -3.2, 0.0],
+	["barrel", 20.0, -3.8, 30.0],
+	["stake", 28.0, 3.5, 10.0],
+	["marker", 38.0, 3.4, 0.0],
+	["sledge", 46.0, -4.6, -15.0],
+	["poles", 52.0, 3.4, 0.0],
+	["crate", 58.0, -3.6, 25.0],
+	["marker", 64.0, 3.3, 0.0],
+	["mitten", 70.0, -3.1, 0.0],
+	["log", 82.0, 4.6, 70.0],
+	["barrel", 90.0, -3.9, 45.0],
+	["marker", 96.0, -3.3, 0.0],
+	["stake", 102.0, 3.5, -10.0],
+	["bucket", 108.0, -3.5, 0.0],
+	["marker", 116.0, 3.3, 0.0],
+	["axe", 122.0, 4.2, 0.0],
+	["log", 130.0, -4.5, -60.0],
+	["marker", 138.0, -3.2, 0.0],
+	["crate", 144.0, 3.8, 15.0],
+	["barrel", 152.0, -3.6, 20.0],
+	["marker", 160.0, 3.3, 0.0],
+	["sign", -40.0, 3.2, 0.0],
 	["crow", -22.0, -2.9, 40.0],
+	["marker", -12.0, -3.1, 0.0],
 ]
 
 
@@ -96,6 +118,10 @@ func _trail_small() -> void:
 		var n: Node3D = null
 		match String(e[0]):
 			"km": n = Props.km_post()
+			"marker": n = Props.winter_road_marker()
+			"stake": n = Props.survey_stake()
+			"crate": n = Props.crate()
+			"sledge": n = Props.surveyor_sledge()
 			"barrel": n = Props.frozen_barrel()
 			"poles": n = Props.ski_poles()
 			"mitten": n = Props.mitten_stake()
@@ -121,6 +147,39 @@ func _trail_small() -> void:
 		add_child(n)
 		n.global_position = q
 		n.rotation.y = face
+
+	# Колея гусениц тягача и нарт по зимнику
+	var s_trk := 4.0
+	var prev_pt := (PrologueTrail.point_at(s_trk)[0] as Vector3)
+	while s_trk < PrologueTrail.length_m() - 10.0:
+		s_trk += 8.0
+		var next_pt: Vector3 = PrologueTrail.point_at(s_trk)[0]
+		SiteDressing.tracks(self, prev_pt, next_pt)
+		prev_pt = next_pt
+
+	# Линия деревянных столбов связи/ЛЭП вдоль зимника пролога
+	var pole_dists := [14.0, 48.0, 84.0, 120.0, 156.0]
+	var pole_wires: Array[Array] = []
+	for pdist: float in pole_dists:
+		if pdist >= PrologueTrail.length_m() - 12.0:
+			continue
+		var pd: Array = PrologueTrail.point_at(pdist)
+		var p: Vector3 = pd[0]
+		var dir: Vector3 = pd[1]
+		var right := Vector3(-dir.z, 0, dir.x)
+		var q := p + right * 4.6
+		q.y = Terrain.height(q.x, q.z)
+		var yaw := atan2(-dir.z, dir.x)
+		var pole := Props.utility_pole(5.2)
+		pole.position = q
+		pole.rotation.y = yaw
+		add_child(pole)
+		var pts := Props.pole_wire_points(5.2)
+		var basis := Basis(Vector3.UP, yaw)
+		pole_wires.append([q + basis * pts[0], q + basis * pts[1]])
+	for i in range(pole_wires.size() - 1):
+		_build_catenary_wire(pole_wires[i], pole_wires[i + 1], 0.6)
+
 	# Намёты по обочинам и подрост — обочина не ровная, как стол
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2140
@@ -146,6 +205,25 @@ func _trail_small() -> void:
 				sap.position = q + right * side * 0.8
 				add_child(sap)
 		s2 += rng.randf_range(9.0, 14.0)
+
+
+func _build_catenary_wire(a: Array, b: Array, sag: float) -> void:
+	var k := MeshKit.new(10)
+	var col := Color(0.12, 0.12, 0.14)
+	for pr in [[a[0], b[0]], [a[1], b[1]]]:
+		var p1: Vector3 = pr[0]
+		var p2: Vector3 = pr[1]
+		var pts: PackedVector3Array = []
+		for step in 8:
+			var t := float(step) / 7.0
+			pts.append(p1.lerp(p2, t) - Vector3(0, sag * 4.0 * t * (1.0 - t), 0))
+		k.tube(pts, [0.014], col, 3)
+	var mi := MeshInstance3D.new()
+	mi.mesh = k.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = col
+	mi.material_override = mat
+	add_child(mi)
 
 
 # --- Двор ------------------------------------------------------------------------------

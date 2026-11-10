@@ -493,7 +493,8 @@ static func build_forest(parent: Node3D, far: float, inner_center: Vector3, inne
 				continue
 			count += list.size()
 			for t: Transform3D in list:
-				SpruceNear.register(v, t)
+				if Vector2(t.origin.x - CENTER.x, t.origin.z - CENTER.y).length_squared() < 40000.0:
+					SpruceNear.register(v, t)
 			for lod in 1:
 				var lm: ArrayMesh = SpruceMesh.lod_far(v, SpruceMesh.NEAR_RANGE)
 				var mm := MultiMesh.new()

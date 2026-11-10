@@ -11,7 +11,7 @@ uniform float dither_amount = 0.5;   // меньше — узор дизерин
 uniform float grain = 0.045;
 uniform float cold = 0.22;     // холодные тени: ночь уходит в синеву, тёплый свет остаётся тёплым
 uniform float vignette = 0.38;
-uniform float chromatic = 0.0032; // ретро-аберрация по краям линзы CRT
+uniform float chromatic = 0.0010; // деликатная ретро-аберрация по краям кадра
 // Лучи от солнца/луны сквозь ели (экранные): идём от пикселя к светилу и копим яркое небо — стволы и лапы
 // его заслоняют, и в дымке встают полосы света. Параметры ставит Station каждый кадр.
 uniform vec2 ray_uv = vec2(0.5, -1.0);
@@ -36,30 +36,35 @@ void fragment() {
 	float d2 = dot(q, q);
 
 	// Оптическая дисперсия линзы CRT: края кадра дают тонкую кайму без замыливания центра
-	float ca = chromatic * d2 * film_fx;
-	float r = texture(TEXTURE, UV + q * ca).r;
-	float g = texture(TEXTURE, UV).g;
-	float b = texture(TEXTURE, UV - q * ca).b;
-	vec3 col = vec3(r, g, b) * brightness;
+	float ca = (ps1_post > 0.5 ? chromatic : chromatic * 0.4) * d2 * film_fx;
+	vec3 col;
+	if (ca > 0.00004) {
+		float r = texture(TEXTURE, UV + q * ca).r;
+		float g = texture(TEXTURE, UV).g;
+		float b = texture(TEXTURE, UV - q * ca).b;
+		col = vec3(r, g, b) * brightness;
+	} else {
+		col = texture(TEXTURE, UV).rgb * brightness;
+	}
 
 	// Сплит-тон: тени холоднее, светлое не трогаем.
 	float l0 = dot(col, vec3(0.299, 0.587, 0.114));
 	col = mix(col, col * vec3(0.82, 0.94, 1.16), cold * (1.0 - smoothstep(0.05, 0.5, l0)));
 
-	if (ray_amount > 0.001) {
-		vec2 dv = (ray_uv - UV) / 18.0 * 0.85;
+	if (ray_amount > 0.01) {
+		vec2 dv = (ray_uv - UV) / 8.0 * 0.85;
 		vec2 p = UV;
 		float acc = 0.0;
 		float w = 1.0;
-		for (int i = 0; i < 18; i++) {
+		for (int i = 0; i < 8; i++) {
 			p += dv;
 			vec2 pc = clamp(p, vec2(0.001), vec2(0.999));
 			float l = dot(texture(TEXTURE, pc).rgb, vec3(0.333)) * brightness;
 			acc += smoothstep(ray_thresh, ray_thresh + 0.25, l) * w;
-			w *= 0.91;
+			w *= 0.88;
 		}
 		float near = exp(-length((UV - ray_uv) * vec2(1.6, 1.0)) * 2.2);
-		col += ray_color * (acc / 10.0) * ray_amount * (0.35 + near);
+		col += ray_color * (acc / 4.8) * ray_amount * (0.35 + near);
 	}
 	if (warm > 0.001) {
 		float lw = dot(col, vec3(0.299, 0.587, 0.114));
@@ -87,21 +92,23 @@ void fragment() {
 	col += vec3(bloom * 0.14, bloom * 0.10, bloom * 0.04);
 
 	// Советский анаморфный горизонтальный стрик (линзы «Гелиос»/«Индустар» от фар ГТ-Т, маяка, огня, ракетницы)
-	vec3 streak = vec3(0.0);
-	const float STREAK_OFFSETS[5] = float[5](0.0035, 0.008, 0.015, 0.024, 0.036);
-	const float STREAK_WEIGHTS[5] = float[5](0.32, 0.25, 0.19, 0.14, 0.10);
-	for (int i = 0; i < 5; i++) {
-		float dx = STREAK_OFFSETS[i];
-		float w = STREAK_WEIGHTS[i];
-		vec3 s_l = texture(TEXTURE, UV - vec2(dx, 0.0)).rgb * brightness;
-		vec3 s_r = texture(TEXTURE, UV + vec2(dx, 0.0)).rgb * brightness;
-		float lum_l = dot(s_l, vec3(0.299, 0.587, 0.114));
-		float lum_r = dot(s_r, vec3(0.299, 0.587, 0.114));
-		float b_l = max(0.0, lum_l - 0.80);
-		float b_r = max(0.0, lum_r - 0.80);
-		streak += (s_l * b_l + s_r * b_r) * w;
+	if (l0 > 0.40) {
+		vec3 streak = vec3(0.0);
+		const float STREAK_OFFSETS[3] = float[3](0.004, 0.009, 0.016);
+		const float STREAK_WEIGHTS[3] = float[3](0.50, 0.30, 0.20);
+		for (int i = 0; i < 3; i++) {
+			float dx = STREAK_OFFSETS[i];
+			float w = STREAK_WEIGHTS[i];
+			vec3 s_l = texture(TEXTURE, UV - vec2(dx, 0.0)).rgb * brightness;
+			vec3 s_r = texture(TEXTURE, UV + vec2(dx, 0.0)).rgb * brightness;
+			float lum_l = dot(s_l, vec3(0.299, 0.587, 0.114));
+			float lum_r = dot(s_r, vec3(0.299, 0.587, 0.114));
+			float b_l = max(0.0, lum_l - 0.78);
+			float b_r = max(0.0, lum_r - 0.78);
+			streak += (s_l * b_l + s_r * b_r) * w;
+		}
+		col += streak * vec3(0.12, 0.15, 0.22);
 	}
-	col += streak * vec3(0.13, 0.16, 0.24);
 
 	// Виньетка: края кадра темнее — взгляд тянет в центр, углы комнаты тонут.
 	col *= 1.0 - vignette * film_fx * smoothstep(0.25, 0.85, d2 * 2.2);

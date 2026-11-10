@@ -219,6 +219,8 @@ func _ready() -> void:
 	_build_snow_survey_route()
 	_build_helipad()
 	_build_frozen_hunter()
+	_build_station_road_dressing()
+	_build_yard_clutter()
 	if Game.is_day() and Game.phase_index == 1:
 
 		_build_footprints()
@@ -4114,6 +4116,233 @@ func _build_helipad_heli() -> void:
 			Game.hud.subtitle(Loc.t(&"sub.heli_keeper"), 5.0)
 			_heli_crate_it.queue_free()
 		)
+
+
+# --- Обустройство дороги от дома к метеокорпусу (Station Road Dressing) -------
+
+func _build_station_road_dressing() -> void:
+	# 1. Дощатые настилы / трапы (Plank Walkways) вдоль основной дороги к метеокорпусу:
+	var trail_segments: Array[Array] = [
+		[Vector3(15.2, 0.0, 3.5), JUNCTION],
+		[JUNCTION, FORK],
+		[FORK, Vector3(40.0, 0.0, -14.0)],
+		[Vector3(40.0, 0.0, -14.0), Vector3(50.0, 0.0, -24.0)],
+		[Vector3(50.0, 0.0, -24.0), Vector3(58.0, 0.0, -28.5)],
+		[Vector3(58.0, 0.0, -28.5), Vector3(72.0, 0.0, -29.5)],
+		[Vector3(72.0, 0.0, -29.5), Vector3(84.0, 0.0, -27.6)],
+		[Vector3(84.0, 0.0, -27.6), CORPUS_PORCH],
+		# К калитке приборной площадки
+		[Vector3(58.0, 0.0, -28.5), Vector3(57.5, 0.0, -22.0)],
+		[Vector3(57.5, 0.0, -22.0), PLOT + Vector3(-5.6, 0.0, 0.0)],
+		# К дизельной / сараю ГСМ
+		[JUNCTION, Vector3(26.0, 0.0, 12.0)],
+		[Vector3(26.0, 0.0, 12.0), Vector3(36.0, 0.0, 24.0)],
+		[Vector3(36.0, 0.0, 24.0), SHED + Vector3(-4.9, 0.0, 0.0)],
+	]
+	for seg: Array in trail_segments:
+		var p0: Vector3 = seg[0]
+		var p1: Vector3 = seg[1]
+		var d := p1 - p0
+		d.y = 0.0
+		var len := d.length()
+		if len < 0.5:
+			continue
+		var mid := (p0 + p1) * 0.5
+		mid.y = Terrain.height(mid.x, mid.z) + 0.02
+		var walkway := Props.plank_walkway(len)
+		walkway.position = mid
+		walkway.rotation.y = atan2(d.x, d.z)
+		add_child(walkway)
+
+	# 2. Воздушная линия ЛЭП к метеокорпусу
+	var pole_m1_pos := Vector3(36.0, 0.0, -9.0)
+	var pole_m2_pos := Vector3(56.0, 0.0, -18.0)
+	var pole_m3_pos := Vector3(76.0, 0.0, -24.0)
+	var corpus_entry_pos := Vector3(87.0, 3.8, -25.5)
+	var pole_trail_pos := Vector3(31.0, 0.0, 16.0)
+
+	var meteo_poles := {
+		"mp1": [pole_m1_pos, pole_m2_pos - pole_trail_pos],
+		"mp2": [pole_m2_pos, pole_m3_pos - pole_m1_pos],
+		"mp3": [pole_m3_pos, corpus_entry_pos - pole_m2_pos],
+	}
+	var m_wires := {}
+	for id: String in meteo_poles:
+		var pp: Vector3 = meteo_poles[id][0]
+		pp.y = Terrain.height(pp.x, pp.z)
+		var d: Vector3 = meteo_poles[id][1]
+		d.y = 0.0
+		var perp := Vector3(-d.z, 0.0, d.x).normalized()
+		var yaw := atan2(-perp.z, perp.x)
+		var pole := Props.utility_pole(5.4)
+		pole.position = pp
+		pole.rotation.y = yaw
+		add_child(pole)
+		var pts := Props.pole_wire_points(5.4)
+		var basis := Basis(Vector3.UP, yaw)
+		m_wires[id] = [pole.position + basis * pts[0], pole.position + basis * pts[1]]
+
+	var trail_pts := Props.pole_wire_points(5.4)
+	var trail_pole_wires := [pole_trail_pos + trail_pts[0], pole_trail_pos + trail_pts[1]]
+	_build_catenary_wire(trail_pole_wires, m_wires["mp1"], 0.55)
+	_build_catenary_wire(m_wires["mp1"], m_wires["mp2"], 0.60)
+	_build_catenary_wire(m_wires["mp2"], m_wires["mp3"], 0.60)
+	_build_catenary_wire(m_wires["mp3"], _entry_pair(corpus_entry_pos, pole_m3_pos), 0.40)
+
+	# 3. Наземная теплотрасса на лежнях вдоль тропы
+	var pipe1 := Props.pipe_rack(4.8)
+	pipe1.position = Vector3(33.5, Terrain.height(33.5, -7.5), -7.5)
+	pipe1.rotation.y = deg_to_rad(-48.0)
+	add_child(pipe1)
+
+	var pipe2 := Props.pipe_rack(4.8)
+	pipe2.position = Vector3(45.5, Terrain.height(45.5, -19.5), -19.5)
+	pipe2.rotation.y = deg_to_rad(-45.0)
+	add_child(pipe2)
+
+	# 4. Вехи со световозвращателями вдоль дороги к станции
+	var markers: Array[Vector3] = [
+		Vector3(23.5, 0.0, 1.2),
+		Vector3(33.0, 0.0, -6.5),
+		Vector3(44.0, 0.0, -17.5),
+		Vector3(53.0, 0.0, -26.0),
+		Vector3(67.0, 0.0, -32.0),
+		Vector3(79.0, 0.0, -30.0),
+	]
+	for mp in markers:
+		var mk := Props.winter_road_marker()
+		mk.position = Vector3(mp.x, Terrain.height(mp.x, mp.z), mp.z)
+		mk.rotation.y = deg_to_rad(Game.rng.randf_range(-15.0, 15.0))
+		add_child(mk)
+
+	# 5. Деревянный указатель на развилке у дома
+	var sign_pos := Vector3(27.8, Terrain.height(27.8, -0.5), -0.5)
+	var sign_prop := Props.arrow_sign(Loc.t(&"it.sign_meteo_route"))
+	sign_prop.position = sign_pos
+	sign_prop.rotation.y = deg_to_rad(-40.0)
+	add_child(sign_prop)
+	var sign_it := Geo.interactable(self, Vector3(1.8, 1.6, 1.8), sign_pos + Vector3(0, 1.0, 0), null, Loc.t(&"it.sign_meteo_route"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.sign_meteo_route"), 5.0)
+	)
+	sign_it.name = "SignMeteoRoute"
+
+	# 6. Гусеничный трактор ТДТ-55 на приколе в открытом секторе двора
+	var tractor_pos := Vector3(32.5, Terrain.height(32.5, 4.5), 4.5)
+	var tractor := Props.crawler_tractor_tdt55()
+	tractor.position = tractor_pos
+	tractor.rotation.y = deg_to_rad(24.0)
+	add_child(tractor)
+	var t_col := Geo.collider(self, Vector3(2.4, 2.2, 4.4), tractor_pos + Vector3(0, 1.1, 0))
+	t_col.rotation.y = deg_to_rad(24.0)
+
+	var tractor_it := Geo.interactable(self, Vector3(3.2, 2.2, 4.8), tractor_pos + Vector3(0, 1.2, 0), null, Loc.t(&"it.crawler_tractor"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.crawler_tractor"), 5.0)
+	)
+	tractor_it.name = "TractorTDT55"
+
+	# Колея от гусениц тягача к зимнику
+	SiteDressing.tracks(self, tractor_pos + Vector3(0, 0, 2.5), Vector3(14.0, 0.0, 14.0))
+	SiteDressing.tracks(self, Vector3(14.0, 0.0, 14.0), Vector3(-10.0, 0.0, 34.0))
+
+
+# --- Дополнительное обустройство двора станции (Yard Clutter) ----------------
+
+func _build_yard_clutter() -> void:
+	# 1. Станционная уборная (Outhouse) на пути к дровянику
+	var outhouse_pos := Vector3(14.2, Terrain.height(14.2, 19.5), 19.5)
+	var outhouse_prop := Props.outhouse()
+	outhouse_prop.position = outhouse_pos
+	outhouse_prop.rotation.y = deg_to_rad(-85.0)
+	add_child(outhouse_prop)
+	var o_col := Geo.collider(self, Vector3(1.3, 2.4, 1.3), outhouse_pos + Vector3(0, 1.2, 0))
+	o_col.rotation.y = deg_to_rad(-85.0)
+
+	# Мостки от тропы к двери уборной
+	var outhouse_walk := Props.plank_walkway(2.4)
+	outhouse_walk.position = Vector3(15.2, Terrain.height(15.2, 19.5) + 0.02, 19.5)
+	outhouse_walk.rotation.y = deg_to_rad(90.0)
+	add_child(outhouse_walk)
+
+	# Лопата у стены уборной
+	var shovel := Props.snow_shovel()
+	shovel.position = outhouse_pos + Vector3(0.7, 0.0, 0.5)
+	shovel.rotation.x = deg_to_rad(12.0)
+	add_child(shovel)
+
+	var outhouse_it := Geo.interactable(self, Vector3(1.8, 2.2, 1.8), outhouse_pos + Vector3(0.5, 1.1, 0), null, Loc.t(&"it.outhouse"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.outhouse"), 5.0)
+	)
+	outhouse_it.name = "StationOuthouse"
+
+	# 2. Лежачая цистерна ГСМ (Fuel Tank) возле сарая дизельной
+	var tank_pos := Vector3(41.0, Terrain.height(41.0, 26.5), 26.5)
+	var tank := Props.fuel_tank()
+	tank.position = tank_pos
+	tank.rotation.y = deg_to_rad(35.0)
+	add_child(tank)
+	var tk_col := Geo.collider(self, Vector3(3.6, 1.8, 1.6), tank_pos + Vector3(0, 0.9, 0))
+	tk_col.rotation.y = deg_to_rad(35.0)
+	SiteDressing.patch(self, tank_pos + Vector3(0.5, 0, 0), 2.2, &"soot")
+
+	var tank_it := Geo.interactable(self, Vector3(3.8, 2.0, 2.2), tank_pos + Vector3(0, 1.0, 0), null, Loc.t(&"it.fuel_cistern"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.fuel_cistern"), 5.0)
+	)
+	tank_it.name = "FuelCistern"
+
+	# 3. Снегоход «Буран» с грузовыми нартами на площадке у дома
+	var buran_pos := Vector3(18.5, Terrain.height(18.5, -4.5), -4.5)
+	var buran := Props.soviet_snowmobile()
+	buran.position = buran_pos
+	buran.rotation.y = deg_to_rad(-20.0)
+	add_child(buran)
+
+	var buran_sledge := Props.siberian_sledge()
+	buran_sledge.position = buran_pos + Vector3(-0.6, 0.0, -2.6)
+	buran_sledge.rotation.y = deg_to_rad(-18.0)
+	add_child(buran_sledge)
+
+	# Ящики с припасами на нартах
+	var crate1 := Props.crate()
+	crate1.position = buran_pos + Vector3(-0.6, 0.35, -2.4)
+	crate1.rotation.y = deg_to_rad(10.0)
+	add_child(crate1)
+
+	var buran_it := Geo.interactable(self, Vector3(2.6, 1.4, 4.8), buran_pos + Vector3(-0.3, 0.7, -1.2), null, Loc.t(&"it.buran_sledge"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.buran_sledge"), 5.0)
+	)
+	buran_it.name = "BuranSnowmobile"
+
+	# 4. Распилочный и дровокольный двор возле поленницы
+	var logs_pos := Vector3(8.0, Terrain.height(8.0, 42.0), 42.0)
+	var logs := Props.log_pile(5.0)
+	logs.position = logs_pos
+	logs.rotation.y = deg_to_rad(15.0)
+	add_child(logs)
+
+	var stump_pos := Vector3(6.0, Terrain.height(6.0, 37.5), 37.5)
+	var stump := Props.axe_stump()
+	stump.position = stump_pos
+	stump.rotation.y = deg_to_rad(-30.0)
+	add_child(stump)
+	SiteDressing.patch(self, stump_pos, 1.9, &"dust")
+
+	var kindling_pos := Vector3(3.2, Terrain.height(3.2, 38.0), 38.0)
+	var kindling := Props.woodbox(3)
+	kindling.position = kindling_pos
+	add_child(kindling)
+
+	# 5. Дополнительная линия снегозащитных щитов вдоль северного поля
+	var fence_pts: Array[Vector3] = [
+		Vector3(48.0, 0.0, -35.0),
+		Vector3(50.5, 0.0, -36.5),
+		Vector3(53.0, 0.0, -38.0),
+	]
+	for fp in fence_pts:
+		var fence := Props.snow_fence(2.6, 1.7)
+		fence.position = Vector3(fp.x, Terrain.height(fp.x, fp.z), fp.z)
+		fence.rotation.y = deg_to_rad(-38.0)
+		add_child(fence)
+		SiteDressing.drift(self, fence.position + Vector3(0.4, 0, -0.6), 2.8, 0.7, 1.2, -38.0)
 
 
 

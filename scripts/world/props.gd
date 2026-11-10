@@ -4212,7 +4212,31 @@ static func winter_road_marker() -> Node3D:
 	var glb := _kedr_model("winter_road_marker", {"scale": 1.0, "bright": 1.1})
 	if glb != null:
 		return glb
-	return Node3D.new()
+	var key := &"winter_road_marker_proc"
+	var cached := _instance_from_cache(key, "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(71, 0.05)
+	var white := Color(0.85, 0.88, 0.90)
+	var black := Color(0.12, 0.12, 0.14)
+	var orange := Color(0.85, 0.45, 0.10)
+	var red_refl := Color(0.80, 0.12, 0.10)
+	var snow := Color(0.88, 0.90, 0.94)
+	# Снежный намёт в основании
+	k.blob(Vector3(0, 0.12, 0), Vector3(0.5, 0.20, 0.5), snow, 4, 6)
+	# Гранёный столб высотой 2.4 м
+	k.box(Vector3(0, 1.20, 0), Vector3(0.10, 2.40, 0.10), white)
+	# Поперечные контрастные полосы (чёрные и сигнальные оранжевые)
+	for seg in range(6):
+		var y := 0.35 + float(seg) * 0.32
+		var col := orange if seg % 2 == 1 else black
+		k.box(Vector3(0, y, 0), Vector3(0.108, 0.15, 0.108), col)
+	# Световозвращатели на верхушке
+	k.box(Vector3(0, 2.22, 0.056), Vector3(0.08, 0.08, 0.015), red_refl)
+	k.box(Vector3(0, 2.22, -0.056), Vector3(0.08, 0.08, 0.015), red_refl)
+	# Снежная шапка на оголовке
+	k.box(Vector3(0, 2.42, 0), Vector3(0.14, 0.05, 0.14), snow)
+	return _mi(k, key, "tex_wood.png")
 
 
 static func gtt_transporter() -> Node3D:
@@ -4226,7 +4250,31 @@ static func outhouse() -> Node3D:
 	var glb := _kedr_model("outhouse", {"scale": 1.0, "bright": 1.0})
 	if glb != null:
 		return glb
-	return Node3D.new()
+	var key := &"outhouse_proc"
+	var cached := _instance_from_cache(key, "tex_planks.png")
+	if cached != null:
+		return cached
+	var k := _kit(82, 0.05)
+	var wood := Color(0.38, 0.32, 0.25)
+	var wood_dark := Color(0.24, 0.20, 0.16)
+	var metal := Color(0.25, 0.26, 0.28)
+	var snow := Color(0.88, 0.90, 0.94)
+	# Основание и сруб-коробка 1.2 x 2.3 x 1.2
+	k.box(Vector3(0, 1.15, 0), Vector3(1.2, 2.30, 1.2), wood)
+	# Дверная коробка и контур двери спереди (Z = +0.6)
+	k.box(Vector3(0, 1.05, 0.605), Vector3(0.85, 1.95, 0.04), wood_dark)
+	# Ручка-скоба и крючок
+	k.box(Vector3(0.32, 1.0, 0.635), Vector3(0.04, 0.16, 0.04), metal)
+	# Односкатная крыша с наклоном назад и свесом
+	k.box(Vector3(0, 2.38, -0.05), Vector3(1.35, 0.08, 1.45), wood_dark, Basis(Vector3.RIGHT, deg_to_rad(-8.0)))
+	# Снежная шапка на кровле
+	k.box(Vector3(0, 2.46, -0.05), Vector3(1.30, 0.12, 1.40), snow, Basis(Vector3.RIGHT, deg_to_rad(-8.0)))
+	# Вытяжная жестяная труба на крыше
+	k.tube([Vector3(0.35, 2.35, -0.35), Vector3(0.35, 2.95, -0.35)], [0.06], metal, 6)
+	k.box(Vector3(0.35, 2.98, -0.35), Vector3(0.18, 0.04, 0.18), snow)
+	# Сугроб у наветренной стены
+	k.blob(Vector3(-0.65, 0.35, 0), Vector3(0.45, 0.65, 1.1), snow, 3, 6)
+	return _mi(k, key, "tex_planks.png")
 
 
 

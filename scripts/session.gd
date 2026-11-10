@@ -123,13 +123,14 @@ func _tick_dynamic_res(delta: float) -> void:
 	var top := clampf(Settings.render_scale, 0.5, 1.0)
 	if not Settings.auto_res:
 		_dyn_scale = top
-	elif fps < 52.0 and (Settings.fps_limit == 0 or Settings.fps_limit > 55):
-		_dyn_scale = maxf(_dyn_scale - 0.07, 0.6)
-	elif fps > 72.0:
+	elif fps < 46.0 and (Settings.fps_limit == 0 or Settings.fps_limit > 50):
+		_dyn_scale = maxf(_dyn_scale - 0.05, 0.75)
+	elif fps >= 57.0:
 		_dyn_scale = minf(_dyn_scale + 0.05, top)
 	_dyn_scale = minf(_dyn_scale, top)
 	if absf(_vp.scaling_3d_scale - _dyn_scale) > 0.001:
 		_vp.scaling_3d_scale = _dyn_scale
+		_vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 
 
 func _apply_settings() -> void:
@@ -139,29 +140,28 @@ func _apply_settings() -> void:
 		_player.camera.fov = Settings.fov
 	if _vp != null:
 		_vp.msaa_3d = Settings.msaa()
-		_vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 		_dyn_scale = clampf(Settings.render_scale, 0.5, 1.0)
 		_vp.scaling_3d_scale = _dyn_scale
+		_vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	if _player != null and _player.flashlight != null:
 		_player.flashlight.shadow_enabled = Settings.quality >= 1
 	if Game.level != null and Game.level.has_method(&"apply_quality"):
 		Game.level.call(&"apply_quality")
 
 
-## Один раз, на первой смене: если кадров мало — снижаем качество, потом разрешение рендера.
-## Игрок с ноутбуком не должен сам искать, почему «лагает».
+## Один раз, на первой смене: если кадров мало — снижаем качество.
 func _auto_tune() -> void:
 	if Settings.auto_tuned or (OS.is_debug_build() and not OS.get_cmdline_user_args().has("autotune")):
 		return
 	await get_tree().create_timer(6.0, false).timeout
 	for step in range(3):
 		var fps := await _avg_fps(6.0)
-		if fps >= 48.0 or not is_inside_tree():
+		if fps >= 42.0 or not is_inside_tree():
 			break
 		if Settings.quality > 0:
 			Settings.quality -= 1
-		elif Settings.render_scale > 0.71:
-			Settings.render_scale = 0.85 if Settings.render_scale > 0.9 else 0.7
+		elif Settings.render_scale > 0.81 and fps < 30.0:
+			Settings.render_scale = 0.85
 		else:
 			break
 		Settings.apply()

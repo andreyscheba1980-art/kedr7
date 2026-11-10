@@ -2504,6 +2504,18 @@ The operator is not to be informed about the object.
 	&"sub.deep_snow_warning": ["Целина! Снег по колено — ноги вязнут в насте. Держись нахоженного зимника.", "Deep virgin snow! Drifts up to the knees. Stick to the packed winter trail."],
 	&"sub.blizzard_wall": ["Ледяная стена бурана! Ветер сбивает с ног и вымораживает лицо. Не сходи с зимника!", "A wall of blizzard! Freezing gale knocks you back. Stay on the trail!"],
 
+	# --- Обустройство станции и двора ---
+	&"it.sign_meteo_route": ["[E] Указатель маршрута к корпусу", "[E] Signpost: route to meteo building"],
+	&"sub.sign_meteo_route": ["Дощатая стрелка: налево — «АЭРОЛОГИЧЕСКИЙ КОРПУС И ПРИБОРНАЯ ПЛОЩАДКА» (60 м); прямо — «РАДИОМАЧТА И ДЭС».", "Wooden pointer: left — 'AEROLOGICAL BUILDING & INSTRUMENT PLOT' (60 m); straight — 'RADIO MAST & DIESEL SHACK'."],
+	&"it.crawler_tractor": ["[E] Гусеничный тягач ТДТ-55", "[E] TDT-55 crawler tractor"],
+	&"sub.crawler_tractor": ["Стальной трелёвочный тягач на зимнем приколе. Капот укрыт обледенелым ватным брезентом. На боку трафарет: «ГУГМС СССР — № 42».", "Skidder crawler on winter layup. Engine hood covered in iced tarpaulin. Stenciled on the side: 'GUGMS USSR — #42'."],
+	&"it.outhouse": ["[E] Станционная уборная", "[E] Station outhouse"],
+	&"sub.outhouse": ["Дощатый скворечник над выгребной ямой, промороженный до звона. Дверь на пружине прихвачена ледяной коркой.", "Wooden latrine over a cesspit, frozen solid. The spring-loaded door is rimed with ice."],
+	&"it.fuel_cistern": ["[E] Цистерна ГСМ", "[E] Fuel cistern"],
+	&"sub.fuel_cistern": ["Лежачая 5000-литровая стальная ёмкость на деревянных лежнях. Маркировка: «СОЛЯРКА ЗИМНЯЯ». Пахнет промёрзшим дизтопливом.", "Horizontal 5,000-liter steel tank on timber cradles. Stencil: 'WINTER DIESEL'. Smells of frozen fuel oil."],
+	&"it.buran_sledge": ["[E] Снегоход «Буран» с нартами", "[E] 'Buran' snowmobile with freight sledge"],
+	&"sub.buran_sledge": ["Таймырский грузовой снегоход и широкие волокуши. В нартах уложены опломбированные ящики снабжения.", "Arctic utility snowmobile and wide cargo sledge. Sealed supply boxes lashed down inside."],
+
 	# --- Лееры и Белая Тьма ---
 	&"it.leer_attach": ["[E] Пристегнуть карабин к лееру", "[E] Clip carabiner to safety rope"],
 	&"it.leer_detach": ["[E] Отстегнуть карабин от леера", "[E] Unclip carabiner from safety rope"],

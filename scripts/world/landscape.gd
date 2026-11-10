@@ -36,8 +36,8 @@ static func build(parent: Node3D) -> void:
 		return
 	_mats.clear()
 	_rings.clear()
-	_mountains(parent, 900.0, 115.0, 0.7, 11)
-	_mountains(parent, 1300.0, 210.0, 0.8, 23)
+	# Горы на горизонте рисует шейдер ночного неба night_sky.gdshader на бесконечности.
+	# Геометрические кольца 80–140 м удалены: они создавали белые срезы и баг с белыми буграми у корпуса.
 	_rivers(parent)
 	_outcrops(parent)
 	_power_line(parent)

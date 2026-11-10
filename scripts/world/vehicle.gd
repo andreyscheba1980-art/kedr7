@@ -743,33 +743,35 @@ func _maybe_try() -> void:
 		return
 	_leaving = true
 	Game.set_flag("dig_pending", false)
-	Voice.say(&"cab.try", 2.0, 1, [], _tracked.global_position)
+	Voice.say(&"cab.try", 1.6, 1, [], _tracked.global_position)
 	_exhaust.amount = 40
 	_exhaust.initial_velocity_max = 5.0
-	create_tween().tween_property(_engine, "pitch_scale", 1.6, 0.8)
-	_spray(2.0)
+	create_tween().tween_property(_engine, "pitch_scale", 1.5, 0.5)
+	_spray(1.2)
 	var tw := create_tween()
-	for k in 4:
-		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.5), 0.25)
-	await get_tree().create_timer(1.8, false).timeout
+	for k in 3:
+		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.0), 0.2)
+	await get_tree().create_timer(1.0, false).timeout
 	if not is_inside_tree():
 		return
 	AudioDirector.play_raw("res://assets/audio/clank.ogg", 4.0)
 	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", _body.global_position + Vector3(0, 1, 0), -4.0, 12.0)
 	if Game.player != null:
-		Game.player.shake(0.06, 0.4)
-	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.4)
+		Game.player.shake(0.08, 0.45)
+	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.0)
 	_exhaust.amount = 16
 	_exhaust.initial_velocity_max = 2.0
-	await get_tree().create_timer(0.8, false).timeout
+	_talk_over = true
 	_finish_talk(true)
 
 
 func _finish_talk(tried: bool) -> void:
 	if tried:
-		Voice.say(&"cab.track", 2.8, 1, [], _tracked.global_position)
-		await get_tree().create_timer(2.6, false).timeout
-	Voice.say(&"cab.stay", 3.4, 1, [], _tracked.global_position)
+		Voice.say(&"cab.track", 2.2, 1, [], _tracked.global_position)
+		await get_tree().create_timer(1.6, false).timeout
+		if not is_inside_tree():
+			return
+	Voice.say(&"cab.stay", 3.2, 1, [], _tracked.global_position)
 	_talk_over = true
 
 

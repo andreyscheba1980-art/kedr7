@@ -976,7 +976,7 @@ func _build_environment() -> void:
 	_sky_light.shadow_caster_mask = 1 | LAYER_OUT
 	# 4 каскада — только «Ультра»: каждый каскад — ещё один проход всей наружной сцены
 	_sky_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality < 3 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	_sky_light.directional_shadow_max_distance = 30.0 if Settings.quality < 2 else (40.0 if Settings.quality == 2 else 140.0)
+	_sky_light.directional_shadow_max_distance = 28.0 if Settings.quality < 2 else (40.0 if Settings.quality == 2 else 65.0)
 	_sky_light.shadow_bias = 0.04
 	add_child(_sky_light)
 
