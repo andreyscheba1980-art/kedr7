@@ -357,6 +357,10 @@ func _update_status() -> void:
 
 func _wind_mechanism() -> void:
 	Game.barograph_wound = 100.0
+	for i in 3:
+		get_tree().create_timer(i * 0.12, false).timeout.connect(func() -> void:
+			AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -4.0 + i)
+		)
 	AudioDirector.play_raw(CLANK_SFX, -3.0)
 	Game.vibrate(0.35, 0.2, 0.2)
 	Game.hud.subtitle(Loc.t(&"barograph.wound_done"), 2.5)

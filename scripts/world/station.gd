@@ -3827,7 +3827,11 @@ func _on_generator_used(p: Player) -> void:
 			_gen_warm = true
 			if _gen_sputter_player != null:
 				_gen_sputter_player.play()
+			AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
 			Game.audio.play_3d(CLANK_SOUND, gen_pos, 2.0)
+			if _gen_smoke != null:
+				_gen_smoke.restart()
+				_gen_smoke.emitting = true
 			p.shake(0.04, 0.35)
 			Game.vibrate(0.45, 0.6, 0.35)
 			Game.hud.subtitle(Loc.t(&"sub.gen_cord_pull"), 3.0)
@@ -3843,7 +3847,9 @@ func _on_generator_used(p: Player) -> void:
 			Game.audio.play_3d(CLANK_SOUND, gen_pos, 1.0)
 			if _gen_sputter_player != null:
 				_gen_sputter_player.play()
-		p.shake(0.05, 0.45)
+		if _gen_smoke != null:
+			_gen_smoke.emitting = true
+		p.shake(0.06, 0.5)
 		Game.vibrate(0.65, 0.85, 0.5)
 		Game.set_power(true)
 		Game.hud.subtitle(Loc.t(&"sub.gen_restarted"), 3.5)
