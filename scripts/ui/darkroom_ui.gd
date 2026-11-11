@@ -12,15 +12,17 @@ uniform float seed = 0.0;
 uniform float develop_progress: hint_range(0.0, 1.0) = 1.0;
 void fragment() {
 	vec4 c = texture(TEXTURE, UV);
-	float g = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+	float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
 	float n = fract(sin(dot(UV * vec2(311.7, 183.3) + seed, vec2(12.9898, 78.233))) * 43758.5453);
-	// Проявление: в растворе сначала медленно выходят тени, затем полутона и света
-	float latent = smoothstep(1.0 - develop_progress * 1.15, 1.0 - develop_progress * 0.85, 1.0 - g);
-	g = (1.0 - exp(-1.9 * g)) / (1.0 - exp(-1.9));
-	g = clamp(g + (n - 0.5) * 0.09, 0.0, 1.0);
-	g = mix(0.95, g, latent);
-	float v = 1.0 - length(UV - 0.5) * 0.55;
-	COLOR = vec4(vec3(g * v) * vec3(1.0, 0.92, 0.8), c.a * COLOR.a);
+	// Проявление: в растворе УП-2 сначала медленно выходят глубокие тени, затем полутона и света
+	float threshold = 1.0 - develop_progress * 1.12;
+	float latent = smoothstep(threshold - 0.14, threshold + 0.14, 1.0 - lum);
+	// Зерно бумаги «Унибром»
+	vec3 silver_img = c.rgb + vec3((n - 0.5) * 0.035);
+	// Чистая фотобумага до проявления — тепло-белая
+	vec3 base_paper = vec3(0.95, 0.93, 0.88);
+	vec3 result = mix(base_paper, silver_img, latent);
+	COLOR = vec4(result, c.a * COLOR.a);
 }
 """
 const CELL := Vector2(232, 130)
@@ -91,8 +93,14 @@ func _ready() -> void:
 		_film(list, shots, Loc.t(&"zenit.dr_title", [Game.night]))
 		if not z.partner_photos.is_empty():
 			_film(list, z.partner_photos, Loc.t(&"zenit.dr_partner"))
+		# Ниже показываем сохнущую архивную плёнку Семёнова
+		var sem_shots: Array[Dictionary] = _get_semenov_archive_shots()
+		_film(list, sem_shots, Loc.t(&"darkroom.semenov_film"))
 	else:
-		# Архивная плёнка Семёнова №3 из кладовой
+		var note := UiKit.label(Loc.p("Плёнка в фотоаппарате «Зенит-Е» ещё не отснята. Делайте снимки на улице и в помещениях во время ночного дежурства [клавиша Z].\nНиже представлены сохнущие архивные отпечатки Семёнова №3 из кладовой:", "Film in Zenit-E camera not yet shot. Take photographs outside and indoors during night watch [key Z].\nBelow are Semyonov's archive prints #3 drying in the storeroom:"), 12)
+		note.add_theme_color_override(&"font_color", Color(0.85, 0.65, 0.55))
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		list.add_child(note)
 		var sem_shots: Array[Dictionary] = _get_semenov_archive_shots()
 		if Game.night >= 4:
 			sem_shots.append(_create_paradox_shot())
@@ -107,7 +115,11 @@ func _ready() -> void:
 	row.add_child(hint_lbl)
 	row.add_spacer(false)
 
-	var btn := UiKit.button(Loc.t(&"zenit.dr_done"), func() -> void: closed.emit())
+	var btn := UiKit.button(Loc.t(&"zenit.dr_done"), func() -> void:
+		if Game.level != null and Game.level.has_method("update_drying_photos"):
+			Game.level.update_drying_photos()
+		closed.emit()
+	)
 	row.add_child(btn)
 	btn.grab_focus.call_deferred()
 
@@ -294,6 +306,10 @@ func _caption(ph: Dictionary) -> String:
 		parts.append(Loc.p("отражение зрачков в темноте", "pupil reflection in dark"))
 	elif ph.get("has_shadow", false):
 		parts.append(Loc.p("суставчатая тень в соснах", "jointed shadow in pines"))
+	elif ph.get("has_mast_creature", false):
+		parts.append(Loc.p("силуэт на оттяжках мачты АШ-4", "silhouette on mast guy wires"))
+	elif ph.get("has_window_face", false):
+		parts.append(Loc.p("расплющенное лицо на стекле окна", "flattened face on window glass"))
 	elif ph.get("has_tracks", false):
 		parts.append(Loc.p("босые следы на снегу", "barefoot prints in snow"))
 	elif ph.get("has_face", false):
@@ -365,12 +381,16 @@ func _build_loupe_overlay() -> void:
 	_loupe_overlay.add_child(dim)
 
 	var center := VBoxContainer.new()
-	center.add_theme_constant_override("separation", 12)
-	UiKit.place(_loupe_overlay, center, 0.5, 0.5, 0.5, 0.5, -340, -250, 340, 250)
+	center.add_theme_constant_override("separation", 8)
+	UiKit.place(_loupe_overlay, center, 0.5, 0.5, 0.5, 0.5, -360, -280, 360, 280)
 
 	_loupe_title = UiKit.label(Loc.t(&"darkroom.loupe_active"), 16)
 	_loupe_title.add_theme_color_override(&"font_color", Color(1.0, 0.7, 0.6))
 	center.add_child(_loupe_title)
+
+	var stamp_lbl := UiKit.label(Loc.p("[ КМЗ «ЗЕНИТ-Е» · ГЕЛИОС-44-2 58mm f/2 · СВЕМА ФОТО-64 · ГОСТ 10691-84 · 8x ЛУПА ЛИ-3 ]", "[ KMZ 'ZENIT-E' · HELIOS-44-2 58mm f/2 · SVEMA PHOTO-64 · GOST 10691-84 · 8x LOUPE LI-3 ]"), 10)
+	stamp_lbl.add_theme_color_override(&"font_color", Color(0.85, 0.55, 0.45, 0.8))
+	center.add_child(stamp_lbl)
 
 	var frame := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
@@ -380,7 +400,7 @@ func _build_loupe_overlay() -> void:
 	center.add_child(frame)
 
 	_loupe_img = TextureRect.new()
-	_loupe_img.custom_minimum_size = Vector2(520, 310)
+	_loupe_img.custom_minimum_size = Vector2(560, 330)
 	_loupe_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_loupe_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var mat := ShaderMaterial.new()
@@ -390,12 +410,12 @@ func _build_loupe_overlay() -> void:
 	_loupe_img.material = mat
 	frame.add_child(_loupe_img)
 
-	_loupe_desc = UiKit.label("", 13)
+	_loupe_desc = UiKit.label("", 12)
 	_loupe_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_loupe_desc.add_theme_color_override(&"font_color", Color(1.0, 0.85, 0.8))
+	_loupe_desc.add_theme_color_override(&"font_color", Color(1.0, 0.88, 0.82))
 	center.add_child(_loupe_desc)
 
-	var close_loupe_btn := UiKit.button(Loc.p("✕ ЗАКРЫТЬ ЛУПУ", "✕ CLOSE LOUPE"), func() -> void: _loupe_overlay.visible = false)
+	var close_loupe_btn := UiKit.button(Loc.p("✕ ЗАКРЫТЬ ЛУПУ [Esc]", "✕ CLOSE LOUPE [Esc]"), func() -> void: _loupe_overlay.visible = false)
 	center.add_child(close_loupe_btn)
 
 
@@ -424,7 +444,7 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 	else:
 		_loupe_title.text = Loc.t(&"darkroom.loupe_active")
 		_loupe_desc.text = ph.get("detail", _caption(ph))
-		if ph.get("ghost", false) or ph.get("has_eyes", false) or ph.get("has_shadow", false) or ph.get("has_tracks", false) or ph.get("has_face", false) or ph.get("has_fingers", false):
+		if ph.get("ghost", false) or ph.get("has_eyes", false) or ph.get("has_shadow", false) or ph.get("has_tracks", false) or ph.get("has_face", false) or ph.get("has_fingers", false) or ph.get("has_mast_creature", false) or ph.get("has_window_face", false):
 			Director.add_tension(7.0, "аномалия на фотоплёнке")
 			AudioDirector.play_raw("res://assets/audio/whisper.ogg", -8.0)
 	_loupe_overlay.visible = true

@@ -104,9 +104,12 @@ func _draw() -> void:
 	var main_col := COLOR_NORMAL_TEXT.lerp(COLOR_FOCUS, _hover_weight)
 	if _hover_weight > 0.8 and Engine.get_process_frames() % 6 == 0:
 		main_col = main_col.lightened(0.08)
-		
-	draw_string(font, Vector2(96.0 + _shift_x, h * 0.66), label_title, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size + 2, main_col)
+
+	var hint_w := clampf(w * 0.40, 130.0, 220.0) if not status_hint.is_empty() else 0.0
+	var title_max_w := (w - hint_w - 110.0) if not status_hint.is_empty() else (w - 110.0)
+	draw_string(font, Vector2(96.0 + _shift_x, h * 0.66), label_title, HORIZONTAL_ALIGNMENT_LEFT, title_max_w, font_size + 2, main_col)
 	
-	# 4. Дополнительный статус справа (например: "СУТКИ 04 // -41°C")
+	# 4. Дополнительный статус справа (например: "СУТКИ 03 // -41°C")
 	if not status_hint.is_empty():
-		draw_string(font, Vector2(w - 140.0, h * 0.65), status_hint, HORIZONTAL_ALIGNMENT_RIGHT, 130.0, font_size - 3, idx_col)
+		var hint_pos_x := w - hint_w - 16.0
+		draw_string(font, Vector2(hint_pos_x, h * 0.65), status_hint, HORIZONTAL_ALIGNMENT_RIGHT, hint_w, font_size - 3, idx_col)

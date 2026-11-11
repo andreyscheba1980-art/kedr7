@@ -194,9 +194,13 @@ func snap() -> void:
 		# Новому существу нужен кадр, чтобы его шейдер собрался и оно попало в отрисовку.
 		for _i in (3 if ghost_pos != Vector3.INF else 1):
 			await RenderingServer.frame_post_draw
-		var tex := p.get_viewport().get_texture()
-		if tex != null:
-			img = tex.get_image()
+		var vp := p.get_viewport()
+		if vp != null and vp.get_texture() != null:
+			img = vp.get_texture().get_image()
+		if (img == null or img.is_empty()) and is_inside_tree() and get_tree().root != null:
+			var root_vp := get_tree().root.get_viewport()
+			if root_vp != null and root_vp.get_texture() != null:
+				img = root_vp.get_texture().get_image()
 	if _ghost != null and is_instance_valid(_ghost):
 		_ghost.visible = false
 	_shutter(false)
@@ -207,10 +211,10 @@ func snap() -> void:
 		img.resize(PRINT_SIZE.x, PRINT_SIZE.y, Image.INTERPOLATE_BILINEAR)
 		var avg := _mean_luma(img)
 		_last_luma = avg
-		if flash and avg > 0.4:
-			img.adjust_bcs(clampf(0.4 / avg, 0.5, 1.0), 1.0, 1.0)   # «автомат» вспышки: снег не выбивает в белое
+		if flash and avg > 0.45:
+			img.adjust_bcs(clampf(0.45 / avg, 0.6, 1.0), 1.0, 1.0)   # «автомат» вспышки: снег не выбивает в белое
 		elif not flash and _needs_flash():
-			img.adjust_bcs(0.65, 1.0, 0.9)   # без вспышки — недодержка
+			img.adjust_bcs(0.75, 1.0, 0.95)   # без вспышки — умеренная ночная недодержка
 	else:
 		img = _synthesize_atmospheric_frame(cam, flash, tags, ghost_pos != Vector3.INF, voice)
 
@@ -262,28 +266,28 @@ static func _develop_film_frame(img: Image, flash: bool) -> void:
 			var col := img.get_pixel(x, y)
 			var luma := col.r * 0.299 + col.g * 0.587 + col.b * 0.114
 
-			# Виньетирование объектива «Гелиос-44-2»
+			# Виньетирование светосильного объектива «Гелиос-44-2 58mm f/2»
 			var r2 := dx * dx + dy * dy
-			var vig := clampf(1.0 - r2 * 0.40, 0.25, 1.0)
+			var vig := clampf(1.0 - r2 * 0.35, 0.40, 1.0)
 			luma *= vig
 
-			# Радиальное затухание вспышки
+			# Радиальное затухание вспышки ФИЛ-41М
 			if flash:
-				var flash_fall := clampf(1.15 - r2 * 0.70, 0.22, 1.25)
+				var flash_fall := clampf(1.15 - r2 * 0.65, 0.28, 1.25)
 				luma *= flash_fall
 			elif is_night and is_outside:
-				luma *= 0.75
+				luma = clampf(luma * 0.85, 0.04, 1.0)
 
 			# Серебряное микрозерно галогенидов серебра
 			var seed_val := float(x * 131 + y * 397)
-			var grain := (fmod(sin(seed_val) * 43758.5453, 1.0) - 0.5) * 0.075
+			var grain := (fmod(sin(seed_val) * 43758.5453, 1.0) - 0.5) * 0.055
 			luma = clampf(luma + grain, 0.0, 1.0)
 
-			# Контраст фотобумаги «Унибром»
-			luma = pow(luma, 1.12)
+			# Мягкий контраст фотобумаги «Унибром» (без провала теней)
+			luma = pow(luma, 1.06)
 
 			# Тёплый серебряно-желатиновый оттенок
-			img.set_pixel(x, y, Color(luma * 1.0, luma * 0.94, luma * 0.88, 1.0))
+			img.set_pixel(x, y, Color(luma * 1.0, luma * 0.95, luma * 0.89, 1.0))
 
 
 func _inject_horror_anomalies(img: Image, shot: Dictionary, cam: Camera3D, flash: bool, ghost: bool, voice: bool) -> void:
@@ -328,6 +332,14 @@ func _inject_horror_anomalies(img: Image, shot: Dictionary, cam: Camera3D, flash
 				shot["ghost"] = true
 				shot["detail"] = Loc.p("Осмотр под 8x лупой: На снегу в конусе вспышки видна чёткая цепочка свежих отпечатков босых человеческих ног на насте при -43°C. Следы выходят из темноты и обрываются ровно перед объективом.", "Under 8x loupe: In the flash cone on the snow, a distinct chain of fresh barefoot human prints at -43°C. The prints emerge from the dark and stop right in front of the lens.")
 				return
+			elif night_num >= 2 and rng.randf() < 0.35:
+				var mx := int(PRINT_SIZE.x * (0.68 if rng.randf() > 0.5 else 0.32))
+				var my := int(PRINT_SIZE.y * 0.46)
+				_draw_mast_creature_anomaly(img, mx, my)
+				shot["has_mast_creature"] = true
+				shot["ghost"] = true
+				shot["detail"] = Loc.p("Осмотр под 8x лупой: На высоте на мачте АШ-4 за оттяжку цепляется тонкий суставчатый силуэт. Длинные узловатые пальцы сжимают стальной трос. Голова наклонена вниз, два точечных огонька глаз неотрывно смотрят на дежурного.", "Under 8x loupe: At height on mast ASH-4, a thin jointed silhouette clings to the guy wire. Long knobby fingers grip the steel cable. Head tilted down, two pinpoint eye glints stare fixedly at the duty officer.")
+				return
 			elif flash and rng.randf() < (0.40 if night_num >= 2 else 0.20):
 				var ex := int(PRINT_SIZE.x * (0.26 if rng.randf() > 0.5 else 0.74))
 				var ey := int(PRINT_SIZE.y * (0.42 + rng.randf_range(-0.06, 0.06)))
@@ -351,6 +363,12 @@ func _inject_horror_anomalies(img: Image, shot: Dictionary, cam: Camera3D, flash
 				shot["has_face"] = true
 				shot["ghost"] = true
 				shot["detail"] = Loc.p("Осмотр под 8x лупой: Сквозь зерно проступает полупрозрачный дефект двойной экспозиции: искажённое криком лицо Семёнова с провалившимися глазницами. Плёнка помнит то, что происходило в этой комнате.", "Under 8x loupe: Bleeding through the grain is a semi-transparent double exposure: Semyonov's screaming face with hollow sockets. The film remembers what happened in this room.")
+				return
+			elif rng.randf() < 0.32:
+				_draw_window_face_anomaly(img)
+				shot["has_window_face"] = true
+				shot["ghost"] = true
+				shot["detail"] = Loc.p("Осмотр под 8x лупой: Снаружи к обледенелому стеклу вплотную прижато бледное, расплющенное в оскале лицо без ресниц и бровей. Плёнка зафиксировала след тепла на заиндевевшем стекле с той стороны.", "Under 8x loupe: Pressed flat against the frosted glass from outside is a pale grinning face without lashes or brows. The film captured a thermal footprint in the frost from the outside.")
 				return
 			elif rng.randf() < 0.30:
 				_draw_frostbitten_fingers(img)
@@ -507,6 +525,62 @@ static func _draw_screaming_face_anomaly(img: Image) -> void:
 						img.set_pixel(px, py, cur.lerp(Color(0.85, 0.82, 0.78, 1.0), ghost_val))
 
 
+static func _draw_mast_creature_anomaly(img: Image, base_x: int, base_y: int) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	var shadow_col := Color(0.012, 0.012, 0.015, 1.0)
+	var len_px := 52
+	# Длинное узловатое тело твари, обвивающее оттяжку мачты
+	for i in range(len_px):
+		var t := float(i) / float(len_px)
+		var cx := base_x + int(sin(t * PI) * 6.0)
+		var cy := base_y - i
+		for dx in range(-2, 3):
+			var px := cx + dx
+			if px >= 0 and px < w and cy >= 0 and cy < h:
+				img.set_pixel(px, cy, shadow_col)
+	# Суставчатые конечности, огибающие трос
+	_draw_line(img, base_x - 12, base_y - 20, base_x, base_y - 12, shadow_col, 2)
+	_draw_line(img, base_x + 14, base_y - 26, base_x, base_y - 18, shadow_col, 2)
+	_draw_line(img, base_x - 16, base_y - 40, base_x, base_y - 32, shadow_col, 2)
+	_draw_line(img, base_x + 12, base_y - 44, base_x, base_y - 36, shadow_col, 2)
+	# Точечные огоньки глаз, смотрящие вниз на дежурного
+	var eye_y := base_y - len_px + 4
+	if base_x - 2 >= 0 and base_x + 2 < w and eye_y >= 0 and eye_y < h:
+		img.set_pixel(base_x - 2, eye_y, Color(1.0, 0.98, 0.85, 1.0))
+		img.set_pixel(base_x + 2, eye_y, Color(1.0, 0.98, 0.85, 1.0))
+
+
+static func _draw_window_face_anomaly(img: Image) -> void:
+	var w := img.get_width()
+	var h := img.get_height()
+	var cx := int(w * 0.52)
+	var cy := int(h * 0.40)
+	var rx := int(w * 0.09)
+	var ry := int(h * 0.14)
+	# Расплющенное лицо снаружи заиндевевшего стекла
+	for dy in range(-ry, ry + 1):
+		for dx in range(-rx, rx + 1):
+			var nx := float(dx) / float(rx)
+			var ny := float(dy) / float(ry)
+			var d2 := nx * nx + ny * ny
+			if d2 <= 1.0:
+				var px := cx + dx
+				var py := cy + dy
+				if px >= 0 and px < w and py >= 0 and py < h:
+					var cur := img.get_pixel(px, py)
+					var pale := Color(0.78, 0.82, 0.88, 1.0)
+					var is_eye := (absf(nx - 0.32) < 0.16 or absf(nx + 0.32) < 0.16) and absf(ny + 0.12) < 0.14
+					var is_mouth := absf(nx) < 0.42 and ny > 0.28 and ny < 0.60
+					if is_eye:
+						img.set_pixel(px, py, cur.lerp(Color(0.01, 0.01, 0.02, 1.0), 0.75))
+					elif is_mouth:
+						img.set_pixel(px, py, cur.lerp(Color(0.02, 0.02, 0.03, 1.0), 0.65))
+					else:
+						var frost_alpha := (1.0 - d2) * 0.50
+						img.set_pixel(px, py, cur.lerp(pale, frost_alpha))
+
+
 static func _draw_frostbitten_fingers(img: Image) -> void:
 	var w := img.get_width()
 	var h := img.get_height()
@@ -554,34 +628,124 @@ static func _draw_line(img: Image, x0: int, y0: int, x1: int, y1: int, col: Colo
 			y0 += sy
 
 
-static func _synthesize_atmospheric_frame(cam: Camera3D, flash: bool, _tags: Array, _ghost: bool, _voice: bool) -> Image:
+static func _synthesize_atmospheric_frame(_cam: Camera3D, flash: bool, _tags: Array, _ghost: bool, _voice: bool) -> Image:
 	var img := Image.create(PRINT_SIZE.x, PRINT_SIZE.y, false, Image.FORMAT_RGBA8)
 	var w := PRINT_SIZE.x
 	var h := PRINT_SIZE.y
 	var is_outside := Game.is_outside()
 	var is_night := Game.is_night()
 
-	for y in range(h):
-		var ny := float(y) / float(h)
-		for x in range(w):
-			var base_col: Color
-			if is_outside:
-				if ny < 0.45:
-					var sky := 0.08 + (0.45 - ny) * 0.12 if is_night else 0.55 - ny * 0.2
-					base_col = Color(sky, sky * 0.98, sky * 0.94, 1.0)
+	if is_outside:
+		# Полярное небо с горизонтом и звездами
+		for y in range(h):
+			var ny := float(y) / float(h)
+			for x in range(w):
+				var nx := float(x) / float(w)
+				var col: Color
+				if ny < 0.48:
+					# Небо: глубокий градиент полярной ночи
+					var sky_lum := (0.04 + (0.48 - ny) * 0.10) if is_night else (0.52 - ny * 0.25)
+					col = Color(sky_lum, sky_lum * 0.98, sky_lum * 0.92, 1.0)
+					# Звезды на небе
+					if is_night:
+						var star_seed := float(x * 79 + y * 277)
+						if fmod(sin(star_seed) * 43758.5453, 1.0) > 0.982:
+							col = Color(0.95, 0.98, 1.0, 1.0)
 				else:
-					var snow := 0.28 + (ny - 0.45) * 0.35 if is_night else 0.78 + (ny - 0.45) * 0.15
-					base_col = Color(snow, snow * 0.98, snow * 0.92, 1.0)
-			else:
-				if ny < 0.65:
-					var log_stripe := fmod(ny * 16.0, 1.0)
-					var wall := (0.18 + log_stripe * 0.12) if is_night else (0.42 + log_stripe * 0.15)
-					base_col = Color(wall, wall * 0.92, wall * 0.85, 1.0)
-				else:
-					var floor_val := 0.14 if is_night else 0.35
-					base_col = Color(floor_val, floor_val * 0.92, floor_val * 0.82, 1.0)
+					# Снежный покров: рельефные сугробы и заструги
+					var drift := sin(nx * 8.0) * 0.02 + sin(nx * 22.0) * 0.008
+					var snow_y := ny - 0.48 + drift
+					var snow_lum := (0.24 + snow_y * 0.45) if is_night else (0.75 + snow_y * 0.22)
+					# Вспышка вблизи
+					if flash:
+						var dx := (nx - 0.5) * 1.6
+						var dy := (ny - 0.85) * 2.0
+						var dist2 := dx * dx + dy * dy
+						snow_lum += clampf(0.65 - dist2 * 0.55, 0.0, 0.65)
+					col = Color(snow_lum, snow_lum * 0.98, snow_lum * 0.93, 1.0)
+				img.set_pixel(x, y, col)
 
-			img.set_pixel(x, y, base_col)
+		# Зубчатая кромка сосновой тайги на горизонте (y = 0.44..0.48)
+		var taiga_y := int(h * 0.48)
+		for x in range(w):
+			var th := int(sin(float(x) * 0.09) * 6.0 + sin(float(x) * 0.28) * 3.0 + 10.0)
+			for dy in range(th):
+				var py := taiga_y - dy
+				if py >= 0 and py < h:
+					img.set_pixel(x, py, Color(0.025, 0.028, 0.03, 1.0))
+
+		# Метеобудка Селянинова (слева, x = 0.24 * w)
+		var bx := int(w * 0.24)
+		var by := int(h * 0.52)
+		for leg_x in [bx - 14, bx - 5, bx + 5, bx + 14]:
+			_draw_line(img, leg_x, by, leg_x, by + 22, Color(0.04, 0.04, 0.04, 1.0), 1)
+		for y in range(by - 20, by):
+			for x in range(bx - 16, bx + 17):
+				var j_col := Color(0.12, 0.12, 0.12, 1.0) if y % 3 == 0 else Color(0.28, 0.27, 0.25, 1.0)
+				img.set_pixel(x, y, j_col)
+		_draw_line(img, bx - 19, by - 20, bx, by - 26, Color(0.06, 0.06, 0.06, 1.0), 2)
+		_draw_line(img, bx, by - 26, bx + 19, by - 20, Color(0.06, 0.06, 0.06, 1.0), 2)
+
+		# 25-метровая метеомачта АШ-4 (справа, x = 0.68 * w)
+		var mx := int(w * 0.68)
+		_draw_line(img, mx - 5, 20, mx - 8, int(h * 0.58), Color(0.05, 0.05, 0.05, 1.0), 2)
+		_draw_line(img, mx + 5, 20, mx + 8, int(h * 0.58), Color(0.05, 0.05, 0.05, 1.0), 2)
+		for my in range(24, int(h * 0.56), 10):
+			_draw_line(img, mx - 6, my, mx + 6, my, Color(0.08, 0.08, 0.08, 1.0), 1)
+			_draw_line(img, mx - 6, my, mx + 6, my + 10, Color(0.06, 0.06, 0.06, 1.0), 1)
+		for gy in [36, 68, 98]:
+			_draw_line(img, mx - 6, gy, 0, gy + 80, Color(0.10, 0.10, 0.10, 1.0), 1)
+			_draw_line(img, mx + 6, gy, w - 1, gy + 80, Color(0.10, 0.10, 0.10, 1.0), 1)
+		# Заградительный огонь ЗОМ на оголовке мачты
+		img.set_pixel(mx, 19, Color(1.0, 0.15, 0.10, 1.0))
+		img.set_pixel(mx - 1, 19, Color(0.8, 0.1, 0.08, 1.0))
+		img.set_pixel(mx + 1, 19, Color(0.8, 0.1, 0.08, 1.0))
+		img.set_pixel(mx, 18, Color(0.8, 0.1, 0.08, 1.0))
+	else:
+		# Помещение станции: брусчатые стены, окно с метелью, рабочий стол и барограф
+		for y in range(h):
+			var ny := float(y) / float(h)
+			for x in range(w):
+				var nx := float(x) / float(w)
+				var col: Color
+				if ny < 0.62:
+					var log_phase := fmod(ny * 14.0, 1.0)
+					var wood := (0.16 + sin(log_phase * PI) * 0.10) if is_night else (0.40 + sin(log_phase * PI) * 0.15)
+					col = Color(wood, wood * 0.90, wood * 0.80, 1.0)
+				else:
+					var plank := fmod(nx * 18.0, 1.0)
+					var floor_val := (0.11 + plank * 0.04) if is_night else (0.28 + plank * 0.08)
+					col = Color(floor_val, floor_val * 0.90, floor_val * 0.82, 1.0)
+				img.set_pixel(x, y, col)
+
+		# Заиндевевшее окно справа (nx = 0.58..0.86, ny = 0.12..0.52)
+		var wx0 := int(w * 0.58)
+		var wx1 := int(w * 0.86)
+		var wy0 := int(h * 0.12)
+		var wy1 := int(h * 0.52)
+		for y in range(wy0 - 4, wy1 + 5):
+			for x in range(wx0 - 4, wx1 + 5):
+				if x < wx0 or x > wx1 or y < wy0 or y > wy1 or absi(x - (wx0 + wx1) / 2) <= 2 or absi(y - (wy0 + wy1) / 2) <= 2:
+					img.set_pixel(x, y, Color(0.06, 0.05, 0.04, 1.0))
+				else:
+					var frost_seed := float(x * 113 + y * 311)
+					var frost := fmod(sin(frost_seed) * 43758.5453, 1.0)
+					var glass_lum := (0.02 + frost * 0.14) if is_night else (0.45 + frost * 0.20)
+					img.set_pixel(x, y, Color(glass_lum, glass_lum * 0.98, glass_lum * 0.94, 1.0))
+
+		# Стол дежурного на переднем плане
+		var ty0 := int(h * 0.60)
+		for y in range(ty0, int(h * 0.88)):
+			for x in range(int(w * 0.10), int(w * 0.60)):
+				img.set_pixel(x, y, Color(0.18, 0.15, 0.12, 1.0))
+		# Барограф М-16АН на столе
+		var baro_cx := int(w * 0.30)
+		var baro_cy := ty0 - 8
+		for by in range(baro_cy - 16, baro_cy):
+			for bx in range(baro_cx - 10, baro_cx + 11):
+				var bcol := Color(0.35, 0.32, 0.28, 1.0) if bx % 2 == 0 else Color(0.24, 0.22, 0.19, 1.0)
+				img.set_pixel(bx, by, bcol)
+
 	return img
 
 

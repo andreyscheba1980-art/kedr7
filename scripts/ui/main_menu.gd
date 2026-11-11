@@ -204,41 +204,64 @@ func _show_main() -> void:
 	_clear_box()
 
 	var has_save := SaveGame.has_save()
-	var save_hint := "СУТКИ 04 // -41°C" if has_save else "НАЧАЛО ДЕЖУРСТВА"
+	var save_hint := ""
+	if has_save:
+		var s_night := int(SaveGame.flags.get("night", 1))
+		var s_is_night := bool(SaveGame.flags.get("is_night", true))
+		var s_temp := -38 - s_night * 2
+		var s_phase := Loc.p("НОЧЬ", "NIGHT") if s_is_night else Loc.p("УТРО", "DAY")
+		save_hint = Loc.p("СУТКИ %02d · %s // %d°C" % [s_night, s_phase, s_temp], "SHIFT %02d · %s // %d°C" % [s_night, s_phase, s_temp])
+	else:
+		save_hint = Loc.p("НАЧАЛО ВАХТЫ", "COMMENCE")
 
 	# Пункт 1: ВАХТА (Продолжить / Начать)
 	if has_save:
-		var cont_btn := _make_telem_btn("КН-01", Loc.t(&"menu.btn_continue"), save_hint, func() -> void:
+		var cont_btn := _make_telem_btn(Loc.p("КН-01", "BTN-01"), Loc.t(&"menu.btn_continue"), save_hint, func() -> void:
 			stop_music()
 			continue_pressed.emit())
 		_box.add_child(cont_btn)
 		cont_btn.grab_focus.call_deferred()
 
-		var new_btn := _make_telem_btn("СМН-02", Loc.t(&"menu.btn_new"), "ПЕРЕЗАПИСЬ", _show_difficulty)
+		var new_btn := _make_telem_btn(Loc.p("СМН-02", "SFT-02"), Loc.t(&"menu.btn_new"), Loc.p("ПЕРЕЗАПИСЬ", "OVERWRITE"), _show_difficulty)
 		_box.add_child(new_btn)
 	else:
-		var new_btn := _make_telem_btn("КН-01", Loc.t(&"menu.btn_new"), save_hint, _show_difficulty)
+		var new_btn := _make_telem_btn(Loc.p("КН-01", "BTN-01"), Loc.t(&"menu.btn_new"), save_hint, _show_difficulty)
 		_box.add_child(new_btn)
 		new_btn.grab_focus.call_deferred()
 
 	# Пункт 2: ДВЕ ВАХТЫ (Связь)
-	var coop_btn := _make_telem_btn("ЗАС-02", Loc.t(&"menu.btn_coop"), "3820 кГц", _show_coop)
+	var coop_btn := _make_telem_btn(Loc.p("ЗАС-02", "SEC-02"), Loc.t(&"menu.btn_coop"), Loc.p("3820 кГц // ЭФИР", "3820 kHz // RADIO"), _show_coop)
 	_box.add_child(coop_btn)
 
 	# Пункт 3: АРХИВ И ФОРМУЛЯРЫ (Единый картотечный хаб)
-	var archive_btn := _make_telem_btn("ТМ-03", Loc.t(&"menu.btn_archive"), "КАРТОТЕКА", _show_dossier_hub)
+	var archive_btn := _make_telem_btn(Loc.p("ТМ-03", "DOC-03"), Loc.t(&"menu.btn_archive"), Loc.p("КАРТОТЕКА", "DOSSIER"), _show_dossier_hub)
 	_box.add_child(archive_btn)
 
 	# Пункт 4: РЕГЛАМЕНТ ПРИБОРОВ (Настройки)
-	var set_btn := _make_telem_btn("РГ-04", Loc.t(&"menu.btn_settings"), "ПРИБОРЫ", _show_settings)
+	var set_btn := _make_telem_btn(Loc.p("РГ-04", "REG-04"), Loc.t(&"menu.btn_settings"), Loc.p("ПРИБОРЫ", "CALIBRATION"), _show_settings)
 	_box.add_child(set_btn)
 
 	# Пункт 5: СДАТЬ СМЕНУ (Выход)
-	var quit_btn := _make_telem_btn("ВЫХ-00", Loc.t(&"menu.btn_quit"), "РУБИЛЬНИК", func() -> void:
+	var quit_btn := _make_telem_btn(Loc.p("ВЫХ-00", "EXT-00"), Loc.t(&"menu.btn_quit"), Loc.p("РУБИЛЬНИК", "POWER OFF"), func() -> void:
 		quit_pressed.emit())
 	_box.add_child(quit_btn)
 
+	_link_focus_chain()
 	grab_initial_focus.call_deferred()
+
+
+func _link_focus_chain() -> void:
+	if _box == null:
+		return
+	var btns: Array[Control] = []
+	for c in _box.get_children():
+		if c is Control and c.focus_mode != Control.FOCUS_NONE and c.visible:
+			btns.append(c)
+	for i in btns.size():
+		var prev: Control = btns[(i - 1 + btns.size()) % btns.size()]
+		var nxt: Control = btns[(i + 1) % btns.size()]
+		btns[i].focus_neighbor_top = prev.get_path()
+		btns[i].focus_neighbor_bottom = nxt.get_path()
 
 
 func grab_initial_focus() -> void:
@@ -265,21 +288,22 @@ func _show_dossier_hub() -> void:
 	hdr.add_theme_color_override("font_color", Color("#FFA62B"))
 	_box.add_child(hdr)
 
-	var b1 := _make_telem_btn("ДОК-01", Loc.t(&"menu.dossier_tab1"), "ИНВЕНТАРЬ", _show_controls)
+	var b1 := _make_telem_btn(Loc.p("ДОК-01", "DOC-01"), Loc.t(&"menu.dossier_tab1"), Loc.p("УПРАВЛЕНИЕ", "CONTROLS"), _show_controls)
 	_box.add_child(b1)
 	b1.grab_focus.call_deferred()
 
-	var b2 := _make_telem_btn("ДОК-02", Loc.t(&"menu.dossier_tab2"), "ЗАВЕТЫ // СЕМЁНОВ", _show_archive)
+	var b2 := _make_telem_btn(Loc.p("ДОК-02", "DOC-02"), Loc.t(&"menu.dossier_tab2"), Loc.p("СЕМЁНОВ", "SEMENOV"), _show_archive)
 	_box.add_child(b2)
 
-	var b3 := _make_telem_btn("ДОК-03", Loc.t(&"menu.dossier_tab3"), "НАГРАДЫ // ЛОР", _show_achievements)
+	var b3 := _make_telem_btn(Loc.p("ДОК-03", "DOC-03"), Loc.t(&"menu.dossier_tab3"), Loc.p("ДОСТИЖЕНИЯ", "AWARDS"), _show_achievements)
 	_box.add_child(b3)
 
-	var b4 := _make_telem_btn("ДОК-04", Loc.t(&"menu.dossier_tab4"), "ФОРМУЛЯР СТАНЦИИ", show_credits)
+	var b4 := _make_telem_btn(Loc.p("ДОК-04", "DOC-04"), Loc.t(&"menu.dossier_tab4"), Loc.p("ФОРМУЛЯР", "PERSONNEL"), show_credits)
 	_box.add_child(b4)
 
-	var back := _make_telem_btn("НАЗ-00", Loc.t(&"ui.back"), "", _show_main)
+	var back := _make_telem_btn(Loc.p("НАЗ-00", "BCK-00"), Loc.t(&"ui.back"), Loc.p("ГЛАВНОЕ МЕНЮ", "MAIN MENU"), _show_main)
 	_box.add_child(back)
+	_link_focus_chain()
 
 
 func _show_difficulty() -> void:
@@ -290,14 +314,14 @@ func _show_difficulty() -> void:
 	hdr.add_theme_color_override("font_color", Color("#FFA62B"))
 	_box.add_child(hdr)
 
-	var story_btn := _make_telem_btn("РЕЖ-01", Loc.t(&"diff.story"), "МЕТЕО-РЕЖИМ", func() -> void:
+	var story_btn := _make_telem_btn(Loc.p("РЕЖ-01", "MOD-01"), Loc.t(&"diff.story"), Loc.p("ИССЛЕДОВАТЕЛЬ", "EXPLORER"), func() -> void:
 		stop_music()
 		new_game.emit("story"))
 	_box.add_child(story_btn)
 	story_btn.grab_focus.call_deferred()
 	_box.add_child(_desc(&"diff.story_desc"))
 
-	var hard_btn := _make_telem_btn("РЕЖ-02", Loc.t(&"diff.hard"), "БУРАН-ХАРДКОР", func() -> void:
+	var hard_btn := _make_telem_btn(Loc.p("РЕЖ-02", "MOD-02"), Loc.t(&"diff.hard"), Loc.p("БУРАН-ХАРДКОР", "BLIZZARD HARDCORE"), func() -> void:
 		stop_music()
 		new_game.emit("hard"))
 	_box.add_child(hard_btn)
@@ -308,8 +332,9 @@ func _show_difficulty() -> void:
 		warn.add_theme_color_override("font_color", Color("#C82820"))
 		_box.add_child(warn)
 
-	var back_btn := _make_telem_btn("НАЗ-00", Loc.t(&"ui.back"), "", _show_main)
+	var back_btn := _make_telem_btn(Loc.p("НАЗ-00", "BCK-00"), Loc.t(&"ui.back"), Loc.p("ОТМЕНА", "CANCEL"), _show_main)
 	_box.add_child(back_btn)
+	_link_focus_chain()
 
 
 func _unhandled_input(event: InputEvent) -> void:

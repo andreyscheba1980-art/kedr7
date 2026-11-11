@@ -2769,12 +2769,7 @@ func _build_darkroom_safelight() -> void:
 	cord.position = Vector3(5.7, 1.82, -5.25)
 	add_child(cord)
 
-	var photo_tex_paths := [
-		"res://assets/textures/photos/photo_archive_mast.png",
-		"res://assets/textures/photos/photo_archive_adit.png",
-		"res://assets/textures/photos/photo_archive_porch.png",
-		"res://assets/textures/photos/photo_archive_crew.png"
-	]
+	_drying_photo_nodes.clear()
 	var xs := [5.15, 5.50, 5.85, 6.20]
 	var rots_y := [-4.0, 3.5, -2.0, 5.0]
 
@@ -2789,7 +2784,7 @@ func _build_darkroom_safelight() -> void:
 		pin.position = Vector3(px, 1.83, -5.25)
 		add_child(pin)
 
-		# Фотобумага «Унибром» с отпечатком (сохнет на веревке)
+		# Фотобумага «Унибром» с отпечатком (сохнет на веревке под неактиничным рубиновым светом)
 		var print_node := MeshInstance3D.new()
 		var pm := QuadMesh.new()
 		pm.size = Vector2(0.24, 0.145)
@@ -2800,17 +2795,48 @@ func _build_darkroom_safelight() -> void:
 		var print_mat := StandardMaterial3D.new()
 		print_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		print_mat.roughness = 0.75
-		if ResourceLoader.exists(photo_tex_paths[i]):
-			print_mat.albedo_texture = load(photo_tex_paths[i])
-		else:
-			print_mat.albedo_color = Color(0.85, 0.85, 0.80)
 		print_node.material_override = print_mat
 		add_child(print_node)
+		_drying_photo_nodes.append(print_node)
+
+	update_drying_photos()
 
 	# Интерактивный осмотр сохнущих отпечатков
-	Geo.interactable(self, Vector3(1.3, 0.4, 0.3), Vector3(5.7, 1.75, -5.22), null, Loc.p("[E] Сохнущие фотоснимки", "[E] Drying photographs"), func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.p("Сохнущие на верёвке архивные снимки Семёнова под рубиновым светом фонаря. Фотобумага «Унибром» ещё влажная от кислого фиксажа...", "Semyonov's archive prints drying on the cord under ruby safelight. 'Unibrom' paper still damp with acid fixer..."), 5.0)
+	Geo.interactable(self, Vector3(1.3, 0.4, 0.3), Vector3(5.7, 1.75, -5.22), null, Loc.p("[E] Осмотреть снимки на веревке", "[E] Inspect drying photographs"), func(_p: Player) -> void:
+		_open_darkroom()
 	)
+
+
+var _drying_photo_nodes: Array[MeshInstance3D] = []
+var _photo_tex_paths: Array[String] = [
+	"res://assets/textures/photos/photo_archive_mast.png",
+	"res://assets/textures/photos/photo_archive_adit.png",
+	"res://assets/textures/photos/photo_archive_porch.png",
+	"res://assets/textures/photos/photo_archive_crew.png"
+]
+
+
+func update_drying_photos() -> void:
+	var z := Game.zenit
+	var has_z_photos := z != null and not z.photos.is_empty()
+	for i in range(_drying_photo_nodes.size()):
+		var node := _drying_photo_nodes[i]
+		if not is_instance_valid(node):
+			continue
+		var mat := node.material_override as StandardMaterial3D
+		if mat == null:
+			continue
+		if has_z_photos and i < z.photos.size():
+			var ph: Dictionary = z.photos[i]
+			var img: Image = ph.get("img")
+			if img != null and not img.is_empty():
+				mat.albedo_texture = ImageTexture.create_from_image(img)
+				mat.albedo_color = Color.WHITE
+		elif i < _photo_tex_paths.size() and ResourceLoader.exists(_photo_tex_paths[i]):
+			mat.albedo_texture = load(_photo_tex_paths[i])
+			mat.albedo_color = Color.WHITE
+		else:
+			mat.albedo_color = Color(0.85, 0.85, 0.80)
 
 
 func _build_storage_footprints() -> void:
