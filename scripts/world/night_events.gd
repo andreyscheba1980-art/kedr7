@@ -1192,13 +1192,23 @@ func _paralysis() -> void:
 
 # --- Ночь 7: зов и выбор -----------------------------------------------------
 
+var _crawler_rig: Node3D
+
 func _start_final_call() -> void:
 	Game.final_call = true
 	_call_t = 20.0
 	Director.add_tension(40.0, "последний зов")
-	Game.hud.subtitle(Loc.t(&"sub.barometric_bottom"), 7.5)
+	if not SaveGame.flags.has("night7_crawler_is_mimic"):
+		var bad := int(SaveGame.flags.get("bad_reports", 0))
+		SaveGame.flags["night7_crawler_is_mimic"] = (randf() > 0.45 or bad > 0)
+	Game.hud.subtitle(Loc.t(&"sub.crawler_arrived"), 7.5)
 	if Game.audio != null:
-		Game.audio.play_2d("res://assets/audio/drone_loop.ogg", -4.0, 18.0)
+		Game.audio.play_2d("res://assets/audio/engine_loop.ogg", 2.0, 30.0)
+	_spawn_crawler_lights()
+	await _wait(4.5)
+	if _ending or Game.dead:
+		return
+	Game.hud.subtitle(Loc.t(&"sub.crawler_sgu_megaphone"), 8.5)
 	await _wait(8.0)
 	if _ending or Game.dead:
 		return
@@ -1213,6 +1223,27 @@ func _start_final_call() -> void:
 		return
 	Game.hud.subtitle(Loc.t(&"call.start"), 7.0)
 	_call_t = 2.0
+
+
+func _spawn_crawler_lights() -> void:
+	if _crawler_rig != null and is_instance_valid(_crawler_rig):
+		return
+	_crawler_rig = Node3D.new()
+	_crawler_rig.name = "CrawlerRig"
+	_crawler_rig.position = Vector3(15.8, 1.8, 32.0)
+	if Game.level != null:
+		Game.level.add_child(_crawler_rig)
+	for offset_x in [-1.2, 1.2]:
+		var spot := SpotLight3D.new()
+		spot.position = Vector3(offset_x, 0, 0)
+		spot.light_color = Color(1.0, 0.92, 0.58)
+		spot.light_energy = 14.0
+		spot.spot_range = 55.0
+		spot.spot_angle = 28.0
+		spot.spot_attenuation = 1.3
+		spot.shadow_enabled = true
+		_crawler_rig.add_child(spot)
+		spot.look_at(Vector3(15.0, 1.5, 3.5), Vector3.UP)
 
 
 func _on_radio_locked(id: StringName) -> void:

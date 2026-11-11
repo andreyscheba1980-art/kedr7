@@ -144,6 +144,8 @@ var _living_trunk: Node3D
 var _damper_door: Node3D
 var _flue_handle: Node3D
 var _switch_lever: Node3D
+var _zaboy_lever: Node3D
+var _zaboy_seal: Node3D
 var _stove_haze: Node3D
 var _stove_haze_mat: ShaderMaterial
 var _moon_windows: Array[Dictionary] = []
@@ -317,11 +319,22 @@ func _process(delta: float) -> void:
 		var draft_k := 0.45 if Game.stove_damper else 1.0
 		if Game.stove_flue:
 			draft_k = 0.2
-		target_fire_vol = lerpf(-24.0, -9.0, fuel_k * draft_k)
+		# Опрокидывание тяги в чугунной печи за 30 секунд до появления Ырки
+		var yrka_near := Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and (Game.yrka.stage in [YrkaThreat.Stage.CALLING, YrkaThreat.Stage.PRESSURE, YrkaThreat.Stage.CHASE] or Game.yrka.threat >= 68.0)
+		if yrka_near:
+			draft_k = 0.1
+			target_fire_vol = -28.0
+			if _fire != null:
+				_fire.light_color = _fire.light_color.lerp(Color(0.45, 0.55, 0.92), minf(delta * 2.5, 1.0))
+		else:
+			target_fire_vol = lerpf(-24.0, -9.0, fuel_k * draft_k)
+			if _fire != null:
+				_fire.light_color = _fire.light_color.lerp(Color(1.0, 0.55, 0.2), minf(delta * 2.5, 1.0))
 		target_crackle_vol = lerpf(-20.0, -7.5, fuel_k * (0.75 + draft_k * 0.25))
 	if _stove_fire_player != null:
+		var yrka_near := Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and (Game.yrka.stage in [YrkaThreat.Stage.CALLING, YrkaThreat.Stage.PRESSURE, YrkaThreat.Stage.CHASE] or Game.yrka.threat >= 68.0)
 		_stove_fire_player.volume_db = lerpf(_stove_fire_player.volume_db, target_fire_vol, minf(delta * 2.5, 1.0))
-		_stove_fire_player.pitch_scale = 0.95 + (0.08 if not Game.stove_damper else -0.05)
+		_stove_fire_player.pitch_scale = (0.58 if yrka_near else 0.95) + (0.08 if not Game.stove_damper else -0.05)
 	if _stove_crackle_player != null:
 		_stove_crackle_player.volume_db = lerpf(_stove_crackle_player.volume_db, target_crackle_vol, minf(delta * 2.5, 1.0))
 	if _stove_haze != null:
@@ -378,15 +391,23 @@ func _process(delta: float) -> void:
 
 	if _gen_engine_player != null:
 		var target_eng_vol := -80.0
+		var threat_near := (Game.events != null and Game.events.knocking) or (Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and Game.yrka.threat >= 68.0)
 		if gen_running:
 			target_eng_vol = -5.5
 			if not shack_door_open:
 				target_eng_vol -= 5.0
-			if Game.generator_fuel < 15.0:
+			if threat_near:
+				_gen_engine_player.pitch_scale = lerpf(_gen_engine_player.pitch_scale, 0.65, minf(delta * 2.0, 1.0))
+				if _bulb_omni != null:
+					_bulb_omni.light_energy = lerpf(_bulb_omni.light_energy, 0.35, minf(delta * 2.0, 1.0))
+					_bulb_omni.light_color = _bulb_omni.light_color.lerp(Color(1.0, 0.42, 0.15), minf(delta * 2.0, 1.0))
+			elif Game.generator_fuel < 15.0:
 				target_eng_vol += sin(_t * 14.0) * 1.5
 				_gen_engine_player.pitch_scale = 1.02 + sin(_t * 11.0) * 0.05
 			else:
 				_gen_engine_player.pitch_scale = 1.02
+				if _bulb_omni != null:
+					_bulb_omni.light_color = _bulb_omni.light_color.lerp(Color(1.0, 0.92, 0.72), minf(delta * 2.0, 1.0))
 		_gen_engine_player.volume_db = lerpf(_gen_engine_player.volume_db, target_eng_vol, minf(delta * 4.0, 1.0))
 
 	if _underfloor_hum_player != null:
@@ -2195,22 +2216,35 @@ func _build_radio_room() -> void:
 	_place(Props.desk_lamp(), Vector3(8.22, 0.75, -1.6))
 	register_lamp(Geo.omni(self, Vector3(8.35, 1.15, -1.3), 2.4, 0.7, Color(1.0, 0.82, 0.6)))
 
-	# Мельхиоровый советский подстаканник с горячим чаем
-	# Чай — один на двоих с чайником: общий «откат», и горячий он, только пока топится печь.
-	var tea_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), Vector3(8.52, 0.85, -0.98), null, Loc.t(&"it.podstakannik"), func(_p: Player) -> void:
-		if Game.tea_cd > 0.0:
-			Game.hud.subtitle(Loc.t(&"sub.kettle_recent"), 2.5)
+	# Брикет прессованного грузинского плиточного чая №36 (ГОСТ 1938-73) с ножом дежурного
+	var brick_it := Geo.interactable(self, Vector3(0.22, 0.15, 0.18), Vector3(8.34, 0.82, -0.98), null, "", func(_p: Player) -> void:
+		Game.chip_tea_brick()
+	)
+	brick_it.prompt_provider = func() -> String:
+		return Loc.t(&"it.tea_chipped_done") if Game.tea_brick_chipped else Loc.t(&"it.tea_chip")
+	var brick_model := Props.tea_brick()
+	brick_model.position.y = -0.05
+	brick_it.add_child(brick_model)
+
+	# Мельхиоровый советский подстаканник с 14-гранным стаканом
+	var tea_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), Vector3(8.56, 0.85, -0.98), null, "", func(_p: Player) -> void:
+		if not Game.tea_brick_chipped:
+			Game.hud.subtitle(Loc.t(&"sub.tea_need_chip"), 3.0)
+			return
+		if not Game.tea_brewed:
+			Game.brew_tea_in_glass()
 			return
 		if Game.stove_wood <= 0.0:
 			Game.hud.subtitle(Loc.t(&"sub.tea_cold"), 2.5)
 			return
-		Game.tea_cd = 90.0
-		Game.audio.play_2d("res://assets/audio/tea_sip.ogg", 0.0)
-		Game.warmth = minf(Game.warmth + 12.0, 100.0)
-		Game.tea_warmth_timer = 40.0
-		Game.hud.subtitle(Loc.t(&"sub.tea_drunk"), 3.5)
-		Director.add_tension(-3.0, "горячий чай")
+		Game.warm_hands_with_glass()
 	)
+	tea_it.prompt_provider = func() -> String:
+		if not Game.tea_brick_chipped:
+			return Loc.t(&"it.tea_need_chip")
+		elif not Game.tea_brewed:
+			return Loc.t(&"it.tea_brew_kettle")
+		return Loc.t(&"it.tea_warm_hands")
 
 	# Вахтенный журнал метеонаблюдений ТМ-1 (на столе перед оператором)
 	var journal_it := Geo.interactable(self, Vector3(0.42, 0.12, 0.36), Vector3(9.5, 0.77, -1.05), null, Loc.t(&"it.journal_tm1"), func(_p: Player) -> void:
@@ -2633,6 +2667,7 @@ func _build_vestibule() -> void:
 	vs43_it.add_child(vs43_model)
 
 	_build_house_switch()
+	_build_zaboy_switch()
 	# Лампа в тамбуре
 	var l_vest := Geo.omni(self, Vector3(13.0, 2.65, 3.5), 4.5, 0.8, Color(1.0, 0.74, 0.46))
 	l_vest.omni_attenuation = 1.7
@@ -2976,7 +3011,18 @@ func _build_generator_shack() -> void:
 	var s_door := Interactable.new()
 	s_door.collision_layer = Geo.LAYER_WORLD
 	s_door.position = Vector3(0.52, 0.95, 0.0)
-	s_door.prompt_provider = func() -> String: return Loc.t(&"it.shack_door_close") if shack_door_open else Loc.t(&"it.shack_door_open")
+	s_door.prompt_provider = func() -> String:
+		if shack_door_open:
+			return Loc.t(&"it.shack_door_close")
+		if Game.is_night() and Game.night >= 2 and Game.padlock_shack_frozen:
+			if Game.padlock_thaw_t > 0.0:
+				return Loc.t(&"it.shack_door_turn_key")
+			if Game.has_item(&"storm_matches") or Game.has_item(&"matches"):
+				return Loc.t(&"it.shack_door_thaw_match")
+			if Game.held == &"kettle":
+				return Loc.t(&"it.shack_door_thaw_kettle")
+			return Loc.t(&"it.shack_door_frozen")
+		return Loc.t(&"it.shack_door_open")
 	s_door.add_child(_shack_door_mesh())
 	s_door.add_child(Geo.box_shape(Vector3(1.05, 1.9, 0.08)))
 	s_door.used.connect(_on_shack_door_used)
@@ -3370,6 +3416,16 @@ func set_shack_door_open(open: bool) -> void:
 
 
 func _on_shack_door_used(_p: Player) -> void:
+	if not shack_door_open and Game.is_night() and Game.night >= 2 and Game.padlock_shack_frozen:
+		if Game.padlock_thaw_t <= 0.0:
+			if Game.has_item(&"storm_matches") or Game.has_item(&"matches"):
+				Game.thaw_padlock_with_match()
+				return
+			elif Game.held == &"kettle":
+				Game.thaw_padlock_with_kettle()
+				return
+		if not Game.try_unlock_padlock():
+			return
 	set_shack_door_open(not shack_door_open)
 
 
@@ -3385,6 +3441,11 @@ func set_door_open(open: bool) -> void:
 	door_open = open
 	if open:
 		EventBus.door_opened.emit()
+		if Game.night == 7 and Game.final_call:
+			_door_busy = false
+			var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+			EventBus.ending_chosen.emit(&"mimic_trap" if is_mimic else &"evac_crawler")
+			return
 	else:
 		EventBus.door_closed.emit()
 	Game.audio.play_3d(DOOR_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -7.0)
@@ -3577,6 +3638,44 @@ static func _switch_mat() -> StandardMaterial3D:
 	m.albedo_color = Color(0.16, 0.1, 0.07)
 	m.roughness = 0.35
 	return m
+
+
+## Аварийный разъединитель «Директива Забой» (высоковольтный контур ДГА-24 на заземление мачты)
+func _build_zaboy_switch() -> void:
+	var at := Vector3(14.37, 1.07, 2.3)
+	Geo.block(self, Vector3(0.03, 0.28, 0.20), at, Palette.m(&"metal"), false)
+	Geo.block(self, Vector3(0.05, 0.20, 0.14), at + Vector3(-0.02, 0, 0), Palette.m(&"metal_dark"), false)
+	Geo.block(self, Vector3(0.055, 0.04, 0.12), at + Vector3(-0.02, 0.07, 0), Palette.m(&"lead"), false)
+	_zaboy_lever = Geo.block(self, Vector3(0.13, 0.03, 0.03), at + Vector3(-0.08, 0.05 if not Game.zaboy_active else -0.05, 0), Palette.m(&"lead"), false)
+	_zaboy_seal = Geo.block(self, Vector3(0.02, 0.035, 0.035), at + Vector3(-0.07, 0.03, 0.04), Palette.m(&"lead"), false)
+	_zaboy_seal.visible = not Game.zaboy_unsealed
+
+	var it := Geo.interactable(self, Vector3(0.3, 0.35, 0.3), at + Vector3(-0.08, 0, 0), null, "", func(_p: Player) -> void:
+		if not Game.zaboy_unsealed:
+			Game.zaboy_unsealed = true
+			if _zaboy_seal != null:
+				_zaboy_seal.visible = false
+			Game.audio.play_3d(CLANK_SOUND, at, 0.0)
+			AudioDirector.play_raw("res://assets/audio/ice_hit.ogg", -2.0)
+			Game.hud.subtitle(Loc.t(&"sub.zaboy_unsealed"), 4.5)
+			return
+		if not Game.zaboy_active:
+			Game.zaboy_active = true
+			if _zaboy_lever != null:
+				_zaboy_lever.position.y = at.y - 0.05
+			Game.audio.play_3d(CLANK_SOUND, at, 2.0)
+			AudioDirector.play_raw("res://assets/audio/elec_buzz_loop.ogg", 1.0)
+			if Game.night == 7 and Game.final_call:
+				EventBus.ending_chosen.emit(&"directive_zaboy")
+			else:
+				Game.hud.subtitle(Loc.t(&"sub.zaboy_no_target"), 4.5)
+	)
+	it.prompt_provider = func() -> String:
+		if not Game.zaboy_unsealed:
+			return Loc.t(&"it.zaboy_break_seal")
+		if not Game.zaboy_active:
+			return Loc.t(&"it.zaboy_throw_lever")
+		return Loc.t(&"it.zaboy_active_desc")
 
 
 func _stove_prompt() -> String:
@@ -4224,6 +4323,14 @@ func _tick_creak(delta: float) -> void:
 	var p := Game.audio.play_3d(snd, pos, vol, 3.5)
 	if p != null:
 		p.pitch_scale = Game.rng.randf_range(0.92, 1.08)
+
+	# Морозные выстрелы: в мороз замерзающая влага рвёт сосновые волокна в углах сруба
+	if Game.is_night() and randf() < 0.28:
+		var snap_pos := pos + Vector3(0.0, -0.6, 0.0)
+		Game.audio.play_3d(CLANK_SOUND, snap_pos, -4.0, 5.0)
+		if Game.player != null and Game.player.camera != null:
+			Game.player.shake(0.014, 0.22)
+		Director.add_tension(3.0, "морозный выстрел в бревне сруба")
 
 
 func _process_susedko(delta: float) -> void:

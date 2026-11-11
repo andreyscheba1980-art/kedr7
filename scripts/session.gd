@@ -756,7 +756,7 @@ func _on_report_sent(index: int) -> void:
 
 # --- Концовки ----------------------------------------------------------------
 
-const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source", &"taiga"]
+const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source", &"taiga", &"directive_zaboy", &"evac_crawler", &"mimic_trap"]
 const FIRE := "res://assets/audio/fire_loop.ogg"
 ## Какая находка эфира дописывает страницу к какому финалу
 const ENDING_FIND := {&"answer": &"alone", &"burn": &"bunker", &"leave": &"roll", &"silence": &"hole",
@@ -779,6 +779,26 @@ func play_ending(id: StringName) -> void:
 				Game.hud.flash_red(0.7, 0.5)
 				_player.shake(0.05, 0.4)
 				await get_tree().create_timer(0.45, false).timeout
+		&"directive_zaboy":
+			# Высоковольтная дуга ДГА-24 на мачту: ослепительный разряд сжигает эфирный резонатор
+			Game.audio.play_2d("res://assets/audio/flare.ogg", 4.0)
+			Game.audio.play_2d("res://assets/audio/elec_buzz_loop.ogg", 2.0)
+			for i in range(5):
+				Game.hud.flash_red(1.0, 0.4)
+				_player.shake(0.12, 0.5)
+				await get_tree().create_timer(0.4, false).timeout
+		&"evac_crawler":
+			# Настоящий тягач ГТ-Т: спасение
+			Game.audio.play_2d("res://assets/audio/engine_loop.ogg", 3.0)
+			_player.shake(0.04, 2.0)
+			await get_tree().create_timer(2.0, false).timeout
+		&"mimic_trap":
+			# Ловушка Ырки у ворот: холодный огонь вместо фар и силуэт Семёнова
+			Game.audio.play_2d("res://assets/audio/radio_anomaly.ogg", 2.0)
+			Game.audio.play_2d("res://assets/audio/growl.ogg", 3.0)
+			Game.hud.flash_red(0.8, 1.2)
+			_player.shake(0.15, 1.5)
+			await get_tree().create_timer(2.0, false).timeout
 		&"answer":
 			# Ты передаёшь сводку — и в наушниках «принято» отвечает твой собственный голос.
 			Game.hud.subtitle(Loc.t(&"end.answer.0"), 3.5)

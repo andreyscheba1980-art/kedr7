@@ -33,6 +33,8 @@ var _base := Vector3.ZERO               ## центр шкал (T_MID) в мир
 var _start_t := 0.0
 var _wipe := false
 var _mouse := Vector2.ZERO
+var _breath_timer := 0.0
+var _breath_warned := false
 
 
 func _ready() -> void:
@@ -273,6 +275,21 @@ func _process(delta: float) -> void:
 		dy += ry
 	if absf(dy) > 0.01:
 		_scroll(dy * 9.0 * delta)
+	var holding_breath := Input.is_action_pressed(&"hold_breath") or Input.is_physical_key_pressed(KEY_SPACE)
+	if not holding_breath:
+		_breath_timer += delta
+		if _breath_timer > 3.5:
+			_shown.x += delta * 0.2
+			for f: Closeup3D.Frost in _frost:
+				var m := f.material_override as StandardMaterial3D
+				if m != null:
+					m.albedo_color.a = clampf(m.albedo_color.a + delta * 0.25, 1.0, 2.5)
+			if not _breath_warned and Game.hud != null:
+				_breath_warned = true
+				Game.hud.subtitle(Loc.t(&"thermo.fog_warning"), 3.5)
+	else:
+		_breath_timer = maxf(0.0, _breath_timer - delta * 2.0)
+
 	if _wipe or Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT) > 0.5:
 		var r := _close.ray(get_global_transform_with_canvas() * _mouse)
 		var hit := false
@@ -282,6 +299,12 @@ func _process(delta: float) -> void:
 				hit = true
 		if hit:
 			_wipe_sfx(delta)
+			for f: Closeup3D.Frost in _frost:
+				var m := f.material_override as StandardMaterial3D
+				if m != null:
+					m.albedo_color.a = 1.0
+			if not _fever:
+				_shown.x = move_toward(_shown.x, _truth.x, delta * 0.5)
 	_light = lerpf(_light, (1.0 if Game.is_daylight() else 0.85) if _close.can_see() else 0.03, clampf(delta * 8.0, 0.0, 1.0))
 	for pm in _plates:
 		pm.albedo_color = Color(_light, _light, _light * 0.95)

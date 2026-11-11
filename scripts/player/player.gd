@@ -79,6 +79,7 @@ var _foot_last := Vector3.INF
 var _foot_root: Node3D
 var _foot_pool: Array[Node3D] = []
 var _sprint_latch := false
+var _rope_tension_event_done := false
 var _breath_latch := false
 var _breath_emitter: CPUParticles3D
 var _breath_timer := 2.0
@@ -250,18 +251,29 @@ func handle_input(event: InputEvent) -> void:
 		var mm := event as InputEventMouseMotion
 		var sens := MOUSE_SENS * Settings.mouse_sens
 		var y_sign := -1.0 if Settings.invert_y else 1.0
-		_mouse_sway += Vector2(mm.relative.x, mm.relative.y * y_sign) * 0.00075
+		var rel_x := mm.relative.x
+		var rel_y := mm.relative.y
+		var f_stage: int = Game.finger_stage()
+		if f_stage == 2:
+			# Квантование ввода задубевшими пальцами (+22..+31°C)
+			rel_x = roundf(rel_x / 2.5) * 2.5
+			rel_y = roundf(rel_y / 2.5) * 2.5
+		elif f_stage == 3:
+			# Окоченение (+14..+21°C): тремор и потеря микромоторики
+			rel_x = roundf(rel_x / 5.0) * 5.0 + randf_range(-2.0, 2.0)
+			rel_y = roundf(rel_y / 5.0) * 5.0 + randf_range(-2.0, 2.0)
+		_mouse_sway += Vector2(rel_x, rel_y * y_sign) * 0.00075
 		_mouse_sway.x = clampf(_mouse_sway.x, -0.09, 0.09)
 		_mouse_sway.y = clampf(_mouse_sway.y, -0.09, 0.09)
 		if Game.has_flag("in_cabin"):
 			var base_yaw := deg_to_rad(225.0)
 			var cur_yaw := wrapf(rotation.y - base_yaw, -PI, PI)
-			var new_yaw := clampf(cur_yaw - mm.relative.x * sens, deg_to_rad(-70.0), deg_to_rad(70.0))
+			var new_yaw := clampf(cur_yaw - rel_x * sens, deg_to_rad(-70.0), deg_to_rad(70.0))
 			rotation.y = base_yaw + new_yaw
-			head.rotation.x = clampf(head.rotation.x - mm.relative.y * sens * y_sign, deg_to_rad(-45.0), deg_to_rad(35.0))
+			head.rotation.x = clampf(head.rotation.x - rel_y * sens * y_sign, deg_to_rad(-45.0), deg_to_rad(35.0))
 			return
-		rotate_y(-mm.relative.x * sens)
-		head.rotation.x = clampf(head.rotation.x - mm.relative.y * sens * y_sign, deg_to_rad(-85.0), deg_to_rad(85.0))
+		rotate_y(-rel_x * sens)
+		head.rotation.x = clampf(head.rotation.x - rel_y * sens * y_sign, deg_to_rad(-85.0), deg_to_rad(85.0))
 		return
 
 	if event.is_action_pressed(&"flashlight"):
@@ -290,6 +302,10 @@ func handle_input(event: InputEvent) -> void:
 		fire_flare()
 		return
 	if event.is_action_pressed(&"interact"):
+		if Game.finger_stage() == 3 and Game.is_outside() and randf() < 0.22:
+			Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0)
+			Game.hud.subtitle(Loc.t(&"sub.finger_numb_fumble"), 3.0)
+			return
 		if Game.has_flag("riding") and Snowmobile.instance != null:
 			Snowmobile.instance.request_dismount()
 			return
@@ -309,12 +325,21 @@ func _handle_radio_input(event: InputEvent) -> void:
 		Game.radio.transmit()
 	elif event.is_action_pressed(&"record"):
 		Game.radio.start_recording()
+	elif event is InputEventKey and event.pressed:
+		var ke := event as InputEventKey
+		if ke.keycode == KEY_Q:
+			Game.radio.fine_step(-1.0)
+		elif ke.keycode == KEY_E:
+			Game.radio.fine_step(1.0)
+		elif ke.keycode == KEY_TAB or ke.keycode == KEY_V:
+			Game.radio.cycle_variometer()
 	elif event is InputEventMouseButton and event.is_pressed():
 		var mb := event as InputEventMouseButton
+		var step_mult := 0.2 if Game.firm_hands_timer > 0.0 else (3.5 if Game.finger_stage() >= 2 else 1.0)
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			Game.radio.nudge(1)
+			Game.radio.nudge_scaled(1, step_mult)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			Game.radio.nudge(-1)
+			Game.radio.nudge_scaled(-1, step_mult)
 
 
 # --- Физика и обновление -----------------------------------------------------
@@ -365,6 +390,8 @@ func _physics_process(delta: float) -> void:
 				_sprint_latch = false
 			want_sprint = _sprint_latch
 		_sprinting = want_sprint and held != &"canister" and held != &"trunk" and stamina > 1.0 and input.y < 0.0 and not cranking
+		if (Input.is_key_pressed(KEY_F) or Input.is_action_just_pressed(&"wipe_face")) and Game.hud != null:
+			Game.hud.wipe_face_frost()
 
 		# Обзор правым аналоговым стиком геймпада
 		var look_vec := Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
@@ -409,6 +436,24 @@ func _physics_process(delta: float) -> void:
 		speed *= 0.9 if shoes else 0.75
 	if Game.is_outside() and global_position.y > 70.0 and not Game.skis_equipped:
 		speed *= 0.78   # крутой каменистый курумник венца цирка: без лыж ноги проваливаются меж валунов
+
+	# Хват за канат леера (ПКМ или Shift в пределах 1.4 м от тропы)
+	var can_grip_rope := Game.is_outside() and _cached_off_path < 1.4
+	var gripping_rope := can_grip_rope and (Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_physical_key_pressed(KEY_SHIFT))
+	if gripping_rope:
+		if not Game.leer_attached:
+			Game.leer_attached = true
+			Game.audio.play_2d("res://assets/audio/clank.ogg", -16.0)
+		speed *= 1.25 # опора на натянутый трос: ускорение против встречного штормового ветра
+		if not _rope_tension_event_done and Game.is_night() and Game.night >= 3 and global_position.x > 32.0 and global_position.x < 50.0 and velocity.length() > 0.4:
+			_rope_tension_event_done = true
+			AudioDirector.play_raw("res://assets/audio/clank.ogg", 2.0, 0.55)
+			Game.audio.play_2d("res://assets/audio/shriek.ogg", -10.0)
+			shake(0.04, 0.45)
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.rope_twang"), 4.0)
+			Director.add_tension(16.0, "вибрация каната в руках")
+
 	speed *= speed_mult
 
 	var target := dir * speed
@@ -641,6 +686,8 @@ func _update_steps(delta: float) -> void:
 		var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
 		if lp != null:
 			lp.pitch_scale = randf_range(1.6, 2.1)
+	if is_out and Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled:
+		Game.yrka.on_player_footstep(global_position, global_basis.z)
 	if is_out and _sprinting and Game.audio != null and Game.audio.has_method(&"record_player_noise"):
 		Game.audio.record_player_noise(global_position)
 

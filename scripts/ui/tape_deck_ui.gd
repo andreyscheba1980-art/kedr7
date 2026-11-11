@@ -38,9 +38,9 @@ var _line_i := 0
 var _cleaning := false
 var _hold := 0.0
 
-var _speed_idx := 1
-const SPEEDS := [0.5, 1.0, 1.5, 2.0]
-const SPEED_NAMES := ["0.5x", "1.0x", "1.5x", "2.0x"]
+var _speed_idx := 0
+const SPEEDS := [1.0, 0.5]
+const SPEED_NAMES := ["19.05 см/с", "9.53 см/с"]
 var _reversed := false
 var _tape_pos := 0.0
 
@@ -60,7 +60,7 @@ func _ready() -> void:
 	var left := VBoxContainer.new()
 	left.custom_minimum_size.x = 380
 	cols.add_child(left)
-	var title := UiStyle.brass_plate(Loc.t(&"tape.title"), 18)
+	var title := UiStyle.brass_plate(Loc.p("МАГНИТОФОН «МАЯК-205» · КАТУШКИ СЕМЁНОВА", "TAPE DECK 'MAYAK-205' · SEMENOV REELS"), 17)
 	title.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	left.add_child(title)
 
@@ -84,14 +84,14 @@ func _ready() -> void:
 	_clean_btn = UiKit.button(Loc.t(&"tape.clean"), _toggle_clean)
 	row_ctl.add_child(_clean_btn)
 
-	_speed_btn = UiKit.button(Loc.t(&"tape.speed", [SPEED_NAMES[_speed_idx]]), _cycle_speed)
+	_speed_btn = UiKit.button(Loc.p("СКОРОСТЬ: " + SPEED_NAMES[_speed_idx], "SPEED: " + SPEED_NAMES[_speed_idx]), _cycle_speed)
 	row_ctl.add_child(_speed_btn)
 
 	var row_ctl2 := HBoxContainer.new()
 	row_ctl2.add_theme_constant_override("separation", 8)
 	left.add_child(row_ctl2)
 
-	_rev_btn = UiKit.button(Loc.t(&"tape.reverse"), _toggle_reverse)
+	_rev_btn = UiKit.button(Loc.p("ДОРОЖКИ: 1-4", "TRACKS: 1-4"), _toggle_reverse)
 	row_ctl2.add_child(_rev_btn)
 
 	var rw_back := UiKit.button("<< [Q]", func() -> void: _rewind(-5.0))
@@ -213,13 +213,13 @@ func _cycle_speed() -> void:
 
 func _toggle_reverse() -> void:
 	_reversed = not _reversed
-	_rev_btn.text = Loc.t(&"tape.forward") if _reversed else Loc.t(&"tape.reverse")
+	_rev_btn.text = Loc.p("ДОРОЖКИ: 2-3 [ШЁПОТ]" if _reversed else "ДОРОЖКИ: 1-4 [ОСНОВНАЯ]", "TRACKS: 2-3 [WHISPER]" if _reversed else "TRACKS: 1-4 [MAIN]")
 	_rev_btn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.3) if _reversed else Color(0.9, 0.9, 0.9))
 
 	if _reversed:
-		Director.add_tension(6.0, "магнитофон: включен реверс")
+		Director.add_tension(6.0, "магнитофон: переключено на дорожки 2-3")
 		_rev_whisper_player.play()
-		# Показ скрытого послания в реверсе для пленок Семёнова
+		# Показ скрытого послания на дорожках 2-3 для пленок Семёнова
 		if String(_selected).begins_with("sem_log_"):
 			var num := String(_selected).replace("sem_log_", "")
 			var rev_key := StringName("tape.rev_sub_" + num)
@@ -234,12 +234,15 @@ func _toggle_reverse() -> void:
 func _check_secret_reveals() -> void:
 	if _selected == &"sem_log_2" and _reversed and not Game.countersign_known:
 		Game.countersign_known = true
-		Director.add_tension(-6.0, "узнан отзыв «Сосна-четыре»")
+		Director.add_tension(-6.0, "узнан отзыв «Бирюса»")
 		Game.hud.subtitle(Loc.t(&"tape.countersign_revealed"), 5.0)
-	elif _selected == &"sem_log_3" and SPEEDS[_speed_idx] == 0.5 and not Game.safe_code_known:
-		Game.safe_code_known = true
-		Director.add_tension(-6.0, "узнан шифр сейфа ГО")
-		Game.hud.subtitle(Loc.t(&"tape.code_revealed"), 5.0)
+	elif _selected == &"sem_log_3" and _reversed and SPEEDS[_speed_idx] == 0.5:
+		if not Game.countersign_known:
+			Game.countersign_known = true
+		if not Game.safe_code_known:
+			Game.safe_code_known = true
+			Director.add_tension(-8.0, "распознан секрет 9-й скорости: шифр сейфа и фонетическая ловушка «Бирюса / Бирюза»")
+			Game.hud.subtitle(Loc.p("Секрет 9-й скорости: на замедлении щебет стал шёпотом Семёнова! Код двери U (••—) и шифр сейфа раскрыты.", "9th speed secret: bird chirping slowed into Semenov's whisper! Door code U and safe cipher revealed."), 6.5)
 
 
 func _rewind(sec_offset: float) -> void:

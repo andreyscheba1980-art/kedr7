@@ -28,6 +28,15 @@ enum Pass { NONE, REAL, REAL_END, FAKE, FAKE_WRONG, FAKE_CLEAN }
 const OPERATOR_A := ["ml_prologue", "ml_ok_1", "ml_ok_2", "ml_last", "ml_silent", "ml_tasks", "ml_task_done"]
 
 var freq := 6100.0
+var fine_tune_khz := 0.0              ## ручка «ТОН» приёмника «Волна-К» (-5.0..+5.0 кГц)
+var variometer_pos := 0.5             ## шаровой вариометр УСС трансивера «Ангара-РА» (0.0..1.0)
+var variometer_resonance := 0.85      ## ток антенны / согласование сопротивления
+var magic_eye_closure := 0.0          ## смыкание секторов лампы 6Е1П (0.0 = 90°, 1.0 = 3°)
+var magic_eye_overload := false       ## аномальный захлёст в белый крест с коронным разрядом
+var _tube_warmup := 0.0               ## прогрев ламп 6К4П (0.0..1.0 за 90 с)
+var _grid_voltage := 220.0            ## напряжение сети от ДГА-24
+var _time := 0.0
+var _noise := FastNoiseLite.new()
 var active := false
 var muted := false                ## испуг может заглушить эфир целиком
 var static_boost := 0.0           ## испуг может поднять помехи
@@ -74,7 +83,7 @@ func play_transmission(stream_path: String, volume_offset_db := 0.0, pass_kind :
 	var generic := stream_path.ends_with("voice_mainland.ogg") or stream_path.ends_with("voice_loop.ogg")
 	var line := AudioDirector.cached_stream(stream_path)
 	var line_len := 7.0 if generic or line == null else line.get_length()
-	if Settings.voice_mode == "zas" and not _fake_voice and (generic or stream_path.contains("ml_") or stream_path.contains("st_")):
+	if generic or (Settings.voice_mode == "zas" and not _fake_voice and (stream_path.contains("ml_") or stream_path.contains("st_"))):
 		line = ZasAudioClass.get_scramble_stream(line_len)
 	p.stream = line
 	var pass_vid := _pass_voice(pass_kind, stream_path.get_file().get_basename() in OPERATOR_A)
@@ -273,6 +282,14 @@ func strength_at(id: StringName, f: float, tower := false) -> float:
 
 
 func _process(delta: float) -> void:
+	_time += delta
+	_tube_warmup = move_toward(_tube_warmup, 1.0, delta / 90.0)
+
+	# 1. Вычисляем тепловой и вольтажный дрейф гетеродина «Волны-К»
+	var target_vario := 0.72 if Game.antenna_iced else 0.48
+	var vario_diff := absf(variometer_pos - target_vario)
+	variometer_resonance = clampf(1.0 - vario_diff * 3.0, 0.0, 1.0)
+
 	# Сеанс поверки связи с партией Белова (14:00 днём и 21:00 ночью = минута 60)
 	if not _belov_checkin_done:
 		var is_checkin_time := (Game.is_day() and Game.shift_minutes >= 0.5 and Game.shift_minutes <= 25.0) or (Game.is_night() and Game.shift_minutes >= 60.0 and Game.shift_minutes <= 85.0)
@@ -312,6 +329,9 @@ func _process(delta: float) -> void:
 			vol = 0.0
 		p.volume_db = linear_to_db(maxf(vol, 0.0001)) + base_db
 
+	magic_eye_closure = clampf(best_s, 0.0, 1.0)
+	magic_eye_overload = best_s > 0.82 and (best_id == &"semenov" or best_id == &"anomaly" or best_id == &"echo" or String(best_id).contains("yrka"))
+
 	var target_amp := lerpf(0.28, 0.03, best_s) + static_boost
 	if Game.knife_in_lintel:
 		target_amp += 0.42
@@ -331,6 +351,7 @@ func _process(delta: float) -> void:
 	# Гетеродинный свист при приближении к несущей частоте (биения гетеродина Р-250)
 	var het_target_db := -80.0
 	var het_pitch := 1.0
+	var eff_f := effective_reception_freq()
 	if active and not voice_active and not muted:
 		var min_d := 9999.0
 		for id in _signals:
@@ -338,7 +359,7 @@ func _process(delta: float) -> void:
 				continue
 			var s_def := Signals.get_def(id)
 			var cf: float = _freq_over.get(id, float(s_def["freq"]))
-			var df := absf(freq - cf)
+			var df := absf(eff_f - cf)
 			if df < min_d:
 				min_d = df
 		if min_d < 140.0 and min_d > 6.0:
@@ -356,7 +377,7 @@ func _process(delta: float) -> void:
 		_update_lock(best_id, best_s, delta)
 		_update_lines(best_id, best_s, delta)
 		_update_recording(best_id, best_s, delta)
-		Game.hud.update_radio(freq, best_s, _locked_id, record_prompt(), recording_progress())
+		Game.hud.update_radio(eff_f, best_s, _locked_id, record_prompt(), recording_progress(), fine_tune_khz, variometer_resonance, magic_eye_closure, magic_eye_overload)
 
 
 # --- Управление --------------------------------------------------------------
@@ -381,9 +402,34 @@ func exit() -> void:
 		Game.audio.play_3d(sq, global_position + Vector3.UP * 0.2, -11.0, 3.5)
 
 
+func effective_reception_freq() -> float:
+	var thermal_drift: float = (1.0 - _tube_warmup) * 4.2
+	var voltage_drift: float = (_grid_voltage - 220.0) * 0.08
+	var ion_flutter: float = _noise.get_noise_1d(_time * 1.5) * 0.35 if _noise != null else 0.0
+	return freq + fine_tune_khz - thermal_drift + voltage_drift + ion_flutter
+
+
 func nudge(dir: int) -> void:
+	nudge_scaled(dir, 1.0)
+
+
+func nudge_scaled(dir: int, step_mult: float = 1.0) -> void:
 	if recording_t < 0.0:
-		set_freq(freq + WHEEL_STEP * dir)
+		set_freq(freq + WHEEL_STEP * dir * step_mult)
+
+
+func fine_step(dir: float) -> void:
+	fine_tune_khz = clampf(fine_tune_khz + dir * 0.25, -5.0, 5.0)
+	if active:
+		_tune_idle = 0.0
+
+
+func cycle_variometer() -> void:
+	variometer_pos = wrapf(variometer_pos + 0.08, 0.0, 1.0)
+	Game.audio.play_3d("res://assets/audio/clank.ogg", global_position + Vector3.UP * 0.2, -6.0, 2.5)
+	var pct := int(roundf(variometer_resonance * 100.0))
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"radio.variometer_status") + " [%d%%]" % pct, 2.5)
 
 
 func set_freq(f: float) -> void:
@@ -454,7 +500,8 @@ func strength_of(id: StringName) -> float:
 		return 0.0
 	var s := Signals.get_def(id)
 	var center: float = _freq_over.get(id, float(s["freq"]))
-	var d := absf(freq - center) / (float(s["width"]) * (1.6 if Gear.has(&"quartz_core") else 1.0))   # кварц: ловит шире
+	var ef := effective_reception_freq()
+	var d := absf(ef - center) / (float(s["width"]) * (1.6 if Gear.has(&"quartz_core") else 1.0))   # кварц: ловит шире
 	var st := smoothstep(0.0, 1.0, clampf(1.0 - d, 0.0, 1.0))
 	if id == &"mainland":
 		st *= Consequences.mainland_k()   # ослабшая оттяжка мачты
@@ -507,6 +554,13 @@ func field_transmit() -> void:
 
 
 func transmit() -> void:
+	if not _field and variometer_resonance < 0.65:
+		Game.audio.play_3d("res://assets/audio/clank.ogg", global_position + Vector3.UP * 0.2, 2.0, 4.0)
+		Game.hud.subtitle(Loc.t(&"radio.variometer_unmatched"), 4.0)
+		return
+	if Game.night == 7 and Game.final_call and not _field:
+		_challenge_night7_crawler()
+		return
 	if Game.final_call and strength_of(&"mainland") >= 0.75 and not _busy:
 		EventBus.ending_chosen.emit(&"answer")   # ночь 7: отвечаем на зов даже поверх голоса в эфире
 		return
@@ -625,8 +679,23 @@ func _check_reply(check: Dictionary, delay: float) -> void:
 			SaveGame.flags["bad_reports"] = int(SaveGame.flags.get("bad_reports", 0)) + 1
 
 
-func _run_prologue_radio_dialogue() -> void:
+func _challenge_night7_crawler() -> void:
 	_busy = true
+	Game.hud.subtitle(Loc.t(&"radio.n7_challenge"), 4.0)
+	await get_tree().create_timer(3.8, false).timeout
+	var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+	if is_mimic:
+		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", global_position + Vector3.UP * 0.2, 0.0, 5.0)
+		Game.hud.subtitle(Loc.t(&"radio.n7_reply_mimic"), 6.5)
+		SaveGame.flags["night7_radio_mimic"] = true
+	else:
+		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
+		Game.hud.subtitle(Loc.t(&"radio.n7_reply_real"), 5.5)
+		SaveGame.flags["night7_radio_ok"] = true
+	_busy = false
+
+
+func _run_prologue_radio_dialogue() -> void:
 	Game.coop_report_ok = false
 	Game.clear_readings()
 	Net.on_report_sent()

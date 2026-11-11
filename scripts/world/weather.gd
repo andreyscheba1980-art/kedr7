@@ -148,13 +148,14 @@ func _tick_front(delta: float) -> void:
 	_front -= delta
 	var k := 1.0 - clampf(_front / FRONT_TIME, 0.0, 1.0)      # 0 — на горизонте, 1 — накрыла
 	if Game.player != null and _wall != null:
-		var r := lerpf(82.0, 3.0, k * k)
+		var r := lerpf(86.0, 24.0, k)
 		var pp := Game.player.global_position
 		_wall.global_position = Vector3(pp.x, pp.y + 12.0, pp.z)
 		_wall.scale = Vector3(r, 46.0, r)
-		_wall_mat.set_shader_parameter(&"amount", lerpf(0.6, 1.0, k))
-		if _env != null and k > 0.6 and not Game.is_indoors():
-			_env.fog_density = maxf(_env.fog_density, lerpf(FOG_CALM, FOG_BLIZZARD * 0.6, (k - 0.6) / 0.4))   # мгла впереди стены
+		var wall_alpha := lerpf(0.6, 1.0, k) * (1.0 - smoothstep(0.75, 1.0, k))
+		_wall_mat.set_shader_parameter(&"amount", wall_alpha)
+		if _env != null and k > 0.4 and not Game.is_indoors():
+			_env.fog_density = maxf(_env.fog_density, lerpf(FOG_CALM, FOG_BLIZZARD * 0.85, (k - 0.4) / 0.6))   # мгла накрывает естественно
 	if _roar != null:
 		_roar.volume_db = lerpf(-36.0, -4.0, k)
 		_roar.pitch_scale = lerpf(0.7, 1.05, k)

@@ -34,6 +34,9 @@ var _hour0 := 20.0
 var _center_p := 746.0
 var _truth := 746.0
 var _truth_tend := 0.0
+var _dead_band := 1.4                   ## мёртвый ход (застой стрелки из-за трения пера о ленту, мм рт. ст.)
+var _tapped := false
+var _tap_step_time := -1.0
 var _ruler_y := -1.0
 var _done := false
 var _cu: Closeup3D
@@ -57,6 +60,9 @@ func _ready() -> void:
 	_truth_tend = _truth - Game.pressure_at(_now_h - 3.0)
 	# Лента стоит так, чтобы и «сейчас», и «три часа назад» были на ней
 	_center_p = roundf(_truth - _truth_tend * 0.5 + randf_range(-2.0, 2.0))
+	if Game.baro_tapped:
+		_dead_band = 0.0
+		_tapped = true
 
 	ThermometerUI.title_plate(self, Loc.t(&"barograph.title"))
 	_build_rig()
@@ -65,9 +71,11 @@ func _ready() -> void:
 	_status.add_theme_color_override("font_color", Color(0.92, 0.62, 0.45, 0.9))
 	UiKit.place(self, _status, 0.5, 0.5, 0.5, 0.5, -500, 202, 100, 226)
 	var wind_btn := UiStyle.text_button(Loc.t(&"barograph.wind_key"), _wind_mechanism)
-	UiKit.place(self, wind_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -205, 266)
+	UiKit.place(self, wind_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -290, 266)
+	var tap_btn := UiStyle.text_button(Loc.t(&"barograph.tap_case"), _tap_case)
+	UiKit.place(self, tap_btn, 0.5, 0.5, 0.5, 0.5, -280, 230, -70, 266)
 	var listen_btn := UiStyle.text_button(Loc.t(&"barograph.listen_pen"), _listen_pen)
-	UiKit.place(self, listen_btn, 0.5, 0.5, 0.5, 0.5, -195, 230, 100, 266)
+	UiKit.place(self, listen_btn, 0.5, 0.5, 0.5, 0.5, -60, 230, 110, 266)
 
 	_book = KMBook.new()
 	HeldPaper.notebook(self, _book)   # книжка КМ-1 — в правой руке
@@ -345,14 +353,53 @@ func _place_arm() -> void:
 
 
 func _update_status() -> void:
+	if Game.night == 7 and Game.final_call:
+		var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+		_status.text = Loc.t(&"barograph.status_n7_mimic" if is_mimic else &"barograph.status_n7_real")
+		return
 	if _listening > 0.0:
 		_status.text = Loc.t(&"barograph.listening_text")
 	elif not Game.barograph_live():
 		_status.text = Loc.t(&"barograph.stopped")
+	elif not _tapped:
+		_status.text = Loc.t(&"barograph.stuck_friction")
 	elif Game.anomalies != null and Game.anomalies.is_active(&"baro_tooth"):
 		_status.text = Loc.t(&"barograph.tooth")
 	else:
 		_status.text = Loc.t(&"barograph.wound_status", [int(Game.barograph_wound)])
+
+
+func _tap_case() -> void:
+	if _tapped:
+		AudioDirector.play_raw(CLANK_SFX, -4.0, 1.9)
+		Game.hud.subtitle(Loc.t(&"barograph.tap_already"), 2.0)
+		return
+	_tapped = true
+	_dead_band = 0.0
+	_tap_step_time = _now_h
+	Game.baro_tapped = true
+	AudioDirector.play_raw(CLANK_SFX, -2.0, 1.8)
+	get_tree().create_timer(0.08, false).timeout.connect(func() -> void:
+		AudioDirector.play_raw(CLANK_SFX, -4.0, 2.1)
+	)
+	Game.vibrate(0.25, 0.15, 0.15)
+	if Game.player != null and Game.player.camera != null:
+		Game.player.shake(0.015, 0.2)
+	if Game.night == 7 and Game.final_call:
+		SaveGame.flags["night7_barograph_checked"] = true
+		var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+		if is_mimic:
+			_truth = 690.0
+			_center_p = 695.0
+			Game.hud.subtitle(Loc.t(&"barograph.n7_mimic"), 6.5)
+		else:
+			_truth = 718.0
+			_center_p = 718.0
+			Game.hud.subtitle(Loc.t(&"barograph.n7_real"), 6.5)
+	else:
+		Game.hud.subtitle(Loc.t(&"barograph.tap_done"), 3.5)
+	_update_status()
+	_chart.queue_redraw()
 
 
 func _wind_mechanism() -> void:
@@ -391,7 +438,17 @@ func _y(p: float) -> float:
 
 ## Что пишет перо в час h: давление плюс то, чего в воздухе не было.
 func _pen(h: float) -> float:
+	if Game.night == 7 and Game.final_call:
+		var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+		if is_mimic:
+			return 690.0
+		else:
+			return 718.0 + sin(h * 340.0) * 0.28   # механическая микровибрация 11-тонного дизеля
 	var p := Game.pressure_at(h)
+	if not _tapped:
+		p += _dead_band
+	elif _tap_step_time > 0.0 and h < _tap_step_time - 0.01:
+		p += 1.4
 	if Game.is_night() and h >= SIGNAL_H and h < SIGNAL_H + 0.06:
 		p = _center_p + MM_HALF * 1.4                           # удар 03:10 — до края ленты
 	if Game.anomalies != null and Game.anomalies.is_active(&"baro_tooth"):

@@ -2,7 +2,7 @@ shader_type spatial;
 // Ели: цвет — из вершин (снег на ярусах, тёмная хвоя по краю), плоские грани.
 // Ветер качает дерево: чем выше вершина, тем сильнее; у каждой ели своя фаза.
 // lod_near > 0: ближе этого расстояния ель рисует карточный двойник (SpruceMesh.near) — эта сжимается в точку.
-render_mode blend_mix, depth_draw_opaque, cull_disabled, diffuse_burley, specular_schlick_ggx;
+render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
 global uniform float wind;
 uniform float srgb_decode = 0.0;

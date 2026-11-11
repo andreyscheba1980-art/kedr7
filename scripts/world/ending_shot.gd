@@ -51,6 +51,12 @@ func run(id: StringName) -> void:
 			await _echo()
 		&"taiga":
 			await _taiga()
+		&"directive_zaboy":
+			await _directive_zaboy()
+		&"evac_crawler":
+			await _evac_crawler()
+		&"mimic_trap":
+			await _mimic_trap()
 	await _coda(id)
 	await _fade_to(1.0, 1.2)
 	for n in _extra:
@@ -406,3 +412,81 @@ func _echo() -> void:
 	_fade_to(0.0, 1.5)
 	await _dolly(Vector3(7.2, 1.5, 1.6), Vector3(8.3, 1.15, -0.2), radio, radio, 12.0)
 	await _wait(1.0)
+
+
+func _directive_zaboy() -> void:
+	_moon(0.4, 45.0)
+	var mast_pos := Vector3(1.2, 0.0, -14.0)
+	var arc_light := OmniLight3D.new()
+	arc_light.position = mast_pos + Vector3(0, 4.0, 0)
+	arc_light.light_color = Color(0.45, 0.85, 1.0)
+	arc_light.light_energy = 0.0
+	arc_light.omni_range = 80.0
+	Game.level.add_child(arc_light)
+	_extra.append(arc_light)
+
+	_fade_to(0.0, 1.2)
+	var p0 := Vector3(18.0, 2.5, 12.0)
+	var p1 := Vector3(14.0, 3.2, 8.0)
+	await _dolly(p0, p1, mast_pos + Vector3(0, 6.0, 0), mast_pos + Vector3(0, 6.0, 0), 10.0, func(k: float) -> void:
+		if k > 0.2 and k < 0.8:
+			var pulse := randf()
+			arc_light.light_energy = 22.0 if pulse > 0.3 else 1.0
+			arc_light.light_color = Color(0.9, 0.95, 1.0) if pulse > 0.6 else Color(0.2, 0.6, 1.0)
+		elif k >= 0.8:
+			arc_light.light_energy = move_toward(arc_light.light_energy, 0.0, 1.0)
+	)
+	_caption(Loc.t(&"end.directive_zaboy.cap"))
+	await _wait(4.0)
+
+
+func _evac_crawler() -> void:
+	_moon(0.6, 50.0)
+	var gate_pos := Vector3(15.8, 0.0, 28.0)
+	var p0 := Vector3(15.8, 2.0, 10.0)
+	var p1 := Vector3(15.8, 2.4, 22.0)
+
+	var beam := SpotLight3D.new()
+	beam.position = gate_pos + Vector3(0, 2.0, 5.0)
+	beam.light_color = Color(1.0, 0.92, 0.6)
+	beam.light_energy = 16.0
+	beam.spot_range = 60.0
+	beam.spot_angle = 30.0
+	Game.level.add_child(beam)
+	_extra.append(beam)
+	beam.look_at(Vector3(15.8, 1.5, 0.0), Vector3.UP)
+
+	_fade_to(0.0, 1.5)
+	await _dolly(p0, p1, gate_pos + Vector3(0, 1.5, 0), gate_pos + Vector3(0, 1.5, 10.0), 10.0)
+	_caption(Loc.t(&"end.evac_crawler.cap"))
+	await _wait(4.0)
+
+
+func _mimic_trap() -> void:
+	_moon(0.15, 30.0)
+	var gate_pos := Vector3(15.8, 0.0, 26.0)
+	var p0 := Vector3(15.8, 1.8, 12.0)
+	var p1 := Vector3(15.8, 1.7, 21.0)
+
+	# Два висящих в воздухе шара холодного призрачного огня
+	for ox in [-1.4, 1.4]:
+		var ball := OmniLight3D.new()
+		ball.position = gate_pos + Vector3(ox, 1.8, 0.0)
+		ball.light_color = Color(0.25, 0.85, 1.0)
+		ball.light_energy = 9.0
+		ball.omni_range = 14.0
+		Game.level.add_child(ball)
+		_extra.append(ball)
+
+	# Тёмный силуэт Семёнова в распахнутом тулупе между шарами
+	var shadow_body := Geo.box_mesh(Vector3(0.6, 1.85, 0.4), Palette.m(&"metal_dark"))
+	shadow_body.position = gate_pos + Vector3(0, 0.92, 0.0)
+	Game.level.add_child(shadow_body)
+	_extra.append(shadow_body)
+
+	_fade_to(0.0, 1.8)
+	await _dolly(p0, p1, gate_pos + Vector3(0, 1.7, 0), gate_pos + Vector3(0, 1.7, 0), 11.0, func(_k: float) -> void:
+		pass
+	)
+	_caption(Loc.t(&"end.mimic_trap.cap"))
+	await _wait(4.5)

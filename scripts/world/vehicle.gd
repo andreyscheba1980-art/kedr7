@@ -314,6 +314,15 @@ func _build_cabin() -> void:
 	smoke.mesh = smq
 	smoke.position = cig + Vector3(0, 0.02, 0)
 	c.add_child(smoke)
+	# Вспышка спички в начале рейса — Михалыч прикуривает папиросу «Прима»
+	var match_light := OmniLight3D.new()
+	match_light.name = "MatchLight"
+	match_light.light_color = Color(1.0, 0.58, 0.18)
+	match_light.light_energy = 0.0
+	match_light.omni_range = 1.8
+	match_light.position = cig + Vector3(0.04, -0.02, 0.08)
+	c.add_child(match_light)
+	_animate_match_start(match_light)
 	# Плафон под крышей: тёплый, слабый — чтобы кабина читалась
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.82, 0.6)
@@ -341,6 +350,20 @@ func _build_cabin() -> void:
 	door.prompt_provider = func() -> String: return Loc.t(&"cab.exit") if _can_exit else ""
 	door.used.connect(func(_p: Player) -> void: request_exit())
 	c.add_child(door)
+
+
+func _animate_match_start(ml: OmniLight3D) -> void:
+	if not _in_cabin or not is_inside_tree():
+		return
+	await get_tree().create_timer(0.8, false).timeout
+	if not is_instance_valid(ml) or not _in_cabin or not is_inside_tree():
+		return
+	AudioDirector.play_raw("res://assets/audio/clank_v4.ogg", -10.0)
+	var tw := create_tween()
+	tw.tween_property(ml, "light_energy", 1.8, 0.10)
+	tw.tween_property(ml, "light_energy", 1.1, 0.08)
+	tw.tween_property(ml, "light_energy", 1.6, 0.12)
+	tw.tween_property(ml, "light_energy", 0.0, 1.6).set_delay(1.0)
 
 
 ## Стекло с инеем по краям: прозрачная середина, белёсые углы (радиальный градиент).
@@ -519,6 +542,7 @@ func _on_exit_cabin() -> void:
 		Game.player.shake(0.04, 0.3)
 	if Game.hud != null:
 		Game.hud.set_prompt("")
+		Game.hud.set_objective(Loc.t(&"obj.dig") + " (0/%d)" % DIG_SPOTS.size())
 	_engine.volume_db = -6.0
 	Game.set_flag("dig_pending", true)
 	_build_dig_spots()
@@ -554,6 +578,9 @@ func _build_dig_spots() -> void:
 			Game.audio.play_3d(SFX_SNOW_FALL, at + Vector3(0, 0.5, 0), -2.0, 5.0)
 			if Game.player != null:
 				Game.player.shake(0.03, 0.25)
+			if _dug < DIG_SPOTS.size():
+				if Game.hud != null:
+					Game.hud.set_objective(Loc.t(&"obj.dig") + " (%d/%d)" % [_dug, DIG_SPOTS.size()])
 			_maybe_try())
 
 
@@ -609,16 +636,7 @@ func _hook_figure() -> bool:
 	# Рация: сквозь шум — позывной станции и чужой, замёрзший голос
 	if _cabin_radio != null and _in_cabin:
 		_cabin_radio.volume_db = -8.0
-		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", _cabin_radio.global_position, -6.0, 2.0)
-		var voice := AudioStreamPlayer3D.new()
-		voice.stream = AudioDirector.cached_stream("res://assets/audio/voice_loop.ogg")
-		voice.bus = &"Radio"
-		voice.pitch_scale = 0.78
-		voice.volume_db = -10.0
-		voice.unit_size = 2.0
-		_cabin_root.add_child(voice)
-		voice.position = Vector3(0.72, 0.67, -1.39)
-		voice.play()
+		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", _cabin_radio.global_position, -4.0, 3.0)
 		var dial := _cabin_root.get_node_or_null("RadioDial") as Node3D
 		Game.hud.subtitle(Loc.t(&"hk.radio"), 5.0)
 		await get_tree().create_timer(5.2, false).timeout
@@ -626,7 +644,6 @@ func _hook_figure() -> bool:
 			_driver_cabin.head_look_target_yaw = deg_to_rad(28.0)   # к рации
 		await get_tree().create_timer(0.7, false).timeout
 		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -2.0)
-		voice.queue_free()
 		_cabin_radio.stop()
 		if dial != null:
 			dial.visible = false
@@ -785,17 +802,26 @@ func _maybe_try() -> void:
 	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.0)
 	_exhaust.amount = 16
 	_exhaust.initial_velocity_max = 2.0
-	_talk_over = true
 	_finish_talk(true)
 
 
 func _finish_talk(tried: bool) -> void:
 	if tried:
 		Voice.say(&"cab.track", 2.2, 1, [], _tracked.global_position)
-		await get_tree().create_timer(1.6, false).timeout
+		await get_tree().create_timer(2.4, false).timeout
 		if not is_inside_tree():
 			return
 	Voice.say(&"cab.stay", 3.2, 1, [], _tracked.global_position)
+	await get_tree().create_timer(3.4, false).timeout
+	if not is_inside_tree():
+		return
+	Voice.say(&"driver.pro3", 3.6, 1, [], _tracked.global_position)
+	await get_tree().create_timer(3.8, false).timeout
+	if not is_inside_tree():
+		return
+	Voice.say(&"driver.pro4", 3.6, 1, [], _tracked.global_position)
+	if Game.hud != null:
+		Game.hud.set_objective(Loc.t(&"obj.prologue_walk"))
 	_talk_over = true
 
 

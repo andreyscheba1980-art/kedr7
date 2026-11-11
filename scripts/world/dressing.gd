@@ -159,8 +159,9 @@ static func _yard_more(st: Node3D) -> void:
 	vane.rotation = Vector3(0.0, deg_to_rad(-30.0), deg_to_rad(4.0))
 	st.add_child(vane)
 	Geo.collider(st, Vector3(0.4, 3.0, 0.4), Vector3(44.0, 1.5, -10.0))
-	# Скамья у крыльца — курилка
-	_m(st, "town/stall-bench", Vector3(17.9, 0, 5.4), 90.0, 0.45, {"collide": true})
+	# Скамья у крыльца — курилка (не спавнится в кадре меню)
+	if not bool(st.get("is_backdrop")):
+		_m(st, "town/stall-bench", Vector3(17.9, 0, 5.4), 90.0, 0.45, {"collide": true})
 
 
 ## Объекты: поленница — колода с топором и сани; изба — поваленный забор, телега без колеса; сарай — колесо.

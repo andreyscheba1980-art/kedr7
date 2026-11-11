@@ -1,7 +1,7 @@
 shader_type spatial;
 // Стена бурана: кольцо вокруг станции, видна только с наветренной стороны — белёсая, клубится,
 // снизу плотная, кверху тает. Чем ближе подходит (amount ↑), тем гуще.
-render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabled, fog_disabled;
+render_mode blend_mix, depth_draw_never, cull_back, unshaded, shadows_disabled;
 
 uniform float amount = 0.0;
 uniform float wind_angle = 0.0;     // откуда идёт буран (азимут в радианах, по UV.x кольца)

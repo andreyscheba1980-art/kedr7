@@ -42,17 +42,18 @@ float vnoise(vec2 p) {
 	return mix(mix(a, b, f.x), mix(c, e, f.x), f.y);
 }
 
-// Треугольная волна: гранёные склоны вместо синусоидальных холмов.
-float tri(float x) {
-	return abs(fract(x) - 0.5) * 2.0;
+// Естественные пологие хребты тайги вместо грубых треугольников
+float fbm_ridge(float az, float seed) {
+	float h = 0.0;
+	h += vnoise(vec2(az * 0.5 + seed, 1.2)) * 0.55;
+	h += vnoise(vec2(az * 1.6 + seed * 2.3, 3.4)) * 0.30;
+	h += vnoise(vec2(az * 3.8 + seed * 5.1, 7.8)) * 0.15;
+	return h;
 }
 
 float ridge(float az, float base, float amp, float seed) {
-	float h = 0.0;
-	h += tri(az * 0.55 + seed) * 1.0;
-	h += tri(az * 1.7 + seed * 2.3) * 0.45;
-	h += tri(az * 4.1 + seed * 5.1) * 0.18;
-	return base + amp * h / 1.63;
+	float h = fbm_ridge(az, seed);
+	return base + amp * smoothstep(0.12, 0.92, h);
 }
 
 void sky() {
@@ -133,17 +134,16 @@ void sky() {
 		col += acc * aurora * 0.62 * pulse * sector * (1.0 - cloud_amount) * smoothstep(0.02, 0.12, el);
 	}
 
-	// Хребты: дальний — в дымке почти цвета горизонта, ближний — темнее.
-	float r1 = ridge(az, 0.035, 0.11, 0.3);
-	float r2 = ridge(az + 1.37, 0.0, 0.075, 1.9);
-	if (el < r1) {
-		col = mix(far_ridge, horizon_color, 0.35 * smoothstep(0.0, r1, el));
-	}
-	if (el < r2) {
-		col = near_ridge;
-	}
-	if (el < -0.01) {
-		col = mix(near_ridge, below_color, smoothstep(-0.01, -0.2, el));
+	// Хребты: естественные пологие сопки тайги с мягкой воздушной перспективой
+	float r1 = ridge(az, 0.015, 0.075, 0.3);
+	float r2 = ridge(az + 1.37, -0.008, 0.048, 1.9);
+	float m1 = smoothstep(0.006, -0.006, el - r1);
+	float m2 = smoothstep(0.004, -0.004, el - r2);
+	vec3 ridge1_col = mix(far_ridge, horizon_color, 0.45);
+	col = mix(col, ridge1_col, m1 * (1.0 - cloud_amount * 0.6));
+	col = mix(col, near_ridge, m2 * (1.0 - cloud_amount * 0.4));
+	if (el < 0.0) {
+		col = mix(col, below_color, smoothstep(0.0, -0.12, el));
 	}
 	// Метель: небо затягивает ночной мглой цвета горизонта (без высветления).
 	col = mix(col, horizon_color * 0.45, cloud_amount * 0.45);

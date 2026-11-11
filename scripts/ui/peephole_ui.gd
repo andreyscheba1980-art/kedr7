@@ -114,8 +114,13 @@ func _ask(choice: int) -> void:
 			if not is_inside_tree(): return
 			AudioDirector.play_raw("res://assets/audio/step_snow_1.ogg", 0.0)
 			AudioDirector.play_raw("res://assets/sfx/scratch_wall.ogg", -4.0)
-			Game.hud.subtitle(Loc.t(&"sub.peep_countersign_ans"), 4.0)
-			if Game.events != null and Game.events.has_method(&"repel_knock_with_countersign"):
+			var is_mimic := Game.events != null and Game.events.knocking and Game.night >= 3
+			var ans_key := &"sub.peep_countersign_fake" if is_mimic else &"sub.peep_countersign_ans"
+			Game.hud.subtitle(Loc.t(ans_key), 4.5)
+			if is_mimic:
+				Game.audio.play_2d("res://assets/audio/whisper.ogg", 2.0)
+				Director.add_tension(12.0, "фонетическая ловушка пароля за дверью")
+			elif Game.events != null and Game.events.has_method(&"repel_knock_with_countersign"):
 				Game.events.repel_knock_with_countersign()
 	await get_tree().create_timer(3.0, false).timeout
 	_interrogating = false

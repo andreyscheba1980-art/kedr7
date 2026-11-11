@@ -6,7 +6,7 @@ signal changed
 
 const PATH := "user://settings.cfg"
 const BUSES: Array[String] = ["SFX", "Ambient", "Music", "Radio", "Tape", "Weather"]
-const STYLE_VERSION := 2
+const STYLE_VERSION := 3
 const PS1_SNAP := 320.0   ## было 140 — крупный снап «ломал» текстуры на больших гранях
 const KEYS: Array[String] = [
 	"master_volume", "sfx_volume", "music_volume", "ambient_volume", "radio_volume",

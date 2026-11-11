@@ -6,6 +6,7 @@ extends CanvasLayer
 const FACE_TEX := "res://assets/textures/face_flash.png"
 const FROST_TEX := "res://assets/textures/frost_vignette.png"
 const CovenantsClass = preload("res://scripts/data/covenants.gd")
+const SpeechChatter = preload("res://scripts/data/speech_chatter.gd")
 
 var root: Control
 var _prompt: Label
@@ -20,6 +21,9 @@ var _strength: ProgressBar
 var _lock_label: Label
 var _record_label: Label
 var _record_bar: ProgressBar
+var _fine_label: Label
+var _magic_eye_label: Label
+var _vario_label: Label
 var _note_backdrop: Control
 var _note_panel: PanelContainer
 var _note_label: Label
@@ -58,6 +62,7 @@ var _sub_until := 0
 var _modal: Control
 var cinematic := false            ## холодный старт и катсцены: без часов, задачи, фонаря
 var _fps_timer := 0.0
+var _frost_wipe_timer := 0.0
 
 
 func _ready() -> void:
@@ -191,14 +196,19 @@ func _process(delta: float) -> void:
 		# Сюжетный режим ведёт за руку; на обычной и сложной — только аварии (их нельзя пропустить).
 		_objective.text = Game.objective_text() if Game.is_story() or Game.is_prologue() or Game.story_goal != "" or Game.memory_goal != "" else Game.alarm_text()
 	if _frost != null:
+		if _frost_wipe_timer > 0.0:
+			_frost_wipe_timer -= delta
 		var frost := clampf((65.0 - Game.warmth) / 55.0, 0.0, 1.0)
-		if Game.mirror_covered:
+		if Game.mirror_covered or _frost_wipe_timer > 0.0:
 			frost = 0.0
 		# Возле горящей печи в избе иней тает в 3 раза быстрее, давая ощущение согревающего тепла
 		var melt_k := 2.0
 		if Game.is_indoors() and Game.zone == &"room" and Game.stove_wood > 0.0 and frost < _frost.modulate.a:
 			melt_k = 5.5
 		_frost.modulate.a = lerpf(_frost.modulate.a, frost * 0.85, minf(delta * melt_k, 1.0))
+		if _frost.modulate.a > 0.38 and Game.is_outside() and _frost_wipe_timer <= 0.0:
+			if _prompt != null and _prompt.text == "":
+				set_prompt(Loc.t(&"hint.wipe_face"))
 
 	if _dark_vignette != null:
 		var tension_factor := Director.tension / 100.0 if Game.is_night() else 0.0
@@ -312,24 +322,18 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 	else:
 		_subtitle.remove_theme_stylebox_override("normal")
 
-	# Телетайпная дешифрация (машинопись текста)
+	# Телетайпная дешифрация (машинопись текста) с характерной псевдоречью (Speech Chatter)
 	var total_chars := display_text.length()
 	if total_chars <= 4 or OS.get_name() == "headless":
 		_subtitle.visible_characters = -1
 	else:
 		_subtitle.visible_characters = 0
-		var type_speed := 40.0
+		var type_speed := 36.0
 		var type_dur := clampf(float(total_chars) / type_speed, 0.35, minf(duration * 0.75, 4.0))
 		var tw := create_tween()
 		tw.tween_property(_subtitle, "visible_characters", total_chars, type_dur)
-		if is_radio:
-			var ticks := mini(total_chars / 4, 18)
-			var tick_step := type_dur / float(maxi(ticks, 1))
-			for k in range(ticks):
-				tw.parallel().tween_callback(func() -> void:
-					if token == _sub_token and _subtitle.visible_characters < total_chars:
-						AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -22.0)
-				).set_delay(float(k) * tick_step)
+		var speaker := SpeechChatter.detect_speaker(display_text)
+		SpeechChatter.play_line_chatter(self, speaker, display_text, type_dur, token)
 
 	await get_tree().create_timer(duration, false).timeout
 	if token == _sub_token:
@@ -337,6 +341,19 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 		_subtitle.visible_characters = -1
 		_subtitle.remove_theme_stylebox_override("normal")
 		_sub_priority = 0
+
+
+## Смахнуть налипший снег и иней с лица/очков шерстяной варежкой
+func wipe_face_frost() -> void:
+	if _frost == null or _frost.modulate.a <= 0.08:
+		return
+	_frost_wipe_timer = 25.0
+	_frost.modulate.a = 0.0
+	if Game.player != null:
+		Game.player.shake(0.018, 0.22)
+	AudioDirector.play_raw(InstrumentView.WIPE_SFX, -12.0)
+	AudioDirector.play_raw("res://assets/audio/whisper.ogg", -16.0)
+	subtitle(Loc.t(&"sub.wipe_face"), 2.6, 1)
 
 
 ## Ненавязчивая советская пиктограмма сохранения смены
@@ -380,12 +397,29 @@ func show_radio(on: bool) -> void:
 	_prompt.visible = not on
 
 
-func update_radio(freq: float, strength: float, locked_id: StringName, record_text: String, record_progress: float) -> void:
+func update_radio(freq: float, strength: float, locked_id: StringName, record_text: String, record_progress: float, fine_tune := 0.0, vario_res := 0.85, magic_eye := 0.0, magic_overload := false) -> void:
 	var freq_str := Loc.t(&"radio.freq", [freq])
 	if absf(freq - 3820.0) <= 35.0:
 		freq_str += Loc.p("  [ 3820.0 · ТАЁЖНАЯ-4 / БЕЛОВ ]", "  [ 3820.0 · TAYOZHNAYA-4 / BELOV ]")
 	_freq_label.text = freq_str
 	_strength.value = strength * 100.0
+
+	if _fine_label != null:
+		_fine_label.text = Loc.p("ТОН: %+0.1f кГц [Q/E]" % fine_tune, "FINE: %+0.1f kHz [Q/E]" % fine_tune)
+	if _vario_label != null:
+		var pct := int(roundf(vario_res * 100.0))
+		var status_str := Loc.p("СОГЛАСОВАНО" if vario_res >= 0.65 else "РАССОГЛАСОВАНО", "MATCHED" if vario_res >= 0.65 else "UNMATCHED")
+		_vario_label.text = Loc.p("УСС ВАРИОМЕТР: %d%% [%s] [TAB/V]" % [pct, status_str], "USS VARIOMETER: %d%% [%s] [TAB/V]" % [pct, status_str])
+		_vario_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6) if vario_res >= 0.65 else Color(1.0, 0.5, 0.4))
+	if _magic_eye_label != null:
+		if magic_overload:
+			_magic_eye_label.text = Loc.p("6Е1П: ††† ЗАХЛЁСТ / КОРОННЫЙ РАЗРЯД †††", "6E1P: ††† OVERLOAD / CORONA DISCHARGE †††")
+			_magic_eye_label.add_theme_color_override("font_color", Color(0.9, 0.7, 1.0))
+		else:
+			var closure_pct := int(roundf(magic_eye * 100.0))
+			_magic_eye_label.text = Loc.p("6Е1П: СМЫКАНИЕ %d%%" % closure_pct, "6E1P: CLOSURE %d%%" % closure_pct)
+			_magic_eye_label.add_theme_color_override("font_color", Color(0.1, 1.0, 0.38)) # #18FF62 изумрудный люминофор
+
 	if locked_id != &"":
 		if String(locked_id).begins_with("bc_belov_"):
 			_lock_label.text = Loc.t(&"sig.belov.title") + " · " + Loc.t(&"radio.locked")
@@ -676,31 +710,49 @@ func _update_breath(delta: float) -> void:
 
 func _build_radio_panel() -> void:
 	_radio_panel = UiKit.panel()
-	_place(_radio_panel, 0.5, 1, 0.5, 1, -360, -330, 360, -180)
+	_place(_radio_panel, 0.5, 1, 0.5, 1, -440, -360, 440, -170)
 	var box := VBoxContainer.new()
 	_radio_panel.add_child(box)
-	var title := UiKit.label(Loc.t(&"radio.title"), 14)
-	title.modulate = Color(1, 1, 1, 0.6)
+	var title := UiKit.label(Loc.p("ВОЛНА-К (ПРИЁМНИК КОНТРОЛЬНЫЙ) · АНГАРА-РА (ТРАНСИВЕР СВЯЗИ)", "VOLNA-K (MONITOR RX) · ANGARA-RA (TX TRANSCEIVER)"), 13)
+	title.modulate = Color(1, 1, 1, 0.7)
 	box.add_child(title)
+
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	box.add_child(row)
-	_freq_label = UiKit.label("", 30)
+	_freq_label = UiKit.label("", 28)
 	_freq_label.add_theme_color_override("font_color", UiKit.AMBER)
 	row.add_child(_freq_label)
 	_strength = ProgressBar.new()
 	_strength.show_percentage = false
-	_strength.custom_minimum_size = Vector2(200, 14)
+	_strength.custom_minimum_size = Vector2(180, 14)
 	_strength.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_strength.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_strength)
+
+	var row_tech := HBoxContainer.new()
+	row_tech.add_theme_constant_override("separation", 16)
+	box.add_child(row_tech)
+
+	_fine_label = UiKit.label("ТОН: +0.0 кГц [Q/E]", 12)
+	_fine_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.6))
+	row_tech.add_child(_fine_label)
+
+	_magic_eye_label = UiKit.label("6Е1П: СМЫКАНИЕ 0%", 12)
+	_magic_eye_label.add_theme_color_override("font_color", Color(0.1, 1.0, 0.38))
+	row_tech.add_child(_magic_eye_label)
+
+	_vario_label = UiKit.label("УСС ВАРИОМЕТР: 85% [СОГЛАСОВАНО] [TAB/V]", 12)
+	_vario_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+	row_tech.add_child(_vario_label)
+
 	var row2 := HBoxContainer.new()
 	box.add_child(row2)
-	_lock_label = UiKit.label("", 14)
+	_lock_label = UiKit.label("", 13)
 	_lock_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
 	_lock_label.custom_minimum_size.x = 200
 	row2.add_child(_lock_label)
-	_record_label = UiKit.label("", 14)
+	_record_label = UiKit.label("", 13)
 	_record_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
 	row2.add_child(_record_label)
 	_record_bar = ProgressBar.new()
@@ -709,7 +761,8 @@ func _build_radio_panel() -> void:
 	_record_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_record_bar.visible = false
 	row2.add_child(_record_bar)
-	var hint := UiKit.label(Loc.t(&"radio.hint"), 13)
+
+	var hint := UiKit.label(Loc.p("[ЛКМ / Колёсико] — Оптический верньер   [Q/E] — Тон   [TAB] — Вариометр УСС   [Пробел/T] — Передача ДЭМШ-1А   [E] — Выйти", "[LMB / Wheel] — Optical vernier   [Q/E] — Tone   [TAB] — USS Variometer   [Space/T] — DEMSH-1A PTT   [E] — Exit"), 12)
 	hint.modulate = Color(1, 1, 1, 0.6)
 	box.add_child(hint)
 	_radio_panel.visible = false

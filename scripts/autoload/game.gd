@@ -75,6 +75,8 @@ var stove_heat := 0.0                   ## жар кладки, 0..100
 var stove_damper := false               ## поддувало прикрыто
 var stove_flue := false                 ## вьюшка закрыта (с огнём — угар; без огня — жар держится дольше)
 var house_switch_off := false           ## рубильник у двери: свет в доме погашен, дизель на холостом
+var zaboy_unsealed := false             ## сорвана свинцовая пломба аварийного рубильника «Директива Забой»
+var zaboy_active := false               ## контур «Забой» замкнут (ток ДГА-24 на заземление мачты)
 var warmth := 100.0
 var memory_goal := ""           ## цель во флешбэке Семёнова (смена уже кончилась — обычных целей нет)
 var story_goal := ""            ## сюжетная цель (вылазка в шахту и т. п.) — поверх обычных
@@ -106,7 +108,14 @@ var co_poisoning := 0.0
 var tea_warmth_timer := 0.0
 var mem_now: Dictionary = {}        ## что игрок натворил этой ночью (NightMemory)
 var tea_cd := 0.0                   ## чай (чайник и подстаканник) — не чаще раза в полторы минуты
+var finger_temp := 36.6              ## температура кожи пальцев (+36.6°C до +14.0°C)
+var firm_hands_timer := 0.0          ## эффект «Твёрдая рука» (5 мин) после согревания о гранёный стакан
+var tea_brick_chipped := false       ## отколот ли кусок прессованного грузинского плиточного чая №36
+var tea_brewed := false              ## заварен ли чай кипятком в 14-гранном стакане с подстаканником
+var padlock_shack_frozen := true     ## замёрз ли чугунный замок ЧЗ-1 у дизельной
+var padlock_thaw_t := 0.0            ## таймер оттайки замка спичкой или кипятком (окно 6 с)
 var barograph_wound := 100.0        ## завод барабана барографа М-22 (%)
+var baro_tapped := false            ## постучали ли по корпусу М-22 (устранение застоя трения)
 var balloon_launched := false       ## запущен ли шар-пилот
 var balloons_left := 2              ## шаров на смену: баллон водорода не бесконечный
 var balloon_task_done := false      ## завершено ли зондирование теодолитом
@@ -321,6 +330,12 @@ func setup_phase(kind: StringName, index: int) -> void:
 	balloons_left = 1 if SaveGame.difficulty == "hard" else 2
 	balloon_task_done = false
 	tea_warmth_timer = 0.0
+	finger_temp = 36.6
+	firm_hands_timer = 0.0
+	tea_brick_chipped = false
+	tea_brewed = false
+	padlock_shack_frozen = true
+	padlock_thaw_t = 0.0
 	flares = (4 if is_story() else 2 if SaveGame.difficulty == "hard" else 3) if SaveGame.items.has(&"flare_gun") else 0
 	if kind == &"night":
 		cfg = Phases.night(index)
@@ -358,6 +373,8 @@ func _reset_stove_aux() -> void:
 	stove_damper = false
 	stove_flue = false
 	house_switch_off = false
+	zaboy_unsealed = false
+	zaboy_active = false
 
 
 ## Сколько печь сейчас греет дом: 1 — топится вовсю, дальше — по жару кладки.
@@ -655,6 +672,7 @@ func has_readings() -> bool:
 func clear_readings() -> void:
 	readings.clear()
 	notebook.clear()
+	baro_tapped = false
 
 
 ## Термометры в будке сейчас: x — сухой, y — смоченный. Ночь к утру выстывает (~0,3 °C в час),
@@ -930,6 +948,25 @@ func _tick_heat(delta: float) -> void:
 	if tea_warmth_timer > 0.0:
 		tea_warmth_timer -= delta
 		warmth = minf(warmth + 0.8 * delta, 100.0)
+
+	if firm_hands_timer > 0.0:
+		firm_hands_timer -= delta
+	if padlock_thaw_t > 0.0:
+		padlock_thaw_t -= delta
+
+	# Моторика пальцев рук (-43°C):
+	if is_outside():
+		var storm_wind: float = weather.intensity if weather != null else 0.0
+		var subzero: float = absf(minf(air_temp().x, -10.0)) - 10.0
+		var cool_rate: float = subzero * 0.009 + (0.06 if storm_wind > 0.5 else 0.0)
+		if not has_item(&"mittens"):
+			cool_rate *= 1.8
+		finger_temp = maxf(finger_temp - cool_rate * delta, 14.0)
+	elif zone == &"room" or zone == &"radio_room":
+		var room_warmth := 0.45 if stove_wood > 0.0 else 0.15
+		finger_temp = minf(finger_temp + room_warmth * delta, 33.5)
+	else:
+		finger_temp = move_toward(finger_temp, 28.0, delta * 0.1)
 
 	# Забитый дымоход при горящей печи: угар копится в тёплых комнатах (не на чердаке и не в кладовой).
 	# ~80 с до смерти — хватает, чтобы понять по кашлю и выйти чистить трубу или залить печь.
@@ -1669,3 +1706,85 @@ func _bind_joy_axis(action: StringName, axis: JoyAxis, val: float) -> void:
 	ev.axis = axis
 	ev.axis_value = val
 	InputMap.action_add_event(action, ev)
+
+
+func finger_stage() -> int:
+	if firm_hands_timer > 0.0 or finger_temp >= 31.5:
+		return 1 # Норма (+32..+36.6°C)
+	elif finger_temp >= 21.5:
+		return 2 # Озноб / Деревянные пальцы (+22..+31°C)
+	return 3 # Окоченение (+14..+21°C)
+
+
+func chip_tea_brick() -> bool:
+	if tea_brick_chipped:
+		return false
+	tea_brick_chipped = true
+	audio.play_2d("res://assets/audio/clank.ogg", -4.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.tea_chipped"), 3.5)
+	return true
+
+
+func brew_tea_in_glass() -> bool:
+	if not tea_brick_chipped or tea_brewed:
+		return false
+	if stove_wood <= 0.0:
+		if hud != null:
+			hud.subtitle(Loc.t(&"sub.tea_kettle_not_boiling"), 3.0)
+		return false
+	tea_brewed = true
+	audio.play_2d("res://assets/audio/tea_sip.ogg", -2.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.tea_poured"), 3.5)
+	return true
+
+
+func warm_hands_with_glass() -> void:
+	finger_temp = 36.6
+	firm_hands_timer = 300.0 # 5 минут «Твёрдая рука»
+	tea_warmth_timer = 90.0
+	warmth = minf(warmth + 35.0, 100.0)
+	Director.add_tension(-4.0, "отогрев рук о стакан чая")
+	audio.play_2d("res://assets/audio/tea_sip.ogg", 0.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.tea_firm_hands"), 4.5)
+
+
+func thaw_padlock_with_match() -> bool:
+	if not padlock_shack_frozen:
+		return false
+	padlock_thaw_t = 6.0
+	audio.play_2d("res://assets/audio/flare_shot.ogg", -6.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.padlock_thawed_match"), 3.5)
+	return true
+
+
+func thaw_padlock_with_kettle() -> bool:
+	if not padlock_shack_frozen:
+		return false
+	if stove_wood <= 0.0:
+		if hud != null:
+			hud.subtitle(Loc.t(&"sub.kettle_not_hot"), 3.0)
+		return false
+	padlock_thaw_t = 6.0
+	audio.play_2d("res://assets/audio/tea_sip.ogg", -2.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.padlock_thawed_water"), 3.5)
+	return true
+
+
+func try_unlock_padlock() -> bool:
+	if not padlock_shack_frozen:
+		return true
+	if padlock_thaw_t > 0.0:
+		padlock_shack_frozen = false
+		audio.play_2d("res://assets/sfx/door_handle.ogg", -3.0)
+		if hud != null:
+			hud.subtitle(Loc.t(&"sub.padlock_opened"), 3.0)
+		return true
+	audio.play_2d("res://assets/audio/clank.ogg", 0.0)
+	if hud != null:
+		hud.subtitle(Loc.t(&"sub.padlock_frozen_jam"), 3.5)
+	return false

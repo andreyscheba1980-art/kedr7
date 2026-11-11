@@ -56,7 +56,11 @@ void fragment() {
 	vec3 n_world = normalize(wnrm + vec3(wd.x * slope, 0.0, wd.y * slope) + vec3(cross_d.x, 0.0, cross_d.y) * slope * 0.2);
 	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
 	float crest = smoothstep(0.6, 1.0, sin(ph)) * amp;
-	ALBEDO = albedo.rgb * t * (1.0 + crest * 0.25);
+	// На крутых склонах сопок снег сдувается ветром, обнажая каменные курумники
+	float slope_rock = smoothstep(0.78, 0.50, wnrm.y);
+	vec3 rock_col = vec3(0.24, 0.25, 0.28) * (0.85 + 0.3 * big);
+	vec3 snow_col = albedo.rgb * t * (1.0 + crest * 0.25);
+	ALBEDO = mix(snow_col, rock_col, slope_rock);
 	ROUGHNESS = 1.0;
 
 	// Кристаллы наста: ~0.7 % клеток 3×3 см, у каждой своя наклонённая микронормаль

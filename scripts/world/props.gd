@@ -1894,6 +1894,61 @@ static func podstakannik() -> Node3D:
 	return _mi(k, &"podstakannik", "tex_metal.png")
 
 
+## Брикет прессованного грузинского плиточного чая №36 (ГОСТ 1938-73) с ножом
+static func tea_brick() -> Node3D:
+	var cached := _instance_from_cache(&"tea_brick", "tex_wood.png")
+	if cached != null:
+		return cached
+	var k := _kit(44, 0.02)
+	var tea_dark := Color(0.20, 0.14, 0.09)
+	var foil := Color(0.78, 0.80, 0.84)
+	var wrapper := Color(0.82, 0.74, 0.58)
+	var knife_wood := Color(0.40, 0.24, 0.14)
+	var steel := Color(0.72, 0.74, 0.76)
+
+	# Прессованный чайный кирпич
+	k.box(Vector3.ZERO, Vector3(0.12, 0.032, 0.075), tea_dark)
+	# Оберточная бумага по центру и разорванная фольга на сколе
+	k.box(Vector3(0.01, 0.001, 0.0), Vector3(0.08, 0.034, 0.077), wrapper)
+	k.box(Vector3(-0.042, 0.001, 0.0), Vector3(0.028, 0.033, 0.076), foil)
+	# Перочинный нож дежурного, воткнутый в угол брикета для откалывания порций
+	k.tube([Vector3(-0.045, 0.016, 0.01), Vector3(-0.035, 0.032, 0.012)], [0.004, 0.002], steel, 4)
+	k.tube([Vector3(-0.035, 0.032, 0.012), Vector3(-0.012, 0.075, 0.018)], [0.008, 0.006], knife_wood, 5)
+
+	return _mi(k, &"tea_brick", "tex_wood.png")
+
+
+## Чугунный навесной замок ЧЗ-1 (с наледью и кристаллами изморози на морозе -43°C)
+static func padlock_chz1(iced := true) -> Node3D:
+	var key := &"padlock_chz1_iced" if iced else &"padlock_chz1_clear"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(52, 0.02)
+	var iron := Color(0.22, 0.23, 0.25)
+	var shackle_col := Color(0.55, 0.58, 0.62)
+	var keyhole := Color(0.05, 0.05, 0.06)
+	var rime := Color(0.92, 0.96, 1.0, 0.92)
+
+	# Массивный чугунный корпус замка
+	k.box(Vector3(0, -0.01, 0), Vector3(0.068, 0.084, 0.026), iron)
+	# Замочная скважина
+	k.box(Vector3(0, -0.025, 0.014), Vector3(0.008, 0.022, 0.002), keyhole)
+	# Полукруглая дужка
+	k.tube([
+		Vector3(-0.022, 0.032, 0), Vector3(-0.022, 0.070, 0),
+		Vector3(0.0, 0.082, 0),
+		Vector3(0.022, 0.070, 0), Vector3(0.022, 0.032, 0)
+	], [0.006], shackle_col, 6)
+
+	if iced:
+		# Кристаллы куржака и наледи на корпусе и дужке
+		k.blob(Vector3(-0.018, 0.055, 0.004), Vector3(0.018, 0.025, 0.014), rime, 4, 6)
+		k.blob(Vector3(0.015, -0.015, 0.012), Vector3(0.022, 0.028, 0.01), rime, 4, 6)
+
+	return _mi(k, key, "tex_metal.png")
+
+
 ## Обледенение чашек флюгера-анемометра (наледь, корка на чашках и сосульки)
 static func anemo_ice() -> Node3D:
 	var cached := _instance_from_cache(&"anemo_ice", "tex_snow.png")

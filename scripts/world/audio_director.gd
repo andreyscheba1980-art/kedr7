@@ -86,7 +86,14 @@ const SFX_ALIASES := {
 }
 
 
+const ZasAudioClass = preload("res://scripts/data/zas_audio.gd")
+
+
 static func _build_stream(path: String) -> AudioStream:
+	if path.ends_with("voice_mainland.ogg") or path.ends_with("voice_loop.ogg"):
+		var scramble := ZasAudioClass.get_scramble_stream(3.5, false)
+		if scramble != null:
+			return scramble
 	var s := load(path) as AudioStream
 	if s == null or path.contains("_v"):
 		return s
@@ -121,9 +128,12 @@ static func _build_stream(path: String) -> AudioStream:
 	return r
 
 
-static func play_raw(path: String, vol_db := 0.0) -> AudioStreamPlayer:
+static func play_raw(path: String, vol_db := 0.0, pitch := 1.0) -> AudioStreamPlayer:
 	if Game.audio != null:
-		return Game.audio.play_2d(path, vol_db)
+		var p := Game.audio.play_2d(path, vol_db)
+		if p != null and not is_equal_approx(pitch, 1.0):
+			p.pitch_scale = pitch
+		return p
 	return null
 
 

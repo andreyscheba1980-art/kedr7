@@ -2140,7 +2140,7 @@ func _run() -> void:
 	Settings.apply()
 	await _wait(0.5)
 	await _shot("menu_sharp")
-	Settings.pixelation = 2
+	Settings.pixelation = 0
 	Settings.apply()
 	menu.call("_show_main")
 	print("[autotest] new game")

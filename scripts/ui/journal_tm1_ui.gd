@@ -283,12 +283,12 @@ func _on_draw_book() -> void:
 		var stamp_pos := Vector2(left_page.position.x + 72, left_page.end.y - 64)
 		_draw_soviet_station_stamp(stamp_pos)
 
-	# Штамп «ПЕРЕДАНО В УГМС», если радиограмма уже отправлена
+	# Штамп «ПЕРЕДАНО В УГКС», если радиограмма уже отправлена
 	if _transmitted or SaveGame.flags.get("forecast_day", -1) == Game.phase_index:
 		var trans_rect := Rect2(right_page.position.x + 120, right_page.end.y - 120, 260, 48)
 		_canvas.draw_rect(trans_rect, Color(0.15, 0.35, 0.75, 0.12))
 		_canvas.draw_rect(trans_rect, Color(0.15, 0.35, 0.75, 0.65), false, 2.0)
-		_canvas.draw_string(UiStyle.type_font(), trans_rect.position + Vector2(18, 30), Loc.p("ПЕРЕДАНО В УГМС • 22:15 МСК", "SENT TO UGMS • 22:15 MSK"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.15, 0.35, 0.75, 0.85))
+		_canvas.draw_string(UiStyle.type_font(), trans_rect.position + Vector2(18, 30), Loc.p("ПЕРЕДАНО В УГКС • 22:15 МСК", "SENT TO UGKS • 22:15 MSK"), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.15, 0.35, 0.75, 0.85))
 
 	# Анимация перелистывания страницы (3 кадра низкий FPS)
 	if _flipping and _flip_frame > 0:
@@ -308,7 +308,7 @@ func _draw_soviet_station_stamp(pos: Vector2) -> void:
 
 	var font := UiStyle.type_font()
 	_canvas.draw_string(font, pos + Vector2(-24, -6), Loc.p("КЕДР-7", "KEDR-7"), HORIZONTAL_ALIGNMENT_CENTER, 48, 10, stamp_col)
-	_canvas.draw_string(font, pos + Vector2(-24, 6), Loc.p("УГМС", "UGMS"), HORIZONTAL_ALIGNMENT_CENTER, 48, 10, stamp_col)
+	_canvas.draw_string(font, pos + Vector2(-24, 6), Loc.p("УГКС", "UGKS"), HORIZONTAL_ALIGNMENT_CENTER, 48, 10, stamp_col)
 	_canvas.draw_string(font, pos + Vector2(-24, 17), "1983", HORIZONTAL_ALIGNMENT_CENTER, 48, 9, Color(stamp_col.r, stamp_col.g, stamp_col.b, stamp_col.a * 0.75))
 	_canvas.draw_circle(pos + Vector2(0, -16), 1.8, stamp_col)
 
@@ -1226,6 +1226,15 @@ func _submit_verdict() -> void:
 		_status_lbl.text = Loc.p("Сначала выберите регламент защиты погоды!", "Choose a weather protection procedure first!")
 		style_paper_label(_status_lbl, C_INK_RED, 12)
 		AudioDirector.play_raw(TICK_SFX, -4.0)
+		return
+
+	if Game.notebook.has(&"baro") and not Game.baro_tapped:
+		var rej_text: String = Loc.t(&"radio.baro_rejected")
+		_status_lbl.text = Loc.p("СВОДКА ЗАБРАКОВАНА: ЗАСТОЙ ТРЕНИЯ БАРОГРАФА", "REPORT REJECTED: BAROGRAPH FRICTION ERROR")
+		style_paper_label(_status_lbl, C_INK_RED, 12)
+		Game.hud.subtitle(rej_text, 7.0)
+		AudioDirector.play_raw(STAMP_SFX, -1.0)
+		Director.add_tension(8.0, "брак сводки из-за барографа")
 		return
 
 	_transmitted = true

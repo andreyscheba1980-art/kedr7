@@ -35,8 +35,8 @@ void fragment() {
 	vec2 q = UV - 0.5;
 	float d2 = dot(q, q);
 
-	// Оптическая дисперсия линзы CRT: края кадра дают тонкую кайму без замыливания центра
-	float ca = (ps1_post > 0.5 ? chromatic : chromatic * 0.4) * d2 * film_fx;
+	// Оптическая дисперсия линзы CRT: края кадра дают тонкую кайму только в PS1-режиме
+	float ca = (ps1_post > 0.5 ? chromatic * d2 * film_fx : 0.0);
 	vec3 col;
 	if (ca > 0.00004) {
 		float r = texture(TEXTURE, UV + q * ca).r;
@@ -87,14 +87,14 @@ void fragment() {
 		col = mix(flattened, whiteout_color, whiteout * dark_mask * 0.94);
 	}
 
-	// Мягкое свечение (halation) ярких огней (фонарь, окно, пламя, маяк)
-	float bloom = max(0.0, l0 - 0.72);
-	col += vec3(bloom * 0.14, bloom * 0.10, bloom * 0.04);
+	// Мягкое свечение (halation) только от сверхярких огней (нить накала, окно, пламя, маяк)
+	float bloom = max(0.0, l0 - 0.92);
+	col += vec3(bloom * 0.12, bloom * 0.08, bloom * 0.03);
 
-	// Советский анаморфный горизонтальный стрик (линзы «Гелиос»/«Индустар» от фар ГТ-Т, маяка, огня, ракетницы)
-	if (l0 > 0.40) {
+	// Советский анаморфный горизонтальный стрик от концентрированных источников света (фары, маяк, сигнальная ракета)
+	if (l0 > 0.90) {
 		vec3 streak = vec3(0.0);
-		const float STREAK_OFFSETS[3] = float[3](0.004, 0.009, 0.016);
+		const float STREAK_OFFSETS[3] = float[3](0.003, 0.006, 0.010);
 		const float STREAK_WEIGHTS[3] = float[3](0.50, 0.30, 0.20);
 		for (int i = 0; i < 3; i++) {
 			float dx = STREAK_OFFSETS[i];
@@ -103,8 +103,8 @@ void fragment() {
 			vec3 s_r = texture(TEXTURE, UV + vec2(dx, 0.0)).rgb * brightness;
 			float lum_l = dot(s_l, vec3(0.299, 0.587, 0.114));
 			float lum_r = dot(s_r, vec3(0.299, 0.587, 0.114));
-			float b_l = max(0.0, lum_l - 0.78);
-			float b_r = max(0.0, lum_r - 0.78);
+			float b_l = max(0.0, lum_l - 0.90);
+			float b_r = max(0.0, lum_r - 0.90);
 			streak += (s_l * b_l + s_r * b_r) * w;
 		}
 		col += streak * vec3(0.12, 0.15, 0.22);

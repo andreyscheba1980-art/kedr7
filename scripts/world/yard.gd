@@ -498,29 +498,10 @@ func _on_pickup(p: Player, it: Interactable, item: StringName) -> void:
 
 # --- Земля, леера, таблички --------------------------------------------------
 
-## Слои морозной дымки между рядами елей: три открытых цилиндра вокруг станции (assets/shaders/forest_haze.gdshader).
-## Ночью — лунное молоко, днём — серая мгла. Лес перестаёт быть плоской тёмной стеной и уходит вдаль.
+## Атмосферная дымка теперь полностью обрабатывается глобальным Environment.fog без
+## артефактных невидимых цилиндров, которые игрок мог пересечь и увидеть белые срезы.
 func _build_forest_haze() -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://assets/shaders/forest_haze.gdshader")
-	mat.set_shader_parameter(&"haze_col", Color(0.62, 0.65, 0.7) if Game.is_daylight() else Color(0.11, 0.18, 0.24))
-	mat.set_shader_parameter(&"strength", 0.22 if Game.is_daylight() else 0.32)
-	for r: float in [48.0, 70.0, 95.0]:
-		var cyl := CylinderMesh.new()
-		cyl.top_radius = r
-		cyl.bottom_radius = r
-		cyl.height = 9.0
-		cyl.radial_segments = 48
-		cyl.rings = 1
-		cyl.cap_top = false
-		cyl.cap_bottom = false
-		var mi := MeshInstance3D.new()
-		mi.mesh = cyl
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.position = Vector3(20.0, 4.5, -5.0)
-		mi.extra_cull_margin = 10.0
-		add_child(mi)
+	pass
 
 
 ## Сугробы, наметённые к стенам дома: ветер с запада и севера кладёт снег вдоль сруба.
@@ -725,14 +706,18 @@ func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
 			_rope_span(tops[i - 1], tops[i])
 
 
-## Трос между вешками: провисает параболой (4 куска), провис — от длины пролёта.
+## Трос между вешками: провисает по цепной линии (парабола 5 кусков, S = 0.22..0.38 м).
 func _rope_span(a: Vector3, b: Vector3) -> void:
-	var sag := 0.05 + a.distance_to(b) * 0.018
-	var n := 4
+	var span_dist := a.distance_to(b)
+	var sag := clampf(0.14 + span_dist * 0.032, 0.22, 0.38)
+	var n := 5
 	var prev := a
+	var mid_pt := Vector3.ZERO
 	for k in range(1, n + 1):
-		var t := float(k) / n
+		var t := float(k) / float(n)
 		var cur := a.lerp(b, t) + Vector3(0, -4.0 * sag * t * (1.0 - t), 0)
+		if k == 3:
+			mid_pt = cur
 		var seg_len := prev.distance_to(cur)
 		var dir := (cur - prev).normalized()
 		var seg := Geo.box_mesh(Vector3(0.022, 0.022, seg_len + 0.01), Palette.m(&"rope"))
@@ -741,6 +726,13 @@ func _rope_span(a: Vector3, b: Vector3) -> void:
 		add_child(seg)
 		_rope_nodes.append(seg)
 		prev = cur
+
+	# На отдельных пролётах каната — акустический или визуальный маяк (жестянка / кумачовый лоскут)
+	if span_dist > 5.5 and mid_pt != Vector3.ZERO:
+		var marker := Geo.box_mesh(Vector3(0.04, 0.12, 0.04), Palette.m(&"metal" if mid_pt.x < 30.0 else &"carpet"))
+		marker.position = mid_pt - Vector3(0, 0.06, 0)
+		add_child(marker)
+		_rope_nodes.append(marker)
 
 
 ## Развилка: здесь сходятся несколько лееров — трос не тянем, чтобы не было сетки из верёвок.
@@ -4159,6 +4151,14 @@ func _build_station_road_dressing() -> void:
 		walkway.position = mid
 		walkway.rotation.y = atan2(d.x, d.z)
 		add_child(walkway)
+		var side_n := Vector3(-d.z, 0.0, d.x).normalized()
+		var n_drifts := maxi(1, int(len / 4.5))
+		for k in n_drifts:
+			var frac := (float(k) + 0.5) / float(n_drifts)
+			var at_p := p0.lerp(p1, frac)
+			for sgn: float in [-1.0, 1.0]:
+				var dp := at_p + side_n * (sgn * 0.9)
+				SiteDressing.drift(self, dp, 3.0, 0.28, 0.7, rad_to_deg(atan2(d.x, d.z)))
 
 	# Поющий провод ЛЭП на ветру
 	var wire_sing := AudioStreamPlayer3D.new()
@@ -4260,6 +4260,72 @@ func _build_station_road_dressing() -> void:
 	# Колея от гусениц тягача к зимнику
 	SiteDressing.tracks(self, tractor_pos + Vector3(0, 0, 2.5), Vector3(14.0, 0.0, 14.0))
 	SiteDressing.tracks(self, Vector3(14.0, 0.0, 14.0), Vector3(-10.0, 0.0, 34.0))
+
+	# 7. Волокуши геодезистов (Surveyor Sledge) на обочине дороги
+	var sledge_pos := Vector3(46.0, Terrain.height(46.0, -17.5), -17.5)
+	var sledge := Props.surveyor_sledge()
+	sledge.position = sledge_pos
+	sledge.rotation.y = deg_to_rad(32.0)
+	add_child(sledge)
+	var sl_col := Geo.collider(self, Vector3(1.6, 1.2, 2.8), sledge_pos + Vector3(0, 0.6, 0))
+	sl_col.rotation.y = deg_to_rad(32.0)
+	var sledge_it := Geo.interactable(self, Vector3(2.2, 1.6, 3.2), sledge_pos + Vector3(0, 0.8, 0), null, Loc.t(&"it.surveyor_sledge_road"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.surveyor_sledge_road"), 5.0)
+	)
+	sledge_it.name = "SurveyorSledgeRoad"
+
+	# 8. Снегозадерживающие щиты (Snow Fences) с северной подветренной стороны дороги
+	var road_fences: Array[Vector3] = [
+		Vector3(42.0, 0.0, -18.5),
+		Vector3(45.5, 0.0, -22.0),
+		Vector3(49.0, 0.0, -25.5),
+		Vector3(63.0, 0.0, -33.5),
+		Vector3(66.5, 0.0, -34.0),
+		Vector3(70.0, 0.0, -34.0),
+	]
+	for rfp in road_fences:
+		var fence := Props.snow_fence(3.2, 1.8)
+		fence.position = Vector3(rfp.x, Terrain.height(rfp.x, rfp.z), rfp.z)
+		fence.rotation.y = deg_to_rad(-42.0 if rfp.x < 55.0 else -10.0)
+		add_child(fence)
+		SiteDressing.drift(self, fence.position + Vector3(0.3, 0, -0.5), 3.4, 0.65, 1.1, fence.rotation_degrees.y)
+
+	# 9. Штабель бочек с полярной соляркой «Арктика» возле опоры mp2
+	var depot_pos := Vector3(61.5, Terrain.height(61.5, -25.5), -25.5)
+	for bi in 4:
+		var b: Node3D = Props.frozen_barrel() if bi % 2 == 1 else Props.barrel()
+		var boff := Vector3((bi % 2) * 0.75 - 0.35, 0.0, (bi / 2) * 0.75 - 0.35)
+		var bp := depot_pos + boff
+		bp.y = Terrain.height(bp.x, bp.z)
+		b.position = bp
+		b.rotation.y = deg_to_rad(bi * 45.0)
+		add_child(b)
+	var depot_col := Geo.collider(self, Vector3(2.0, 1.4, 2.0), depot_pos + Vector3(0, 0.7, 0))
+	var depot_it := Geo.interactable(self, Vector3(2.4, 1.6, 2.4), depot_pos + Vector3(0, 0.8, 0), null, Loc.t(&"it.fuel_depot_road"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.fuel_depot_road"), 5.0)
+	)
+	depot_it.name = "FuelDepotRoad"
+
+	# Деревянный ящик снабжения у бочек
+	var cr := Props.crate()
+	var cr_pos := depot_pos + Vector3(1.2, 0.0, 0.2)
+	cr_pos.y = Terrain.height(cr_pos.x, cr_pos.z)
+	cr.position = cr_pos
+	cr.rotation.y = deg_to_rad(18.0)
+	add_child(cr)
+
+	# 10. Лопата и ступени у входа в метеокорпус (Corpus Porch)
+	var porch_shovel := Props.snow_shovel()
+	var ps_pos := CORPUS_PORCH + Vector3(-1.4, 0.0, 1.2)
+	ps_pos.y = Terrain.height(ps_pos.x, ps_pos.z)
+	porch_shovel.position = ps_pos
+	porch_shovel.rotation.x = deg_to_rad(14.0)
+	porch_shovel.rotation.y = deg_to_rad(-65.0)
+	add_child(porch_shovel)
+	var psh_it := Geo.interactable(self, Vector3(1.4, 1.6, 1.4), ps_pos + Vector3(0, 0.7, 0), null, Loc.t(&"it.shovel_corpus"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.shovel_corpus"), 4.5)
+	)
+	psh_it.name = "CorpusPorchShovel"
 
 
 # --- Дополнительное обустройство двора станции (Yard Clutter) ----------------

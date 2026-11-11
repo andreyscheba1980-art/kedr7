@@ -25,6 +25,12 @@ void fragment() {
 """
 const CELL := Vector2(232, 130)
 
+static var tank_loaded_this_session := false
+var _black_overlay: ColorRect
+var _black_label: Label
+var _spiral_turns := 0
+var _breathed := false
+
 var _shader: Shader
 var _n := 0
 var _loupe_overlay: Control
@@ -50,11 +56,11 @@ func _ready() -> void:
 	UiKit.place(self, root, 0.5, 0.5, 0.5, 0.5, -540, -330, 540, 330)
 
 	# Заголовок фотолаборатории
-	var title := UiKit.label(Loc.t(&"darkroom.title"), 20)
+	var title := UiKit.label(Loc.p("ФОТОЛАБОРАТОРИЯ «ЛЕНИНГРАД-4» · БУМАГА «УНИБРОМ»", "DARKROOM 'LENINGRAD-4' · 'UNIBROM' PAPER"), 20)
 	title.add_theme_color_override(&"font_color", Color(1.0, 0.6, 0.5))
 	root.add_child(title)
 
-	var sub := UiKit.label(Loc.t(&"darkroom.sub"), 12)
+	var sub := UiKit.label(Loc.p("Фаза 2: Экспонирование на фотобумагу и покачивание кювет в проявителе УП-2", "Phase 2: Paper exposure and tray agitation in UP-2 developer"), 12)
 	sub.add_theme_color_override(&"font_color", Color(0.88, 0.52, 0.46))
 	root.add_child(sub)
 
@@ -106,6 +112,76 @@ func _ready() -> void:
 	btn.grab_focus.call_deferred()
 
 	_build_loupe_overlay()
+	if not tank_loaded_this_session:
+		_build_blind_tank_phase()
+
+
+func _build_blind_tank_phase() -> void:
+	_black_overlay = ColorRect.new()
+	_black_overlay.color = Color.BLACK
+	_black_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	UiKit.place(self, _black_overlay, 0, 0, 1, 1, 0, 0, 0, 0)
+
+	var center_box := VBoxContainer.new()
+	center_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	center_box.add_theme_constant_override("separation", 14)
+	_black_overlay.add_child(center_box)
+	UiKit.place(_black_overlay, center_box, 0.5, 0.5, 0.5, 0.5, -380, -140, 380, 140)
+
+	var h1 := UiKit.label(Loc.p("ФАЗА 1: ЗАРЯДКА В ЭБОНИТОВЫЙ БАЧОК (100% ТЕМНОТА)", "PHASE 1: EBONITE SPIRAL TANK LOADING (TOTAL DARKNESS)"), 16, HORIZONTAL_ALIGNMENT_CENTER)
+	h1.add_theme_color_override("font_color", Color(0.85, 0.25, 0.22))
+	center_box.add_child(h1)
+
+	var desc := UiKit.label(Loc.p("Плёнка «Свема ФОТО-64» — изопанхроматическая (красный свет засветит её в черноту).\nОриентируйтесь вслепую по слуху и щелчкам перфорации спирали.\n\n[Колёсико мыши вверх (Wheel Up)] — вращать спираль\n[Wheel Down] — отмотка назад при заедании", "Film 'Svema PHOTO-64' is panchromatic (red light ruins it completely).\nWork by touch in total darkness, listening to perforation clicks.\n\n[Mouse Wheel Up] — turn spiral\n[Wheel Down] — unwind snag"), 13, HORIZONTAL_ALIGNMENT_CENTER)
+	desc.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65))
+	center_box.add_child(desc)
+
+	_black_label = UiKit.label(Loc.p("Заправлено витков: 0 / 10", "Spiral turns: 0 / 10"), 18, HORIZONTAL_ALIGNMENT_CENTER)
+	_black_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.7))
+	center_box.add_child(_black_label)
+
+	var skip_btn := UiKit.button(Loc.p("Закрутить крышку бачка [Готово]", "Screw tank lid [Done]"), func() -> void:
+		_finish_spiral_loading()
+	)
+	center_box.add_child(skip_btn)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _black_overlay != null and is_instance_valid(_black_overlay) and _black_overlay.visible:
+		if event is InputEventMouseButton and event.is_pressed():
+			var mb := event as InputEventMouseButton
+			if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_advance_spiral()
+			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_rewind_spiral()
+
+
+func _advance_spiral() -> void:
+	_spiral_turns += 1
+	Game.audio.play_2d("res://assets/audio/clank.ogg", -12.0)
+	if _spiral_turns == 5 and not _breathed:
+		_breathed = true
+		Game.audio.play_2d("res://assets/audio/teeth_chatter.ogg", -6.0)
+		Game.hud.subtitle(Loc.p("(В темноте в 30 см от вашего левого уха раздался тихий влажный вздох...)", "(In the darkness 30 cm from your ear, a wet breath sighed...)"), 4.0)
+	if _black_label != null:
+		_black_label.text = Loc.p("Заправлено витков: %d / 10" % _spiral_turns, "Spiral turns: %d / 10" % _spiral_turns)
+	if _spiral_turns >= 10:
+		_finish_spiral_loading()
+
+
+func _rewind_spiral() -> void:
+	_spiral_turns = maxi(_spiral_turns - 1, 0)
+	Game.audio.play_2d("res://assets/audio/clank.ogg", -15.0)
+	if _black_label != null:
+		_black_label.text = Loc.p("Заправлено витков: %d / 10" % _spiral_turns, "Spiral turns: %d / 10" % _spiral_turns)
+
+
+func _finish_spiral_loading() -> void:
+	tank_loaded_this_session = true
+	Game.audio.play_2d("res://assets/audio/clank.ogg", -2.0)
+	Game.hud.subtitle(Loc.p("Крышка эбонитового бачка закручена намертво. Включаем красный лабораторный фонарь...", "Ebonite tank lid screwed lightproof. Turning on red lab lamp..."), 3.5)
+	if _black_overlay != null and is_instance_valid(_black_overlay):
+		_black_overlay.queue_free()
 
 
 func _make_tray_badge(txt: String, bg_col: Color) -> PanelContainer:

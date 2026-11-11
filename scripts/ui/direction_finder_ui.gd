@@ -34,6 +34,7 @@ var _lock_t := 0.0
 var _rec_t := -1.0
 var _drag := false
 var _done := false
+var _sense_active := false
 
 
 func _ready() -> void:
@@ -102,15 +103,32 @@ func _tuned() -> Array:
 	return [best, bs]
 
 
-## Диаграмма рамки: «восьмёрка» — провал, когда указатель смотрит на источник (или от него).
+## Диаграмма рамки РП-2: бритвенно-острый «акустический ноль» (±1°) и штырь-кардиоида
 func _pattern(id: StringName) -> float:
 	if id == &"" or not Efir.can_bearing(id) or Efir.too_close(id, point):
 		return 1.0
-	var d := deg_to_rad(_angle - Efir.true_bearing(id, point))
-	return clampf(pow(absf(sin(d)), 0.8), 0.04, 1.0)
+
+	# Ночь 5: аномалия строго на оси вращения рамки (на крыше над головой или под полом)
+	if Game.night == 5 and (id == &"semenov" or id == &"anomaly" or id == &"code" or String(id).contains("yrka")):
+		return 1.0
+
+	var target_brg := Efir.true_bearing(id, point)
+	# Ночь 7: проверка спасателей — если мимик, звук идёт из Штольни №4 (15°), а не от ворот (180°)
+	if Game.night == 7 and Game.final_call:
+		var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
+		target_brg = 15.0 if is_mimic else 180.0
+
+	var d := deg_to_rad(_angle - target_brg)
+	if _sense_active:
+		# Кардиоида: штыревая антенна складывает диаграмму, устраняя двузначность на 180°
+		return clampf(0.5 * (1.0 + cos(d)), 0.08, 1.0)
+
+	# Акустический ноль (восьмёрка рамки с острым провалом звука):
+	return clampf(pow(absf(sin(d)), 3.2), 0.005, 1.0)
 
 
 func _process(delta: float) -> void:
+	_sense_active = Input.is_physical_key_pressed(KEY_SPACE) or Input.is_physical_key_pressed(KEY_C) or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	var fast := not Input.is_key_pressed(KEY_SHIFT)
 	# A/D и левый стик — частота, W/S и правый стик — рамка; стрелки заняты книжкой
 	var lx := Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
@@ -242,6 +260,10 @@ func _draw_panel() -> void:
 	_panel.draw_circle(c, 6, ink)
 	UiStyle.dial_glass(_panel, c, r)
 	_panel.draw_string(font, c + Vector2(-6, -r - 22), Loc.t(&"map.north"), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, face)
+
+	var mode_str := Loc.p("РЕЖИМ: ШТЫРЬ-КАРДИОИДА (УСТРАНЕНИЕ 180°)" if _sense_active else "РЕЖИМ: РАМКА РП-2 (АКУСТИЧЕСКИЙ НОЛЬ ±1°)", "MODE: SENSE CARDIOID (180° RESOLVE)" if _sense_active else "MODE: RP-2 LOOP (ACOUSTIC NULL ±1°)")
+	var mode_col := Color(0.95, 0.75, 0.3) if _sense_active else Color(0.65, 0.85, 0.65)
+	_panel.draw_string(font, Vector2(24, w.y - 18), mode_str + "  [ПРОБЕЛ / C / ПКМ]", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, mode_col)
 
 
 # --- Запись пеленга ---------------------------------------------------------------------

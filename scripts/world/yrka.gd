@@ -37,9 +37,11 @@ const VOICES: Array[String] = [
 	"res://assets/audio/yrka_voice_1.ogg",
 	"res://assets/audio/yrka_voice_2.ogg",
 	"res://assets/audio/yrka_voice_3.ogg",
-	"res://assets/audio/yrka_voice_4.ogg"
+	"res://assets/audio/yrka_voice_4.ogg",
+	"res://assets/audio/yrka_voice_1.ogg",
+	"res://assets/audio/yrka_voice_2.ogg"
 ]
-const VOICE_SUBS: Array[StringName] = [&"yrka.voice.1", &"yrka.voice.2", &"yrka.voice.3", &"yrka.voice.4"]
+const VOICE_SUBS: Array[StringName] = [&"yrka.voice.1", &"yrka.voice.2", &"yrka.voice.3", &"yrka.voice.4", &"yrka.voice.5", &"yrka.voice.6"]
 const STILL_LIMIT := 6.0       ## сколько можно стоять на зове, прежде чем он подойдёт вплотную
 
 var enabled := false
@@ -416,10 +418,31 @@ func _update_voice_and_drift(delta: float) -> void:
 		cam_fwd.y = 0.0
 		if cam_fwd.length_squared() > 0.01:
 			var dot := cam_fwd.normalized().dot(to_voice.normalized())
+			if p.camera != null:
+				if dot > 0.25 and dot <= 0.65:
+					p.camera.fov = lerpf(p.camera.fov, 62.0, delta * 5.0)
+				else:
+					p.camera.fov = lerpf(p.camera.fov, 40.0, delta * 3.0)
 			if dot > 0.65:
 				_pull_timer = 0.0
 				NightMemory.mark(&"turned")
 				_start_contact()
+
+
+## Рассинхрон шагов: второй тяжёлый хруст по насту в 1.1 м за пятками игрока
+func on_player_footstep(player_pos: Vector3, player_back_dir: Vector3) -> void:
+	if not enabled or stage == Stage.CALM or stage == Stage.CHASE or stage == Stage.RETREAT:
+		return
+	if not (stage in [Stage.STALKING, Stage.CALLING, Stage.PRESSURE]):
+		return
+	get_tree().create_timer(0.18, false).timeout.connect(func() -> void:
+		if enabled and Game.is_outside() and stage in [Stage.STALKING, Stage.CALLING, Stage.PRESSURE]:
+			var step_pos := player_pos + player_back_dir.normalized() * 1.1
+			var step_sfx := "res://assets/audio/step_snow_%d.ogg" % randi_range(1, 4)
+			var sp := Game.audio.play_3d(step_sfx, step_pos, 0.5, 6.0)
+			if sp != null:
+				sp.pitch_scale = randf_range(0.82, 0.90)
+	)
 
 
 func _start_contact() -> void:
