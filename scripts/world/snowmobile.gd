@@ -27,6 +27,9 @@ var speed := 0.0
 var fuel := 60.0
 var driven := 0.0                ## метров за поездку (для шага обучения)
 var steer_amount := 0.0          ## сглаженный руль −1…1 (для рук игрока)
+var mittens_off := false
+var frostbite_timer := 0.0
+var wrench_dropped := false
 
 var _yaw := PARK_YAW
 var _body: Node3D
@@ -188,7 +191,35 @@ func _prompt() -> String:
 		return Loc.t(&"it.buran_tarp") if Game.has_flag("prologue_arrived") else Loc.t(&"it.snowmobile")
 	if Game.player != null and Game.player.held == &"canister":
 		return Loc.t(&"it.buran_refuel")
-	return Loc.t(&"it.buran_ride", [roundi(fuel)])
+	if mittens_off:
+		return Loc.p("[E] Обслужить свечи А17ДВ и магнето МД-4Б | [G] Надеть рукавицы", "[E] Service A17DV plugs & MD-4B magneto | [G] Put mittens on")
+	return Loc.p("[G] Снять рукавицы для тонкого ремонта · ", "[G] Remove mittens for repair · ") + Loc.t(&"it.buran_ride", [roundi(fuel)])
+
+
+func toggle_mittens() -> void:
+	mittens_off = not mittens_off
+	if mittens_off:
+		Game.audio.play_3d("res://assets/audio/clank.ogg", global_position, -8.0)
+		Game.hud.subtitle(Loc.p("Снял меховые рукавицы [G]: руки обнажены на -41°C. До обморожения 45 секунд!", "Removed fur mittens [G]: bare hands at -41°C. 45 seconds to severe frostbite!"), 4.0)
+	else:
+		Game.audio.play_3d("res://assets/audio/clank.ogg", global_position, -8.0)
+		Game.hud.subtitle(Loc.p("Надел меховые рукавицы [G]: пальцы отогреваются.", "Put fur mittens back on [G]: fingers warming up."), 3.0)
+
+
+func service_engine() -> void:
+	if not mittens_off:
+		Game.hud.subtitle(Loc.p("В толстых рукавицах невозможно выставить зазор контактов магнето МД-4Б! Снимите их [G].", "Impossible to adjust MD-4B magneto contact gap in heavy mittens! Take them off [G]."), 3.5)
+		return
+	if wrench_dropped:
+		wrench_dropped = false
+		Game.audio.play_3d(CLANK, global_position, -2.0)
+		Game.hud.subtitle(Loc.p("Поднял ключ 21 мм из сугроба.", "Retrieved 21mm wrench from snow."), 2.5)
+		return
+	Game.audio.play_3d(CLANK, global_position, 0.0)
+	SaveGame.flags["buran_plug"] = true
+	SaveGame.flags["buran_tuned"] = true
+	_plugs_flooded = false
+	Game.hud.subtitle(Loc.p("Вывернул свечи А17ДВ ключом на 21, прокалил, выставил зазор магнето 0.4 мм и продул жиклёр карбюратора!", "Extracted A17DV spark plugs with 21mm wrench, cleaned gap to 0.4mm and purged carburetor jet!"), 5.0)
 
 
 func _on_use(p: Player) -> void:
@@ -202,6 +233,9 @@ func _on_use(p: Player) -> void:
 		_set_body_meshes(true)
 		Game.audio.play_3d(CLANK, global_position, -6.0)
 		Game.hud.subtitle(Loc.t(&"sub.buran_uncovered"), 4.0)
+		return
+	if mittens_off:
+		service_engine()
 		return
 	if p.held == &"canister":
 		p.set_held(&"")
@@ -348,6 +382,22 @@ func _physics_process(delta: float) -> void:
 		if absf(speed) > 0.05:
 			speed = move_toward(speed, 0.0, BRAKE * delta)
 			_move(delta)
+		# Механика обморожения при ремонте без рукавиц [G]
+		if mittens_off:
+			frostbite_timer += delta
+			var p_ref := Game.player
+			if frostbite_timer > 20.0 and frostbite_timer < 35.0:
+				if randf() < delta * 0.4 and p_ref != null:
+					p_ref.shake(0.04, 0.3)
+					Game.hud.subtitle(Loc.p("Пальцы деревенеют от холода (-41°C)... Надень рукавицы [G]!", "Fingers going numb from the bitter cold (-41°C)... Put mittens on [G]!"), 2.5)
+			elif frostbite_timer >= 45.0 and not wrench_dropped:
+				wrench_dropped = true
+				Game.audio.play_3d(CLANK, global_position, 2.0)
+				if p_ref != null:
+					p_ref.shake(0.08, 0.5)
+				Game.hud.subtitle(Loc.p("Онемевшие пальцы свело судорогой — рожковый ключ 21 мм выскользнул в сугроб!", "Numb fingers cramped — 21mm open-end wrench slipped into the snowbank!"), 4.5)
+		else:
+			frostbite_timer = maxf(frostbite_timer - delta * 1.5, 0.0)
 		return
 	var p := Game.player
 	if p == null or Game.dead:
@@ -739,6 +789,8 @@ func _spawn_trail_segment(p0: Vector3, p1: Vector3) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not riding:
+		if event.is_action_pressed(&"drop") and Game.player != null and global_position.distance_to(Game.player.global_position) < 3.2:
+			toggle_mittens()
 		return
 	if not engine_on:
 		if event.is_action_pressed(&"flashlight"):

@@ -678,6 +678,7 @@ func _on_flash() -> void:
 		# Вспышку видно за километр — и не только людям.
 		if Game.yrka != null and Game.yrka.enabled:
 			Game.yrka.notice_sound(p.global_position, 0.9)
+			Game.yrka.on_zenit_flash(p.global_position, -p.camera.global_basis.z)
 		if not _told_flash:
 			_told_flash = true
 			Game.hud.subtitle(Loc.t(&"zenit.flash_seen"), 3.0)

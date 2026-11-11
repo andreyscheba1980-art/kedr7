@@ -333,8 +333,15 @@ func _process(delta: float) -> void:
 			vol = 0.0
 		p.volume_db = linear_to_db(maxf(vol, 0.0001)) + base_db
 
+	# Проверка близости Ырки к аппаратной (менее 32 м) для аномального захлёста 6Е1П
+	var yrka_near_radio := false
+	if Game.yrka != null and Game.yrka.enabled:
+		var p_xz := Vector2(global_position.x, global_position.z)
+		var y_dist := p_xz.distance_to(Game.yrka.virtual_pos)
+		if y_dist < 32.0:
+			yrka_near_radio = true
 	magic_eye_closure = clampf(best_s, 0.0, 1.0)
-	magic_eye_overload = best_s > 0.82 and (best_id == &"semenov" or best_id == &"anomaly" or best_id == &"echo" or String(best_id).contains("yrka"))
+	magic_eye_overload = (best_s > 0.82 and (best_id == &"semenov" or best_id == &"anomaly" or best_id == &"echo" or best_id == &"roof_echo" or String(best_id).contains("yrka"))) or yrka_near_radio
 
 	var target_amp := lerpf(0.28, 0.03, best_s) + static_boost
 	if Game.knife_in_lintel:

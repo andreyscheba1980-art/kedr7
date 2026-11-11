@@ -21,6 +21,10 @@ var _truth := Vector2(-28.0, -30.0)     ## что на самом деле в в
 var _shown := Vector2(-28.0, -30.0)     ## что показывают столбики (в «жар» сухой врёт)
 var _fever := false
 var _fever_seen := false
+var _tm4_frozen := false
+var _use_tm9 := false
+var _mode_btn: Button
+var _title_node: Control
 var _book: KMBook
 var _hint: Label
 var _done := false
@@ -44,9 +48,13 @@ func _ready() -> void:
 	if Game.yard != null and Game.yard.has_method(&"claim_fever") and Game.yard.claim_fever():
 		_fever = true
 		_shown.x = FEVER
+	if _truth.x <= -38.83:
+		_tm4_frozen = true
 	_start_t = clampf(_truth.x + randf_range(-4.0, 4.0), T_MIN + 8.0, T_MAX - 8.0)
 
 	title_plate(self, Loc.t(&"thermo.title"))
+	_mode_btn = UiStyle.text_button(Loc.p("[Tab] ТМ-9 (спиртовой -70°C)", "[Tab] TM-9 (spirit -70°C)"), _toggle_tm9)
+	UiKit.place(self, _mode_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -210, 266)
 	_build_rig()
 	_close = Closeup3D.new()
 	Game.level.add_child(_close)
@@ -67,6 +75,11 @@ func _ready() -> void:
 	add_buttons(self, Game.notebook.has(&"temp_dry"), _write, func() -> void: closed.emit())
 	_hint = hint_label(self)
 	Game.audio.play_2d("res://assets/sfx/door_handle.ogg", -10.0)   # дверца будки
+	if _tm4_frozen:
+		Game.audio.play_2d(PEN_SFX, -4.0)
+		get_tree().create_timer(0.4, false).timeout.connect(func() -> void:
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.p("Тихий звон стекла: ртуть в ТМ-4 замерзла (-38.83°C)! По регламенту перейдите на ТМ-9 [Tab].", "Quiet glass clink: TM-4 mercury froze (-38.83°C)! Switch to TM-9 [Tab] per regulations."), 4.5))
 
 
 func _exit_tree() -> void:
@@ -366,6 +379,16 @@ func _gui_input(event: InputEvent) -> void:
 				_wipe = mb.pressed
 
 
+func _toggle_tm9() -> void:
+	_use_tm9 = not _use_tm9
+	Game.audio.play_2d(PEN_SFX, -8.0)
+	if _mode_btn != null:
+		_mode_btn.text = Loc.p("[Tab] ТМ-4 (ртутный)" if _use_tm9 else "[Tab] ТМ-9 (спиртовой -70°C)", "[Tab] TM-4 (mercury)" if _use_tm9 else "[Tab] TM-9 (spirit -70°C)")
+	if Game.hud != null:
+		var msg: String = Loc.p("Переключено на ТМ-9: шкала до -70°C (толуол/спирт) по Наставлению ГМС", "Switched to TM-9: scale down to -70°C (toluene/spirit) per HMS regulations") if _use_tm9 else Loc.p("Переключено на ТМ-4 (станционный ртутный)", "Switched to TM-4 (station mercury)")
+		Game.hud.subtitle(msg, 3.5)
+
+
 # --- Запись -----------------------------------------------------------------------------
 
 func _write() -> void:
@@ -374,6 +397,11 @@ func _write() -> void:
 	_done = true
 	var dry := _book.value(0)
 	var wet := _book.value(1)
+	if _tm4_frozen and not _use_tm9:
+		Game.set_flag("tm4_mercury_violation", true)
+		Game.hud.subtitle(Loc.p("НАРУШЕНИЕ РЕГЛАМЕНТА: Записаны показания замерзшей ртути ТМ-4 (-38.8°C)! Сводка забракована.", "REGULATION VIOLATION: Recorded frozen TM-4 mercury (-38.8°C)! Report rejected by Sverdlovsk."), 5.0)
+	else:
+		Game.set_flag("tm4_mercury_violation", false)
 	Game.write_reading(&"temp_dry", dry, _truth.x)
 	Game.write_reading(&"temp_wet", wet, _truth.y)
 	Game.take_reading(&"temp")
@@ -390,6 +418,9 @@ static func fmt(v: float, decimals: int) -> String:
 func handle_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") or event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_cancel"):
 		closed.emit()
+		return
+	if event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_TAB:
+		_toggle_tm9()
 		return
 	if event.is_action_pressed(&"flashlight") and Game.player != null:
 		Game.player.toggle_flashlight()

@@ -27,6 +27,8 @@ const S := {
 	&"diff.hard_desc": ["Ырка быстрее тебя, холод злее, ресурсов впритык. Задачи — только в журнале (Tab).", "Yrka outruns you, the cold bites harder, supplies are tight. Objectives only in the log (Tab)."],
 	&"pause.title": ["ПАУЗА", "PAUSED"],
 	&"pause.resume": ["Продолжить", "Resume"],
+	&"pause.controls": ["Инструкция дежурного", "Duty manual & controls"],
+	&"pause.settings": ["Настройки и регламент", "Settings & regulations"],
 	&"pause.to_menu": ["В главное меню", "Main menu"],
 	&"pause.note": ["Прогресс сохраняется в начале каждого дня и каждой ночи.", "Progress is saved at the start of every day and night."],
 	&"menu.settings": ["Регламент и настройки", "Settings & regulations"],
@@ -1188,6 +1190,9 @@ If a voice on the air calls you by name — don't answer. It isn't me. — S.\""
 
 	# --- Сигналы эфира ---
 	&"sig.mainland.1": ["(ровная несущая. Большая Земля на приёме — R: передать сводку)", "(steady carrier. The mainland is listening — R: send report)"],
+	&"sig.ob12_baric.1": ["РАДИО (Обь-12, 3215 кГц): «Кедр-7, у нас барический провал 18.5 мбар при полном штиле. Ковалев не выходит на связь с 06:00...»", "RADIO (Ob-12, 3215 kHz): 'Kedr-7, we have an 18.5 mbar baric drop in total calm. Kovalyov silent since 06:00...'"],
+	&"sig.pechora_df.1": ["РАДИО (Пеленгатор Печора, 3215 кГц): «Внимание Кедр-7! В квадрате 44 несущая 1 кВт движется 12 км/ч через метель без дорог...»", "RADIO (DF Pechora, 3215 kHz): 'Attention Kedr-7! In square 44 a 1 kW carrier moving 12 km/h through blizzard without roads...'"],
+	&"sig.roof_echo.1": ["РАДИО (3215 кГц): «Кедр-7! На приемной частоте ваш двойник! Сигнал бьет прямо с вашей крыши!..» — Мальцев... почему ты не на крыше?..", "RADIO (3215 kHz): 'Kedr-7! Your double is on receive frequency! Signal originates directly from your roof!..' — Maltsev... why aren't you on the roof?.."],
 	&"sig.buzzer.1": ["(монотонное жужжание. Ни слов, ни пауз)", "(a monotone buzz. No words, no pauses)"],
 	&"sig.numbers.1": ["...семь... ноль... четыре...", "...seven... zero... four..."],
 	&"sig.numbers.2": ["...кедр... кедр... семь...", "...kedr... kedr... seven..."],
@@ -2150,8 +2155,8 @@ The operator is not to be informed about the object.
 	&"set.gamepad_sens": ["Чувствительность стика геймпада", "Gamepad stick sensitivity"],
 	&"set.invert_y": ["Инверсия оси Y (обзор)", "Invert Y-axis (look)"],
 	&"set.head_bob": ["Покачивание камеры при ходьбе", "Head bobbing intensity"],
-	&"menu.controls": ["[ 4 ] Инструкция дежурного", "[ 4 ] Duty instructions"],
-	&"menu.archive": ["[ 5 ] Архив наблюдений", "[ 5 ] Observation archive"],
+	&"menu.controls": ["Инструкция дежурного", "Duty manual & controls"],
+	&"menu.archive": ["Архив наблюдений", "Observation archive"],
 	&"hud.save_toast": ["СМЕНА ЗАПИСАНА", "SHIFT SAVED"],
 	&"sub.flash_low": ["Нить накаливания фонаря тускнеет... пора подкрутить динамо [Q / X].", "The bulb filament is dimming... crank the dynamo [Q / X]."],
 

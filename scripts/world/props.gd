@@ -5234,6 +5234,27 @@ static func lbvk_safety_lamp() -> Node3D:
 	light.omni_range = 4.5
 	light.name = "FlameLight"
 	node.add_child(light)
+
+	# Поведение пламени ЛБВК (шахтная лампа Дэви):
+	# При приближении Ырки пламя отрывается на 10 мм и горит призрачным циановым ореолом;
+	# В забоях без вентиляции пламя притухает от нехватки кислорода.
+	var flame_timer := Timer.new()
+	flame_timer.wait_time = 0.5
+	flame_timer.autostart = true
+	node.add_child(flame_timer)
+	flame_timer.timeout.connect(func() -> void:
+		if not is_instance_valid(light):
+			return
+		var yrka_near: bool = Game.yrka != null and Game.yrka.enabled and (Game.yrka.virtual_pos.distance_to(Vector2(node.global_position.x, node.global_position.z)) < 25.0)
+		if yrka_near:
+			light.light_color = Color(0.2, 0.85, 1.0)
+			light.position.y = 0.19
+			light.light_energy = 1.6
+		else:
+			light.light_color = Color(1.0, 0.8, 0.4)
+			light.position.y = 0.18
+			light.light_energy = 1.2
+	)
 	return node
 
 

@@ -1172,10 +1172,35 @@ static func _make_mast_shadow_texture() -> ImageTexture:
 
 func _on_mast_used(_p: Player) -> void:
 	if not Game.antenna_iced:
+		Game.hud.subtitle(Loc.p("Мачта «Унжа-1» (25 м): оттяжки натянуты, заградительный огонь ЗОМ чист от льда.", "Mast 'Unzha-1' (25m): guy wires tensioned, ZOM obstacle light clear of ice."), 3.5)
 		return
-	Game.set_antenna_iced(false)
-	Game.hud.subtitle(Loc.t(&"sub.ice_done"), 3.5)
-	_check_routine_scare_mast()
+	_climb_unzha_mast()
+
+
+func _climb_unzha_mast() -> void:
+	var p := Game.player
+	if p == null:
+		return
+	Game.audio.play_3d("res://assets/audio/clank.ogg", MAST + Vector3(0, 2.0, 0), -2.0)
+	Game.hud.subtitle(Loc.p("Пристегнул карабин пояса ПМ-1 к скобтрапу мачты «Унжа-1» (25 м). Подъём...", "Snapped PM-1 safety belt carabiner to the Unzha-1 mast ladder (25m). Climbing..."), 3.5)
+	p.shake(0.05, 0.4)
+
+	# Таймеры и контрольные точки на 8м, 16м, 24м
+	get_tree().create_timer(1.8, false).timeout.connect(func() -> void:
+		if p != null:
+			p.shake(0.08, 0.5)
+			Game.audio.play_3d("res://assets/audio/wind_gust_01.ogg", MAST + Vector3(0, 12.0, 0), 2.0)
+			Game.hud.subtitle(Loc.p("Высота 16 м: порыв ветра 28 м/с! Мачта гудит и вибрирует с амплитудой 35 см...", "Height 16m: 28 m/s wind gust! The mast hums and sways with 35cm amplitude..."), 3.5)
+	)
+
+	get_tree().create_timer(4.0, false).timeout.connect(func() -> void:
+		Game.set_antenna_iced(false)
+		Game.audio.play_3d(HIT_SOUND, MAST + Vector3(0, 16.0, 0), 2.0)
+		if p != null:
+			p.shake(0.04, 0.4)
+		Game.hud.subtitle(Loc.p("Оголовье 25 м: ключом на 21 сколол ледяной панцирь с плафона ЗОМ! Рубиновый маяк горит.", "Top 25m: chipped rime ice off ZOM beacon with 21mm wrench! Ruby beacon ignited."), 4.5)
+		_check_routine_scare_mast()
+	)
 
 
 func _on_mast_ground_used(_p: Player) -> void:

@@ -730,6 +730,9 @@ func report_check() -> Dictionary:
 		if (k == &"temp_dry" or k == &"temp_wet") and v >= 35.0 and v <= 38.0:
 			out["verdict"] = &"fever"
 			return out
+		if has_flag("tm4_mercury_violation") and (k == &"temp_dry" or k == &"temp_wet"):
+			if not out["bad"].has(&"temp"):
+				out["bad"].append(&"temp")
 		var err := absf(v - float(e["t"]))
 		if k == &"wind_dir":
 			err = minf(err, 16.0 - err)

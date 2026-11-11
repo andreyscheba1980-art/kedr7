@@ -11,6 +11,18 @@ const DATA := {
 		"freq": 6880.0, "width": 20.0, "stream": "res://assets/audio/carrier_loop.ogg",
 		"lines": [&"sig.mainland.1"], "recordable": false,
 	},
+	&"ob12_baric": {
+		"freq": 3215.0, "width": 16.0, "stream": "res://assets/audio/voice_mainland.ogg",
+		"lines": [&"sig.ob12_baric.1"], "recordable": true,
+	},
+	&"pechora_df": {
+		"freq": 3215.0, "width": 16.0, "stream": "res://assets/audio/voice_mainland.ogg",
+		"lines": [&"sig.pechora_df.1"], "recordable": true,
+	},
+	&"roof_echo": {
+		"freq": 3215.0, "width": 16.0, "stream": "res://assets/audio/voice_loop.ogg",
+		"lines": [&"sig.roof_echo.1"], "recordable": true,
+	},
 	&"buzzer": {
 		"freq": 4625.0, "width": 18.0, "stream": "res://assets/audio/buzzer_loop.ogg",
 		"lines": [&"sig.buzzer.1"], "recordable": true,
@@ -136,13 +148,14 @@ static func is_free(f: float, gap := 60.0) -> bool:
 const BC_STATIONS := 7140.0
 const BC_DIARY := 3950.0
 const BC_BELOV := 3820.0
+const BC_OB12 := 3215.0
 const BROADCAST := {
 	1: [[&"bc_st_1", BC_STATIONS, &"st_sosna_1"], [&"bc_sem_1", BC_DIARY, &"sem_log_1"], [&"bc_belov_1", BC_BELOV, &"belov_1"]],
-	2: [[&"bc_st_2", BC_STATIONS, &"st_bereza_1"], [&"bc_sem_2", BC_DIARY, &"sem_log_2"], [&"bc_belov_2", BC_BELOV, &"belov_2"]],
+	2: [[&"bc_st_2", BC_STATIONS, &"st_bereza_1"], [&"bc_sem_2", BC_DIARY, &"sem_log_2"], [&"bc_belov_2", BC_BELOV, &"belov_2"], [&"ob12_baric", BC_OB12, &"ob12_baric"]],
 	3: [[&"bc_st_3", BC_STATIONS, &"st_sosna_2"], [&"bc_sem_3", BC_DIARY, &"sem_log_3"], [&"bc_belov_3", BC_BELOV, &"belov_3"]],
-	4: [[&"bc_st_4", BC_STATIONS, &"st_bereza_2"], [&"bc_sem_4", BC_DIARY, &"sem_log_4"], [&"bc_belov_4", BC_BELOV, &"belov_4"]],
+	4: [[&"bc_st_4", BC_STATIONS, &"st_bereza_2"], [&"bc_sem_4", BC_DIARY, &"sem_log_4"], [&"bc_belov_4", BC_BELOV, &"belov_4"], [&"pechora_df", BC_OB12, &"pechora_df"]],
 	5: [[&"bc_st_5", BC_STATIONS, &"st_sosna_3"], [&"bc_sem_5", BC_DIARY, &"sem_log_5"], [&"bc_belov_5", BC_BELOV, &"belov_5"]],
-	6: [[&"bc_st_6", BC_STATIONS, &"st_kedr7_fake"], [&"bc_sem_6", BC_DIARY, &"sem_log_6"]],
+	6: [[&"bc_st_6", BC_STATIONS, &"st_kedr7_fake"], [&"bc_sem_6", BC_DIARY, &"sem_log_6"], [&"roof_echo", BC_OB12, &"roof_echo"]],
 }
 const BC_FALLBACK_STREAM := "res://assets/audio/voice_loop.ogg"
 

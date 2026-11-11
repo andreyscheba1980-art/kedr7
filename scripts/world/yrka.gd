@@ -13,6 +13,20 @@ extends Node
 
 enum Stage { CALM, STALKING, CALLING, PRESSURE, CONTACT, CHASE, RETREAT }
 
+## Советско-фольклорный FSM Ырки (Полярный регламент 1983):
+enum FsmState {
+	PERIMETER_ORBIT,  ## Орбитальный патруль по периметру метеоплощадки / тайги
+	AUDITORY_LURE,    ## Акустическое заманивание (имитация голосов с дефектами)
+	NECK_LOCK_STALK,  ## Неотступное следование за затылком игрока (1.3 м -> 0.4 м при панике)
+	GLARE_STANDOFF,   ## Прямой зрительный контакт / отражение глаз (Tapetum Lucidum) / срезка вспышкой
+	CABIN_SIEGE,      ## Осада сруба (скрежет по ставням, приближение к двери при затухании печи)
+	PYRO_RECOIL       ## Термический откат (магниевая ракета ПСНД 1800°C или керосиновый фонарь)
+}
+var fsm_state := FsmState.PERIMETER_ORBIT
+var stalk_dist := 1.3
+var _prev_cam_yaw := 0.0
+var _panic_freeze_timer := 0.0
+
 const WHISTLE_AT := 20.0
 const STALK_AT := 35.0
 const CALL_AT := 50.0
@@ -250,13 +264,17 @@ func _process(delta: float) -> void:
 	elif threat < 70.0:
 		_pre_chase_warned = false
 
-	# Ночи 6–7: открытая дверь — приглашение. Постоит открытой — он войдёт.
+	# Ночи 6–7: открытая дверь — приглашение. Но раскалённая чугунная печь (+60°C) создаёт тепловой барьер!
 	if bool(Game.cfg.get("yrka_house", false)) and Game.is_home() and Game.level.door_open:
-		_door_open_t += delta
-		if _door_open_t > (40.0 if Game.is_story() else 25.0):
-			_door_open_t = 0.0
-			force_house_chase()
-			return
+		if Game.stove_heat > 15.0:
+			_door_open_t = 0.0 # Жар печи отпугивает тварь от дверного проема
+		else:
+			_door_open_t += delta
+			fsm_state = FsmState.CABIN_SIEGE
+			if _door_open_t > (40.0 if Game.is_story() else 25.0):
+				_door_open_t = 0.0
+				force_house_chase()
+				return
 	else:
 		_door_open_t = 0.0
 
@@ -267,18 +285,25 @@ func _process(delta: float) -> void:
 		_pull_timer = 0.0
 		if stage != Stage.RETREAT:
 			stage = Stage.CALM
+			fsm_state = FsmState.PERIMETER_ORBIT
 		return
 
 	# Переходы между стадиями страха вне погони
 	if stage != Stage.RETREAT:
 		if threat >= PRESSURE_AT and max_stage >= 3:
 			stage = Stage.PRESSURE
+			fsm_state = FsmState.AUDITORY_LURE
 		elif threat >= CALL_AT and max_stage >= 2:
 			stage = Stage.CALLING
+			fsm_state = FsmState.AUDITORY_LURE
 		elif threat >= STALK_AT:
 			stage = Stage.STALKING
+			fsm_state = FsmState.NECK_LOCK_STALK
 		else:
 			stage = Stage.CALM
+			fsm_state = FsmState.PERIMETER_ORBIT
+
+	_update_look_vector_math(delta)
 
 	if threat >= WHISTLE_AT and not _whistled and _whistle_cd <= 0.0:
 		_whistled = true
@@ -398,8 +423,14 @@ func _update_voice_and_drift(delta: float) -> void:
 
 		# Вакуумная тишина: перед шёпотом метель смолкает
 		Game.audio.trigger_vacuum(3.2)
-		Game.audio.play_3d(v_path, _last_voice_pos + Vector3(0, 1.4, 0), 3.2, 7.0)
-		Game.hud.subtitle(Loc.t(v_sub), 2.8)
+		var sp := Game.audio.play_3d(v_path, _last_voice_pos + Vector3(0, 1.4, 0), 3.2, 7.0)
+		if sp != null:
+			# Ингрессивность (звук на вдохе): микротремор высоты тона
+			sp.pitch_scale = randf_range(0.92, 1.06)
+		var v_line: String = Loc.t(v_sub)
+		if Game.night >= 3:
+			v_line = v_line.replace("Семёнов", "Земёнов").replace("Слышишь", "Злызизь").replace("слышишь", "злызизь")
+		Game.hud.subtitle(v_line, 2.8)
 		Director.add_tension(10.0, "шёпот за спиной")
 
 	# Магнитное наваждение: голова медленно тянется назад к шёпоту
@@ -427,6 +458,65 @@ func _update_voice_and_drift(delta: float) -> void:
 				_pull_timer = 0.0
 				NightMemory.mark(&"turned")
 				_start_contact()
+
+
+## Математика взгляда D_align = F_cam · L_home и контроль паники по угловой скорости
+func _update_look_vector_math(delta: float) -> void:
+	var p := Game.player
+	if p == null or p.camera == null:
+		return
+	var cur_yaw: float = p.camera.global_rotation.y
+	var dyaw: float = absf(angle_difference(cur_yaw, _prev_cam_yaw))
+	_prev_cam_yaw = cur_yaw
+	var yaw_velocity: float = dyaw / maxf(delta, 0.001)
+
+	# Панический поворот головы (резкий рывок мыши > 4.5 рад/с): тварь чувствует срыв хладнокровия
+	if yaw_velocity > 4.5 and (stage in [Stage.STALKING, Stage.CALLING, Stage.PRESSURE]):
+		if stalk_dist > 0.5:
+			stalk_dist = 0.4
+			_panic_freeze_timer = 2.5
+			var neck_pos := p.global_position + p.global_basis.z * 0.4 + Vector3(0, 1.5, 0)
+			Game.audio.play_3d("res://assets/audio/breath_loop.ogg", neck_pos, 2.0, 4.0)
+			p.shake(0.06, 0.4)
+			Game.hud.subtitle(Loc.p("Ледяное дыхание прямо на обнажённой шее...", "Icy breath right against your bare neck..."), 2.0)
+	elif stalk_dist < 1.3 and _panic_freeze_timer <= 0.0:
+		stalk_dist = move_toward(stalk_dist, 1.3, delta * 0.3)
+
+	if _panic_freeze_timer > 0.0:
+		_panic_freeze_timer -= delta
+
+	# Расчёт вектора взгляда к порогу дома: D_align = F_cam · L_home
+	var porch_pos := Yard.HOUSE_CENTER + Vector3(0, 0, 4.0)
+	var to_porch_2d := Vector2(porch_pos.x - p.global_position.x, porch_pos.z - p.global_position.z).normalized()
+	var cam_fwd_2d := Vector2(-p.camera.global_basis.z.x, -p.camera.global_basis.z.z).normalized()
+	var d_align: float = cam_fwd_2d.dot(to_porch_2d)
+
+	if stage in [Stage.CALLING, Stage.PRESSURE]:
+		if d_align < 0.17:
+			# Опасный сектор: взгляд в темную глушь, спиной к дому
+			Director.add_tension(delta * 4.0, "взгляд в темный лес спиной к дому")
+		elif d_align >= 0.34:
+			# Безопасный сектор: взгляд на крыльцо/свет
+			Director.add_tension(-delta * 2.0, "взгляд на спасительное крыльцо")
+
+
+## Отпугивание вспышкой «Зенит-Е» (Ярус 2 защиты огнем/светом)
+func on_zenit_flash(flash_pos: Vector3, flash_dir: Vector3) -> void:
+	if not enabled or Game.dead or _creature == null or not _creature.visible:
+		return
+	var to_c := (_creature.global_position - flash_pos).normalized()
+	var dot := flash_dir.dot(to_c)
+	var dist := flash_pos.distance_to(_creature.global_position)
+	if dist < 22.0 and dot > 0.35:
+		Game.audio.play_3d(SHRIEK, _creature.global_position + Vector3(0, 1.4, 0), 4.5, 12.0)
+		threat = maxf(threat - 28.0, 5.0)
+		_cooldown = 20.0
+		fsm_state = FsmState.PYRO_RECOIL
+		stage = Stage.RETREAT
+		var push_dir := (_creature.global_position - flash_pos).normalized()
+		push_dir.y = 0.0
+		_creature.global_position += push_dir * 10.0
+		Game.hud.subtitle(Loc.p("Ослепительная магниевая вспышка обожгла сетчатку твари — она с визгом отпрянула в ельник!", "Blinding magnesium flash scorched the creature's retinas — it shrieked and recoiled into the pines!"), 4.0)
 
 
 ## Рассинхрон шагов: второй тяжёлый хруст по насту в 1.1 м за пятками игрока
@@ -515,7 +605,16 @@ func _update_contact(delta: float) -> void:
 			_cooldown = 40.0
 		return
 
-	# В упор спасает огонь: ракета (см. _on_flare) или луч фонаря прямо в морду — держать, пока корчится.
+	# В упор спасает огонь: ракета (см. _on_flare), живой огонь фонаря/ЛБВК или луч фонаря прямо в морду.
+	var has_live_fire := Gear.has(&"lantern") or Gear.has(&"lbvk") or (Game.yard != null and Game.yard.is_porch_lit(p.global_position))
+	if has_live_fire:
+		_beam_t += delta * 1.5
+		_contact_timer += delta * 1.2 # Открытый огонь керосина/бензина удерживает тварь в радиусе 3м
+		if _beam_t >= 2.0:
+			Game.hud.subtitle(Loc.p("Живое пламя керосинового фонаря отпугнуло тварь!", "The living flame of the kerosene lantern repelled the creature!"), 3.0)
+			_end_chase("repelled")
+			return
+
 	if p.flashlight_on() and Game.flash_charge > 3.0:
 		_beam_t += delta
 		_contact_timer += delta * 0.8      # свет его держит
