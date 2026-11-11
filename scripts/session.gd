@@ -12,6 +12,8 @@ const SCREAM := "res://assets/audio/scream.ogg"
 const SeismographUIScript = preload("res://scripts/ui/seismograph_ui.gd")
 const JournalTM1UIScript = preload("res://scripts/ui/journal_tm1_ui.gd")
 const MeteorFaxUIScript = preload("res://scripts/ui/meteor_fax_ui.gd")
+const GeneratorDGA24UIScript = preload("res://scripts/ui/generator_dga24_ui.gd")
+const InterferometerUIScript = preload("res://scripts/ui/interferometer_ui.gd")
 const AftermathClass = preload("res://scripts/world/aftermath.gd")
 const PlayerProfilerClass = preload("res://scripts/ai/player_profiler.gd")
 const HunterBrainClass = preload("res://scripts/ai/hunter_brain.gd")
@@ -635,6 +637,10 @@ func _open_ui(id: StringName) -> void:
 			ui = SupplyUI.new()
 		&"repair":
 			ui = RepairUI.new()
+		&"dga24":
+			ui = GeneratorDGA24UIScript.new()
+		&"interferometer":
+			ui = InterferometerUIScript.new()
 		_:
 			return
 
@@ -756,7 +762,7 @@ func _on_report_sent(index: int) -> void:
 
 # --- Концовки ----------------------------------------------------------------
 
-const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source", &"taiga", &"directive_zaboy", &"evac_crawler", &"mimic_trap"]
+const ENDINGS: Array[StringName] = [&"answer", &"burn", &"leave", &"silence", &"echo", &"source", &"taiga", &"directive_zaboy", &"evac_crawler", &"mimic_trap", &"mi8_escape"]
 const FIRE := "res://assets/audio/fire_loop.ogg"
 ## Какая находка эфира дописывает страницу к какому финалу
 const ENDING_FIND := {&"answer": &"alone", &"burn": &"bunker", &"leave": &"roll", &"silence": &"hole",
@@ -792,6 +798,11 @@ func play_ending(id: StringName) -> void:
 			Game.audio.play_2d("res://assets/audio/engine_loop.ogg", 3.0)
 			_player.shake(0.04, 2.0)
 			await get_tree().create_timer(2.0, false).timeout
+		&"mi8_escape":
+			# Спасение полярной авиацией СССР: вертолёт Ми-8Т СССР-22481
+			Game.audio.play_2d("res://assets/audio/engine_loop.ogg", 4.0)
+			_player.shake(0.06, 2.5)
+			await get_tree().create_timer(2.5, false).timeout
 		&"mimic_trap":
 			# Ловушка Ырки у ворот: холодный огонь вместо фар и силуэт Семёнова
 			Game.audio.play_2d("res://assets/audio/radio_anomaly.ogg", 2.0)

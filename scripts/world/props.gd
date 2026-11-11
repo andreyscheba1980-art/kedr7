@@ -158,6 +158,114 @@ static func ap50_breaker() -> Node3D:
 	return _mi(k, &"ap50_breaker_fb", "tex_metal.png")
 
 
+## Дизель-генераторный агрегат ДГА-24М (дизель 4Ч 10.5/13, генератор ЕСС5-62-4У2 на раме-салазках)
+static func dga24_genset() -> Node3D:
+	var glb := _soviet_model("SM_DGA24_Genset")
+	if glb != null:
+		return glb
+	return generator()
+
+
+## Щит управления ЩСУ-24 (виброчастотомер В85, вольтметр Э377, амперметр Э378, манометр МД-214, соляной глаз)
+static func dga24_switchboard() -> Node3D:
+	var glb := _soviet_model("SM_DGA24_Switchboard")
+	if glb != null:
+		return glb
+	var k := _kit(418, 0.04)
+	k.box(Vector3.ZERO, Vector3(0.60, 0.85, 0.25), Color(0.24, 0.26, 0.22))
+	return _mi(k, &"dga24_switchboard_fb", "tex_metal.png")
+
+
+## Паяльная лампа ПЛ-64 (латунный бачок, ручной насос, эжекторная жаровая труба)
+static func pl64_blowtorch() -> Node3D:
+	var glb := _soviet_model("SM_PL64_Blowtorch")
+	if glb != null:
+		return glb
+	var k := _kit(419, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.14, 0.26, 0.32), Color(0.72, 0.58, 0.28))
+	return _mi(k, &"pl64_blowtorch_fb", "tex_metal.png")
+
+
+## Шахтный оптический интерферометр ШИ-11 (окуляр, резиновая груша, кнопка подсветки)
+static func shi11_interferometer() -> Node3D:
+	var glb := _soviet_model("SM_SHI11_Interferometer")
+	if glb != null:
+		return glb
+	var k := _kit(420, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.12, 0.18, 0.08), Color(0.18, 0.22, 0.18))
+	return _mi(k, &"shi11_interferometer_fb", "tex_metal.png")
+
+
+## Сцинтилляционный гамма-радиометр СРП-68-01 (пульт со стрелочным прибором и зонд БДГ-1)
+static func srp68_radiometer() -> Node3D:
+	var glb := _soviet_model("SM_SRP68_Radiometer")
+	if glb != null:
+		return glb
+	var k := _kit(421, 0.03)
+	k.box(Vector3.ZERO, Vector3(0.22, 0.16, 0.18), Color(0.55, 0.56, 0.54))
+	return _mi(k, &"srp68_radiometer_fb", "tex_metal.png")
+
+
+## Сейсмоприёмник СВ-20 (электродинамический геофон со стальным штырем)
+static func sv20_geophone() -> Node3D:
+	var glb := _soviet_model("SM_SV20_Geophone")
+	if glb != null:
+		return glb
+	var k := _kit(422, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.08, 0.16, 0.08), Color(0.68, 0.32, 0.14))
+	return _mi(k, &"sv20_geophone_fb", "tex_metal.png")
+
+
+## Ящик керновый экспедиции Дубова (1979 г., 5 продольных желобов, маркировка тушью)
+static func corebox_1979() -> Node3D:
+	var glb := _soviet_model("SM_CoreBox_1979")
+	if glb != null:
+		return glb
+	var k := _kit(423, 0.04)
+	k.box(Vector3.ZERO, Vector3(0.48, 0.12, 1.05), Color(0.42, 0.34, 0.24))
+	return _mi(k, &"corebox_1979_fb", "tex_wood.png")
+
+
+## Импульсный измеритель высоты облаков ИВО-1М (приёмопередатчик на треноге)
+static func ivo1m_cloudmeter() -> Node3D:
+	var glb := _soviet_model("SM_IVO1M_CloudMeter")
+	if glb != null:
+		return glb
+	var k := _kit(424, 0.04)
+	k.box(Vector3.ZERO, Vector3(0.45, 1.25, 0.45), Color(0.32, 0.36, 0.30))
+	return _mi(k, &"ivo1m_cloudmeter_fb", "tex_metal.png")
+
+
+## Щит видимости М-37 с сигнальным фонарем для ночных наблюдений
+static func m37_visibility_shield() -> Node3D:
+	var glb := _soviet_model("SM_M37_VisibilityShield")
+	if glb != null:
+		return glb
+	var k := _kit(425, 0.05)
+	k.box(Vector3.ZERO, Vector3(1.2, 1.8, 0.15), Color(0.12, 0.12, 0.12))
+	return _mi(k, &"m37_visibility_shield_fb", "tex_wood.png")
+
+
+## Посадочная жаровня вертодрома (чугунная чаша на ножках с соляркой и ветошью)
+static func helipad_firepot() -> Node3D:
+	var glb := _soviet_model("SM_Helipad_FirePot")
+	if glb != null:
+		return glb
+	var k := _kit(426, 0.03)
+	k.box(Vector3.ZERO, Vector3(0.45, 0.35, 0.45), Color(0.18, 0.18, 0.20))
+	return _mi(k, &"helipad_firepot_fb", "tex_metal.png")
+
+
+## Патрон сигнальный ночной/дневной ПСНД (ночной магниевый факел 20 000 свечей)
+static func psnd_flare() -> Node3D:
+	var glb := _soviet_model("SM_PSND_Flare")
+	if glb != null:
+		return glb
+	var k := _kit(427, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.06, 0.22, 0.06), Color(0.72, 0.16, 0.14))
+	return _mi(k, &"psnd_flare_fb", "tex_metal.png")
+
+
 ## Пакетный поворотный выключатель ПВ2-16 (карболитовая «бабочка», 90° поворот)
 static func pv2_switch() -> Node3D:
 	var glb := _soviet_model("SM_PV2_RotarySwitch")
@@ -386,6 +494,9 @@ static func shelf() -> Node3D:
 
 ## Дизель-генератор на салазках: блок, рёбра цилиндра, бак, выхлоп в стену, щиток. Лицо −Z.
 static func generator() -> Node3D:
+	var glb_soviet := _soviet_model("SM_DGA24_Genset")
+	if glb_soviet != null:
+		return glb_soviet
 	var glb := _kedr_model("generator_ab4", {"center": false, "bright": 1.0})
 	if glb != null:
 		return glb

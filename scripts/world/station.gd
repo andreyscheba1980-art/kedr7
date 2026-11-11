@@ -3316,6 +3316,20 @@ func _build_generator_shack() -> void:
 	_barrel.hold_check = func() -> bool: return Game.final_call
 	_barrel.hold_sound = "res://assets/audio/stove_add.ogg"
 
+	# Щит управления ЩСУ-24 на стене будки (виброчастотомер В85, вольтметр Э377, АП-50)
+	var sb := Geo.interactable(self, Vector3(0.7, 0.9, 0.35), shack_center + Vector3(0.55, 1.25, -0.6), null, Loc.t(&"it.dga24_panel"), func(_p: Player) -> void:
+		EventBus.ui_requested.emit(&"dga24")
+	)
+	var sb_mesh := Props.dga24_switchboard()
+	sb_mesh.position.y = -0.42
+	sb.add_child(sb_mesh)
+	sb.name = "DGA24Switchboard"
+
+	# Паяльная лампа ПЛ-64 на верстаке у стены
+	var torch := Props.pl64_blowtorch()
+	torch.position = shack_center + Vector3(0.85, 0.55, 0.4)
+	add_child(torch)
+
 	# Масляные пятна на дощатом полу под картером двигателя и у бочки
 	Geo.block(self, Vector3(0.9, 0.005, 0.7), shack_center + Vector3(-0.3, 0.108, -0.2), Palette.m(&"dark"), false)   # пятна чуть выше рамы дизеля
 	Geo.block(self, Vector3(0.65, 0.005, 0.65), shack_center + Vector3(0.9, 0.108, -0.3), Palette.m(&"dark"), false)

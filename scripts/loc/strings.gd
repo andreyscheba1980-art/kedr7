@@ -2871,6 +2871,58 @@ The operator is not to be informed about the object.
 	&"coop.spoof_light": ["— (сквозь помехи)...Приём... тут у сарая... выключи прожектор... светит в глаза...", "— (through static)...Copy... by the shed... turn off the searchlight... it's blinding me..."],
 	&"coop.spoof_door": ["— (сквозь вой ветра)...Витька, открой сени... у меня тангента замёрзла... открой...", "— (through gale howl)...Open the porch door... my PTT is frozen... open up..."],
 	&"coop.spoof_behind": ["— (шёпотом в эфире)...Не оборачивайся на леере... оно идёт за тобой след в след...", "— (whispered on air)...Don't turn around on the lifeline... it's walking right behind your footsteps..."],
+
+	# --- Советский реализм: ДГА-24М, ШИ-11, СРП-68-01, Полярная авиация Ми-8Т ---
+	&"it.dga24_panel": ["[E] Щит управления ДГА-24М / Дизель 4Ч 10.5/13", "[E] DGA-24M Control Panel / 4Ch 10.5/13 Diesel"],
+	&"dga24.title": ["ДИЗЕЛЬ-ГЕНЕРАТОР ДГА-24М (4Ч 10.5/13 • 24 кВт)", "DIESEL GENERATOR DGA-24M (4Ch 10.5/13 • 24 kW)"],
+	&"dga24.blowtorch_heat": ["[1] Прогрев картера паяльной лампой ПЛ-64", "[1] Heat oil sump with PL-64 blowtorch"],
+	&"dga24.rnm1_pump": ["[2] Прокачка масла ручным насосом РНМ-1", "[2] Prime oil with RNM-1 hand pump"],
+	&"dga24.decompr_toggle": ["[3] Рычаг декомпрессора: %s", "[3] Decompressor lever: %s"],
+	&"dga24.glow_plugs": ["[4] Накал свечей СН-150 (Соляной глаз)", "[4] SN-150 glow plugs (Salt Eye)"],
+	&"dga24.starter_crank": ["[5] Пуск стартером СТ-721 (24В)", "[5] Crank with ST-721 starter (24V)"],
+	&"dga24.drain_filter": ["[6] Слив парафина/льда из фильтра ЭТФ-3 и подкачка РНП", "[6] Drain wax/ice from ETF-3 filter & prime RNP"],
+	&"dga24.freq_reed": ["Виброчастотомер В85: %s (50 Гц = центральный язычок)", "V85 reed frequency: %s (50 Hz = center reed)"],
+	&"dga24.ap50_breaker": ["[7] Автомат АП-50: Подключение нагрузки станции", "[7] AP-50 breaker: Connect station load"],
+	&"dga24.started_ok": ["Дизель 4Ч 10.5/13 подхватил компрессию! Обороты 1500 об/мин, напряжение 220 В.", "4Ch 10.5/13 diesel hit compression! 1500 RPM, 220V grid online."],
+	&"dga24.thick_oil_warn": ["Масло МС-20 застыло камнем (-43°C)! Сначала прогрейте картер паяльной лампой ПЛ-64.", "MS-20 oil is solid rock (-43°C)! Warm the sump with PL-64 blowtorch first."],
+	&"dga24.no_oil_pressure": ["Давление масла ниже 1.5 кгс/см²! Прокачайте систему насосом РНМ-1.", "Oil pressure below 1.5 kgf/cm²! Prime system with RNM-1 hand pump."],
+	&"dga24.no_decompr": ["Стартер не может провернуть коленвал на полной компрессии! Сбросьте рычаг в ДЕКОМПРЕССИЮ.", "Starter cannot turn crankshaft under full compression! Throw decompressor lever."],
+	&"dga24.frozen_filter_die": ["Дизель чихнул и заглох! Замёрз конденсат в фильтре ЭТФ-3. Открутите сливной кран 14 мм ключом.", "Diesel sputtered and died! Frozen ice in ETF-3 filter. Bleed drain cock with 14mm wrench."],
+
+	&"it.shi11_interferometer": ["[E] Оптический интерферометр ШИ-11", "[E] SHI-11 optical interferometer"],
+	&"shi11.title": ["ШАХТНЫЙ ИНТЕРФЕРОМЕТР ШИ-11 (ГОСТ 1978 г.)", "MINE OPTICAL INTERFEROMETER SHI-11"],
+	&"shi11.pump": ["[Пробел] Сжать резиновую грушу (прокачка 5 объёмов)", "[Space] Squeeze rubber bulb (flush 5 volumes)"],
+	&"shi11.zero": ["[Z] Юстировка нулевой полосы", "[Z] Zero fringe calibration"],
+	&"shi11.exit": ["[Tab / Esc] Оторваться от окуляра", "[Tab / Esc] Step away from eyepiece"],
+	&"shi11.reading_fresh": ["ШИ-11: Чистый воздух (0.0% СH4, 0.04% CO2). Спектр ровный.", "SHI-11: Clean air (0.0% CH4, 0.04% CO2). Spectrum stable."],
+	&"shi11.reading_co2": ["ШИ-11: ОПАСНОСТЬ! CO2 = 2.4%. Полосы смещены вправо.", "SHI-11: DANGER! CO2 = 2.4%. Fringes shifted right."],
+	&"shi11.reading_ch4": ["ШИ-11: ВНИМАНИЕ! СH4 = 1.6%. Полосы смещены влево.", "SHI-11: ATTENTION! CH4 = 1.6%. Fringes shifted left."],
+	&"shi11.reading_anomaly": ["Интерференционные полосы ШИ-11 изогнулись в пульсирующий вертикальный зрачок...", "SHI-11 interference fringes warped into a pulsing vertical slit pupil..."],
+
+	&"it.srp68_inspect": ["[E] Радиометр СРП-68-01 [БДГ-1]", "[E] Radiometer SRP-68-01 [BDG-1 probe]"],
+	&"srp68.reading_norm": ["Фон: 14 мкР/ч (нормальный гранитный фон)", "Background: 14 uR/h (normal granite background)"],
+	&"srp68.reading_spike": ["ТРЕСК СЧЁТЧИКА! Стрелка зашкаливает: 450 мкР/ч у аномального керна!", "COUNTER CHATTER! Needle pegs at 450 uR/h near anomalous core!"],
+
+	&"it.helipad_firepot": ["[E] Зажечь посадочную жаровню вертодрома (%d/4)", "[E] Light helipad fire-pot (%d/4)"],
+	&"it.helipad_pots_lit": ["Посадочный треугольник жаровен зажжён против ветра", "Fire-pot landing triangle lit against the wind"],
+	&"it.psnd_flare_use": ["[Зажать E] Выдернуть шнур ночного магниевого патрона ПСНД", "[Hold E] Pull cord of PSND night magnesium flare"],
+	&"sub.psnd_flare_blinding": ["В темноту ударил слепящий красный магниевый факел 20 000 свечей! Порог посадки обозначен.", "A blinding 20,000 candlepower red magnesium torch ignited! Landing threshold marked."],
+	&"it.ivo1m_inspect": ["[E] Измеритель ВНГО ИВО-1М: %s", "[E] IVO-1M Cloud Base Meter: %s"],
+	&"it.m37_inspect": ["[E] Щит видимости М-37: %s", "[E] M-37 Visibility Shield: %s"],
+
+	&"radio.mi8_call": ["— Кедр-7, борт СССР-22481, командир Савушкин. Заходим вслепую по приводу! Дайте давление QFE, ВНГО, видимость и ветер!", "— Kedr-7, flight USSR-22481, Commander Savushkin. Inbound blind on NDB! Request station QFE, cloud base, visibility and wind!"],
+	&"radio.mi8_choice_prompt": ["Ответ борту СССР-22481:", "Reply to flight USSR-22481:"] ,
+	&"radio.mi8_opt_correct": ["QFE: 738 мм рт. ст., ВНГО: 180 м, видимость: 800 м, посадка в треугольник", "QFE: 738 mmHg, cloud base: 180m, visibility: 800m, land into triangle"],
+	&"radio.mi8_opt_hpa_fail": ["Давление: 984 гПа (ошибка единиц!), облака 180 м, посадка по ветру", "Pressure: 984 hPa (unit error!), cloud 180m, land downwind"],
+	&"radio.mi8_opt_downwind_fail": ["QFE: 738 мм рт. ст., но жаровни расставлены по ветру", "QFE: 738 mmHg, but fire-pots laid out downwind"],
+	&"radio.mi8_crash_mast": ["ВЫСОТОМЕР ВД-10 ЗАНИЗИЛ НА 250 МЕТРОВ! Вертолёт на полной скорости врезался в мачту «Унжа-1»!", "VD-10 ALTIMETER ERRED BY 250 METERS! The helicopter slammed full-speed into the Unzha-1 mast!"],
+	&"radio.mi8_vortex_crash": ["ВИХРЕВОЕ КОЛЬЦО! При посадке по ветру вертолёт потерял подъёмную силу и рухнул в овраг!", "VORTEX RING STATE! Landing downwind caused rotor stall and catastrophic plunge into the ravine!"],
+	&"radio.mi8_landing_ok": ["Борт СССР-22481 коснулся посадочного креста в свете красного магниевого факела ПСНД!", "Flight USSR-22481 touched down on the landing cross in the light of the red PSND flare!"],
+	&"it.mi8_board": ["[E] Подняться по трапу в кабину Ми-8 [ЭВАКУАЦИЯ]", "[E] Board the Mi-8 cargo cabin [EVACUATION]"],
+	&"end.mi8_escape.title": ["КОНЦОВКА: ПОЛЯРНАЯ АВИАЦИЯ СССР", "ENDING: SOVIET POLAR AVIATION"],
+	&"end.mi8_escape.1": ["Тяжёлая створка грузового отсека Ми-8 захлопнулась за твоей спиной. Запах керосина, горячего масла и тепло кабинного калорифера отрезали ледяную ночь.", "The heavy cargo door of the Mi-8 slammed shut behind you. The smell of kerosene, warm oil, and the cabin heater heat severed the freezing night."],
+	&"end.mi8_escape.2": ["Командир Савушкин прибавил шаг винта. Земля под колёсами ушла вниз. В иллюминаторе среди бурана остался лишь тусклый огонёк станции «Кедр-7»... и тонкий тёмный силуэт у калитки, запрокинувший голову в небо.", "Commander Savushkin pulled collective. The ground fell away. In the cabin porthole amidst the blizzard remained only the dim beacon of Kedr-7... and a slender dark silhouette at the gate, its head tilted back toward the sky."],
+	&"case.verdict.mi8_escape": ["Дежурный наблюдатель Мальцев успешно эвакуирован бортом Ми-8 СССР-22481. Журнал ТМ-1 и архивные кассеты доставлены в Ивдель.", "Duty observer Maltsev successfully evacuated aboard Mi-8 USSR-22481. TM-1 log and archive tapes delivered to Ivdel."]
 }
 
 

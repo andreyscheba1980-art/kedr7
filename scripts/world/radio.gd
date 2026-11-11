@@ -575,6 +575,10 @@ func transmit() -> void:
 		Game.hud.subtitle(Loc.t(&"radio.variometer_unmatched"), 4.0)
 		return
 	if Game.night == 7 and Game.final_call and not _field:
+		if not SaveGame.flags.get("mi8_contacted", false):
+			SaveGame.flags["mi8_contacted"] = true
+			_run_mi8_evac_exchange()
+			return
 		_challenge_night7_crawler()
 		return
 	if Game.final_call and strength_of(&"mainland") >= 0.75 and not _busy:
@@ -708,6 +712,39 @@ func _challenge_night7_crawler() -> void:
 		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
 		Game.hud.subtitle(Loc.t(&"radio.n7_reply_real"), 5.5)
 		SaveGame.flags["night7_radio_ok"] = true
+	_busy = false
+
+
+func _run_mi8_evac_exchange() -> void:
+	_busy = true
+	Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
+	Game.hud.subtitle(Loc.t(&"radio.mi8_call"), 7.0)
+	await get_tree().create_timer(4.5, false).timeout
+	if not is_inside_tree():
+		_busy = false
+		return
+	var choice: int = await TalkChoiceUI.ask([
+		Loc.t(&"radio.mi8_opt_correct"),
+		Loc.t(&"radio.mi8_opt_hpa_fail"),
+		Loc.t(&"radio.mi8_opt_downwind_fail")
+	], 18.0)
+	if choice == 0:
+		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_landing_ok"), 6.5)
+		SaveGame.flags["mi8_landing_ready"] = true
+		SaveGame.flags["mi8_landed"] = true
+		EventBus.sound_triggered.emit(&"mi8_landed")
+	elif choice == 1:
+		Game.audio.play_2d("res://assets/audio/flare.ogg", 6.0)
+		Game.audio.play_2d("res://assets/audio/clank.ogg", 4.0)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_crash_mast"), 7.5)
+		Director.add_tension(50.0, "катастрофа Ми-8 на мачте Унжа-1")
+		SaveGame.flags["mi8_crashed"] = true
+	else:
+		Game.audio.play_2d("res://assets/audio/generator_sputter.ogg", 4.0)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_vortex_crash"), 7.5)
+		Director.add_tension(45.0, "вихревое кольцо Ми-8")
+		SaveGame.flags["mi8_crashed"] = true
 	_busy = false
 
 

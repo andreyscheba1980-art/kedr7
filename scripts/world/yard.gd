@@ -4106,6 +4106,94 @@ func _build_helipad() -> void:
 	_helipad_drift = drift_it
 	_build_helipad_heli()
 
+	# 4 посадочные жаровни вертодрома: посадочный треугольник + хвостовой костёр
+	var pot_offsets: Array[Vector3] = [
+		Vector3(0.0, 0.0, -5.5),
+		Vector3(-4.5, 0.0, 3.5),
+		Vector3(4.5, 0.0, 3.5),
+		Vector3(0.0, 0.0, 7.5)
+	]
+	for p_idx in range(4):
+		var pot_pos := HELIPAD + pot_offsets[p_idx]
+		var pot := Props.helipad_firepot()
+		pot.position = pot_pos
+		add_child(pot)
+
+		var pot_light := OmniLight3D.new()
+		pot_light.position = pot_pos + Vector3(0, 0.45, 0)
+		pot_light.light_color = Color(1.0, 0.62, 0.22)
+		pot_light.light_energy = 0.0
+		pot_light.omni_range = 14.0
+		pot_light.shadow_enabled = false
+		add_child(pot_light)
+
+		var it_pot := Geo.interactable(self, Vector3(1.2, 0.8, 1.2), pot_pos + Vector3(0, 0.35, 0), null, "", func(_p: Player) -> void:
+			if pot_light.light_energy > 0.1:
+				return
+			pot_light.light_energy = 3.5
+			var cur_lit := int(SaveGame.flags.get("helipad_firepots_lit_count", 0)) + 1
+			SaveGame.flags["helipad_firepots_lit_count"] = cur_lit
+			AudioDirector.play_raw("res://assets/audio/stove_add.ogg", 0.0)
+			Game.audio.play_3d("res://assets/audio/stove_add.ogg", pot_pos, 0.0, 15.0)
+			if cur_lit >= 4:
+				SaveGame.flags["helipad_pots_all_lit"] = true
+				Game.hud.subtitle(Loc.t(&"it.helipad_pots_lit"), 4.5)
+		)
+		it_pot.prompt_provider = func() -> String:
+			if pot_light.light_energy > 0.1:
+				return ""
+			var cur := int(SaveGame.flags.get("helipad_firepots_lit_count", 0)) + 1
+			return Loc.t(&"it.helipad_firepot", [cur])
+		it_pot.name = "FirePot_%d" % p_idx
+
+	# Патрон сигнальный ночной/дневной ПСНД (магниевый красный огонь 20 000 свечей)
+	var psnd := Props.psnd_flare()
+	var psnd_pos := HELIPAD + Vector3(-5.2, 0.35, -4.8)
+	psnd.position = psnd_pos
+	add_child(psnd)
+
+	var psnd_light := OmniLight3D.new()
+	psnd_light.position = psnd_pos + Vector3(0, 0.5, 0)
+	psnd_light.light_color = Color(1.0, 0.12, 0.12)
+	psnd_light.light_energy = 0.0
+	psnd_light.omni_range = 28.0
+	psnd_light.shadow_enabled = true
+	add_child(psnd_light)
+
+	var it_psnd := Geo.interactable(self, Vector3(0.8, 0.8, 0.8), psnd_pos, null, Loc.t(&"it.psnd_flare_use"), func(_p: Player) -> void:
+		if psnd_light.light_energy > 0.1:
+			return
+		psnd_light.light_energy = 16.0
+		SaveGame.flags["psnd_flare_lit"] = true
+		AudioDirector.play_raw("res://assets/audio/flare.ogg", 4.0)
+		Game.audio.play_3d("res://assets/audio/flare.ogg", psnd_pos, 4.0, 35.0)
+		Game.hud.subtitle(Loc.t(&"sub.psnd_flare_blinding"), 5.5)
+		Game.hud.flash_red(0.4, 0.6)
+	)
+	it_psnd.name = "PSNDFlare"
+
+	# Измеритель ВНГО ИВО-1М у метеоплощадки
+	var ivo := Props.ivo1m_cloudmeter()
+	ivo.position = PLOT + Vector3(5.5, 0.0, 3.2)
+	add_child(ivo)
+	var it_ivo := Geo.interactable(self, Vector3(1.0, 1.4, 1.0), PLOT + Vector3(5.5, 0.7, 3.2), null, "", func(_p: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
+		Game.hud.subtitle(Loc.t(&"it.ivo1m_inspect", ["ВНГО = 180 м (Низкая слоисто-дождевая облачность)"]), 4.5)
+	)
+	it_ivo.prompt_provider = func() -> String: return Loc.t(&"it.ivo1m_inspect", ["180 м"])
+	it_ivo.name = "IVO1M_Meter"
+
+	# Щит видимости М-37 на границе двора
+	var m37 := Props.m37_visibility_shield()
+	m37.position = PLOT + Vector3(-22.0, 0.0, 16.0)
+	add_child(m37)
+	var it_m37 := Geo.interactable(self, Vector3(1.5, 2.0, 0.8), PLOT + Vector3(-22.0, 1.0, 16.0), null, "", func(_p: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
+		Game.hud.subtitle(Loc.t(&"it.m37_inspect", ["Метеорологическая дальность видимости = 800 м"]), 4.5)
+	)
+	it_m37.prompt_provider = func() -> String: return Loc.t(&"it.m37_inspect", ["800 м"])
+	it_m37.name = "M37_Shield"
+
 
 func _build_helipad_heli() -> void:
 	# 4. Появление вертолёта Ми-8 снабжения и эвакуации (Ночь 5 или День 5)
@@ -4138,6 +4226,13 @@ func _build_helipad_heli() -> void:
 			Game.hud.subtitle(Loc.t(&"sub.heli_keeper"), 5.0)
 			_heli_crate_it.queue_free()
 		)
+
+		# Трап эвакуации на борт Ми-8 (активен на 7-й смене)
+		if Game.night == 7:
+			var evac_it := Geo.interactable(_heli_node, Vector3(2.5, 2.0, 2.5), Vector3(-1.8, 0.8, 0.0), null, Loc.t(&"it.mi8_board"), func(_p: Player) -> void:
+				EventBus.ending_chosen.emit(&"mi8_escape")
+			)
+			evac_it.name = "Mi8EvacRamp"
 
 
 # --- Обустройство дороги от дома к метеокорпусу (Station Road Dressing) -------

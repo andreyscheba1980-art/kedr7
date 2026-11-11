@@ -206,11 +206,48 @@ func _build_inside() -> void:
 	rack.position = ROOT + Vector3(16.5, 0.0, -15.5)
 	rack.rotation.y = deg_to_rad(90.0)
 	add_child(rack)
+
+	# Аутентичный советский керновый ящик экспедиции Дубова (1979 г.)
+	var cb79 := Props.corebox_1979()
+	cb79.position = ROOT + Vector3(16.5, 0.85, -14.2)
+	cb79.rotation.y = deg_to_rad(90.0)
+	add_child(cb79)
+
 	var it_rack := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), ROOT + Vector3(16.5, 0.7, -15.5), null, Loc.t(&"it.adit_core_rack"), func(_p: Player) -> void:
 		Game.hud.show_note(Loc.t(&"note.adit_core_anomaly"))
 		Director.add_tension(10.0, "осмотр аномального керна в штольне")
 		SaveGame.write())
 	it_rack.name = "AditCoreRack"
+
+	# Шахтный оптический интерферометр ШИ-11 на верстаке у ствола
+	var shi11 := Props.shi11_interferometer()
+	shi11.position = ROOT + Vector3(1.2, 0.75, -5.5)
+	add_child(shi11)
+	var it_shi := Geo.interactable(self, Vector3(0.6, 0.5, 0.6), ROOT + Vector3(1.2, 0.75, -5.5), null, Loc.t(&"it.shi11_interferometer"), func(_p: Player) -> void:
+		EventBus.ui_requested.emit(&"interferometer")
+	)
+	it_shi.name = "MineSHI11"
+
+	# Радиометр СРП-68-01 с зондом БДГ-1 около кернохранилища
+	var srp := Props.srp68_radiometer()
+	srp.position = ROOT + Vector3(15.2, 0.65, -15.2)
+	add_child(srp)
+	var it_srp := Geo.interactable(self, Vector3(0.6, 0.5, 0.6), ROOT + Vector3(15.2, 0.65, -15.2), null, Loc.t(&"it.srp68_inspect"), func(_p: Player) -> void:
+		AudioDirector.play_raw("res://assets/audio/clank.ogg", -4.0)
+		AudioDirector.play_raw("res://assets/audio/radio_anomaly.ogg", 0.0)
+		Game.hud.subtitle(Loc.t(&"srp68.reading_spike"), 5.5)
+		Director.add_tension(12.0, "зашкал радиометра СРП-68-01")
+	)
+	it_srp.name = "MineSRP68"
+
+	# Сейсмоприёмник СВ-20, вбитый штырём в скалу основного штрека
+	var sv20 := Props.sv20_geophone()
+	sv20.position = ROOT + Vector3(-1.1, 0.35, -20.0)
+	add_child(sv20)
+	var it_sv := Geo.interactable(self, Vector3(0.5, 0.5, 0.5), ROOT + Vector3(-1.1, 0.35, -20.0), null, Loc.t(&"it.sv20_listen"), func(_p: Player) -> void:
+		EventBus.ui_requested.emit(&"seismograph")
+	)
+	it_sv.name = "MineSV20"
 
 	# Забой: вмёрзший перфоратор ПР-30К, ящик аммонита, бензиновая лампа ЛБВК и светильник СГГ-3
 	var drill := Props.pr30k_stoper_drill()
@@ -296,8 +333,13 @@ func _process(delta: float) -> void:
 		_co2_timer += delta
 		var co2_factor := clampf(1.0 - (_co2_timer / 90.0), 0.08, 1.0)
 		if _lbvk_flame_light != null:
-			_lbvk_flame_light.light_energy = 1.2 * co2_factor
-			_lbvk_flame_light.light_color = Color(1.0, 0.8 * co2_factor, 0.4 + (1.0 - co2_factor) * 0.45)
+			if local.z < -39.0 or Game.yrka_nearby:
+				# Аномалия «Отзвук» / Ырка: неестественное фиолетово-зелёное пламя
+				_lbvk_flame_light.light_color = Color(0.45, 0.15, 0.92)
+				_lbvk_flame_light.light_energy = 1.6 + 0.3 * sin(_co2_timer * 8.0)
+			else:
+				_lbvk_flame_light.light_energy = 1.2 * co2_factor
+				_lbvk_flame_light.light_color = Color(1.0, 0.8 * co2_factor, 0.4 + (1.0 - co2_factor) * 0.45)
 		if _co2_timer >= 60.0 and not Game.has_flag("adit_dead_air_warned"):
 			Game.set_flag("adit_dead_air_warned", true)
 			Game.hud.subtitle(Loc.t(&"sub.adit_dead_air"), 5.0)
@@ -309,8 +351,12 @@ func _process(delta: float) -> void:
 			Game.player.speed_mult = 1.0
 		_co2_timer = maxf(_co2_timer - delta * 2.5, 0.0)
 		if _lbvk_flame_light != null:
-			_lbvk_flame_light.light_energy = 1.2
-			_lbvk_flame_light.light_color = Color(1.0, 0.8, 0.4)
+			if Game.yrka_nearby:
+				_lbvk_flame_light.light_color = Color(0.45, 0.15, 0.92)
+				_lbvk_flame_light.light_energy = 1.5
+			else:
+				_lbvk_flame_light.light_energy = 1.2
+				_lbvk_flame_light.light_color = Color(1.0, 0.8, 0.4)
 
 	# 2. Ночь 5: Лаз через завал (ограничение поворота ±28°, осыпание породы при шуме, валенки на выходе)
 	var in_crawl := (local.z < -35.2 and local.z > -39.2 and absf(local.x) < 1.2)
