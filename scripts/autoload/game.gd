@@ -75,6 +75,7 @@ var stove_heat := 0.0                   ## жар кладки, 0..100
 var stove_damper := false               ## поддувало прикрыто
 var stove_flue := false                 ## вьюшка закрыта (с огнём — угар; без огня — жар держится дольше)
 var house_switch_off := false           ## рубильник у двери: свет в доме погашен, дизель на холостом
+var pzs35_on := false                   ## прожектор ПЗС-35 на крыше (12 А)
 var zaboy_unsealed := false             ## сорвана свинцовая пломба аварийного рубильника «Директива Забой»
 var zaboy_active := false               ## контур «Забой» замкнут (ток ДГА-24 на заземление мачты)
 var warmth := 100.0
@@ -373,6 +374,7 @@ func _reset_stove_aux() -> void:
 	stove_damper = false
 	stove_flue = false
 	house_switch_off = false
+	pzs35_on = false
 	zaboy_unsealed = false
 	zaboy_active = false
 

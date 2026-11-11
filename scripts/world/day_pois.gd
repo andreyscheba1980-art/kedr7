@@ -35,6 +35,8 @@ var _tower_wind_player: AudioStreamPlayer3D
 var _shrine_whisper_player: AudioStreamPlayer3D
 var _mi4_wind_player: AudioStreamPlayer3D
 var _solar_halo: Node3D = null
+var _tower_model: Node3D = null
+var _tower_pos := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -56,6 +58,17 @@ func _process(delta: float) -> void:
 	_tick_anomalous_pois(delta)
 	if Game.is_day() and Game.is_outside():
 		_tick_peripheral_pareidolia(delta)
+	# Качка внешней рабочей пирамиды вышки 812 от ветра
+	if _tower_model != null and Game.player != null:
+		var pp := Game.player.global_position
+		if pp.y > _tower_pos.y + 18.0 and Vector2(pp.x - _tower_pos.x, pp.z - _tower_pos.z).length() < 4.0:
+			var w_k: float = 1.0 + (Game.weather.intensity * 2.0 if Game.weather != null else 0.5)
+			if not Game.has_flag("tower_ice_cleared"):
+				w_k *= 1.6
+			var sway := sin(Time.get_ticks_msec() * 0.0022) * 0.015 * w_k
+			_tower_model.rotation.z = sway
+			if randf() < delta * 0.25:
+				AudioDirector.play_raw("res://assets/sfx/cc0/log_frost_crack_v2.ogg", -12.0)
 
 
 # --- 1. Построение 14 точек интереса (POI) ---
@@ -329,14 +342,16 @@ func _build_finger(base_pos: Vector3) -> void:
 	marker_it.name = "ChertovFingerMarker"
 
 
-# 6. 24-метровая деревянная триангуляционная вышка геодезистов
+# 6. 24-метровая деревянная триангуляционная вышка геодезистов («Сигнал ГГС Высота 812»)
 func _build_tower(base_pos: Vector3) -> void:
 	var p := _place_ground_y(base_pos)
-	var model := Props.triangulation_tower_24m()
+	_tower_pos = p
+	var model := Props.geodetic_signal_tower()
 	if model != null:
 		model.position = p
 		model.rotation.y = deg_to_rad(40.0)
 		add_child(model)
+		_tower_model = model
 
 	# Опоры у основания
 	_solid(p + Vector3(0, 2.0, 0), Vector3(3.6, 4.0, 3.6), deg_to_rad(40.0))
@@ -368,6 +383,25 @@ func _build_tower(base_pos: Vector3) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.tower_descended"), 3.0)
 	)
 	ladder_down.name = "TowerLadderDown"
+
+	# Визирный решетчатый барабан — срубить наледь топором
+	var drum_ice_it := Geo.interactable(self, Vector3(1.6, 2.2, 1.6), p + Vector3(0, 21.6, 0), null, "", func(_pl: Player) -> void:
+		if not Game.has_flag("tower_ice_cleared"):
+			Game.set_flag("tower_ice_cleared", true)
+			AudioDirector.play_raw("res://assets/audio/ice_hit.ogg", 2.0)
+			AudioDirector.play_raw("res://assets/sfx/cc0/log_frost_crack_v2.ogg", 0.0)
+			if _tower_model != null:
+				var ice_node := _tower_model.find_child("DrumRimeIce", true, false)
+				if ice_node != null:
+					ice_node.visible = false
+			Game.hud.subtitle(Loc.t(&"sub.tower_ice_cleared"), 5.0)
+			Director.add_tension(8.0, "сбита наледь с визирного барабана")
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.tower_ice_already_cleared"), 2.5)
+	)
+	drum_ice_it.prompt_provider = func() -> String:
+		return Loc.t(&"it.tower_ice_cleared_done") if Game.has_flag("tower_ice_cleared") else Loc.t(&"it.tower_chop_ice")
+	drum_ice_it.name = "TowerDrumIceChop"
 
 	# Ящик геодезистов с сигнальными ракетами и спиртовкой
 	var ammo_it := Geo.interactable(self, Vector3(1.0, 0.8, 1.0), p + Vector3(1.6, 0.4, 1.2), null, Loc.t(&"it.poi_tower"), func(_pl: Player) -> void:

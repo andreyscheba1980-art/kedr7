@@ -52,6 +52,7 @@ var _static: AudioStreamPlayer3D
 var _tune: AudioStreamPlayer3D     ## шорох верньера, пока крутят ручку
 var _tune_idle := 1.0
 var _heterodyne: AudioStreamPlayer3D ## свист гетеродина при приближении к несущей
+var tube_synth: VolnaTubeSynthesizer ## процедурный синтез ламп 6К4П («Волна-К»)
 var _morse_t := 70.0               ## далёкая чужая морзянка между станциями
 var _players: Dictionary = {}
 var _static_amp := 0.3
@@ -247,6 +248,9 @@ func _ready() -> void:
 	add_child(_heterodyne)
 	_heterodyne.play()
 
+	tube_synth = VolnaTubeSynthesizer.new()
+	add_child(tube_synth)
+
 	for id in _signals:
 		var p := AudioStreamPlayer3D.new()
 		p.name = "Signal_" + String(id)
@@ -347,6 +351,11 @@ func _process(delta: float) -> void:
 		target_amp = 0.0
 	_static_amp = lerpf(_static_amp, target_amp, minf(delta * 5.0, 1.0))   # без резких скачков шума
 	_static.volume_db = base_db + linear_to_db(maxf(_static_amp, 0.0001))
+
+	if tube_synth != null:
+		tube_synth.grid_voltage = _grid_voltage
+		tube_synth.carrier_suppression = clampf(best_s, 0.0, 1.0)
+		tube_synth.receiver_gain = 0.0 if muted else 0.55
 
 	# Гетеродинный свист при приближении к несущей частоте (биения гетеродина Р-250)
 	var het_target_db := -80.0

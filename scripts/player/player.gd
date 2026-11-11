@@ -118,6 +118,9 @@ var kettle_heat_timer := 0.0       ## таймер тепла чайника н�
 var fov_offset: float = 0.0
 var stamina_drain_mult: float = 1.0
 var speed_mult: float = 1.0
+var target_head_y: float = 1.58
+var yaw_limit_base: float = NAN
+var yaw_limit_half_angle: float = deg_to_rad(28.0)
 var _prev_velocity_len: float = 0.0
 
 
@@ -265,6 +268,12 @@ func handle_input(event: InputEvent) -> void:
 		_mouse_sway += Vector2(rel_x, rel_y * y_sign) * 0.00075
 		_mouse_sway.x = clampf(_mouse_sway.x, -0.09, 0.09)
 		_mouse_sway.y = clampf(_mouse_sway.y, -0.09, 0.09)
+		if not is_nan(yaw_limit_base):
+			var cur_yaw := wrapf(rotation.y - yaw_limit_base, -PI, PI)
+			var new_yaw := clampf(cur_yaw - rel_x * sens, -yaw_limit_half_angle, yaw_limit_half_angle)
+			rotation.y = yaw_limit_base + new_yaw
+			head.rotation.x = clampf(head.rotation.x - rel_y * sens * y_sign, deg_to_rad(-45.0), deg_to_rad(35.0))
+			return
 		if Game.has_flag("in_cabin"):
 			var base_yaw := deg_to_rad(225.0)
 			var cur_yaw := wrapf(rotation.y - base_yaw, -PI, PI)
@@ -485,6 +494,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if head != null:
+		head.position.y = lerpf(head.position.y, target_head_y, minf(delta * 5.0, 1.0))
 	_update_stamina(delta)
 	_update_hold_breath(delta)
 	_update_flashlight(delta)
@@ -690,6 +701,8 @@ func _update_steps(delta: float) -> void:
 		Game.yrka.on_player_footstep(global_position, global_basis.z)
 	if is_out and _sprinting and Game.audio != null and Game.audio.has_method(&"record_player_noise"):
 		Game.audio.record_player_noise(global_position)
+	if not is_out and Game.radio != null and Game.radio.tube_synth != null:
+		Game.radio.tube_synth.trigger_tube_microphonics(0.35 if not _sprinting else 0.65)
 
 
 ## Звук шага по поверхности: доски дома, гулкие мостки и крыльцо, железо, снег и твёрдый наст.

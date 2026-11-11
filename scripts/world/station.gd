@@ -123,6 +123,12 @@ var _curtain_panels: Array[Node3D] = []
 var _kerosene_lamp_prop: Node3D
 var _kerosene_light: OmniLight3D
 var _kerosene_lit := false
+var _ap50_lever: Node3D = null
+var _pzs35_light: SpotLight3D = null
+var _double_door_timer := 65.0
+var _double_door_active := false
+var _double_door_done := false
+var _double_figure: Node3D = null
 var _susedko_node: Node3D = null
 var _susedko_timer := 45.0
 var _susedko_peeking := false
@@ -194,6 +200,8 @@ func _ready() -> void:
 	Perf.mark("station _build_generator_shack()")
 	_build_storm_beacon()
 	Perf.mark("station _build_storm_beacon()")
+	var cabin_acoustics := CabinAcousticSim.new()
+	add_child(cabin_acoustics)
 	add_child(Yard.new())
 	Perf.mark("station add_child(Yard.new())")
 	Dressing.build(self)
@@ -436,6 +444,53 @@ func _process(delta: float) -> void:
 		_storm_beacon.visible = false
 	if _gen_smoke != null:
 		_gen_smoke.emitting = Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0
+
+	# 1. Расчёт нагрузки генератора ДГА-24 и автомата защиты АП-50 (предел 20 А)
+	var base_current: float = 2.5 if (Game.power_on and not Game.house_switch_off) else 0.5
+	var pzs35_current: float = 12.0 if (Game.pzs35_on and not Game.has_flag("ap50_tripped")) else 0.0
+	var is_radio_on: bool = Game.radio != null and Game.radio.active
+	var angara_transmitting: bool = Net.talking or (Game.radio != null and Game.radio.recording_t >= 0.0)
+	var angara_current: float = 11.0 if (is_radio_on and angara_transmitting) else (2.0 if is_radio_on else 0.0)
+	var total_amps: float = base_current + pzs35_current + angara_current
+	if total_amps > 20.0 and not Game.has_flag("ap50_tripped"):
+		Game.set_flag("ap50_tripped", true)
+		Game.pzs35_on = false
+		if _pzs35_light != null:
+			_pzs35_light.visible = false
+		if _ap50_lever != null:
+			_ap50_lever.position.y = 1.26 - 0.03
+		Game.audio.play_3d(CLANK_SOUND, Vector3(14.37, 1.26, 2.3), 3.0)
+		Game.hud.subtitle(Loc.t(&"sub.breaker_tripped"), 5.0)
+		_apply_lamps()
+
+	# 2. Двойник у порога (Ночь 4-5)
+	if Game.is_night() and Game.night >= 4 and not _double_door_done and Game.has_flag("in_cabin"):
+		_double_door_timer -= delta
+		if _double_door_timer <= 0.0:
+			_double_door_timer = 99999.0
+			_double_door_active = true
+			Game.audio.play_3d("res://assets/audio/knock_v3.ogg", Vector3(14.5, 1.4, 2.3), 2.0, 10.0)
+			get_tree().create_timer(0.4, false).timeout.connect(func() -> void:
+				Game.audio.play_3d("res://assets/audio/knock_v3.ogg", Vector3(14.5, 1.4, 2.3), 2.0, 10.0))
+			get_tree().create_timer(1.2, false).timeout.connect(func() -> void:
+				Game.audio.play_3d("res://assets/audio/knock_v3.ogg", Vector3(14.5, 1.4, 2.3), 2.5, 10.0)
+				Game.hud.subtitle(Loc.t(&"sub.double_door_knock"), 5.0))
+			Director.add_tension(12.0, "двойник стучит в сени")
+
+			get_tree().create_timer(3.5, false).timeout.connect(func() -> void:
+				Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", Vector3(9.2, 0.96, -1.5), 1.0, 8.0)
+				Game.hud.subtitle(Loc.t(&"coop.spoof_door"), 6.0))
+			get_tree().create_timer(9.0, false).timeout.connect(func() -> void:
+				Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", Vector3(9.2, 0.96, -1.5), 0.8, 8.0)
+				Game.hud.subtitle(Loc.t(&"coop.spoof_behind"), 6.5))
+
+			get_tree().create_timer(25.0, false).timeout.connect(func() -> void:
+				if _double_door_active:
+					_double_door_active = false
+					_double_door_done = true
+					Game.audio.play_3d("res://assets/sfx/cc0/log_frost_crack_v2.ogg", Vector3(14.5, 1.4, 2.3), 1.0, 8.0)
+					Game.hud.subtitle(Loc.t(&"sub.double_scratched_left"), 5.0))
+
 	if is_backdrop:
 		return   # фон главного меню: только картинка, никаких событий смены (HUD нет)
 	# Заглохание — только ночью и не чаще пары раз за смену (правило журнала: «генератор капризный, но не каждый час»).
@@ -829,6 +884,8 @@ func outside_lit() -> bool:
 
 func _lamp_on(l: Light3D, base: bool) -> bool:
 	if not base:
+		return false
+	if Game.has_flag("ap50_tripped"):
 		return false
 	return not Game.house_switch_off or not is_pos_inside_house(l.global_position)
 
@@ -2188,6 +2245,8 @@ func _build_radio_room() -> void:
 	# Крупный план (BarographUI) прячет модель и ставит на её место свой барабан: где стол и куда лицом
 	baro_model.add_to_group(&"barograph_model")
 	baro_model.set_meta(&"rig_base", Vector3(8.55, 0.75, -1.45))   # чуть правее: тумба «Слухача» не лезет в кадр
+
+	_build_pzs35_searchlight()
 	baro_model.set_meta(&"rig_yaw", 0.0)
 
 	# Грунтовый геофон и сейсмоприемник СВ-20 («Слухач») на отдельной виброизолированной тумбе
@@ -2667,6 +2726,7 @@ func _build_vestibule() -> void:
 	vs43_it.add_child(vs43_model)
 
 	_build_house_switch()
+	_build_ap50_breaker()
 	_build_zaboy_switch()
 	# Лампа в тамбуре
 	var l_vest := Geo.omni(self, Vector3(13.0, 2.65, 3.5), 4.5, 0.8, Color(1.0, 0.74, 0.46))
@@ -3439,6 +3499,8 @@ func set_door_open(open: bool) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.phobia_door_hesitate"), 3.0)
 		await get_tree().create_timer(0.32, false).timeout
 	door_open = open
+	if not open and Game.radio != null and Game.radio.tube_synth != null:
+		Game.radio.tube_synth.trigger_tube_microphonics(1.0)
 	if open:
 		EventBus.door_opened.emit()
 		if Game.night == 7 and Game.final_call:
@@ -3678,6 +3740,66 @@ func _build_zaboy_switch() -> void:
 		return Loc.t(&"it.zaboy_active_desc")
 
 
+## Автомат защиты АП-50 (20 А): выбивает при одновременной работе прожектора ПЗС-35 и передатчика
+func _build_ap50_breaker() -> void:
+	var at := Vector3(14.37, 1.26, 2.3)
+	Geo.block(self, Vector3(0.03, 0.16, 0.14), at, Palette.m(&"metal_dark"), false)
+	_ap50_lever = Geo.block(self, Vector3(0.08, 0.03, 0.025), at + Vector3(-0.04, -0.03 if Game.has_flag("ap50_tripped") else 0.03, 0), Palette.m(&"lead"), false)
+
+	var it := Geo.interactable(self, Vector3(0.25, 0.25, 0.25), at + Vector3(-0.05, 0, 0), null, "", func(_p: Player) -> void:
+		if Game.has_flag("ap50_tripped"):
+			Game.set_flag("ap50_tripped", false)
+			if _ap50_lever != null:
+				_ap50_lever.position.y = at.y + 0.03
+			Game.audio.play_3d(CLANK_SOUND, at, 2.0)
+			_apply_lamps()
+			if _pzs35_light != null:
+				_pzs35_light.visible = Game.pzs35_on and Game.power_on
+			Game.hud.subtitle(Loc.t(&"sub.breaker_reset"), 4.0)
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.breaker_ok"), 2.5)
+	)
+	it.prompt_provider = func() -> String:
+		return Loc.t(&"it.breaker_reset") if Game.has_flag("ap50_tripped") else Loc.t(&"it.breaker_inspect")
+	it.name = "AP50Breaker"
+
+
+func _build_pzs35_searchlight() -> void:
+	# Прожектор ПЗС-35 на коньке крыши над срубом, направленный во двор к метеоплощадке
+	_pzs35_light = SpotLight3D.new()
+	_pzs35_light.position = Vector3(14.2, 3.85, 2.3)
+	_pzs35_light.rotation_degrees = Vector3(-18.0, 45.0, 0.0)
+	_pzs35_light.spot_range = 75.0
+	_pzs35_light.spot_angle = 24.0
+	_pzs35_light.light_energy = 5.0
+	_pzs35_light.light_color = Color(1.0, 0.94, 0.82)
+	_pzs35_light.shadow_enabled = Settings.quality >= 2
+	_pzs35_light.visible = Game.pzs35_on and not Game.has_flag("ap50_tripped") and Game.power_on
+	_pzs35_light.name = "PZS35Searchlight"
+	add_child(_pzs35_light)
+
+	# Корпус прожектора на крыше
+	var pzs_body := Geo.block(self, Vector3(0.45, 0.45, 0.55), Vector3(14.2, 3.85, 2.3), Palette.m(&"metal_dark"), false)
+	pzs_body.rotation_degrees = Vector3(-18.0, 45.0, 0.0)
+
+	# Тумблер прожектора в радиорубке у окна (стол дежурного)
+	var sw_at := Vector3(8.05, 1.05, -1.5)
+	Geo.block(self, Vector3(0.04, 0.16, 0.12), sw_at, Palette.m(&"metal_dark"), false)
+	var sw_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), sw_at, null, "", func(_p: Player) -> void:
+		if Game.has_flag("ap50_tripped"):
+			Game.hud.subtitle(Loc.t(&"sub.breaker_tripped"), 4.0)
+			return
+		Game.pzs35_on = not Game.pzs35_on
+		if _pzs35_light != null:
+			_pzs35_light.visible = Game.pzs35_on and Game.power_on
+		Game.audio.play_3d(CLANK_SOUND, sw_at, 1.0)
+		Game.hud.subtitle(Loc.t(&"sub.pzs35_on") if Game.pzs35_on else Loc.t(&"sub.pzs35_off"), 4.0)
+	)
+	sw_it.prompt_provider = func() -> String:
+		return Loc.t(&"it.pzs35_toggle")
+	sw_it.name = "PZS35Switch"
+
+
 func _stove_prompt() -> String:
 	if Game.player != null and Game.player.held == &"wood":
 		return Loc.t(&"it.stove_add")
@@ -3706,6 +3828,8 @@ func _on_stove_used(p: Player) -> void:
 		_light_prologue_stove()
 		return
 	Game.add_wood()
+	if Game.radio != null and Game.radio.tube_synth != null:
+		Game.radio.tube_synth.trigger_tube_microphonics(0.7)
 	Game.audio.play_3d(STOVE_SOUND, Vector3(-1.5, 0.65, 1.0), 0.0)
 	Game.hud.subtitle(Loc.t(&"sub.stove_added"), 2.5)
 
@@ -3718,6 +3842,8 @@ func _light_prologue_stove() -> void:
 	AudioDirector.play_raw("res://assets/audio/clank.ogg", -2.0)
 	Game.stove_wood = 65.0
 	Game.add_wood()
+	if Game.radio != null and Game.radio.tube_synth != null:
+		Game.radio.tube_synth.trigger_tube_microphonics(0.7)
 	Game.audio.play_3d(STOVE_SOUND, Vector3(-1.5, 0.65, 1.0), 0.0)
 	Game.audio.play_3d("res://assets/audio/fire_loop.ogg", Vector3(-1.5, 0.65, 1.0), -2.0)
 	Game.hud.subtitle(Loc.t(&"sub.stove_lit_prologue"), 5.0)

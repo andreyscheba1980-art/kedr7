@@ -17,6 +17,13 @@ var _surface: Vector3
 var _drip_t := 3.0
 var _creak_t := 9.0
 var _scared := {}
+var _co2_timer := 0.0
+var _rustle_t := 0.0
+var _valenki_active := false
+var _valenki_event_done := false
+var _valenki_stand_timer := 0.0
+var _valenki_node: Node3D = null
+var _lbvk_flame_light: OmniLight3D = null
 
 
 static func known() -> bool:
@@ -65,6 +72,20 @@ func _notification(what: int) -> void:
 func _build_entry() -> void:
 	var at := _surface + ENTRY
 	at.y = Terrain.height(at.x, at.z) if Terrain.ready() else at.y
+
+	# Бетонный оголовник с архивной надписью «МГ СССР • ГРП-14 • 1959 г.»
+	var portal_header := Node3D.new()
+	portal_header.position = at + Vector3(0.0, 2.45, 0.0)
+	add_child(portal_header)
+	Geo.block(portal_header, Vector3(2.6, 0.45, 0.4), Vector3.ZERO, Palette.m(&"concrete"), true)
+	var lbl := Label3D.new()
+	lbl.text = "МГ СССР • ГРП-14 • 1959 г."
+	lbl.font_size = 36
+	lbl.pixel_size = 0.0032
+	lbl.modulate = Color(0.18, 0.16, 0.14)
+	lbl.position = Vector3(0.0, 0.0, 0.21)
+	portal_header.add_child(lbl)
+
 	# Груда смёрзшихся камней и брёвен у левой стойки портала
 	var rubble := Node3D.new()
 	rubble.position = at
@@ -160,8 +181,62 @@ func _build_inside() -> void:
 	var marks := Geo.interactable(self, Vector3(0.3, 0.8, 0.5), ROOT + Vector3(-1.85, 1.15, -40.0), null, Loc.t(&"it.mine_marks"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.mine_marks"), 6.0))
 	marks.name = "MineMarks"
+	# Узкоколейка (колея 600 мм, рельсы Р-18) по центру основного штрека от ствола до завала
+	var rail_mat := Palette.m(&"metal_dark")
+	var wood_mat := Palette.m(&"wood")
+	Geo.block(self, Vector3(0.06, 0.07, 36.0), ROOT + Vector3(-0.3, 0.035, -18.0), rail_mat, false)
+	Geo.block(self, Vector3(0.06, 0.07, 36.0), ROOT + Vector3(0.3, 0.035, -18.0), rail_mat, false)
+	for k in range(30):
+		var z_tie := -1.0 - float(k) * 1.2
+		Geo.block(self, Vector3(0.95, 0.05, 0.16), ROOT + Vector3(0.0, 0.02, z_tie), wood_mat, false)
+
+	# Водоотливная канавка с замерзшей охристой рудничной водой
+	Geo.block(self, Vector3(0.35, 0.02, 36.0), ROOT + Vector3(0.9, 0.01, -18.0), Palette.m(&"lead"), false)
+
+	# Сублимационные шестигранные кристаллы льда (гоже) в первых 15 метрах штольни
+	var ice_mat := Palette.m(&"ice")
+	for ice_i in range(8):
+		var iz := -1.5 - float(ice_i) * 1.8
+		var side_x := -1.1 if ice_i % 2 == 0 else 1.1
+		var plate := Geo.block(self, Vector3(0.4, 0.35, 0.04), ROOT + Vector3(side_x, 2.1, iz), ice_mat, false)
+		plate.rotation.z = deg_to_rad(15.0 if ice_i % 2 == 0 else -15.0)
+
+	# Кернохранилище в боковой рассечке (рамы с ящиками)
+	var rack := Props.core_storage_rack()
+	rack.position = ROOT + Vector3(16.5, 0.0, -15.5)
+	rack.rotation.y = deg_to_rad(90.0)
+	add_child(rack)
+	var it_rack := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), ROOT + Vector3(16.5, 0.7, -15.5), null, Loc.t(&"it.adit_core_rack"), func(_p: Player) -> void:
+		Game.hud.show_note(Loc.t(&"note.adit_core_anomaly"))
+		Director.add_tension(10.0, "осмотр аномального керна в штольне")
+		SaveGame.write())
+	it_rack.name = "AditCoreRack"
+
+	# Забой: вмёрзший перфоратор ПР-30К, ящик аммонита, бензиновая лампа ЛБВК и светильник СГГ-3
+	var drill := Props.pr30k_stoper_drill()
+	drill.position = ROOT + Vector3(0.0, 0.0, -43.0)
+	add_child(drill)
+
+	var lbvk := Props.lbvk_safety_lamp()
+	lbvk.position = ROOT + Vector3(0.65, 0.35, -42.8)
+	add_child(lbvk)
+	_lbvk_flame_light = lbvk.find_child("FlameLight", true, false) as OmniLight3D
+
+	var sgg3 := Props.sgg3_headlamp()
+	sgg3.position = ROOT + Vector3(-0.65, 0.1, -42.5)
+	add_child(sgg3)
+
+	# Опрокинутая вагонетка УВО-0.6 в западном тупике с кусками магнетита
+	var car := Props.mine_cart_uvo06()
+	if car != null:
+		car.position = ROOT + Vector3(-7.2, 0.45, -26.0)
+		car.rotation.z = deg_to_rad(75.0)
+		add_child(car)
+		for m_i in range(6):
+			var mop := Geo.block(self, Vector3(0.2, 0.18, 0.22), ROOT + Vector3(-6.8 + float(m_i) * 0.25, 0.08, -26.0 + (float(m_i % 3) - 1.0) * 0.25), Palette.m(&"metal_dark"), false)
+			mop.rotation.y = float(m_i) * 0.7
+
 	# Старые шахтёрские фонари ФАС на стойках крепи: тусклые, тёплые, где-то мигают, один разбит.
-	# Без них в штреке видно одно пятно фонаря у руки (он гасится у близкой стены).
 	var spots := [Vector3(0.85, 1.6, -4.0), Vector3(-0.85, 1.6, -13.0), Vector3(0.85, 1.6, -21.0), Vector3(-0.85, 1.6, -30.0), Vector3(15.0, 1.6, -15.8), Vector3(-6.0, 1.6, -26.3)]
 	for k in spots.size():
 		var at: Vector3 = ROOT + spots[k]
@@ -200,8 +275,86 @@ func _on_cache(_p: Player) -> void:
 
 func _process(delta: float) -> void:
 	if Game.player == null or not zone_has(Game.player.global_position):
+		if Game.player != null and not is_nan(Game.player.yaw_limit_base):
+			Game.player.yaw_limit_base = NAN
 		return
 	var pp := Game.player.global_position
+	var local := pp - ROOT
+
+	# 1. Ночь 3: Просадка потолка до 1.45м, шарканье брезента рюкзака и гипоксия от CO2
+	var in_deep_adit := local.z < -15.0
+	if Game.night >= 3 and in_deep_adit:
+		Game.player.target_head_y = 1.15
+		Game.player.speed_mult = 0.5
+		if Game.player.velocity.length() > 0.4:
+			_rustle_t -= delta
+			if _rustle_t <= 0.0:
+				_rustle_t = randf_range(1.8, 3.5)
+				Game.audio.play_3d("res://assets/sfx/cc0/coat_rustle.ogg", pp + Vector3(0, 0.3, 0), -4.0, 6.0)
+
+		# Накопление «мертвого воздуха» (CO2)
+		_co2_timer += delta
+		var co2_factor := clampf(1.0 - (_co2_timer / 90.0), 0.08, 1.0)
+		if _lbvk_flame_light != null:
+			_lbvk_flame_light.light_energy = 1.2 * co2_factor
+			_lbvk_flame_light.light_color = Color(1.0, 0.8 * co2_factor, 0.4 + (1.0 - co2_factor) * 0.45)
+		if _co2_timer >= 60.0 and not Game.has_flag("adit_dead_air_warned"):
+			Game.set_flag("adit_dead_air_warned", true)
+			Game.hud.subtitle(Loc.t(&"sub.adit_dead_air"), 5.0)
+		if _co2_timer >= 90.0:
+			Game.player.whiteout_panic = clampf(Game.player.whiteout_panic + delta * 0.12, 0.0, 0.75)
+	else:
+		if not (local.z < -35.2 and local.z > -39.2):
+			Game.player.target_head_y = 1.58
+			Game.player.speed_mult = 1.0
+		_co2_timer = maxf(_co2_timer - delta * 2.5, 0.0)
+		if _lbvk_flame_light != null:
+			_lbvk_flame_light.light_energy = 1.2
+			_lbvk_flame_light.light_color = Color(1.0, 0.8, 0.4)
+
+	# 2. Ночь 5: Лаз через завал (ограничение поворота ±28°, осыпание породы при шуме, валенки на выходе)
+	var in_crawl := (local.z < -35.2 and local.z > -39.2 and absf(local.x) < 1.2)
+	if in_crawl:
+		Game.player.target_head_y = 0.55
+		Game.player.yaw_limit_base = deg_to_rad(180.0 if local.z > -37.2 else 0.0)
+		Game.player.yaw_limit_half_angle = deg_to_rad(28.0)
+		# Осыпание породы от динамо-фонарика
+		if Game.player.cranking:
+			if randf() < delta * 1.5:
+				Game.audio.play_3d("res://assets/sfx/cc0/log_frost_crack_v2.ogg", pp + Vector3(0.3, 0.2, 0), -6.0, 5.0)
+
+		# Обратный путь: валенки перекрывают выход из лаза
+		if Game.night >= 5 and Game.has_flag("mine_note_read") and not _valenki_event_done:
+			if local.z > -37.5 and not _valenki_active:
+				_valenki_active = true
+				_valenki_node = Props.valenki()
+				_valenki_node.position = ROOT + Vector3(0.0, 0.0, -35.0)
+				_valenki_node.rotation.y = deg_to_rad(180.0)
+				add_child(_valenki_node)
+				Game.audio.play_3d("res://assets/audio/knock_v3.ogg", _valenki_node.position, 1.0, 10.0)
+				Game.hud.subtitle(Loc.t(&"sub.adit_valenki_blocked"), 5.0)
+				Director.add_tension(15.0, "валенки перекрыли лаз")
+
+			if _valenki_active:
+				var breath_held: bool = Game.player.holding_breath
+				var light_off: bool = not Game.player.flashlight.visible
+				if breath_held and light_off:
+					_valenki_stand_timer += delta
+					if _valenki_stand_timer >= 8.0:
+						_valenki_event_done = true
+						_valenki_active = false
+						if _valenki_node != null:
+							_valenki_node.queue_free()
+							_valenki_node = null
+						Game.audio.play_3d("res://assets/sfx/cc0/step_crust_3.ogg", ROOT + Vector3(0, 0.2, -31.0), 0.0, 12.0)
+						Game.hud.subtitle(Loc.t(&"sub.adit_valenki_left"), 4.5)
+				else:
+					_valenki_stand_timer = maxf(_valenki_stand_timer - delta * 0.5, 0.0)
+	else:
+		if not in_deep_adit:
+			Game.player.yaw_limit_base = NAN
+
+	# Капли и треск крепей
 	_drip_t -= delta
 	if _drip_t <= 0.0:
 		_drip_t = randf_range(1.5, 4.0)
@@ -211,15 +364,15 @@ func _process(delta: float) -> void:
 	if _creak_t <= 0.0:
 		_creak_t = randf_range(10.0, 22.0)
 		Game.audio.play_3d("res://assets/sfx/cc0/log_frost_crack_v2.ogg", pp + Vector3(randf_range(-8, 8), 2.0, randf_range(-8, 8)), -8.0, 14.0)
-	var local := pp - ROOT
-	# Тупик с вагонеткой: из-за завала стучат — три раза, как Михалыч сигналит
+
+	# Тупик с вагонеткой: стук
 	if local.x < -5.0 and local.z < -24.0 and local.z > -28.0 and not _scared.has(&"knock"):
 		_scared[&"knock"] = true
 		for k in 3:
 			get_tree().create_timer(0.6 + k * 0.7, false).timeout.connect(func() -> void:
 				Game.audio.play_3d("res://assets/audio/knock_v3.ogg", ROOT + Vector3(-10.5, 1.0, -26.0), 2.0, 14.0))
 		Director.add_tension(10.0, "стук в тупике штольни")
-	# Забой: шёпот за спиной, со стороны лаза
+	# Забой: шёпот
 	if local.z < -40.0 and not _scared.has(&"whisper"):
 		_scared[&"whisper"] = true
 		Game.audio.play_3d("res://assets/audio/whisper.ogg", ROOT + Vector3(0.0, 1.0, -37.0), -2.0, 8.0)

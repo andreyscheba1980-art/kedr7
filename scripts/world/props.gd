@@ -5075,3 +5075,196 @@ static func seismic_geophone_box() -> Node3D:
 	return _mi(k, key, "tex_metal.png")
 
 
+## Контрольная взрывобезопасная бензиновая лампа ЛБВК (с двойной панцирной сеткой)
+static func lbvk_safety_lamp() -> Node3D:
+	var key := &"lbvk_safety_lamp_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(405, 0.03)
+	var brass := Color(0.68, 0.54, 0.22)
+	var steel_mesh := Color(0.38, 0.40, 0.42)
+	var glass := Color(0.85, 0.92, 0.95)
+	var flame_col := Color(1.0, 0.75, 0.2)
+
+	# Латунный резервуар для бензина (нижняя чаша)
+	k.tube([Vector3(0, 0.0, 0), Vector3(0, 0.12, 0)], [0.07, 0.07], brass, 10, true, true)
+	k.tube([Vector3(0, 0.12, 0), Vector3(0, 0.14, 0)], [0.065, 0.065], brass, 8)
+
+	# Стеклянный толстостенный цилиндр
+	k.tube([Vector3(0, 0.14, 0), Vector3(0, 0.26, 0)], [0.055, 0.055], glass, 10, false, false)
+
+	# Четыре латунные стойки каркаса
+	for i in range(4):
+		var ang := float(i) * (TAU / 4.0)
+		var sx := cos(ang) * 0.065
+		var sz := sin(ang) * 0.065
+		k.tube([Vector3(sx, 0.13, sz), Vector3(sx, 0.38, sz)], [0.005], brass, 4)
+
+	# Двойная латунная/стальная предохранительная сетка Дэви (панцирная сетка)
+	k.tube([Vector3(0, 0.26, 0), Vector3(0, 0.38, 0)], [0.05, 0.045], steel_mesh, 10, false, true)
+	k.tube([Vector3(0, 0.27, 0), Vector3(0, 0.37, 0)], [0.046, 0.041], steel_mesh, 8, false, true)
+
+	# Верхний колпак с отражателем и крюк для подвески
+	k.tube([Vector3(0, 0.38, 0), Vector3(0, 0.42, 0)], [0.07, 0.03], brass, 10, true, true)
+	k.tube([Vector3(0, 0.42, 0), Vector3(0, 0.48, 0), Vector3(0.04, 0.52, 0), Vector3(0.08, 0.49, 0)], [0.005], brass, 4)
+
+	# Фитиль и пламя
+	k.box(Vector3(0, 0.16, 0), Vector3(0.015, 0.03, 0.015), flame_col)
+
+	var node := _mi(k, key, "tex_metal.png")
+	var light := OmniLight3D.new()
+	light.position = Vector3(0, 0.18, 0)
+	light.light_color = Color(1.0, 0.8, 0.4)
+	light.light_energy = 1.2
+	light.omni_range = 4.5
+	light.name = "FlameLight"
+	node.add_child(light)
+	return node
+
+
+## Шахтерский аккумуляторный светильник СГГ-3 («Коногонка» на ремне)
+static func sgg3_headlamp() -> Node3D:
+	var key := &"sgg3_headlamp_v1"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(406, 0.03)
+	var ebonite := Color(0.12, 0.12, 0.14)
+	var metal := Color(0.45, 0.48, 0.50)
+	var leather := Color(0.32, 0.22, 0.14)
+	var reflector := Color(0.90, 0.92, 0.95)
+
+	# Аккумуляторный блок (щелочная батарея)
+	k.box(Vector3(0, 0.15, 0), Vector3(0.14, 0.22, 0.08), ebonite)
+	k.box(Vector3(0, 0.26, 0), Vector3(0.145, 0.02, 0.085), metal)
+	k.box(Vector3(0, 0.15, -0.045), Vector3(0.06, 0.18, 0.01), leather)
+
+	# Бронированный гибкий провод к головной фаре
+	k.tube([Vector3(0.04, 0.27, 0), Vector3(0.10, 0.32, 0.08), Vector3(0.22, 0.25, 0.18), Vector3(0.32, 0.12, 0.24)], [0.012], ebonite, 5)
+
+	# Головная фара
+	k.tube([Vector3(0.32, 0.12, 0.24), Vector3(0.32, 0.12, 0.30)], [0.05, 0.06], metal, 10, true, false)
+	k.box(Vector3(0.32, 0.12, 0.302), Vector3(0.09, 0.09, 0.005), reflector)
+	k.box(Vector3(0.32, 0.18, 0.25), Vector3(0.02, 0.08, 0.01), metal)
+
+	return _mi(k, key, "tex_metal.png")
+
+
+## Опрокинутая шахтная вагонетка УВО-0.6
+static func mine_cart_uvo06() -> Node3D:
+	var key := &"mine_cart_uvo06"
+	var cached := _instance_from_cache(key, "tex_metal.png")
+	if cached != null:
+		return cached
+	var k := _kit(408, 0.05)
+	var steel := Color(0.35, 0.36, 0.38)
+	var dark_metal := Color(0.18, 0.18, 0.20)
+	k.box(Vector3(0, 0.35, 0), Vector3(1.1, 0.65, 1.4), steel)
+	k.box(Vector3(0, 0.55, 0), Vector3(0.95, 0.5, 1.25), dark_metal)
+	for sz: float in [-0.4, 0.4]:
+		k.tube([Vector3(-0.4, 0.05, sz), Vector3(0.4, 0.05, sz)], [0.035, 0.035], steel, 6)
+	return _mi(k, key, "tex_metal.png")
+
+
+## Кернохранилище: стеллажи с 5-секционными ящиками (в глубине — идол в кварце)
+static func core_storage_rack() -> Node3D:
+	var root := Node3D.new()
+	var wood := Palette.m(&"wood")
+	var quartz_m := Palette.m(&"ice")
+	var idol_m := Palette.m(&"metal_dark")
+
+	Geo.block(root, Vector3(0.08, 2.6, 0.4), Vector3(-1.5, 1.3, 0), wood, false)
+	Geo.block(root, Vector3(0.08, 2.6, 0.4), Vector3(0.0, 1.3, 0), wood, false)
+	Geo.block(root, Vector3(0.08, 2.6, 0.4), Vector3(1.5, 1.3, 0), wood, false)
+
+	for y_idx in range(4):
+		var py := 0.4 + float(y_idx) * 0.65
+		Geo.block(root, Vector3(3.1, 0.04, 0.45), Vector3(0, py, 0), wood, false)
+		for box_i in range(3):
+			var bx := -1.0 + float(box_i) * 1.0
+			Geo.block(root, Vector3(0.85, 0.12, 0.40), Vector3(bx, py + 0.07, 0), wood, false)
+			for slot in range(4):
+				var sz := -0.14 + float(slot) * 0.09
+				var is_anomaly := (y_idx == 0 and box_i == 2 and slot == 3) # Глуб. 240 м
+				var mat := quartz_m if not is_anomaly else idol_m
+				Geo.block(root, Vector3(0.80, 0.05, 0.06), Vector3(bx, py + 0.10, sz), mat, false)
+
+	return root
+
+
+## Пневматический перфоратор ПР-30К на распорной колонке с ящиком аммонита
+static func pr30k_stoper_drill() -> Node3D:
+	var root := Node3D.new()
+	var steel := Palette.m(&"metal")
+	var dark_metal := Palette.m(&"metal_dark")
+	var wood := Palette.m(&"wood")
+
+	Geo.block(root, Vector3(0.09, 2.8, 0.09), Vector3(0, 1.4, 0), steel, false)
+	Geo.block(root, Vector3(0.18, 0.24, 0.65), Vector3(0, 1.6, 0.25), dark_metal, false)
+	Geo.block(root, Vector3(0.04, 0.04, 1.4), Vector3(0, 1.6, 0.95), steel, false)
+	Geo.block(root, Vector3(0.55, 0.35, 0.45), Vector3(0.65, 0.18, 0.2), wood, false)
+	Geo.block(root, Vector3(0.12, 0.28, 0.12), Vector3(0.65, 0.45, 0.2), steel, false)
+
+	return root
+
+
+## Советский 4-гранный геодезический сигнал («Сигнал ГГС Высота 812», 24м)
+## Включает две независимые пирамиды: внешнюю рабочую и внутреннюю нетронутую треногу
+static func geodetic_signal_tower() -> Node3D:
+	var root := Node3D.new()
+	var wood := Palette.m(&"wood")
+	var ice_m := Palette.m(&"ice")
+
+	# ВНЕШНЯЯ ПИРАМИДА (4-гранная, высота 24м)
+	for i in range(4):
+		var ang := float(i) * (TAU / 4.0) + PI / 4.0
+		var r_base := 4.5
+		var r_top := 1.2
+		var base_p := Vector3(cos(ang) * r_base, 0.0, sin(ang) * r_base)
+		var top_p := Vector3(cos(ang) * r_top, 24.0, sin(ang) * r_top)
+		var mid := (base_p + top_p) * 0.5
+		Geo.block(root, Vector3(0.32, 24.2, 0.32), mid, wood, true)
+
+	for level in range(1, 6):
+		var h := float(level) * 4.0
+		var rad := lerpf(4.5, 1.2, h / 24.0)
+		for side in range(4):
+			var a1 := float(side) * (TAU / 4.0) + PI / 4.0
+			var a2 := float(side + 1) * (TAU / 4.0) + PI / 4.0
+			var p1 := Vector3(cos(a1) * rad, h, sin(a1) * rad)
+			var p2 := Vector3(cos(a2) * rad, h, sin(a2) * rad)
+			Geo.block(root, Vector3(p1.distance_to(p2), 0.2, 0.2), (p1 + p2) * 0.5, wood, false)
+
+	Geo.block(root, Vector3(2.8, 0.08, 2.8), Vector3(0, 20.0, 0), wood, true)
+	Geo.block(root, Vector3(3.0, 1.1, 0.08), Vector3(0, 20.55, 1.4), wood, false)
+	Geo.block(root, Vector3(3.0, 1.1, 0.08), Vector3(0, 20.55, -1.4), wood, false)
+	Geo.block(root, Vector3(0.08, 1.1, 3.0), Vector3(1.4, 20.55, 0), wood, false)
+	Geo.block(root, Vector3(0.08, 1.1, 3.0), Vector3(-1.4, 20.55, 0), wood, false)
+
+	# ВНУТРЕННЯЯ ТРЁХГРАННАЯ ТРЕНОГА (столик теодолита)
+	var tripod := Node3D.new()
+	tripod.name = "InternalInstrumentTripod"
+	root.add_child(tripod)
+	for i in range(3):
+		var ang := float(i) * (TAU / 3.0)
+		var b_pos := Vector3(cos(ang) * 2.2, 0.0, sin(ang) * 2.2)
+		var t_pos := Vector3(cos(ang) * 0.25, 21.5, sin(ang) * 0.25)
+		Geo.block(tripod, Vector3(0.24, 21.6, 0.24), (b_pos + t_pos) * 0.5, wood, false)
+	Geo.block(tripod, Vector3(0.7, 0.12, 0.7), Vector3(0, 21.5, 0), wood, true)
+
+	# ВИЗИРНЫЙ РЕШЕТЧАТЫЙ БАРАБАН НА ВЕРШИНЕ (высота 21-24м)
+	var drum := Node3D.new()
+	drum.name = "SightingDrum"
+	drum.position = Vector3(0, 22.8, 0)
+	root.add_child(drum)
+	for i in range(12):
+		var ang := float(i) * (TAU / 12.0)
+		var slat_pos := Vector3(cos(ang) * 0.85, 0, sin(ang) * 0.85)
+		Geo.block(drum, Vector3(0.12, 2.2, 0.03), slat_pos, wood, false)
+	var ice_block := Geo.block(drum, Vector3(1.6, 1.8, 1.6), Vector3.ZERO, ice_m, false)
+	ice_block.name = "DrumRimeIce"
+
+	return root
+
+

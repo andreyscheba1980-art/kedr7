@@ -2838,6 +2838,33 @@ The operator is not to be informed about the object.
 	&"end.mimic_trap.2": ["В морозном воздухе на высоте двух метров просто висели два немигающих шара холодного огня.\nА между ними стоял человек в распахнутом тулупе Семёнова. Из его открытого рта непрерывно рвался оглушительный рёв танкового дизеля.", "In the freezing air, two meters high, two unblinking spheres of cold fire simply hovered.\nAnd between them stood a man in Semyonov's unbuttoned sheepskin coat. From his open mouth continuously roared the thunder of a tank diesel."],
 	&"end.mimic_trap.3": ["Он повернул голову к тебе. Лица под капюшоном не было — только тёмный провал, в глубине которого шевелился твой собственный замёрзший голос:\n«Мальцев... выходи... на погрузку...»", "He turned his head toward you. There was no face beneath the hood — only a dark void, in the depths of which stirred your own frozen voice:\n\"Maltsev... get out here... to load up...\""],
 	&"case.verdict.mimic_trap": ["Дежурный Мальцев покинул жилой сруб во время ложного сигнала. Тело не найдено. Найдена расстёгнутая куртка.", "Duty officer Maltsev left the living cabin during a false signal. Body not recovered. Unbuttoned coat found."],
+
+	# --- v1.69.0: Советская Штольня №4 («ГРП-14 • 1959 г.») и Вышка 812 ---
+	&"it.adit_core_rack": ["[E] Осмотреть керновый ящик [Глуб. 240 м]", "[E] Inspect core box [Depth 240 m]"],
+	&"note.adit_core_anomaly": ["Справка кернохранилища ГРП-14 (Глуб. 240 м):\n\nВместо керна диабаза в ячейке монолита — расколотый буровой коронкой почерневший деревянный лик мансийского идола, сросшийся с друзой горного хрусталя.\nНа кварцевом теле видны свежие борозды, оставленные человеческими зубами.", "Core storage report GRP-14 (Depth 240 m):\n\nInstead of diabase core in the monolith slot — a blackened wooden face of a Mansi idol split by a drill bit, fused into a rock crystal cluster.\nOn the quartz body fresh grooves are visible, carved by human teeth."],
+	&"sub.adit_dead_air": ["Воздух стал тяжёлым... Пламя контрольной лампы ЛБВК отрывается от фитиля — здесь мёртвый воздух!", "The air has turned heavy... The safety lamp flame is detaching from the wick — dead air!"],
+	&"sub.adit_valenki_blocked": ["Выход из лаза перекрыт... В полуметре стоят чьи-то серые валенки. Не двигайся и не дыши (Пробел / погасить свет)!", "The crawlway exit is blocked... Someone's gray felt boots stand right there. Do not move or breathe (Space / kill light)!"],
+	&"sub.adit_valenki_left": ["Тяжёлые шаги удалились по рельсам в темноту... Лаз свободен.", "Heavy steps receded along the rails into the dark... The crawlway is clear."],
+	&"it.tower_chop_ice": ["[E] Срубить топором наледь с визирного барабана", "[E] Chop rime ice off the sighting drum with axe"],
+	&"it.tower_ice_cleared_done": ["Визирный барабан очищен от наледи", "Sighting drum cleared of rime ice"],
+	&"sub.tower_ice_cleared": ["Тяжёлые корки сублимационного льда с грохотом рухнули в пропасть! Парусность вышки упала.", "Heavy rime ice slabs crashed down into the abyss! The tower's wind drag plummeted."],
+	&"sub.tower_ice_already_cleared": ["Планки визирного барабана чистые, ветер свободно проходит сквозь щели.", "Sighting drum slats are clear, the gale passes freely through the gaps."],
+
+	# --- v1.69.0: Автомат АП-50, прожектор ПЗС-35 и полудуплекс ---
+	&"it.breaker_inspect": ["[E] Автомат АП-50: норма [20 А]", "[E] AP-50 Breaker: normal [20 A]"],
+	&"it.breaker_reset": ["[E] Взвести автомат АП-50 [Перегрузка сети]", "[E] Reset AP-50 breaker [Grid Overload]"],
+	&"sub.breaker_tripped": ["Хлопок в щитовой! Автомат АП-50 выбило от перегрузки (прожектор + передатчик превысили 20 А)!", "Clack in the breaker panel! AP-50 tripped from overload (searchlight + transmitter exceeded 20 A)!"],
+	&"sub.breaker_reset": ["Автомат защиты АП-50 взведён. Высоковольтные цепи снова под напряжением.", "AP-50 protection breaker reset. High-voltage circuits energized."],
+	&"sub.breaker_ok": ["Автомат АП-50 во включенном положении. Нагрузка генератора в норме.", "AP-50 breaker is ON. Generator load is within normal limits."],
+	&"it.pzs35_toggle": ["[E] Тумблер прожектора ПЗС-35 [12 А]", "[E] PZS-35 searchlight switch [12 A]"],
+	&"sub.pzs35_on": ["Прожектор ПЗС-35 на крыше включен. Двор залит резким светом (нагрузка +12 А).", "Roof searchlight PZS-35 turned on. The yard is flooded with sharp light (+12 A load)."],
+	&"sub.pzs35_off": ["Прожектор ПЗС-35 выключен.", "Roof searchlight PZS-35 turned off."],
+	&"sub.double_door_knock": ["В дверь сруба раздался четкий стук: два коротких, один длинный...", "A distinct knock echoed on the porch door: two short, one long..."],
+	&"sub.double_scratched_left": ["За дверью раздался четвёртый сухой скребок по войлоку... и тишина. Оно не выдержало и ушло.", "A fourth dry claw scrape sounded on the felt... and then silence. It couldn't hold back and left."],
+	&"sub.crawler_mast_climb": ["В микрофоне напарника сквозь вой бурана слышно, как снизу по скобам мачты за ним кто-то лезет!", "Through the partner's mic over the storm, iron clanks reveal someone climbing the mast right behind them!"],
+	&"coop.spoof_light": ["— (сквозь помехи)...Приём... тут у сарая... выключи прожектор... светит в глаза...", "— (through static)...Copy... by the shed... turn off the searchlight... it's blinding me..."],
+	&"coop.spoof_door": ["— (сквозь вой ветра)...Витька, открой сени... у меня тангента замёрзла... открой...", "— (through gale howl)...Open the porch door... my PTT is frozen... open up..."],
+	&"coop.spoof_behind": ["— (шёпотом в эфире)...Не оборачивайся на леере... оно идёт за тобой след в след...", "— (whispered on air)...Don't turn around on the lifeline... it's walking right behind your footsteps..."],
 }
 
 

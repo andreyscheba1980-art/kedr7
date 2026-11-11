@@ -855,6 +855,19 @@ func _ptt(on: bool) -> void:
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _voice(bytes: PackedByteArray) -> void:
 	_partner_silent = 0.0
+	# Жёсткий полудуплекс: реле приёма-передачи отключает приёмник от антенны во время передачи (PTT)
+	if talking:
+		return
+
+	# Геомагнитная тень / штольня / мачта: прямая связь рвётся в помехи
+	if YrkaRadioInterceptor.is_partner_in_radio_shadow(_partner_pos):
+		if _voice_pb != null:
+			for i in range(min(bytes.size() / 4, 40)):
+				if _voice_pb.can_push_buffer(1):
+					var h := randf_range(-0.12, 0.12)
+					_voice_pb.push_frame(Vector2(h, h))
+		return
+
 	_ensure_voice_player()
 	var n := bytes.size() / 2
 	# Погибший пробивается сквозь помехи: рваный, с белым шумом — так же Ырка подделывает его голос.

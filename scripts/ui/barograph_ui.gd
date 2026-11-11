@@ -378,6 +378,8 @@ func _tap_case() -> void:
 	_dead_band = 0.0
 	_tap_step_time = _now_h
 	Game.baro_tapped = true
+	if Game.radio != null and Game.radio.tube_synth != null:
+		Game.radio.tube_synth.trigger_tube_microphonics(0.85)
 	AudioDirector.play_raw(CLANK_SFX, -2.0, 1.8)
 	get_tree().create_timer(0.08, false).timeout.connect(func() -> void:
 		AudioDirector.play_raw(CLANK_SFX, -4.0, 2.1)
