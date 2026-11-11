@@ -4151,14 +4151,6 @@ func _build_station_road_dressing() -> void:
 		walkway.position = mid
 		walkway.rotation.y = atan2(d.x, d.z)
 		add_child(walkway)
-		var side_n := Vector3(-d.z, 0.0, d.x).normalized()
-		var n_drifts := maxi(1, int(len / 4.5))
-		for k in n_drifts:
-			var frac := (float(k) + 0.5) / float(n_drifts)
-			var at_p := p0.lerp(p1, frac)
-			for sgn: float in [-1.0, 1.0]:
-				var dp := at_p + side_n * (sgn * 0.9)
-				SiteDressing.drift(self, dp, 3.0, 0.28, 0.7, rad_to_deg(atan2(d.x, d.z)))
 
 	# Поющий провод ЛЭП на ветру
 	var wire_sing := AudioStreamPlayer3D.new()
@@ -4206,45 +4198,30 @@ func _build_station_road_dressing() -> void:
 	_build_catenary_wire(m_wires["mp2"], m_wires["mp3"], 0.60)
 	_build_catenary_wire(m_wires["mp3"], _entry_pair(corpus_entry_pos, pole_m3_pos), 0.40)
 
-	# 3. Наземная теплотрасса на лежнях вдоль тропы
+	# 3. Наземная теплотрасса на лежнях (убрана с тропы в складскую зону за сараем)
 	var pipe1 := Props.pipe_rack(4.8)
-	pipe1.position = Vector3(33.5, Terrain.height(33.5, -7.5), -7.5)
+	pipe1.position = Vector3(44.0, Terrain.height(44.0, 38.0), 38.0)
 	pipe1.rotation.y = deg_to_rad(-48.0)
 	add_child(pipe1)
 
 	var pipe2 := Props.pipe_rack(4.8)
-	pipe2.position = Vector3(45.5, Terrain.height(45.5, -19.5), -19.5)
+	pipe2.position = Vector3(48.0, Terrain.height(48.0, 39.0), 39.0)
 	pipe2.rotation.y = deg_to_rad(-45.0)
 	add_child(pipe2)
 
-	# 4. Вехи со световозвращателями вдоль дороги к станции
-	var markers: Array[Vector3] = [
-		Vector3(23.5, 0.0, 1.2),
-		Vector3(33.0, 0.0, -6.5),
-		Vector3(44.0, 0.0, -17.5),
-		Vector3(53.0, 0.0, -26.0),
-		Vector3(67.0, 0.0, -32.0),
-		Vector3(79.0, 0.0, -30.0),
-	]
-	for mp in markers:
-		var mk := Props.winter_road_marker()
-		mk.position = Vector3(mp.x, Terrain.height(mp.x, mp.z), mp.z)
-		mk.rotation.y = deg_to_rad(Game.rng.randf_range(-15.0, 15.0))
-		add_child(mk)
-
-	# 5. Деревянный указатель на развилке у дома
-	var sign_pos := Vector3(27.8, Terrain.height(27.8, -0.5), -0.5)
+	# 4. Деревянный указатель маршрута на развилке (сдвинут на обочину, не перекрывает настил)
+	var sign_pos := Vector3(25.0, Terrain.height(25.0, 5.5), 5.5)
 	var sign_prop := Props.arrow_sign(Loc.t(&"it.sign_meteo_route"))
 	sign_prop.position = sign_pos
-	sign_prop.rotation.y = deg_to_rad(-40.0)
+	sign_prop.rotation.y = deg_to_rad(-25.0)
 	add_child(sign_prop)
 	var sign_it := Geo.interactable(self, Vector3(1.8, 1.6, 1.8), sign_pos + Vector3(0, 1.0, 0), null, Loc.t(&"it.sign_meteo_route"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.sign_meteo_route"), 5.0)
 	)
 	sign_it.name = "SignMeteoRoute"
 
-	# 6. Гусеничный трактор ТДТ-55 на приколе в открытом секторе двора
-	var tractor_pos := Vector3(32.5, Terrain.height(32.5, 4.5), 4.5)
+	# 5. Гусеничный трактор ТДТ-55 (на тракторной стоянке у сарая дизельной, не посреди двора)
+	var tractor_pos := Vector3(44.0, Terrain.height(44.0, 30.0), 30.0)
 	var tractor := Props.crawler_tractor_tdt55()
 	tractor.position = tractor_pos
 	tractor.rotation.y = deg_to_rad(24.0)
@@ -4261,8 +4238,8 @@ func _build_station_road_dressing() -> void:
 	SiteDressing.tracks(self, tractor_pos + Vector3(0, 0, 2.5), Vector3(14.0, 0.0, 14.0))
 	SiteDressing.tracks(self, Vector3(14.0, 0.0, 14.0), Vector3(-10.0, 0.0, 34.0))
 
-	# 7. Волокуши геодезистов (Surveyor Sledge) на обочине дороги
-	var sledge_pos := Vector3(46.0, Terrain.height(46.0, -17.5), -17.5)
+	# 6. Волокуши геодезистов (Surveyor Sledge) на северной опушке
+	var sledge_pos := Vector3(48.0, Terrain.height(48.0, -32.0), -32.0)
 	var sledge := Props.surveyor_sledge()
 	sledge.position = sledge_pos
 	sledge.rotation.y = deg_to_rad(32.0)
@@ -4274,19 +4251,19 @@ func _build_station_road_dressing() -> void:
 	)
 	sledge_it.name = "SurveyorSledgeRoad"
 
-	# 8. Снегозадерживающие щиты (Snow Fences) с северной подветренной стороны дороги
+	# 7. Снегозадерживающие щиты (Snow Fences) вдоль дальнего северного поля
 	var road_fences: Array[Vector3] = [
-		Vector3(42.0, 0.0, -18.5),
-		Vector3(45.5, 0.0, -22.0),
-		Vector3(49.0, 0.0, -25.5),
-		Vector3(63.0, 0.0, -33.5),
-		Vector3(66.5, 0.0, -34.0),
-		Vector3(70.0, 0.0, -34.0),
+		Vector3(44.0, 0.0, -34.0),
+		Vector3(48.0, 0.0, -35.0),
+		Vector3(52.0, 0.0, -36.0),
+		Vector3(64.0, 0.0, -36.0),
+		Vector3(68.0, 0.0, -36.0),
+		Vector3(72.0, 0.0, -36.0),
 	]
 	for rfp in road_fences:
 		var fence := Props.snow_fence(3.2, 1.8)
 		fence.position = Vector3(rfp.x, Terrain.height(rfp.x, rfp.z), rfp.z)
-		fence.rotation.y = deg_to_rad(-42.0 if rfp.x < 55.0 else -10.0)
+		fence.rotation.y = deg_to_rad(-35.0 if rfp.x < 55.0 else -10.0)
 		add_child(fence)
 		SiteDressing.drift(self, fence.position + Vector3(0.3, 0, -0.5), 3.4, 0.65, 1.1, fence.rotation_degrees.y)
 
@@ -4373,16 +4350,16 @@ func _build_yard_clutter() -> void:
 	)
 	tank_it.name = "FuelCistern"
 
-	# 3. Снегоход «Буран» с грузовыми нартами на площадке у дома
-	var buran_pos := Vector3(18.5, Terrain.height(18.5, -4.5), -4.5)
+	# 3. Снегоход «Буран» с грузовыми нартами на стоянке у сарая дизельной
+	var buran_pos := Vector3(38.0, Terrain.height(38.0, 24.0), 24.0)
 	var buran := Props.soviet_snowmobile()
 	buran.position = buran_pos
-	buran.rotation.y = deg_to_rad(-20.0)
+	buran.rotation.y = deg_to_rad(-45.0)
 	add_child(buran)
 
 	var buran_sledge := Props.siberian_sledge()
 	buran_sledge.position = buran_pos + Vector3(-0.6, 0.0, -2.6)
-	buran_sledge.rotation.y = deg_to_rad(-18.0)
+	buran_sledge.rotation.y = deg_to_rad(-45.0)
 	add_child(buran_sledge)
 
 	# Ящики с припасами на нартах

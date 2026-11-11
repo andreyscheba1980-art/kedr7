@@ -29,6 +29,7 @@ const S := {
 	&"pause.resume": ["Продолжить", "Resume"],
 	&"pause.to_menu": ["В главное меню", "Main menu"],
 	&"pause.note": ["Прогресс сохраняется в начале каждого дня и каждой ночи.", "Progress is saved at the start of every day and night."],
+	&"menu.settings": ["Регламент и настройки", "Settings & regulations"],
 	&"set.title": ["НАСТРОЙКИ", "SETTINGS"],
 	&"set.master": ["Общая громкость", "Master volume"],
 	&"set.sfx": ["Звуки", "Sound effects"],

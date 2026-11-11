@@ -813,6 +813,10 @@ func _split_light_layers() -> void:
 			var l := n as Light3D
 			if l is DirectionalLight3D:
 				continue
+			if l.name == "PZS35Searchlight":
+				l.light_cull_mask = LAYER_OUT
+				l.shadow_caster_mask = LAYER_OUT
+				continue
 			var lp := l.global_position
 			if lp.y >= 2.8 and is_pos_inside_house(lp):
 				continue            # чердак: его лампа светит и на изнанку крыши, а она — «снаружи»
@@ -3742,7 +3746,7 @@ func _build_zaboy_switch() -> void:
 
 ## Автомат защиты АП-50 (20 А): выбивает при одновременной работе прожектора ПЗС-35 и передатчика
 func _build_ap50_breaker() -> void:
-	var at := Vector3(14.37, 1.26, 2.3)
+	var at := Vector3(14.37, 1.26, 2.56)
 	Geo.block(self, Vector3(0.03, 0.16, 0.14), at, Palette.m(&"metal_dark"), false)
 	_ap50_lever = Geo.block(self, Vector3(0.08, 0.03, 0.025), at + Vector3(-0.04, -0.03 if Game.has_flag("ap50_tripped") else 0.03, 0), Palette.m(&"lead"), false)
 
@@ -3767,24 +3771,27 @@ func _build_ap50_breaker() -> void:
 func _build_pzs35_searchlight() -> void:
 	# Прожектор ПЗС-35 на коньке крыши над срубом, направленный во двор к метеоплощадке
 	_pzs35_light = SpotLight3D.new()
-	_pzs35_light.position = Vector3(14.2, 3.85, 2.3)
+	_pzs35_light.position = Vector3(14.8, 3.85, 2.3)
 	_pzs35_light.rotation_degrees = Vector3(-18.0, 45.0, 0.0)
 	_pzs35_light.spot_range = 75.0
 	_pzs35_light.spot_angle = 24.0
-	_pzs35_light.light_energy = 5.0
+	_pzs35_light.light_energy = 4.5
 	_pzs35_light.light_color = Color(1.0, 0.94, 0.82)
-	_pzs35_light.shadow_enabled = Settings.quality >= 2
+	_pzs35_light.shadow_enabled = true
+	_pzs35_light.light_cull_mask = LAYER_OUT
+	_pzs35_light.shadow_caster_mask = LAYER_OUT
 	_pzs35_light.visible = Game.pzs35_on and not Game.has_flag("ap50_tripped") and Game.power_on
 	_pzs35_light.name = "PZS35Searchlight"
 	add_child(_pzs35_light)
 
 	# Корпус прожектора на крыше
-	var pzs_body := Geo.block(self, Vector3(0.45, 0.45, 0.55), Vector3(14.2, 3.85, 2.3), Palette.m(&"metal_dark"), false)
+	var pzs_body := Geo.block(self, Vector3(0.45, 0.45, 0.55), Vector3(14.8, 3.85, 2.3), Palette.m(&"metal_dark"), false)
 	pzs_body.rotation_degrees = Vector3(-18.0, 45.0, 0.0)
 
 	# Тумблер прожектора в радиорубке у окна (стол дежурного)
 	var sw_at := Vector3(8.05, 1.05, -1.5)
 	Geo.block(self, Vector3(0.04, 0.16, 0.12), sw_at, Palette.m(&"metal_dark"), false)
+	Geo.block(self, Vector3(0.05, 0.04, 0.04), sw_at + Vector3(-0.02, 0.0, 0.0), Palette.m(&"lead"), false)
 	var sw_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), sw_at, null, "", func(_p: Player) -> void:
 		if Game.has_flag("ap50_tripped"):
 			Game.hud.subtitle(Loc.t(&"sub.breaker_tripped"), 4.0)

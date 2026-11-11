@@ -38,6 +38,8 @@ const COLORS := {
 	&"lake": Color(0.42, 0.5, 0.58),
 	&"water": Color(0.01, 0.02, 0.03),
 	&"rust": Color(0.48, 0.22, 0.12),
+	&"metal_dark": Color(0.12, 0.13, 0.14),
+	&"lead": Color(0.28, 0.30, 0.32),
 }
 
 ## Текстура и сколько метров на один её повтор.
@@ -124,8 +126,9 @@ static func glass() -> StandardMaterial3D:
 	if _cache.has(&"glass"):
 		return _cache[&"glass"]
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.55, 0.65, 0.75, 0.16)
+	mat.albedo_color = Color(0.45, 0.55, 0.65, 0.12)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.roughness = 0.1
+	mat.roughness = 0.5
+	mat.metallic = 0.0
 	_cache[&"glass"] = mat
 	return mat

@@ -399,7 +399,7 @@ func _physics_process(delta: float) -> void:
 				_sprint_latch = false
 			want_sprint = _sprint_latch
 		_sprinting = want_sprint and held != &"canister" and held != &"trunk" and stamina > 1.0 and input.y < 0.0 and not cranking
-		if (Input.is_key_pressed(KEY_F) or Input.is_action_just_pressed(&"wipe_face")) and Game.hud != null:
+		if (Input.is_key_pressed(KEY_F) or (InputMap.has_action(&"wipe_face") and Input.is_action_just_pressed(&"wipe_face"))) and Game.hud != null:
 			Game.hud.wipe_face_frost()
 
 		# Обзор правым аналоговым стиком геймпада
