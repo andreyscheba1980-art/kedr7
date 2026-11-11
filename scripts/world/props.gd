@@ -134,6 +134,108 @@ static func _kedr_model(id: String, opts := {}) -> Node3D:
 	return root
 
 
+## Аутентичные советские модели ГОСТ (Блендер → assets/models/soviet/<id>.glb).
+static func _soviet_model(id: String, opts := {}) -> Node3D:
+	var path := "res://assets/models/soviet/%s.glb" % id
+	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
+		return null
+	var root := Node3D.new()
+	var o := {"grime": 0.0, "bright": 1.0, "sat": 1.0, "scale": 1.0, "center": false, "keep": true}
+	o.merge(opts, true)
+	if Models.spawn(root, "soviet/" + id, Vector3.ZERO, 0.0, -1.0, o) == null:
+		root.free()
+		return null
+	return root
+
+
+## Автомат защиты сети АП-50 (20 А, карболитовый корпус, кнопки Пуск/Стоп, шильдик)
+static func ap50_breaker() -> Node3D:
+	var glb := _soviet_model("SM_AP50_Breaker")
+	if glb != null:
+		return glb
+	var k := _kit(410, 0.04)
+	k.box(Vector3.ZERO, Vector3(0.113, 0.176, 0.090), Color(0.12, 0.12, 0.13))
+	return _mi(k, &"ap50_breaker_fb", "tex_metal.png")
+
+
+## Пакетный поворотный выключатель ПВ2-16 (карболитовая «бабочка», 90° поворот)
+static func pv2_switch() -> Node3D:
+	var glb := _soviet_model("SM_PV2_RotarySwitch")
+	if glb != null:
+		return glb
+	var k := _kit(412, 0.03)
+	k.tube([Vector3(0, 0, 0), Vector3(0, 0, 0.05)], [0.038, 0.038], Color(0.12, 0.12, 0.13), 12)
+	return _mi(k, &"pv2_switch_fb", "tex_metal.png")
+
+
+## Тумблер ТВ1-1 (хромированный рычажок, резьбовая втулка, накидная гайка)
+static func tv1_switch() -> Node3D:
+	var glb := _soviet_model("SM_TV1_ToggleSwitch")
+	if glb != null:
+		return glb
+	var k := _kit(411, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.04, 0.06, 0.025), Color(0.7, 0.72, 0.75))
+	return _mi(k, &"tv1_switch_fb", "tex_metal.png")
+
+
+## Рубильник открытый РПБ-250 (текстолитовое/фарфоровое основание, медные ножи, пломба КГБ)
+static func knife_switch() -> Node3D:
+	var glb := _soviet_model("SM_RPB_KnifeSwitch")
+	if glb != null:
+		return glb
+	var k := _kit(413, 0.04)
+	k.box(Vector3.ZERO, Vector3(0.14, 0.24, 0.05), Color(0.85, 0.85, 0.82))
+	return _mi(k, &"knife_switch_fb", "tex_metal.png")
+
+
+## Печная задвижка-вьюшка ЗВ-1 (чугунная рамка, выдвижное полотно с петлёй под кочергу)
+static func stove_flue_damper() -> Node3D:
+	var glb := _soviet_model("SM_ZV1_FlueDamper")
+	if glb != null:
+		return glb
+	var k := _kit(414, 0.03)
+	k.box(Vector3.ZERO, Vector3(0.18, 0.03, 0.22), Color(0.2, 0.2, 0.22))
+	return _mi(k, &"stove_flue_damper_fb", "tex_metal.png")
+
+
+## Топочная чугунная дверка ДТ-3 (ГОСТ 5330-74, поворотный вертушок-запор)
+static func firebox_door_dt3() -> Node3D:
+	var glb := _soviet_model("SM_DT3_FireboxDoor")
+	if glb != null:
+		return glb
+	var k := _kit(415, 0.03)
+	k.box(Vector3.ZERO, Vector3(0.28, 0.24, 0.04), Color(0.2, 0.2, 0.22))
+	return _mi(k, &"firebox_door_dt3_fb", "tex_metal.png")
+
+
+## Поддувальная дверка ДП-1 (чугунная заслонка с дисковым регулятором тяги)
+static func ash_door_dp1() -> Node3D:
+	var glb := _soviet_model("SM_DP1_AshDoor")
+	if glb != null:
+		return glb
+	var k := _kit(416, 0.03)
+	k.box(Vector3.ZERO, Vector3(0.25, 0.14, 0.04), Color(0.2, 0.2, 0.22))
+	return _mi(k, &"ash_door_dp1_fb", "tex_metal.png")
+
+
+## Полярный чайный набор: мельхиоровый подстаканник с 14-гранным стаканом и чай №36
+static func polar_tea_set() -> Node3D:
+	var glb := _soviet_model("SM_Polar_TeaSet")
+	if glb != null:
+		return glb
+	return tea_brick()
+
+
+## Тангента радиостанции с микрофоном ДЭМШ-1А и клавишей PTT
+static func demsh_handset() -> Node3D:
+	var glb := _soviet_model("SM_DEMSH_Handset")
+	if glb != null:
+		return glb
+	var k := _kit(417, 0.02)
+	k.box(Vector3.ZERO, Vector3(0.06, 0.12, 0.05), Color(0.2, 0.2, 0.22))
+	return _mi(k, &"demsh_handset_fb", "tex_metal.png")
+
+
 static func tape_deck() -> Node3D:
 	var glb := _kedr_model("vesna306")
 	if glb != null:
@@ -1920,6 +2022,9 @@ static func tea_brick() -> Node3D:
 
 ## Чугунный навесной замок ЧЗ-1 (с наледью и кристаллами изморози на морозе -43°C)
 static func padlock_chz1(iced := true) -> Node3D:
+	var sov := _soviet_model("SM_CHZ1_Padlock")
+	if sov != null:
+		return sov
 	var key := &"padlock_chz1_iced" if iced else &"padlock_chz1_clear"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -3387,6 +3492,9 @@ static func retro_transistor_radio() -> Node3D:
 ## Советский недельный барограф М-22 (ГОСТ 7193-79) под стеклянным колпаком.
 ## Литое чугунное основание, стопка анероидных коробок, часовой барабан с лентой и пером.
 static func barograph() -> Node3D:
+	var sov := _soviet_model("SM_M22AN_Barograph")
+	if sov != null:
+		return sov
 	var glb := _kedr_model("barograph_m22")
 	if glb != null:
 		glb.add_child(_barograph_glass(Vector3(0.312, 0.148, 0.152), 0.112))
@@ -4571,6 +4679,9 @@ static func blowtorch() -> Node3D:
 
 ## Обледеневший амбарный замок с куржаком.
 static func frozen_padlock() -> Node3D:
+	var sov := _soviet_model("SM_CHZ1_Padlock")
+	if sov != null:
+		return sov
 	return _kedr_model("frozen_padlock", {"scale": 1.0, "bright": 1.1})
 
 
@@ -5077,6 +5188,9 @@ static func seismic_geophone_box() -> Node3D:
 
 ## Контрольная взрывобезопасная бензиновая лампа ЛБВК (с двойной панцирной сеткой)
 static func lbvk_safety_lamp() -> Node3D:
+	var sov := _soviet_model("SM_LBVK_SafetyLamp")
+	if sov != null:
+		return sov
 	var key := &"lbvk_safety_lamp_v1"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -5125,6 +5239,9 @@ static func lbvk_safety_lamp() -> Node3D:
 
 ## Шахтерский аккумуляторный светильник СГГ-3 («Коногонка» на ремне)
 static func sgg3_headlamp() -> Node3D:
+	var sov := _soviet_model("SM_SGG3_MinerLamp")
+	if sov != null:
+		return sov
 	var key := &"sgg3_headlamp_v1"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:

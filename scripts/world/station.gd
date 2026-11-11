@@ -124,6 +124,8 @@ var _kerosene_lamp_prop: Node3D
 var _kerosene_light: OmniLight3D
 var _kerosene_lit := false
 var _ap50_lever: Node3D = null
+var _ap50_btn_start: Node3D = null
+var _ap50_btn_stop: Node3D = null
 var _pzs35_light: SpotLight3D = null
 var _double_door_timer := 65.0
 var _double_door_active := false
@@ -457,8 +459,7 @@ func _process(delta: float) -> void:
 		Game.pzs35_on = false
 		if _pzs35_light != null:
 			_pzs35_light.visible = false
-		if _ap50_lever != null:
-			_ap50_lever.position.y = 1.26 - 0.03
+		_update_ap50_visual()
 		Game.audio.play_3d(CLANK_SOUND, Vector3(14.37, 1.26, 2.3), 3.0)
 		Game.hud.subtitle(Loc.t(&"sub.breaker_tripped"), 5.0)
 		_apply_lamps()
@@ -2200,6 +2201,11 @@ func _build_radio_room() -> void:
 	# Модель из Блендера (tools/blender/r250.py): запечённые цвет + AO, свой износ — без триплан-грязи
 	if Models.spawn(radio_set, "kedr/r250", Vector3(0, -0.21, 0), 0.0, 0.42, {"grime": 0.0, "bright": 1.25, "sat": 0.85}) == null:
 		radio_set.add_child(Props.radio())
+	# Тангента с микрофоном ДЭМШ-1А радиостанции на столе оператора
+	var handset := Props.demsh_handset()
+	handset.position = Vector3(7.72, 0.77, -0.92)
+	handset.rotation_degrees = Vector3(0, 15.0, 0)
+	add_child(handset)
 	# Подсветка шкалы-барабана: тёплое пятно на шкале, будто лампочки за ней
 	var scale_lamp := OmniLight3D.new()
 	scale_lamp.light_color = Color(1.0, 0.68, 0.32)
@@ -2308,6 +2314,9 @@ func _build_radio_room() -> void:
 		elif not Game.tea_brewed:
 			return Loc.t(&"it.tea_brew_kettle")
 		return Loc.t(&"it.tea_warm_hands")
+	var tea_model := Props.polar_tea_set()
+	tea_model.position.y = -0.06
+	tea_it.add_child(tea_model)
 
 	# Вахтенный журнал метеонаблюдений ТМ-1 (на столе перед оператором)
 	var journal_it := Geo.interactable(self, Vector3(0.42, 0.12, 0.36), Vector3(9.5, 0.77, -1.05), null, Loc.t(&"it.journal_tm1"), func(_p: Player) -> void:
@@ -3648,30 +3657,42 @@ func _trigger_prologue_distant_engine_hook() -> void:
 	Game.hud.subtitle(Loc.t(&"sub.engine_warning_memory"), 5.5)
 
 
-## Поддувало (чугунная дверца внизу печи) и вьюшка (задвижка в трубе) — топить «на долго» перед выходом.
+## Поддувало (чугунная дверца ДП-1), топка (ДТ-3) и вьюшка (ЗВ-1 в трубе) — топить «на долго» перед выходом.
 func _build_stove_controls() -> void:
-	var iron := Palette.m(&"metal")
-	_damper_door = Node3D.new()
-	_damper_door.position = Vector3(-1.5, 0.12, 1.465)
-	add_child(_damper_door)
-	var plate := Geo.block(_damper_door, Vector3(0.26, 0.12, 0.015), Vector3(0, 0.06, 0), iron, false)
-	plate.name = "Plate"
-	Geo.block(_damper_door, Vector3(0.04, 0.015, 0.03), Vector3(0.09, 0.07, 0.015), Palette.m(&"dark"), false)
+	# 1. Поддувальная дверка ДП-1 (чугунная дверца внизу печи)
+	var dp1_model := Props.ash_door_dp1()
+	dp1_model.position = Vector3(-1.5, 0.18, 1.465)
+	add_child(dp1_model)
+	_damper_door = dp1_model.find_child("Door_Leaf_DP1", true, false) as Node3D
+	if _damper_door != null:
+		_damper_door.rotation_degrees.y = -65.0 if not Game.stove_damper else 0.0
+
 	var damper := Geo.interactable(self, Vector3(0.4, 0.25, 0.25), Vector3(-1.5, 0.18, 1.5), null, "", func(_p: Player) -> void:
 		Game.stove_damper = not Game.stove_damper
-		_damper_door.rotation.x = -1.1 if not Game.stove_damper else 0.0
+		if _damper_door != null:
+			_damper_door.rotation_degrees.y = -65.0 if not Game.stove_damper else 0.0
 		Game.audio.play_3d(CLANK_SOUND, Vector3(-1.5, 0.2, 1.5), -6.0)
 		Game.hud.subtitle(Loc.t(&"sub.damper_closed") if Game.stove_damper else Loc.t(&"sub.damper_opened"), 3.5))
 	damper.prompt_provider = func() -> String:
 		return Loc.t(&"it.damper_open") if Game.stove_damper else Loc.t(&"it.damper_close")
-	_damper_door.rotation.x = -1.1
-	# Вьюшка: задвижка в трубе над печью — ручка торчит из кладки
-	# (лицо трубы — z = 1.0, x −1.71..−1.29: ручка торчит из кладки, задвинута — вьюшка закрыта)
-	Geo.block(self, Vector3(0.14, 0.1, 0.01), Vector3(-1.4, 2.05, 1.005), iron, false)
-	_flue_handle = Geo.block(self, Vector3(0.035, 0.035, 0.14), Vector3(-1.4, 2.05, 1.07), iron, false)
+
+	# 2. Топочная чугунная дверка ДТ-3 (ГОСТ 5330-74, поворотный вертушок-запор)
+	var dt3_model := Props.firebox_door_dt3()
+	dt3_model.position = Vector3(-1.5, 0.50, 1.465)
+	add_child(dt3_model)
+
+	# 3. Вьюшка: задвижка ЗВ-1 в трубе над печью — ручка торчит из кладки
+	var flue_model := Props.stove_flue_damper()
+	flue_model.position = Vector3(-1.4, 2.05, 1.005)
+	add_child(flue_model)
+	_flue_handle = flue_model.find_child("Slide_Plate", true, false) as Node3D
+	if _flue_handle != null:
+		_flue_handle.position.z = -0.06 if not Game.stove_flue else 0.0
+
 	var flue := Geo.interactable(self, Vector3(0.3, 0.25, 0.25), Vector3(-1.4, 2.05, 1.12), null, "", func(_p: Player) -> void:
 		Game.stove_flue = not Game.stove_flue
-		_flue_handle.position.z = 1.02 if Game.stove_flue else 1.07
+		if _flue_handle != null:
+			_flue_handle.position.z = -0.06 if not Game.stove_flue else 0.0
 		Game.audio.play_3d(CLANK_SOUND, Vector3(-1.4, 2.05, 1.1), -8.0)
 		if not Game.stove_flue:
 			Game.hud.subtitle(Loc.t(&"sub.flue_opened"), 3.0)
@@ -3683,15 +3704,22 @@ func _build_stove_controls() -> void:
 		return Loc.t(&"it.flue_open") if Game.stove_flue else Loc.t(&"it.flue_close")
 
 
-## Рубильник у входной двери: погасить свет в доме — дизель на холостом тянет втрое дольше.
+## Поворотный пакетный выключатель ПВ2-16 у входной двери: погасить свет в доме
 func _build_house_switch() -> void:
 	var at := Vector3(14.37, 1.45, 2.3)   # по другую сторону двери от вешалки
-	Geo.block(self, Vector3(0.03, 0.26, 0.18), at, Palette.m(&"wood"), false)
-	Geo.block(self, Vector3(0.05, 0.18, 0.12), at + Vector3(-0.02, 0, 0), _switch_mat(), false)
-	_switch_lever = Geo.block(self, Vector3(0.12, 0.025, 0.025), at + Vector3(-0.08, 0.05, 0), Palette.m(&"metal"), false)
+	Geo.block(self, Vector3(0.02, 0.22, 0.16), at, Palette.m(&"wood"), false)
+	var sw_model := Props.pv2_switch()
+	sw_model.position = at + Vector3(-0.015, 0, 0)
+	sw_model.rotation_degrees = Vector3(0, -90, 0)
+	add_child(sw_model)
+	_switch_lever = sw_model.find_child("Handle_Butterfly", true, false) as Node3D
+	if _switch_lever != null:
+		_switch_lever.rotation_degrees.z = 90.0 if Game.house_switch_off else 0.0
+
 	var it := Geo.interactable(self, Vector3(0.25, 0.35, 0.3), at + Vector3(-0.08, 0, 0), null, "", func(_p: Player) -> void:
 		Game.house_switch_off = not Game.house_switch_off
-		_switch_lever.position.y = at.y + (-0.05 if Game.house_switch_off else 0.05)
+		if _switch_lever != null:
+			_switch_lever.rotation_degrees.z = 90.0 if Game.house_switch_off else 0.0
 		_apply_lamps()
 		Game.audio.play_3d(CLANK_SOUND, at, -2.0)
 		Game.hud.subtitle(Loc.t(&"sub.switch_off") if Game.house_switch_off else Loc.t(&"sub.switch_on"), 4.0))
@@ -3706,15 +3734,19 @@ static func _switch_mat() -> StandardMaterial3D:
 	return m
 
 
-## Аварийный разъединитель «Директива Забой» (высоковольтный контур ДГА-24 на заземление мачты)
+## Аварийный разъединитель «Директива Забой» (рубильник РПБ-250 под свинцовой пломбой)
 func _build_zaboy_switch() -> void:
 	var at := Vector3(14.37, 1.07, 2.3)
-	Geo.block(self, Vector3(0.03, 0.28, 0.20), at, Palette.m(&"metal"), false)
-	Geo.block(self, Vector3(0.05, 0.20, 0.14), at + Vector3(-0.02, 0, 0), Palette.m(&"metal_dark"), false)
-	Geo.block(self, Vector3(0.055, 0.04, 0.12), at + Vector3(-0.02, 0.07, 0), Palette.m(&"lead"), false)
-	_zaboy_lever = Geo.block(self, Vector3(0.13, 0.03, 0.03), at + Vector3(-0.08, 0.05 if not Game.zaboy_active else -0.05, 0), Palette.m(&"lead"), false)
-	_zaboy_seal = Geo.block(self, Vector3(0.02, 0.035, 0.035), at + Vector3(-0.07, 0.03, 0.04), Palette.m(&"lead"), false)
-	_zaboy_seal.visible = not Game.zaboy_unsealed
+	var rpb_model := Props.knife_switch()
+	rpb_model.position = at + Vector3(-0.015, 0, 0)
+	rpb_model.rotation_degrees = Vector3(0, -90, 0)
+	add_child(rpb_model)
+	_zaboy_lever = rpb_model.find_child("Knife_Blades_Assy", true, false) as Node3D
+	_zaboy_seal = rpb_model.find_child("Seal_KGB_Wire", true, false) as Node3D
+	if _zaboy_seal != null:
+		_zaboy_seal.visible = not Game.zaboy_unsealed
+	if _zaboy_lever != null:
+		_zaboy_lever.rotation_degrees.x = -65.0 if Game.zaboy_active else 0.0
 
 	var it := Geo.interactable(self, Vector3(0.3, 0.35, 0.3), at + Vector3(-0.08, 0, 0), null, "", func(_p: Player) -> void:
 		if not Game.zaboy_unsealed:
@@ -3728,7 +3760,7 @@ func _build_zaboy_switch() -> void:
 		if not Game.zaboy_active:
 			Game.zaboy_active = true
 			if _zaboy_lever != null:
-				_zaboy_lever.position.y = at.y - 0.05
+				_zaboy_lever.rotation_degrees.x = -65.0
 			Game.audio.play_3d(CLANK_SOUND, at, 2.0)
 			AudioDirector.play_raw("res://assets/audio/elec_buzz_loop.ogg", 1.0)
 			if Game.night == 7 and Game.final_call:
@@ -3744,17 +3776,32 @@ func _build_zaboy_switch() -> void:
 		return Loc.t(&"it.zaboy_active_desc")
 
 
-## Автомат защиты АП-50 (20 А): выбивает при одновременной работе прожектора ПЗС-35 и передатчика
+## Обновление визуального состояния кнопок автомата защиты АП-50
+func _update_ap50_visual() -> void:
+	var tripped := Game.has_flag("ap50_tripped")
+	if _ap50_btn_start != null:
+		_ap50_btn_start.position.z = 0.094 if not tripped else 0.104
+	if _ap50_btn_stop != null:
+		_ap50_btn_stop.position.z = 0.106 if not tripped else 0.096
+	if _ap50_lever != null:
+		_ap50_lever.position.y = 1.26 + (-0.03 if tripped else 0.03)
+
+
+## Автомат защиты АП-50 (20 А): карболитовый корпус, кнопки Пуск/Стоп, алюминиевый шильдик
 func _build_ap50_breaker() -> void:
 	var at := Vector3(14.37, 1.26, 2.56)
-	Geo.block(self, Vector3(0.03, 0.16, 0.14), at, Palette.m(&"metal_dark"), false)
-	_ap50_lever = Geo.block(self, Vector3(0.08, 0.03, 0.025), at + Vector3(-0.04, -0.03 if Game.has_flag("ap50_tripped") else 0.03, 0), Palette.m(&"lead"), false)
+	var breaker_model := Props.ap50_breaker()
+	breaker_model.position = at
+	breaker_model.rotation_degrees = Vector3(0, -90, 0)
+	add_child(breaker_model)
+	_ap50_btn_start = breaker_model.find_child("Btn_Start_Black", true, false) as Node3D
+	_ap50_btn_stop = breaker_model.find_child("Btn_Stop_Red", true, false) as Node3D
+	_update_ap50_visual()
 
-	var it := Geo.interactable(self, Vector3(0.25, 0.25, 0.25), at + Vector3(-0.05, 0, 0), null, "", func(_p: Player) -> void:
+	var it := Geo.interactable(self, Vector3(0.25, 0.25, 0.25), at + Vector3(-0.06, 0, 0), null, "", func(_p: Player) -> void:
 		if Game.has_flag("ap50_tripped"):
 			Game.set_flag("ap50_tripped", false)
-			if _ap50_lever != null:
-				_ap50_lever.position.y = at.y + 0.03
+			_update_ap50_visual()
 			Game.audio.play_3d(CLANK_SOUND, at, 2.0)
 			_apply_lamps()
 			if _pzs35_light != null:
@@ -3788,15 +3835,23 @@ func _build_pzs35_searchlight() -> void:
 	var pzs_body := Geo.block(self, Vector3(0.45, 0.45, 0.55), Vector3(14.8, 3.85, 2.3), Palette.m(&"metal_dark"), false)
 	pzs_body.rotation_degrees = Vector3(-18.0, 45.0, 0.0)
 
-	# Тумблер прожектора в радиорубке у окна (стол дежурного)
+	# Аутентичный советский тумблер ТВ1-1 прожектора в радиорубке у окна (стол дежурного)
 	var sw_at := Vector3(8.05, 1.05, -1.5)
-	Geo.block(self, Vector3(0.04, 0.16, 0.12), sw_at, Palette.m(&"metal_dark"), false)
-	Geo.block(self, Vector3(0.05, 0.04, 0.04), sw_at + Vector3(-0.02, 0.0, 0.0), Palette.m(&"lead"), false)
+	var tv1_model := Props.tv1_switch()
+	tv1_model.position = sw_at
+	tv1_model.rotation_degrees = Vector3(0, -90, 0)
+	add_child(tv1_model)
+	var tv1_lever := tv1_model.find_child("Lever_Chrome", true, false) as Node3D
+	if tv1_lever != null:
+		tv1_lever.rotation_degrees.x = 28.0 if Game.pzs35_on else -28.0
+
 	var sw_it := Geo.interactable(self, Vector3(0.2, 0.25, 0.2), sw_at, null, "", func(_p: Player) -> void:
 		if Game.has_flag("ap50_tripped"):
 			Game.hud.subtitle(Loc.t(&"sub.breaker_tripped"), 4.0)
 			return
 		Game.pzs35_on = not Game.pzs35_on
+		if tv1_lever != null:
+			tv1_lever.rotation_degrees.x = 28.0 if Game.pzs35_on else -28.0
 		if _pzs35_light != null:
 			_pzs35_light.visible = Game.pzs35_on and Game.power_on
 		Game.audio.play_3d(CLANK_SOUND, sw_at, 1.0)

@@ -1387,6 +1387,7 @@ func _setup_input() -> void:
 	_bind(&"move_right", [KEY_D, KEY_RIGHT])
 	_bind(&"interact", [KEY_E])
 	_bind(&"flashlight", [KEY_F])
+	_bind(&"wipe_face", [KEY_F])
 	_bind(&"crank", [KEY_Q])
 	_bind(&"drop", [KEY_G])
 	_bind(&"tasks", [KEY_TAB])

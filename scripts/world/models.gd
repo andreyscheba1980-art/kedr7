@@ -33,7 +33,7 @@ const ALIASES: Dictionary = {
 static func spawn(parent: Node, id: String, pos: Vector3, yaw_deg := 0.0, height := -1.0, opts := {}) -> Node3D:
 	if ALIASES.has(id):
 		id = ALIASES[id]
-	var is_baked := id.begins_with("kedr/")
+	var is_baked := id.begins_with("kedr/") or id.begins_with("soviet/")
 	if is_baked and not opts.has("is_baked"):
 		opts["is_baked"] = true
 	var ps := _scene(id)
