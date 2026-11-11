@@ -290,7 +290,17 @@ func _caption(ph: Dictionary) -> String:
 			parts.append(Loc.t(StringName("poi." + String(id) + ".cap")))
 		else:
 			parts.append(Loc.t(StringName("anom." + String(id))))
-	if ph.get("ghost", false):
+	if ph.get("has_eyes", false):
+		parts.append(Loc.p("отражение зрачков в темноте", "pupil reflection in dark"))
+	elif ph.get("has_shadow", false):
+		parts.append(Loc.p("суставчатая тень в соснах", "jointed shadow in pines"))
+	elif ph.get("has_tracks", false):
+		parts.append(Loc.p("босые следы на снегу", "barefoot prints in snow"))
+	elif ph.get("has_face", false):
+		parts.append(Loc.p("двойная экспозиция: кричащее лицо", "double exposure: screaming face"))
+	elif ph.get("has_fingers", false):
+		parts.append(Loc.p("обмороженные пальцы на косяке", "frostbitten fingers on jamb"))
+	elif ph.get("ghost", false):
 		parts.append(Loc.t(&"zenit.cap_ghost"))
 	if parts.is_empty():
 		return t + (Loc.t(&"zenit.cap_empty") if img != null else Loc.t(&"zenit.cap_fogged"))
@@ -299,32 +309,47 @@ func _caption(ph: Dictionary) -> String:
 
 func _get_semenov_archive_shots() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	var descriptions := [
-		Loc.p("Метеомачта в сумерках. На отметке 12м — суставчатая тень на растяжках.", "Radio mast at dusk. At 12m mark — jointed shadow on guy wires."),
-		Loc.p("Распадка в тайге. Оплавленная воронка снега диаметром 4 метра.", "Taiga ravine. Fused snow crater 4 meters across."),
-		Loc.p("Вход в жилую избу ночью. Следы ведут внутрь порога и не выходят.", "Cabin entrance at night. Tracks lead over the sill and do not return.")
+	var data := [
+		{
+			"path": "res://assets/textures/photos/photo_archive_mast.png",
+			"archive_title": Loc.p("Кадр №1: «Метеомачта АШ-4 на закате. Ноябрь 1982 г.»", "Frame #1: 'Mast ASH-4 at dusk. Nov 1982'"),
+			"detail": Loc.p("Метеомачта АШ-4 и будка приборов в метели. На отметке 12м за растяжку цепляется длинный суставчатый силуэт, склонившийся над станцией. Два зрачка светятся отражённым светом вспышки.", "Mast ASH-4 and shelter in blizzard. At 12m mark a long jointed silhouette clings to the guy wire, leaning over the station. Two pupils gleam with flash reflection."),
+			"ghost": true
+		},
+		{
+			"path": "res://assets/textures/photos/photo_archive_adit.png",
+			"archive_title": Loc.p("Кадр №2: «Штольня №4 и вагонетка. Октябрь 1982 г.»", "Frame #2: 'Adit #4 & mine cart. Oct 1982'"),
+			"detail": Loc.p("Портал заброшенной штольни №4 в базальтовой скале и опрокинутая вагонетка УВО-0.6. Из абсолютной черноты тоннеля выступает фигура в бушлате, а по обледенелой скале за ней тянутся неестественно длинные пальцы.", "Portal of abandoned Adit #4 in basalt rock with overturned mine cart. Out of total blackness a figure in pea coat emerges, while unnaturally long fingers stretch along the icy rock behind it."),
+			"ghost": true
+		},
+		{
+			"path": "res://assets/textures/photos/photo_archive_porch.png",
+			"archive_title": Loc.p("Кадр №3: «Крыльцо станции в буран. Декабрь 1982 г.»", "Frame #3: 'Cabin porch in blizzard. Dec 1982'"),
+			"detail": Loc.p("Последний кадр из плёнки Семёнова. Дверь сруба приоткрыта: в узкой щели изнутри за косяк судорожно держится бледная обмороженная ладонь. На стекле окна рядом — расплющенное в оскале лицо, прижатое снаружи.", "Last shot on Semyonov's film. Cabin door ajar: in narrow slit from inside a pale frostbitten hand clutches the frame. On window glass nearby — a flattened grinning face pressed from outside."),
+			"ghost": true
+		},
+		{
+			"path": "res://assets/textures/photos/photo_archive_crew.png",
+			"archive_title": Loc.p("Кадр №4: «Бригада ТДС Кедр-7. Август 1982 г.»", "Frame #4: 'Crew of TDS Kedr-7. Aug 1982'"),
+			"detail": Loc.p("Групповой снимок смены метеорологов: Семёнов сидит на скамье, рядом техник и радист. Прямо за плечом Семёнова стоит четвёртая размытая фигура в тёмном балахоне без лица, положа длинную руку ему на спину.", "Group portrait of meteorologist shift: Semyonov sits on bench with tech and radio operator. Right behind Semyonov stands a fourth blurred figure in dark cowl without face, resting a long hand on his back."),
+			"ghost": true
+		}
 	]
-	for idx in range(3):
-		var img := Image.create(160, 100, false, Image.FORMAT_RGB8)
-		# Базовый градиент ночной съёмки
-		for y in range(100):
-			for x in range(160):
-				var nx := float(x) / 160.0
-				var ny := float(y) / 100.0
-				var lum := (1.0 - ny * 0.7) * 0.3
-				if idx == 0 and absf(nx - 0.5) < 0.04 and ny < 0.8:
-					lum += 0.4
-				elif idx == 1 and ((nx - 0.5) * (nx - 0.5) * 2.5 + (ny - 0.55) * (ny - 0.55)) < 0.08:
-					lum += 0.35
-				elif idx == 2 and nx > 0.35 and nx < 0.65 and ny > 0.2 and ny < 0.9:
-					lum += 0.25
-				img.set_pixel(x, y, Color(lum, lum * 0.95, lum * 0.85))
-		out.append({
-			"img": img,
-			"archive_title": Loc.p("Кадр №%d: «Семёнов, ноябрь 1982 г.»", "Frame #%d: 'Semyonov, Nov 1982'") % (idx + 1),
-			"detail": descriptions[idx],
-			"ghost": idx == 0
-		})
+	for item in data:
+		var img: Image = null
+		if ResourceLoader.exists(item["path"]):
+			var tex := load(item["path"]) as Texture2D
+			if tex != null:
+				img = tex.get_image()
+		elif FileAccess.file_exists(item["path"]):
+			img = Image.load_from_file(item["path"])
+		if img != null:
+			out.append({
+				"img": img,
+				"archive_title": item["archive_title"],
+				"detail": item["detail"],
+				"ghost": item["ghost"]
+			})
 	return out
 
 
@@ -381,8 +406,9 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 		_loupe_img.texture = ImageTexture.create_from_image(img)
 	if ph.get("paradox", false):
 		_loupe_title.text = Loc.t(&"darkroom.paradox_title")
-		_loupe_desc.text = Loc.t(&"darkroom.paradox_desc")
+		_loupe_desc.text = ph.get("detail", Loc.t(&"darkroom.paradox_desc"))
 		Director.add_tension(15.0, "осознание хронологического парадокса")
+		AudioDirector.play_raw("res://assets/audio/whisper.ogg", -4.0)
 		Game.paradox_photo_seen = true
 		_loupe_overlay.visible = true
 		return
@@ -393,21 +419,33 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 			break
 	if poi_tag != &"":
 		_loupe_title.text = Loc.t(&"darkroom.loupe_poi_revealed")
-		_loupe_desc.text = Loc.t(StringName("poi." + String(poi_tag) + ".loupe"))
+		_loupe_desc.text = ph.get("detail", Loc.t(StringName("poi." + String(poi_tag) + ".loupe")))
 		Director.add_tension(4.0, "скрытая деталь снимка")
 	else:
 		_loupe_title.text = Loc.t(&"darkroom.loupe_active")
 		_loupe_desc.text = ph.get("detail", _caption(ph))
+		if ph.get("ghost", false) or ph.get("has_eyes", false) or ph.get("has_shadow", false) or ph.get("has_tracks", false) or ph.get("has_face", false) or ph.get("has_fingers", false):
+			Director.add_tension(7.0, "аномалия на фотоплёнке")
+			AudioDirector.play_raw("res://assets/audio/whisper.ogg", -8.0)
 	_loupe_overlay.visible = true
 
 
 func _create_paradox_shot() -> Dictionary:
-	var img := _create_paradox_image()
+	var path := "res://assets/textures/photos/photo_archive_paradox.png"
+	var img: Image = null
+	if ResourceLoader.exists(path):
+		var tex := load(path) as Texture2D
+		if tex != null:
+			img = tex.get_image()
+	elif FileAccess.file_exists(path):
+		img = Image.load_from_file(path)
+	if img == null:
+		img = _create_paradox_image()
 	return {
 		"img": img,
 		"paradox": true,
 		"archive_title": Loc.t(&"darkroom.paradox_title"),
-		"detail": Loc.t(&"darkroom.paradox_desc"),
+		"detail": Loc.p("На снимке — стол проявки и спина дежурного прямо в этот момент. В метре позади за косяком двери стоит наблюдающая Ырка со светящимися глазами. Снимок ещё мокрый.", "The print shows the darkroom table and the duty officer's back right now. One meter behind in the doorway stands the Yrka with glowing eyes. The print is still wet."),
 		"ghost": true
 	}
 

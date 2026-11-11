@@ -2146,6 +2146,21 @@ func _build_living_quarters() -> void:
 
 	# 5b. Фотография бригады метеорологов станции «Кедр-7» в деревянной рамке
 	Models.spawn(self, "kaykit/pictureframe_large_A", Vector3(2.1, 1.80, 0.12), 0.0, 0.45, {"tint": Color(0.85, 0.78, 0.65)})
+	var crew_photo_plane := MeshInstance3D.new()
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.38, 0.25)
+	crew_photo_plane.mesh = qm
+	var cmat := StandardMaterial3D.new()
+	cmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	cmat.roughness = 0.85
+	if ResourceLoader.exists("res://assets/textures/photos/photo_archive_crew.png"):
+		cmat.albedo_texture = load("res://assets/textures/photos/photo_archive_crew.png")
+	else:
+		cmat.albedo_color = Color(0.7, 0.68, 0.65)
+	crew_photo_plane.material_override = cmat
+	crew_photo_plane.position = Vector3(2.1, 1.80, 0.14)
+	add_child(crew_photo_plane)
+
 	Geo.interactable(self, Vector3(0.45, 0.45, 0.2), Vector3(2.1, 1.80, 0.12), null, Loc.t(&"it.crew_photo"), func(_p: Player) -> void:
 		var photo_txt := Loc.t(&"sub.crew_photo_n1")
 		if Game.is_night():
@@ -2680,8 +2695,122 @@ func _build_storage() -> void:
 	)
 	dr_it.name = "DarkroomTable"
 
+	# Неактиничный рубиновый лабораторный фонарь СПР-1 и сохнущие снимки на веревке
+	_build_darkroom_safelight()
+
 	# Влажные тающие следы босых ног на дощатом полу кладовой
 	_build_storage_footprints()
+
+
+func _build_darkroom_safelight() -> void:
+	# 1. Корпус советского лабораторного неактиничного фонаря «СПР-1» с рубиновым стеклом
+	var lamp_root := Node3D.new()
+	lamp_root.name = "DarkroomSafelight"
+	lamp_root.position = Vector3(5.7, 2.18, -5.18)
+	add_child(lamp_root)
+
+	# Кронштейн крепления к потолочной балке
+	var mount := MeshInstance3D.new()
+	var mm := CylinderMesh.new()
+	mm.top_radius = 0.015
+	mm.bottom_radius = 0.015
+	mm.height = 0.22
+	mount.mesh = mm
+	mount.material_override = Palette.m(&"metal")
+	mount.position = Vector3(0, 0.11, 0)
+	lamp_root.add_child(mount)
+
+	# Стальной чёрный кожух фонаря
+	var housing := MeshInstance3D.new()
+	var hm := BoxMesh.new()
+	hm.size = Vector3(0.24, 0.16, 0.18)
+	housing.mesh = hm
+	housing.material_override = Palette.m(&"dark")
+	housing.position = Vector3(0, -0.04, 0)
+	lamp_root.add_child(housing)
+
+	# Рубиновое стекло (светофильтр неактиничного излучения), направленное вниз на стол
+	var ruby_glass := MeshInstance3D.new()
+	var gm := QuadMesh.new()
+	gm.size = Vector2(0.20, 0.14)
+	ruby_glass.mesh = gm
+	ruby_glass.rotation.x = deg_to_rad(90.0)
+	ruby_glass.position = Vector3(0, -0.121, 0)
+
+	var ruby_mat := StandardMaterial3D.new()
+	ruby_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ruby_mat.albedo_color = Color(1.0, 0.06, 0.03, 1.0)
+	ruby_mat.emission_enabled = true
+	ruby_mat.emission = Color(1.0, 0.08, 0.04)
+	ruby_mat.emission_energy_multiplier = 3.2
+	ruby_glass.material_override = ruby_mat
+	lamp_root.add_child(ruby_glass)
+
+	# Источник света (глубокий рубиново-красный свет, заливающий увеличитель и кюветы)
+	var red_light := OmniLight3D.new()
+	red_light.name = "DarkroomRubyLight"
+	red_light.position = Vector3(5.7, 2.02, -5.18)
+	red_light.light_color = Color(1.0, 0.10, 0.04)
+	red_light.light_energy = 1.75
+	red_light.omni_range = 3.6
+	red_light.omni_attenuation = 1.35
+	red_light.shadow_enabled = true
+	add_child(red_light)
+
+	# 2. Натянутая бельевая верёвка с деревянными прищепками и сохнущими отпечатками Семёнова
+	var cord := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.003
+	cm.bottom_radius = 0.003
+	cm.height = 1.45
+	cord.mesh = cm
+	cord.material_override = Palette.m(&"wood")
+	cord.rotation.z = deg_to_rad(90.0)
+	cord.position = Vector3(5.7, 1.82, -5.25)
+	add_child(cord)
+
+	var photo_tex_paths := [
+		"res://assets/textures/photos/photo_archive_mast.png",
+		"res://assets/textures/photos/photo_archive_adit.png",
+		"res://assets/textures/photos/photo_archive_porch.png",
+		"res://assets/textures/photos/photo_archive_crew.png"
+	]
+	var xs := [5.15, 5.50, 5.85, 6.20]
+	var rots_y := [-4.0, 3.5, -2.0, 5.0]
+
+	for i in range(4):
+		var px: float = xs[i]
+		# Деревянная бельевая прищепка на верёвке
+		var pin := MeshInstance3D.new()
+		var pin_mesh := BoxMesh.new()
+		pin_mesh.size = Vector3(0.012, 0.045, 0.015)
+		pin.mesh = pin_mesh
+		pin.material_override = Palette.m(&"wood")
+		pin.position = Vector3(px, 1.83, -5.25)
+		add_child(pin)
+
+		# Фотобумага «Унибром» с отпечатком (сохнет на веревке)
+		var print_node := MeshInstance3D.new()
+		var pm := QuadMesh.new()
+		pm.size = Vector2(0.24, 0.145)
+		print_node.mesh = pm
+		print_node.position = Vector3(px, 1.72, -5.245)
+		print_node.rotation.y = deg_to_rad(rots_y[i])
+
+		var print_mat := StandardMaterial3D.new()
+		print_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		print_mat.roughness = 0.75
+		if ResourceLoader.exists(photo_tex_paths[i]):
+			print_mat.albedo_texture = load(photo_tex_paths[i])
+		else:
+			print_mat.albedo_color = Color(0.85, 0.85, 0.80)
+		print_node.material_override = print_mat
+		add_child(print_node)
+
+	# Интерактивный осмотр сохнущих отпечатков
+	Geo.interactable(self, Vector3(1.3, 0.4, 0.3), Vector3(5.7, 1.75, -5.22), null, Loc.p("[E] Сохнущие фотоснимки", "[E] Drying photographs"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.p("Сохнущие на верёвке архивные снимки Семёнова под рубиновым светом фонаря. Фотобумага «Унибром» ещё влажная от кислого фиксажа...", "Semyonov's archive prints drying on the cord under ruby safelight. 'Unibrom' paper still damp with acid fixer..."), 5.0)
+	)
 
 
 func _build_storage_footprints() -> void:
