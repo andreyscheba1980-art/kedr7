@@ -122,6 +122,13 @@ var target_head_y: float = 1.58
 var yaw_limit_base: float = NAN
 var yaw_limit_half_angle: float = deg_to_rad(28.0)
 var _prev_velocity_len: float = 0.0
+var _was_on_floor: bool = true
+var _last_fall_vel: float = 0.0
+var _landing_dip: float = 0.0
+var _turn_roll: float = 0.0
+var _slope_roll: float = 0.0
+var _lantern_lag: Vector2 = Vector2.ZERO
+var _filament_flicker_t: float = 0.0
 
 
 func _ready() -> void:
@@ -281,6 +288,9 @@ func handle_input(event: InputEvent) -> void:
 			rotation.y = base_yaw + new_yaw
 			head.rotation.x = clampf(head.rotation.x - rel_y * sens * y_sign, deg_to_rad(-45.0), deg_to_rad(35.0))
 			return
+		_turn_roll = clampf(_turn_roll - rel_x * sens * 1.6, deg_to_rad(-2.2), deg_to_rad(2.2))
+		_lantern_lag.x = clampf(_lantern_lag.x - rel_x * sens * 14.0, -0.06, 0.06)
+		_lantern_lag.y = clampf(_lantern_lag.y - rel_y * sens * y_sign * 14.0, -0.06, 0.06)
 		rotate_y(-rel_x * sens)
 		head.rotation.x = clampf(head.rotation.x - rel_y * sens * y_sign, deg_to_rad(-85.0), deg_to_rad(85.0))
 		return
@@ -384,6 +394,24 @@ func _physics_process(delta: float) -> void:
 
 	if not is_on_floor():
 		velocity.y -= _gravity * delta
+		_last_fall_vel = velocity.y
+	else:
+		if not _was_on_floor and _last_fall_vel < -1.6:
+			var drop_intensity := clampf(absf(_last_fall_vel) / 7.5, 0.02, 0.09)
+			_landing_dip = -drop_intensity
+			shake(0.012 * drop_intensity, 0.18)
+			var land_snd := _step_sound(Game.is_outside())
+			Game.audio.play_2d(land_snd, -8.0)
+		_last_fall_vel = 0.0
+	_was_on_floor = is_on_floor()
+
+	if is_on_floor():
+		var floor_n := get_floor_normal()
+		var local_n := transform.basis.inverse() * floor_n
+		var target_slope_roll := clampf(-local_n.x * 0.045, deg_to_rad(-2.5), deg_to_rad(2.5))
+		_slope_roll = lerpf(_slope_roll, target_slope_roll, minf(delta * 6.0, 1.0))
+	else:
+		_slope_roll = lerpf(_slope_roll, 0.0, minf(delta * 4.0, 1.0))
 
 	var dir := Vector3.ZERO
 	_sprinting = false
@@ -410,6 +438,9 @@ func _physics_process(delta: float) -> void:
 			_mouse_sway += Vector2(look_vec.x, look_vec.y * y_sign) * delta * 0.18
 			_mouse_sway.x = clampf(_mouse_sway.x, -0.09, 0.09)
 			_mouse_sway.y = clampf(_mouse_sway.y, -0.09, 0.09)
+			_turn_roll = clampf(_turn_roll - look_vec.x * stick_sens * delta * 0.45, deg_to_rad(-2.2), deg_to_rad(2.2))
+			_lantern_lag.x = clampf(_lantern_lag.x - look_vec.x * stick_sens * delta * 2.8, -0.06, 0.06)
+			_lantern_lag.y = clampf(_lantern_lag.y - look_vec.y * stick_sens * delta * y_sign * 2.8, -0.06, 0.06)
 			rotate_y(-look_vec.x * stick_sens * delta)
 			head.rotation.x = clampf(head.rotation.x - look_vec.y * stick_sens * delta * y_sign, deg_to_rad(-85.0), deg_to_rad(85.0))
 	var speed := WALK_SPEED
@@ -466,8 +497,9 @@ func _physics_process(delta: float) -> void:
 	speed *= speed_mult
 
 	var target := dir * speed
-	velocity.x = move_toward(velocity.x, target.x, ACCEL * delta)
-	velocity.z = move_toward(velocity.z, target.z, ACCEL * delta)
+	var accel_rate := 14.0 if target.length_squared() < 0.01 else 9.5
+	velocity.x = move_toward(velocity.x, target.x, accel_rate * delta)
+	velocity.z = move_toward(velocity.z, target.z, accel_rate * delta)
 	move_and_slide()
 	_lay_footprints()
 	_prev_velocity_len = Vector2(velocity.x, velocity.z).length()
@@ -683,16 +715,22 @@ func _update_steps(delta: float) -> void:
 		_step_acc = 0.0
 		return
 	_step_acc += speed * delta
-	var step_len := 1.85 if Game.skis_equipped else STEP_LEN
-	if _step_acc < step_len:
-		return
-	_step_acc = 0.0
 	var is_out := Game.is_outside()
 	if Game.level is Station and (Game.level as Station).is_pos_inside_house(global_position):
 		is_out = false
+	var in_deep: bool = is_out and (Game.has_flag("in_deep_snow") or _cached_off_path > 4.5)
+	var step_len := 1.85 if Game.skis_equipped else (1.55 if in_deep else STEP_LEN)
+	if _step_acc < step_len:
+		return
+	_step_acc = 0.0
 	var path := _step_sound(is_out)
-	var p := Game.audio.play_2d(path, -12.0 if not _sprinting else -8.0)
-	p.pitch_scale = randf_range(0.9, 1.1)
+	var vol_offset := randf_range(-1.2, 1.2)
+	var base_vol := -12.0 if not _sprinting else -8.0
+	if in_deep:
+		base_vol -= 1.0
+	var p := Game.audio.play_2d(path, base_vol + vol_offset)
+	if p != null:
+		p.pitch_scale = randf_range(0.82, 0.96) if in_deep else randf_range(0.95, 1.10)
 	if Game.leer_attached and is_out:
 		var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
 		if lp != null:
@@ -710,13 +748,20 @@ func _step_sound(is_out: bool) -> String:
 	const CC := "res://assets/sfx/cc0/"
 	if Game.skis_equipped and is_out:
 		return CC + ("step_crust_%d.ogg" % randi_range(1, 3))
-	if Game.zone == &"bunker":
+	if Game.zone == &"bunker" or Game.zone == &"gen_shack":
 		return CC + ("step_metal_%d.ogg" % randi_range(1, 6) if randf() < 0.7 else "step_metal_b_%d.ogg" % randi_range(1, 3))
 	if Game.level != null and Game.level.has_method(&"on_boardwalk") and bool(Game.level.call(&"on_boardwalk", global_position)):
 		return CC + "step_deck_%d.ogg" % randi_range(1, 8)
 	if not is_out:
-		return CC + "step_plank_%d.ogg" % randi_range(1, 8) if randf() < 0.5 else STEPS_WOOD[randi() % STEPS_WOOD.size()]
-	if randf() < 0.35:
+		if randf() < 0.08:
+			return CC + ("floor_creak_%d.ogg" % randi_range(1, 2))
+		if randf() < 0.65:
+			return CC + "step_plank_%d.ogg" % randi_range(1, 8)
+		return STEPS_WOOD[randi() % STEPS_WOOD.size()]
+	var in_deep: bool = Game.has_flag("in_deep_snow") or _cached_off_path > 4.5
+	if in_deep:
+		return STEPS_SNOW[randi() % STEPS_SNOW.size()]
+	if randf() < 0.70:
 		return CC + "step_crust_%d.ogg" % randi_range(1, 3)
 	return STEPS_SNOW[randi() % STEPS_SNOW.size()]
 
@@ -809,8 +854,19 @@ func _update_breath(delta: float) -> void:
 	_breath_timer -= delta
 	if _breath_timer <= 0.0:
 		if Game.warmth < 55.0 or Game.is_outside() or Game.house_cold > 0.4:
+			if Game.is_outside() and Game.weather != null:
+				var w_int: float = Game.weather.intensity
+				_breath_emitter.direction = Vector3(0.15 + w_int * 1.8, -0.05, -0.8).normalized()
+				_breath_emitter.initial_velocity_min = 0.4 + w_int * 0.8
+				_breath_emitter.initial_velocity_max = 0.8 + w_int * 1.5
+				_breath_emitter.gravity = Vector3(w_int * 0.6, -0.05, 0.0)
+			else:
+				_breath_emitter.direction = Vector3(0.0, 0.2, -0.7).normalized()
+				_breath_emitter.initial_velocity_min = 0.25
+				_breath_emitter.initial_velocity_max = 0.45
+				_breath_emitter.gravity = Vector3(0.0, 0.12, 0.0)
 			_breath_emitter.restart()
-		_breath_timer = randf_range(1.5, 2.2) if _sprinting else randf_range(3.2, 4.4)
+		_breath_timer = randf_range(1.4, 2.0) if _sprinting else randf_range(3.2, 4.2)
 
 	# Чужой выдох из-за плеча (Phantom Breath)
 	if Vector2(velocity.x, velocity.z).length_squared() < 0.05:
@@ -1008,6 +1064,7 @@ func _update_flashlight(delta: float) -> void:
 
 	# Инерция взгляда, шаг и тремор замерзающих рук на фонаре
 	_mouse_sway = _mouse_sway.lerp(Vector2.ZERO, minf(delta * 9.0, 1.0))
+	_lantern_lag = _lantern_lag.lerp(Vector2.ZERO, minf(delta * 7.0, 1.0))
 	var speed := Vector2(velocity.x, velocity.z).length()
 	var walk_k := clampf(speed / WALK_SPEED, 0.0, 1.35)
 	var bob_factor: float = Settings.head_bob if (Settings != null and "head_bob" in Settings) else 1.0
@@ -1031,8 +1088,8 @@ func _update_flashlight(delta: float) -> void:
 		var jz := sin(t_ms * 0.9) * 0.5 + (randf() - 0.5) * 0.3
 		shiver_pos = Vector3(jx, jy, jz) * (cold_k * 0.014)
 		shiver_rot = Vector3(jy * 1.2, jx * 1.5, jz * 0.8) * (cold_k * 0.045)
-	var sway_pos := Vector3(-_mouse_sway.x * 0.16, _mouse_sway.y * 0.14, 0.0)
-	var sway_rot := Vector3(-_mouse_sway.y * 0.42, -_mouse_sway.x * 0.52, _mouse_sway.x * 0.22)
+	var sway_pos := Vector3(-_mouse_sway.x * 0.16 + _lantern_lag.x * 0.16, _mouse_sway.y * 0.14 - _lantern_lag.y * 0.12, 0.0)
+	var sway_rot := Vector3(-_mouse_sway.y * 0.42 - _lantern_lag.y * 0.40, -_mouse_sway.x * 0.52 - _lantern_lag.x * 0.50, _mouse_sway.x * 0.22 + _lantern_lag.x * 0.25)
 	var target_pos := _flash_base_pos + bob_offset + shiver_pos + sway_pos
 	var target_rot := bob_rot + shiver_rot + sway_rot
 	if flashlight != null:
@@ -1081,6 +1138,9 @@ func _update_flashlight(delta: float) -> void:
 		near_k = clampf(lerpf(0.18, 1.0, (from.distance_to(hit["position"]) - 0.35) / 2.2), 0.18, 1.0)
 	if closeup_dim:
 		near_k = 0.0
+	if _filament_flicker_t > 0.0:
+		_filament_flicker_t -= delta
+		energy *= randf_range(0.4, 1.0)
 	_flash_near = lerpf(_flash_near, near_k, minf(delta * 8.0, 1.0))
 	energy *= _flash_near
 	if absf(flashlight.light_energy - energy) > 0.01:
@@ -1092,10 +1152,14 @@ func _update_flashlight(delta: float) -> void:
 
 func _update_camera_fx(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()
+	var in_deep: bool = Game.has_flag("in_deep_snow") or (_cached_off_path > 4.5 and not Game.skis_equipped and Game.is_outside())
+	var bob_speed_k := 2.6 if in_deep else 3.2
 	if speed > 0.3:
-		_bob_t += delta * speed * 3.2
+		_bob_t += delta * speed * bob_speed_k
 	var bob_factor: float = Settings.head_bob if (Settings != null and "head_bob" in Settings) else 1.0
-	var bob := sin(_bob_t) * 0.025 * clampf(speed / WALK_SPEED, 0.0, 1.4) * bob_factor
+	var deep_bob_mult := 1.45 if in_deep else 1.0
+	var bob := sin(_bob_t) * 0.025 * clampf(speed / WALK_SPEED, 0.0, 1.4) * bob_factor * deep_bob_mult
+	var bob_h := cos(_bob_t * 0.5) * 0.012 * clampf(speed / WALK_SPEED, 0.0, 1.4) * bob_factor
 
 	var sx := 0.0
 	var sy := 0.0
@@ -1129,17 +1193,19 @@ func _update_camera_fx(delta: float) -> void:
 	else:
 		_gust_timer = minf(_gust_timer, 5.0)
 
+	_turn_roll = lerpf(_turn_roll, 0.0, minf(delta * 8.0, 1.0))
+	var base_roll := _turn_roll + _slope_roll
 	if _gust_flinch_t > 0.0:
 		_gust_flinch_t -= delta
 		var gust_k := clampf(_gust_flinch_t / 0.16, 0.0, 1.0)
 		sx += _gust_jerk * sin(gust_k * PI)
 		sy -= _gust_dip * sin(gust_k * PI)
-		camera.rotation.z = _gust_roll * sin(gust_k * PI)
-	else:
-		camera.rotation.z = move_toward(camera.rotation.z, 0.0, delta * 2.0)
+		base_roll += _gust_roll * sin(gust_k * PI)
 
-	camera.h_offset = sx
-	camera.v_offset = bob + sy
+	camera.rotation.z = lerpf(camera.rotation.z, base_roll, minf(delta * 12.0, 1.0))
+	_landing_dip = lerpf(_landing_dip, 0.0, minf(delta * 8.0, 1.0))
+	camera.h_offset = sx + bob_h
+	camera.v_offset = bob + sy + _landing_dip
 
 	# Покачивание переносимого предмета в руках при ходьбе с учётом массы (тяжёлый рундук)
 	if _held_root != null and _held_root.visible:
@@ -1164,6 +1230,9 @@ func toggle_flashlight() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.flash_dead"), 3.0)
 		return
 	flashlight.visible = not flashlight.visible
+	var click := Game.audio.play_2d("res://assets/audio/clank.ogg", -10.0, randf_range(1.75, 1.95))
+	if flashlight.visible:
+		_filament_flicker_t = 0.07
 	if flashlight.visible and Game.is_night():
 		SaveGame.flags["flash_used_%d" % Game.night] = true
 	if Game.profiler != null:
@@ -1171,8 +1240,10 @@ func toggle_flashlight() -> void:
 
 
 func set_flashlight(on: bool) -> void:
-	if flashlight != null:
+	if flashlight != null and flashlight.visible != on:
 		flashlight.visible = on
+		if on:
+			_filament_flicker_t = 0.07
 
 
 ## Ракетница: одна ракета — и Ырка отступает, свет держится секунд десять.

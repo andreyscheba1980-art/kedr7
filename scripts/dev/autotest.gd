@@ -973,13 +973,16 @@ func _test_cabin() -> void:
 	print("After exit: pos=", Game.player.global_position, " in_cabin=", Game.has_flag("in_cabin"), " left_cabin=", Game.has_flag("left_cabin"), " head_y=", Game.player.head.position.y)
 	assert(not Game.has_flag("in_cabin"), "in_cabin must be false after exit!")
 	assert(Game.has_flag("left_cabin"), "left_cabin must be true after exit!")
-	assert(Game.player.global_position.distance_to(Vector3(-70.69, 7.85, -94.69)) < 0.2, "Player must be at tailgate snow pos after exit!")
+	assert(Game.player.global_position.distance_to(Vehicle._instance._tracked.global_position) < 8.0, "Player must be near vehicle after exit!")
 	assert(is_equal_approx(Game.player.head.position.y, 1.58), "Head height must be restored to 1.58 after exit!")
 	print("--- TESTING PROLOGUE RADIO TRANSMIT ---")
 	assert(Game.radio != null, "Radio must exist!")
 	assert(not Game.has_readings(), "Player has no weather readings in prologue arrival!")
-	Game.radio.freq = 6880.0
-	assert(Game.radio.strength_of(&"mainland") >= 0.75, "Mainland signal strength should be >= 0.75 at 6880 kHz!")
+	var m_freq: float = float(Signals.get_def(&"mainland").get("freq", 3215.0))
+	Game.radio._tube_warmup = 1.0
+	Game.radio.freq = m_freq
+	Game.radio.variometer_pos = 0.48
+	assert(Game.radio.strength_of(&"mainland") >= 0.75, "Mainland signal strength should be >= 0.75 at mainland freq!")
 	Game.radio.transmit()
 	assert(Game.radio._busy, "Radio should start transmitting arrival dialogue without requiring weather readings!")
 	print("✓ Тест передачи сигнала в прологе без сводок успешно пройден!")

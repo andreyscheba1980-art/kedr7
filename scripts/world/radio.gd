@@ -787,6 +787,7 @@ func _run_mi8_evac_exchange() -> void:
 
 
 func _run_prologue_radio_dialogue() -> void:
+	_busy = true
 	Game.coop_report_ok = false
 	Game.clear_readings()
 	Net.on_report_sent()
@@ -828,6 +829,7 @@ func _run_prologue_radio_dialogue() -> void:
 	if not is_inside_tree(): return
 
 	_busy = false
+	Game.set_flag("prologue_arrived")
 	Game.complete_step(&"test_report")
 
 

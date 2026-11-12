@@ -53,6 +53,9 @@ var _door_snow: Node3D
 var _door_snow_noticed := false
 var _handle_jiggle_timer := 80.0
 var _window_look_timer := 0.0
+var _chimney_wind_player: AudioStreamPlayer3D
+var _indoor_wind_player: AudioStreamPlayer3D
+var _house_stress_timer: float = 22.0
 var _window_face_flashed := false
 var _draft_was_home := false
 var _baro_warn_timer := 0.0
@@ -756,6 +759,41 @@ func _process(delta: float) -> void:
 	# Суседко (Тень)
 	_process_susedko(delta)
 
+	# Управление фоновым звуковым эмбиентом дома
+	if _chimney_wind_player != null:
+		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.2
+		var target_chim_db: float = lerpf(-32.0, -14.0, w_intensity)
+		if Game.stove_flue or Game.chimney_iced:
+			target_chim_db -= 8.0
+		_chimney_wind_player.volume_db = lerpf(_chimney_wind_player.volume_db, target_chim_db, minf(delta * 2.0, 1.0))
+		_chimney_wind_player.pitch_scale = lerpf(0.85, 1.25, w_intensity)
+
+	if _indoor_wind_player != null:
+		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.2
+		var target_indoor_db: float = lerpf(-26.0, -18.0, w_intensity)
+		if door_open:
+			target_indoor_db += 8.0
+		_indoor_wind_player.volume_db = lerpf(_indoor_wind_player.volume_db, target_indoor_db, minf(delta * 3.0, 1.0))
+
+	# Периодические потрескивания стропил от мороза и дребезжание рам на ветру
+	if not is_backdrop and Game.is_night():
+		_house_stress_timer -= delta
+		if _house_stress_timer <= 0.0:
+			_house_stress_timer = Game.rng.randf_range(16.0, 32.0)
+			if Game.is_home():
+				var t_air := Game.air_temp().x
+				if t_air < -22.0 and randf() < 0.65:
+					# Треск промерзающих бревен в перекрытиях
+					var crack_path := "res://assets/sfx/cc0/log_frost_crack_%d.ogg" % randi_range(1, 5)
+					var crack_pos := Vector3(randf_range(-1.0, 9.0), 2.7, randf_range(1.0, 5.0))
+					Game.audio.play_3d(crack_path, crack_pos, -10.0, 3.5)
+				elif Game.weather != null and Game.weather.intensity > 0.4 and randf() < 0.5:
+					# Дрожь оконных рам от напора ветра
+					var rattle_path := "res://assets/sfx/cc0/window_rattle_%d.ogg" % randi_range(1, 4)
+					var w_spot: Dictionary = window_spots[randi() % window_spots.size()] if window_spots.size() > 0 else {}
+					var r_pos: Vector3 = w_spot.get("feet", Vector3(1.0, 1.4, 6.5))
+					Game.audio.play_3d(rattle_path, r_pos, -8.0, 3.0)
+
 
 # --- API для систем ----------------------------------------------------------
 
@@ -1241,6 +1279,22 @@ func _build_house() -> void:
 		if Models.spawn(self, "kedr/house_int_" + room, Vector3(0, HOUSE_INT_Y, 0), 0.0, -1.0, {"center": false, "grime": 0.0, "bright": 1.7, "sat": 1.0}) == null:
 			_int_models = false
 
+	# Непрерывный гул сквозняков и напора пурги в срубе
+	_indoor_wind_player = AudioStreamPlayer3D.new()
+	var in_stream := load("res://assets/sfx/cc0/wind_indoor_loop.ogg") as AudioStream
+	if in_stream is AudioStreamOggVorbis:
+		in_stream = in_stream.duplicate()
+		(in_stream as AudioStreamOggVorbis).loop = true
+	_indoor_wind_player.stream = in_stream
+	_indoor_wind_player.unit_size = 9.0
+	_indoor_wind_player.max_distance = 28.0
+	_indoor_wind_player.volume_db = -22.0
+	_indoor_wind_player.bus = &"Ambient"
+	_indoor_wind_player.position = Vector3(4.5, 1.5, 3.0)
+	_indoor_wind_player.autoplay = true
+	add_child(_indoor_wind_player)
+	_indoor_wind_player.play()
+
 	# 1. Полы (сплошной дощатый настил с физической коллизией):
 	# Жилая комната дежурного (x: -2.5..3.5, z: 0.0..6.6):
 	_shell(Vector3(6.0, 0.24, 6.6), Vector3(0.5, -0.07, 3.3), floor_m, true)
@@ -1378,6 +1432,22 @@ func _build_chimney() -> void:
 	var pipe := Props.chimney_pipe()
 	pipe.position = Vector3(-1.5, ROOM_H + 0.85, 1.0)
 	add_child(pipe)
+
+	# Гул ветра в печной трубе
+	_chimney_wind_player = AudioStreamPlayer3D.new()
+	var chim_stream := load("res://assets/sfx/cc0/chimney_howl.ogg") as AudioStream
+	if chim_stream is AudioStreamOggVorbis:
+		chim_stream = chim_stream.duplicate()
+		(chim_stream as AudioStreamOggVorbis).loop = true
+	_chimney_wind_player.stream = chim_stream
+	_chimney_wind_player.unit_size = 4.5
+	_chimney_wind_player.max_distance = 16.0
+	_chimney_wind_player.volume_db = -26.0
+	_chimney_wind_player.bus = &"Ambient"
+	_chimney_wind_player.position = Vector3(-1.5, ROOM_H + 0.5, 1.0)
+	_chimney_wind_player.autoplay = true
+	add_child(_chimney_wind_player)
+	_chimney_wind_player.play()
 
 	_smoke = CPUParticles3D.new()
 	_smoke.amount = 20
@@ -2145,6 +2215,38 @@ func _build_living_quarters() -> void:
 	chair1.add_child(Props.chair())
 	var chair2 := _collider(Vector3(0.45, 0.45, 0.45), Vector3(1.2, 0.225, 4.8))
 	chair2.add_child(Props.chair())
+
+	# Уютный советский абажур над обеденным столом и танцующие пылинки
+	var table_lamp := Props.desk_lamp()
+	table_lamp.position = Vector3(0.72, 0.75, 4.35)
+	table_lamp.rotation.y = deg_to_rad(-45.0)
+	add_child(table_lamp)
+	var l_table := Geo.omni(self, Vector3(0.85, 1.15, 4.2), 3.4, 0.95, Color(1.0, 0.82, 0.52))
+	l_table.shadow_enabled = false
+	register_lamp(l_table)
+
+	var table_dust := CPUParticles3D.new()
+	table_dust.name = "TableDustMotes"
+	table_dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	table_dust.emission_box_extents = Vector3(0.55, 0.45, 0.55)
+	table_dust.position = Vector3(1.1, 1.25, 4.0)
+	table_dust.amount = 24
+	table_dust.lifetime = 4.5
+	table_dust.direction = Vector3(0.0, 0.1, 0.0)
+	table_dust.spread = 180.0
+	table_dust.initial_velocity_min = 0.02
+	table_dust.initial_velocity_max = 0.05
+	table_dust.gravity = Vector3(0.0, 0.01, 0.0)
+	var d_qm := QuadMesh.new()
+	d_qm.size = Vector2(0.012, 0.012)
+	var d_mat := StandardMaterial3D.new()
+	d_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	d_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	d_mat.albedo_color = Color(1.0, 0.92, 0.75, 0.35)
+	d_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	table_dust.mesh = d_qm
+	table_dust.material_override = d_mat
+	add_child(table_dust)
 
 	# 4. Книжные полки / шкаф у восточной стены
 	_collider(Vector3(0.4, 1.6, 1.2), Vector3(3.2, 0.8, 5.5))
@@ -3147,7 +3249,11 @@ func _on_living_door_used(_p: Player) -> void:
 	var target_y := deg_to_rad(-75.0) if living_door_open else 0.0
 	var tw := create_tween()
 	tw.tween_property(_living_door_hinge, "rotation:y", target_y, 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func() -> void: _living_door_busy = false)
+	tw.tween_callback(func() -> void:
+		_living_door_busy = false
+		if not living_door_open:
+			Game.audio.play_3d(CLANK_SOUND, _living_door_hinge.global_position, -12.0, 1.4)
+	)
 
 
 static func _make_door_slit_texture() -> ImageTexture:
@@ -3711,6 +3817,9 @@ func set_door_open(open: bool) -> void:
 		Game.radio.tube_synth.trigger_tube_microphonics(1.0)
 	if open:
 		EventBus.door_opened.emit()
+		Game.audio.play_3d(CLANK_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -6.0, 1.45)
+		if Game.is_outside() and Game.weather != null and (Game.weather.intensity > 0.25 or Game.weather.blizzard):
+			Game.audio.play_3d("res://assets/audio/gust.ogg", _door_hinge.global_position, -8.0, 4.0)
 		if Game.night == 7 and Game.final_call:
 			_door_busy = false
 			var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
@@ -3720,9 +3829,11 @@ func set_door_open(open: bool) -> void:
 		EventBus.door_closed.emit()
 	Game.audio.play_3d(DOOR_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -7.0)
 	var tw := create_tween()
-	tw.tween_property(_door_hinge, "rotation:y", deg_to_rad(105.0) if open else 0.0, 0.45).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(_door_hinge, "rotation:y", deg_to_rad(105.0) if open else 0.0, 0.48).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN if not open else Tween.EASE_OUT)
 	await tw.finished
 	_door_busy = false
+	if not open:
+		Game.audio.play_3d(CLANK_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -4.0, 1.15)
 	if not open:
 		var pt = get_tree().root.find_child("PrologueTrail", true, false)
 		if pt != null:

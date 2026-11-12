@@ -25,6 +25,22 @@ var _cabin_root: Node3D
 var _wipers: Array[Node3D] = []
 var _wiper_sfx_t := 0.0
 var _speedo_needle: Node3D
+var _tach_needle: Node3D
+var _oil_needle: Node3D
+var _water_needle: Node3D
+var _amp_needle: Node3D
+var _warn_mat: StandardMaterial3D
+var _pendant: Node3D
+var _pendant_vel := Vector2.ZERO
+var _pendant_rot := Vector2.ZERO
+var _ember_light: OmniLight3D
+var _ember_mat: StandardMaterial3D
+var _cab_smoke: CPUParticles3D
+var _cab_breath: CPUParticles3D
+var _cig_puff_t := 4.0
+var _breath_t := 1.5
+var _cab_wind: AudioStreamPlayer
+var _cab_hum: AudioStreamPlayer
 var _frost_tex: Array[GradientTexture2D] = []
 var _bump_t := 3.0
 var _jolt := 0.0
@@ -42,7 +58,11 @@ var _road := PackedVector3Array()  ## точки зимника через 2 м:
 var _drop_i := 0
 var _s := 0.0                      ## где тягач на дороге (индекс с дробью)
 var _in_cabin := false
-var _can_exit := false
+var _can_exit := false:
+	set(v):
+		_can_exit = v
+		if _can_exit and _in_cabin and Game.hud != null:
+			Game.hud.set_prompt(Loc.t(&"cab.exit"))
 var _driving := false
 var _leaving := false
 var _yaw_set := false
@@ -155,6 +175,28 @@ func _build_lights() -> void:
 		beam.shadow_enabled = side > 0.0 and Settings.quality >= 1
 		_tracked.add_child(beam)
 		_beams.append(beam)
+		var cone := MeshInstance3D.new()
+		var cm := CylinderMesh.new()
+		cm.top_radius = 0.14
+		cm.bottom_radius = 2.4
+		cm.height = 14.0
+		cm.radial_segments = 12
+		cm.rings = 1
+		cm.cap_top = false
+		cm.cap_bottom = false
+		cone.mesh = cm
+		var cmat := StandardMaterial3D.new()
+		cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		cmat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		cmat.cull_mode = BaseMaterial3D.CULL_DISABLED
+		cmat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		cmat.albedo_color = Color(0.85, 0.90, 1.0, 0.032)
+		cone.material_override = cmat
+		cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cone.position = Vector3(0.0, 0.0, -6.8)
+		cone.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+		beam.add_child(cone)
 	var rear := Geo.omni(_tracked, Vector3(0.0, 1.4, 3.1), 4.0, 0.6, Color(1.0, 0.2, 0.15))
 	rear.shadow_enabled = false
 
@@ -205,6 +247,8 @@ func _place(s: float, facing_station: bool) -> void:
 func _build_cabin() -> void:
 	_in_cabin = true
 	Game.set_flag("in_cabin", true)
+	if Game.player != null and Game.player.head != null:
+		Game.player.head.position.y = 0.90
 	_engine.volume_db = -14.0
 	if _exterior_mesh != null:
 		_exterior_mesh.visible = false
@@ -230,16 +274,24 @@ func _build_cabin() -> void:
 	for d: Array in [[-0.40, 0.86, 0.06], [-0.56, 0.86, 0.05], [-0.26, 0.87, 0.035], [-0.26, 0.79, 0.035], [0.22, 0.86, 0.04]]:
 		var g := Geo.cylinder(c, d[2], 0.02, Vector3(d[0], d[1], -1.535), dial_m, false)
 		g.rotation.x = deg_to_rad(90.0 - 25.0)
-	_speedo_needle = Node3D.new()
-	_speedo_needle.position = Vector3(-0.40, 0.86, -1.52)
-	_speedo_needle.rotation.x = deg_to_rad(90.0 - 25.0)
-	c.add_child(_speedo_needle)
-	Geo.cylinder(_speedo_needle, 0.002, 0.035, Vector3(0, 0.018, 0), Palette.glow(&"amber"), false)
+	_speedo_needle = _make_needle(c, Vector3(-0.40, 0.86, -1.52), 0.038)
+	_tach_needle = _make_needle(c, Vector3(-0.56, 0.86, -1.52), 0.032)
+	_oil_needle = _make_needle(c, Vector3(-0.26, 0.87, -1.52), 0.024)
+	_water_needle = _make_needle(c, Vector3(-0.26, 0.79, -1.52), 0.024)
+	_amp_needle = _make_needle(c, Vector3(0.22, 0.86, -1.52), 0.026)
+	_warn_mat = StandardMaterial3D.new()
+	_warn_mat.albedo_color = Color(0.25, 0.06, 0.04)
+	_warn_mat.emission_enabled = true
+	_warn_mat.emission = Color(1.0, 0.2, 0.08)
+	_warn_mat.emission_energy_multiplier = 0.25
+	var warn_lamp := Geo.cylinder(c, 0.008, 0.012, Vector3(-0.33, 0.88, -1.53), _warn_mat, false)
+	warn_lamp.rotation.x = deg_to_rad(90.0 - 25.0)
+	_build_pendant(c)
 	for k in 4:
 		Geo.cylinder(c, 0.005, 0.03, Vector3(-0.12 + k * 0.035, 0.83, -1.54), metal, false)
 	var grab := Geo.cylinder(c, 0.014, 0.36, Vector3(0.50, 0.92, -1.55), metal, false)
 	grab.rotation.z = deg_to_rad(90.0)
-	var dial_light := Geo.omni(c, Vector3(-0.4, 0.92, -1.45), 0.9, 0.2, Color(0.3, 0.95, 0.5))   # зелень шкал — только на торпеде
+	var dial_light := Geo.omni(c, Vector3(-0.4, 0.92, -1.45), 1.1, 0.35, Color(0.3, 0.95, 0.5))   # зелень шкал
 	dial_light.shadow_enabled = false
 	var roof_lamp := Geo.omni(c, Vector3(0.0, 1.45, -1.0), 2.6, 0.34, Color(1.0, 0.78, 0.5))
 	roof_lamp.shadow_enabled = false
@@ -289,41 +341,6 @@ func _build_cabin() -> void:
 	_cab_snow.mesh = sq
 	_cab_snow.position = Vector3(0, 1.25, -3.6)
 	c.add_child(_cab_snow)
-	# Михалыч курит: огонёк у губ, дым мягкими струйками тянется к форточке
-	var cig := CABIN_DRIVER_LOCAL + Vector3(0.05, 1.06, -0.14)
-	var ember := Geo.block(c, Vector3(0.007, 0.007, 0.028), cig, Palette.glow(&"amber"), false)
-	ember.name = "Cigarette"
-	var smoke := CPUParticles3D.new()
-	smoke.amount = 14
-	smoke.lifetime = 2.4
-	smoke.direction = Vector3(0.25, 1, 0.15)
-	smoke.spread = 14.0
-	smoke.initial_velocity_min = 0.06
-	smoke.initial_velocity_max = 0.14
-	smoke.gravity = Vector3(0.04, 0.04, 0.02)
-	smoke.scale_amount_min = 0.5
-	smoke.scale_amount_max = 1.8
-	var smq := QuadMesh.new()
-	smq.size = Vector2(0.032, 0.032)
-	var smm := StandardMaterial3D.new()
-	smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	smm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	smm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	smm.albedo_texture = Atmosphere.glare_texture()
-	smm.albedo_color = Color(0.75, 0.75, 0.78, 0.14)
-	smq.material = smm
-	smoke.mesh = smq
-	smoke.position = cig + Vector3(0, 0.015, 0)
-	c.add_child(smoke)
-	# Вспышка спички в начале рейса — Михалыч прикуривает папиросу «Прима»
-	var match_light := OmniLight3D.new()
-	match_light.name = "MatchLight"
-	match_light.light_color = Color(1.0, 0.58, 0.18)
-	match_light.light_energy = 0.0
-	match_light.omni_range = 1.8
-	match_light.position = cig + Vector3(0.04, -0.02, 0.08)
-	c.add_child(match_light)
-	_animate_match_start(match_light)
 	# Плафон под крышей: тёплый, слабый — чтобы кабина читалась
 	var lamp := OmniLight3D.new()
 	lamp.light_color = Color(1.0, 0.82, 0.6)
@@ -336,6 +353,111 @@ func _build_cabin() -> void:
 	_driver_cabin.position = CABIN_DRIVER_LOCAL
 	_driver_cabin.scale = Vector3.ONE * 0.88
 	c.add_child(_driver_cabin)
+	# Михалыч курит: папироса «Прима» привязана к кости головы — движется при поворотах к Виктору
+	var cig_parent: Node3D = c
+	var cig := CABIN_DRIVER_LOCAL + Vector3(0.05, 1.06, -0.14)
+	if _driver_cabin.skel != null:
+		var h_idx := _driver_cabin.skel.find_bone("head")
+		if h_idx >= 0:
+			var ba := BoneAttachment3D.new()
+			ba.name = "HeadCigAttachment"
+			ba.bone_name = "head"
+			_driver_cabin.skel.add_child(ba)
+			var holder := Node3D.new()
+			holder.transform = _driver_cabin.skel.get_bone_global_rest(h_idx).affine_inverse()
+			ba.add_child(holder)
+			cig_parent = holder
+			cig = Vector3(0.025, 1.638, -0.148)
+	var paper_m := StandardMaterial3D.new()
+	paper_m.albedo_color = Color(0.86, 0.84, 0.78)
+	Geo.block(cig_parent, Vector3(0.0065, 0.0065, 0.038), cig + Vector3(0.0, 0.004, 0.024), paper_m, false)
+	_ember_mat = StandardMaterial3D.new()
+	_ember_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_ember_mat.albedo_color = Color(1.0, 0.45, 0.12)
+	var ember := Geo.block(cig_parent, Vector3(0.007, 0.007, 0.012), cig, _ember_mat, false)
+	ember.name = "Cigarette"
+	_ember_light = OmniLight3D.new()
+	_ember_light.name = "EmberLight"
+	_ember_light.light_color = Color(1.0, 0.48, 0.14)
+	_ember_light.light_energy = 0.22
+	_ember_light.omni_range = 0.65
+	_ember_light.position = cig + Vector3(0.02, 0.01, -0.02)
+	cig_parent.add_child(_ember_light)
+
+	_cab_smoke = CPUParticles3D.new()
+	_cab_smoke.amount = 14
+	_cab_smoke.lifetime = 2.4
+	_cab_smoke.direction = Vector3(0.25, 1, 0.15)
+	_cab_smoke.spread = 14.0
+	_cab_smoke.initial_velocity_min = 0.06
+	_cab_smoke.initial_velocity_max = 0.14
+	_cab_smoke.gravity = Vector3(0.04, 0.04, 0.02)
+	_cab_smoke.scale_amount_min = 0.5
+	_cab_smoke.scale_amount_max = 1.8
+	var smq := QuadMesh.new()
+	smq.size = Vector2(0.032, 0.032)
+	var smm := StandardMaterial3D.new()
+	smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	smm.albedo_texture = Atmosphere.glare_texture()
+	smm.albedo_color = Color(0.75, 0.75, 0.78, 0.14)
+	smq.material = smm
+	_cab_smoke.mesh = smq
+	_cab_smoke.position = cig + Vector3(0, 0.015, 0)
+	cig_parent.add_child(_cab_smoke)
+
+	# Пар от дыхания Михалыча на морозе
+	_cab_breath = CPUParticles3D.new()
+	_cab_breath.amount = 8
+	_cab_breath.lifetime = 1.4
+	_cab_breath.emitting = false
+	_cab_breath.one_shot = true
+	_cab_breath.explosiveness = 0.6
+	_cab_breath.direction = Vector3(0.0, 0.08, -1.0)
+	_cab_breath.spread = 18.0
+	_cab_breath.initial_velocity_min = 0.15
+	_cab_breath.initial_velocity_max = 0.35
+	_cab_breath.gravity = Vector3(0.01, 0.03, 0.0)
+	_cab_breath.scale_amount_min = 0.4
+	_cab_breath.scale_amount_max = 1.4
+	var brm := QuadMesh.new()
+	brm.size = Vector2(0.045, 0.045)
+	var brmt := StandardMaterial3D.new()
+	brmt.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	brmt.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	brmt.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	brmt.albedo_texture = Atmosphere.glare_texture()
+	brmt.albedo_color = Color(0.9, 0.94, 1.0, 0.10)
+	brm.material = brmt
+	_cab_breath.mesh = brm
+	_cab_breath.position = cig + Vector3(-0.025, 0.0, 0.03)
+	cig_parent.add_child(_cab_breath)
+
+	# Аудио атмосферы в кабине: гул стального корпуса и приглушённый вой метели
+	_cab_hum = AudioStreamPlayer.new()
+	_cab_hum.stream = AudioDirector.cached_stream("res://assets/audio/hum_loop.ogg")
+	_cab_hum.volume_db = -24.0
+	_cab_hum.bus = &"SFX"
+	c.add_child(_cab_hum)
+	_cab_hum.play()
+
+	_cab_wind = AudioStreamPlayer.new()
+	_cab_wind.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/wind_whistle_loop.ogg")
+	_cab_wind.volume_db = -28.0
+	_cab_wind.bus = &"SFX"
+	c.add_child(_cab_wind)
+	_cab_wind.play()
+
+	# Вспышка спички в начале рейса — Михалыч прикуривает папиросу «Прима»
+	var match_light := OmniLight3D.new()
+	match_light.name = "MatchLight"
+	match_light.light_color = Color(1.0, 0.58, 0.18)
+	match_light.light_energy = 0.0
+	match_light.omni_range = 1.8
+	match_light.position = cig + Vector3(0.04, -0.02, -0.06)
+	cig_parent.add_child(match_light)
+	_animate_match_start(match_light)
 	# Шорох рации и дверь
 	_cabin_radio = AudioStreamPlayer3D.new()
 	_cabin_radio.stream = AudioDirector.cached_stream("res://assets/audio/static_loop.ogg")
@@ -367,8 +489,32 @@ func _animate_match_start(ml: OmniLight3D) -> void:
 	tw.tween_property(ml, "light_energy", 0.0, 1.6).set_delay(1.0)
 
 
+func _make_needle(parent: Node3D, pos: Vector3, length: float) -> Node3D:
+	var n := Node3D.new()
+	n.position = pos
+	n.rotation.x = deg_to_rad(90.0 - 25.0)
+	parent.add_child(n)
+	Geo.cylinder(n, 0.0018, length, Vector3(0, length * 0.5, 0), Palette.glow(&"amber"), false)
+	return n
+
+
+func _build_pendant(parent: Node3D) -> void:
+	_pendant = Node3D.new()
+	_pendant.name = "CabinPendant"
+	_pendant.position = Vector3(-0.20, 1.56, -1.78)
+	parent.add_child(_pendant)
+	var red_m := StandardMaterial3D.new()
+	red_m.albedo_color = Color(0.74, 0.14, 0.08)
+	var gold_m := StandardMaterial3D.new()
+	gold_m.albedo_color = Color(0.88, 0.74, 0.22)
+	Geo.cylinder(_pendant, 0.0015, 0.09, Vector3(0, -0.045, 0), Palette.glow(&"amber"), false)
+	Geo.block(_pendant, Vector3(0.11, 0.13, 0.004), Vector3(0, -0.155, 0), red_m, false)
+	Geo.block(_pendant, Vector3(0.035, 0.035, 0.006), Vector3(0, -0.145, 0), gold_m, false)
+	Geo.block(_pendant, Vector3(0.11, 0.012, 0.006), Vector3(0, -0.225, 0), gold_m, false)
+
+
 ## Стекло с инеем по краям: прозрачная середина, белёсые углы (радиальный градиент).
-## Кабина живёт: дворники ходят, пока едем; ухабы встряхивают кабину и звякает термос;
+## Кабина живёт: дворники ходят, пока едем; ухабы встряхивают кабину, качают вымпел и звякает кружка;
 ## встали — снег перестаёт лететь, иней ползёт по стеклу от краёв.
 func _cabin_life(delta: float) -> void:
 	var t := Time.get_ticks_msec() * 0.001
@@ -382,12 +528,52 @@ func _cabin_life(delta: float) -> void:
 		_wiper_sfx_t -= delta
 		if _wiper_sfx_t <= 0.0:
 			_wiper_sfx_t = 1.20
-			var wp := Game.audio.play_2d("res://assets/audio/clank_v2.ogg", -24.0)
+			var wp := Game.audio.play_2d("res://assets/audio/ice_hit.ogg", -28.0)
 			if wp != null:
-				wp.pitch_scale = randf_range(1.7, 2.1)
+				wp.pitch_scale = randf_range(2.1, 2.5)
 	if _speedo_needle != null:
 		var target_angle := deg_to_rad(38.0 + sin(t * 14.0) * 4.5) if _driving else deg_to_rad(-45.0)
 		_speedo_needle.rotation.z = lerp_angle(_speedo_needle.rotation.z, target_angle, minf(delta * 8.0, 1.0))
+	if _tach_needle != null:
+		var target_tach := deg_to_rad(22.0 + sin(t * 24.0) * 3.5) if _driving else deg_to_rad(-30.0 + sin(t * 12.0) * 2.0)
+		_tach_needle.rotation.z = lerp_angle(_tach_needle.rotation.z, target_tach, minf(delta * 9.0, 1.0))
+	if _oil_needle != null:
+		var target_oil := deg_to_rad(15.0 + sin(t * 9.0) * 1.5)
+		_oil_needle.rotation.z = lerp_angle(_oil_needle.rotation.z, target_oil, minf(delta * 5.0, 1.0))
+	if _water_needle != null:
+		var target_water := deg_to_rad(8.0 + sin(t * 4.0) * 0.8)
+		_water_needle.rotation.z = lerp_angle(_water_needle.rotation.z, target_water, minf(delta * 3.0, 1.0))
+	if _amp_needle != null:
+		var target_amp := deg_to_rad(-10.0 + sin(t * 18.0) * 2.2) if _driving else deg_to_rad(-3.0)
+		_amp_needle.rotation.z = lerp_angle(_amp_needle.rotation.z, target_amp, minf(delta * 7.0, 1.0))
+	if _pendant != null:
+		var target_pitch := -_jolt * 2.8 - (0.035 if _driving else 0.0)
+		var target_roll := sin(t * 2.1) * (0.065 if _driving else 0.008) + _jolt * sin(t * 16.0) * 1.2
+		_pendant_vel.x += (target_pitch - _pendant_rot.x) * 22.0 * delta
+		_pendant_vel.y += (target_roll - _pendant_rot.y) * 22.0 * delta
+		_pendant_vel *= exp(-3.8 * delta)
+		_pendant_rot += _pendant_vel * delta
+		_pendant.rotation = Vector3(_pendant_rot.x, 0.0, _pendant_rot.y)
+	_cig_puff_t -= delta
+	if _cig_puff_t <= 0.0:
+		_cig_puff_t = randf_range(11.0, 17.0)
+		if _driver_cabin != null and _driver_cabin.has_clip(&"sit_smoke") and not _talking:
+			_driver_cabin.pose_override = &"sit_smoke"
+			get_tree().create_timer(3.5, false).timeout.connect(func() -> void:
+				if is_instance_valid(_driver_cabin) and _driver_cabin.pose_override == &"sit_smoke":
+					_driver_cabin.pose_override = &""
+			)
+		if _ember_light != null:
+			var tw_e := create_tween()
+			tw_e.tween_property(_ember_light, "light_energy", 1.5, 0.6)
+			tw_e.tween_property(_ember_light, "light_energy", 0.22, 1.2).set_delay(0.8)
+		if _cab_smoke != null:
+			_cab_smoke.restart()
+	_breath_t -= delta
+	if _breath_t <= 0.0:
+		_breath_t = randf_range(3.2, 5.0)
+		if _cab_breath != null:
+			_cab_breath.restart()
 	if _cab_snow != null:
 		_cab_snow.emitting = _driving
 	if _driving:
@@ -398,6 +584,10 @@ func _cabin_life(delta: float) -> void:
 			var ck := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
 			if ck != null:
 				ck.pitch_scale = randf_range(1.6, 2.2)
+			if randf() < 0.55:
+				var mug := Game.audio.play_2d("res://assets/audio/clank_v3.ogg", -24.0)
+				if mug != null:
+					mug.pitch_scale = randf_range(1.9, 2.4)
 	_jolt = move_toward(_jolt, 0.0, delta * 0.12)
 	Game.player.head.position.y += sin(t * 40.0) * _jolt
 	if _cabin_root != null:
@@ -486,14 +676,19 @@ func _run_cabin() -> void:
 	_talking = false
 	while _driving and _in_cabin:
 		await get_tree().process_frame
-	# Перемёт: тягач зарывается носом, его ведёт вбок, дизель воет — гусеницы буксуют в снегу
-	AudioDirector.play_raw("res://assets/audio/clank.ogg", 2.0)
+	# Перемёт: тягач зарывается носом в сугроб, лязг металла, дизель взвывает
+	AudioDirector.play_raw("res://assets/audio/ice_hit_v2.ogg", 3.0)
+	AudioDirector.play_raw("res://assets/audio/sub_drop.ogg", 2.2)
+	AudioDirector.play_raw("res://assets/audio/clank.ogg", 3.0)
+	if _warn_mat != null:
+		_warn_mat.emission_energy_multiplier = 3.5
+	_pendant_vel += Vector2(6.5, 3.2)
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(self, "_lever_pull", deg_to_rad(-24.0), 0.35).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(_tracked, "rotation:z", deg_to_rad(5.5), 0.5).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(_tracked, "position:y", -0.35, 0.5)
+	tw.tween_property(self, "_lever_pull", deg_to_rad(-28.0), 0.30).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(_tracked, "rotation:z", deg_to_rad(6.5), 0.45).set_trans(Tween.TRANS_BACK)
+	tw.tween_property(_tracked, "position:y", -0.40, 0.45)
 	if Game.player != null:
-		Game.player.shake(0.12, 0.7)
+		Game.player.shake(0.22, 0.85)
 	create_tween().tween_property(_engine, "pitch_scale", 1.45, 0.6)
 	_spray(1.6)
 	await get_tree().create_timer(1.6, false).timeout
@@ -521,9 +716,15 @@ func _on_exit_cabin() -> void:
 	for f in ["has_trunk", "trunk_delivered", "has_fas4", "has_tablet"]:
 		Game.set_flag(f, true)
 	Game.complete_step(&"driver")
-	AudioDirector.play_raw("res://assets/audio/door.ogg", 2.0)
+	AudioDirector.play_raw("res://assets/sfx/door_handle.ogg", 2.0)
+	AudioDirector.play_raw("res://assets/audio/door.ogg", 2.5)
+	AudioDirector.play_raw("res://assets/audio/gust.ogg", 2.0)
 	if _cabin_radio != null:
 		_cabin_radio.stop()
+	if _cab_hum != null:
+		_cab_hum.stop()
+	if _cab_wind != null:
+		_cab_wind.stop()
 	_cabin_root.visible = false
 	if is_instance_valid(_driver_cabin):
 		_driver_cabin.reparent(_tracked, false)
@@ -549,7 +750,7 @@ func _on_exit_cabin() -> void:
 		Game.player.shake(0.04, 0.3)
 	if Game.hud != null:
 		Game.hud.set_prompt("")
-		Game.hud.set_objective(Loc.t(&"obj.dig") + " (0/%d)" % DIG_SPOTS.size())
+		Game.hud.subtitle(Loc.t(&"obj.dig") + " (0/%d)" % DIG_SPOTS.size(), 4.0)
 	_engine.volume_db = -6.0
 	Game.set_flag("dig_pending", true)
 	_build_dig_spots()
@@ -574,7 +775,7 @@ func _build_dig_spots() -> void:
 		_dig_nodes.append(m)
 		var it := Geo.interactable(self, Vector3(1.6, 1.0, 2.0), at + Vector3(0, 0.45, 0), null, "", Callable())
 		it.hold_time = 1.0
-		it.hold_sound = "res://assets/audio/step_snow_3.ogg"
+		it.hold_sound = "res://assets/sfx/cc0/step_crust_1.ogg"
 		it.prompt_provider = func() -> String: return Loc.t(&"cab.dig") if m.visible else ""
 		it.used.connect(func(_p: Player) -> void:
 			if not m.visible:
@@ -582,12 +783,13 @@ func _build_dig_spots() -> void:
 			m.visible = false
 			it.collision_layer = 0
 			_dug += 1
-			Game.audio.play_3d(SFX_SNOW_FALL, at + Vector3(0, 0.5, 0), -2.0, 5.0)
+			AudioDirector.play_raw("res://assets/audio/ice_hit.ogg", 1.8)
+			Game.audio.play_3d(SFX_SNOW_FALL, at + Vector3(0, 0.5, 0), 1.0, 8.0)
 			if Game.player != null:
 				Game.player.shake(0.03, 0.25)
 			if _dug < DIG_SPOTS.size():
 				if Game.hud != null:
-					Game.hud.set_objective(Loc.t(&"obj.dig") + " (%d/%d)" % [_dug, DIG_SPOTS.size()])
+					Game.hud.subtitle(Loc.t(&"obj.dig") + " (%d/%d)" % [_dug, DIG_SPOTS.size()], 3.0)
 			_maybe_try())
 
 
@@ -802,10 +1004,11 @@ func _maybe_try() -> void:
 	await get_tree().create_timer(1.0, false).timeout
 	if not is_inside_tree():
 		return
-	AudioDirector.play_raw("res://assets/audio/clank.ogg", 4.0)
-	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", _body.global_position + Vector3(0, 1, 0), -4.0, 12.0)
+	AudioDirector.play_raw("res://assets/audio/clank_v4.ogg", 4.5)
+	AudioDirector.play_raw("res://assets/audio/ice_hit_v3.ogg", 3.2)
+	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", _body.global_position + Vector3(0, 1, 0), -1.0, 15.0)
 	if Game.player != null:
-		Game.player.shake(0.08, 0.45)
+		Game.player.shake(0.14, 0.6)
 	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.0)
 	_exhaust.amount = 16
 	_exhaust.initial_velocity_max = 2.0
@@ -828,7 +1031,7 @@ func _finish_talk(tried: bool) -> void:
 		return
 	Voice.say(&"driver.pro4", 3.6, 1, [], _tracked.global_position)
 	if Game.hud != null:
-		Game.hud.set_objective(Loc.t(&"obj.prologue_walk"))
+		Game.hud.subtitle(Loc.t(&"obj.prologue_walk"), 4.0)
 	_talk_over = true
 
 
@@ -918,12 +1121,13 @@ func _process(delta: float) -> void:
 		_tracked.rotation.z = sin(Time.get_ticks_msec() * 0.0022) * deg_to_rad(0.9)
 		if _s <= _drop_i + 0.01:
 			_driving = false
-	if _in_cabin and not hold:
-		if not _yaw_set:
-			_yaw_set = true
-			Game.player.rotation.y = _tracked.global_rotation.y   # смотрим вперёд, по ходу тягача
-		Game.player.global_position = _tracked.to_global(CABIN_SEAT_LOCAL)
-		Game.player.velocity = Vector3.ZERO
+	if _in_cabin:
+		if not hold:
+			if not _yaw_set:
+				_yaw_set = true
+				Game.player.rotation.y = _tracked.global_rotation.y   # смотрим вперёд, по ходу тягача
+			Game.player.global_position = _tracked.to_global(CABIN_SEAT_LOCAL)
+			Game.player.velocity = Vector3.ZERO
 		var vib := sin(Time.get_ticks_msec() * 0.035) * (0.005 if _driving else 0.002)
 		Game.player.head.position.y = 0.90 + vib
 		_cabin_life(delta)
