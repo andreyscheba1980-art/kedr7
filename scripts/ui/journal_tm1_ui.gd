@@ -198,6 +198,21 @@ func _get_measured_count() -> int:
 	return (1 if has_b else 0) + (1 if has_t else 0) + (1 if has_w else 0) + (1 if has_s else 0) + (1 if has_m else 0)
 
 
+func _compute_shift_objective() -> String:
+	if not Game.power_on:
+		return Loc.t(&"objective.restore_power")
+	if not Game.has_readings():
+		return Loc.t(&"objective.take_readings")
+	var report_due := Game.is_night() and Game.reports_sent < Game.report_times().size()
+	if report_due:
+		return Loc.t(&"objective.send_report")
+	if Game.night == 7 and Game.helipad_cleared:
+		var pots := mini(int(SaveGame.flags.get("helipad_firepots_lit_count", 0)), 4)
+		var psnd := 1 if bool(SaveGame.flags.get("psnd_flare_lit", false)) else 0
+		return Loc.t(&"objective.evac_prep", [pots, psnd])
+	return Loc.t(&"objective.await_next_shift")
+
+
 # --- ОТРИСОВКА КНИГИ (КАНВАС) ------------------------------------------------
 
 func _on_draw_book() -> void:
@@ -351,6 +366,12 @@ func _build_shift_spread() -> void:
 	meta_lbl.text = Loc.p("Станция 2-го разряда «КЕДР-7» (Свердловск-44) • Смена №%d • Срок 22:00", "Class II station «KEDR-7» (Sverdlovsk-44) • Shift #%d • Due 22:00") % cur_night
 	style_paper_label(meta_lbl, C_INK_MAIN, 12)
 	left_box.add_child(meta_lbl)
+
+	var obj_lbl := Label.new()
+	obj_lbl.text = _compute_shift_objective()
+	obj_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	style_paper_label(obj_lbl, C_INK_RED if not Game.power_on else C_INK_MAIN, 11)
+	left_box.add_child(obj_lbl)
 
 	left_box.add_child(_make_line(Color(0.20, 0.22, 0.35, 0.35)))
 

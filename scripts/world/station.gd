@@ -35,8 +35,6 @@ var _shack_door_hinge: Node3D
 var _shack_door_busy := false
 var shack_door_open := false
 var _vestibule_shovel: Interactable
-var _gen_warm := false
-var _gen_pull_count := 0
 var _wind_door_timer := 65.0
 var _clock_label: Label3D
 var _tape_deck: Interactable
@@ -388,14 +386,37 @@ func _process(delta: float) -> void:
 			var flick := 1.0 + (sin(_t * 7.3) * 0.08 if burning and not lights_lit() else 0.0)
 			_living_door_slit_mat.albedo_color.a = clampf(0.85 * flick, 0.0, 1.0)
 
-	# Мерцающий свет в сарае/будке генератора сквозь щели стен
-	var gen_running := Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0
+	# Мерцающий свет в сарае/будке генератора сквозь щели стен и температура блока ДГА-24М
+	var gen_running := (Game.dga_engine_running or Game.power_on) and not Game.gen_broken and Game.generator_fuel > 0.0
+	if not is_backdrop and Game.clock_running:
+		if Game.dga_engine_running:
+			Game.dga_engine_temp = move_toward(Game.dga_engine_temp, 78.0, 4.5 * delta)
+		else:
+			var shack_t := Game.air_temp().x * 0.6
+			Game.dga_engine_temp = move_toward(Game.dga_engine_temp, shack_t, 0.35 * delta)
+		# Парафинизация фильтра ЭТФ-3 при морозе <= -38°C без предпускового подогрева ПЛ-64
+		if Game.is_night() and not Game.is_prologue() and Game.dga_engine_running and Game.air_temp().x <= -38.0 \
+			and not Game.dga_pl64_used_before_start and not Game.dga_paraffin_triggered_tonight and Game.generator_fuel < 30.0:
+			Game.dga_paraffin_triggered_tonight = true
+			Game.dga_filter_clogged = true
+			_gen_stalled = true
+			Game.dga_engine_running = false
+			Game.set_power(false)
+			flicker(1.2)
+			if _gen_sputter_player != null:
+				_gen_sputter_player.play()
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"dga24.paraffin_stall"), 5.5, 2)
+
+	if _gen_smoke != null:
+		_gen_smoke.emitting = gen_running
+	var shack_lit := Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0
 	for sd: Dictionary in _shack_light_slits:
 		var mi: MeshInstance3D = sd["mesh"]
 		var smat: StandardMaterial3D = sd["mat"]
 		var base_a: float = sd["base_a"]
-		mi.visible = gen_running
-		if gen_running:
+		mi.visible = shack_lit
+		if shack_lit:
 			var gflick := clampf(0.78 + sin(_t * 31.0) * 0.16 + sin(_t * 67.0) * 0.08 + (randf() - 0.5) * 0.08, 0.2, 1.15)
 			smat.albedo_color.a = clampf(base_a * gflick, 0.0, 1.0)
 
@@ -403,9 +424,12 @@ func _process(delta: float) -> void:
 		var target_eng_vol := -80.0
 		var threat_near := (Game.events != null and Game.events.knocking) or (Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and Game.yrka.threat >= 68.0)
 		if gen_running:
-			target_eng_vol = -5.5
-			if not shack_door_open:
+			var ui_open := Game.player != null and Game.player.mode == Player.Mode.UI and Game.zone == &"gen_shack"
+			_gen_engine_player.attenuation_filter_cutoff_hz = 20500.0 if (ui_open or shack_door_open or Game.zone == &"gen_shack") else 3200.0
+			target_eng_vol = -3.5 if ui_open else -5.5
+			if not shack_door_open and not ui_open and Game.zone != &"gen_shack":
 				target_eng_vol -= 5.0
+			var base_pitch := 1.02 if (Game.dga_ap50_engaged or Game.power_on) else 0.84
 			if threat_near:
 				_gen_engine_player.pitch_scale = lerpf(_gen_engine_player.pitch_scale, 0.65, minf(delta * 2.0, 1.0))
 				if _bulb_omni != null:
@@ -413,9 +437,9 @@ func _process(delta: float) -> void:
 					_bulb_omni.light_color = _bulb_omni.light_color.lerp(Color(1.0, 0.42, 0.15), minf(delta * 2.0, 1.0))
 			elif Game.generator_fuel < 15.0:
 				target_eng_vol += sin(_t * 14.0) * 1.5
-				_gen_engine_player.pitch_scale = 1.02 + sin(_t * 11.0) * 0.05
+				_gen_engine_player.pitch_scale = base_pitch + sin(_t * 11.0) * 0.05
 			else:
-				_gen_engine_player.pitch_scale = 1.02
+				_gen_engine_player.pitch_scale = base_pitch
 				if _bulb_omni != null:
 					_bulb_omni.light_color = _bulb_omni.light_color.lerp(Color(1.0, 0.92, 0.72), minf(delta * 2.0, 1.0))
 		_gen_engine_player.volume_db = lerpf(_gen_engine_player.volume_db, target_eng_vol, minf(delta * 4.0, 1.0))
@@ -3286,15 +3310,16 @@ func _build_generator_shack() -> void:
 	_gen_smoke.position = shack_center + Vector3(-0.5, 3.4, -0.6)
 	add_child(_gen_smoke)
 
-	# Дизель-генератор внутри будки
+	# Дизель-генератор ДГА-24М внутри будки (физическое обслуживание: топливо, фильтр ЭТФ-3, ремонт)
 	var gen := Geo.interactable(self, Vector3(1.1, 0.85, 0.8), shack_center + Vector3(-0.3, 0.50, -0.2), null, "", _on_generator_used)
+	gen.name = "GeneratorBody"
 	var gen_mesh := Props.generator()
 	gen_mesh.position.y = -0.40
 	gen.add_child(gen_mesh)
 	gen.prompt_provider = _generator_prompt
 	gen.hold_sound = CLANK_SOUND
 	gen.hold_check = func() -> bool:
-		return (Game.gen_broken and Game.has_item(&"tools")) or (not Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0) or (Game.player != null and Game.player.held == &"canister")
+		return (Game.gen_broken and Game.has_item(&"tools")) or Game.dga_filter_clogged or (Game.player != null and Game.player.held == &"canister")
 	_generator = gen
 
 	_gen_sputter_player = AudioStreamPlayer3D.new()
@@ -4214,8 +4239,6 @@ func _trigger_generator_stall() -> void:
 	if not Game.power_on or Game.gen_broken or Game.generator_fuel <= 0.0 or Game.is_prologue():
 		return
 	_gen_stalled = true
-	_gen_warm = false
-	_gen_pull_count = 0
 	var gen_pos := _generator.global_position if _generator != null else Vector3(14.2, 0.45, -13.65)
 	var stall := Voice.sfx(&"gen_stall")
 	if stall != "":
@@ -4225,6 +4248,8 @@ func _trigger_generator_stall() -> void:
 	flicker(1.4)
 	await get_tree().create_timer(1.2, false).timeout
 	if _gen_stalled and Game.power_on:
+		Game.dga_ap50_engaged = false
+		Game.dga_engine_running = false
 		Game.set_power(false)
 		Director.add_tension(12.0, "генератор заглох")
 		Game.hud.subtitle(Loc.t(&"sub.gen_stalled"), 4.5, 2)
@@ -4237,12 +4262,9 @@ func _generator_prompt() -> String:
 		return Loc.t(&"it.gen_repair") if Game.has_item(&"tools") else Loc.t(&"it.gen_broken")
 	if Game.player != null and Game.player.held == &"canister":
 		return Loc.t(&"it.gen_fill")
-	if not Game.power_on:
-		if Game.generator_fuel <= 0.0:
-			return Loc.t(&"it.gen_no_fuel")
-		return Loc.t(&"it.gen_restart")
-	var state := "%d%%" % int(Game.generator_fuel)
-	return Loc.t(&"it.gen", [state])
+	if Game.dga_filter_clogged:
+		return Loc.t(&"gen.etf3_clean")
+	return Loc.t(&"gen.inspect_prompt")
 
 
 func _on_generator_used(p: Player) -> void:
@@ -4257,6 +4279,11 @@ func _on_generator_used(p: Player) -> void:
 	if Game.gen_broken:
 		if Game.has_item(&"tools"):
 			Game.gen_broken = false
+			_gen_stalled = false
+			Game.dga_engine_temp = maxf(Game.dga_engine_temp, 45.0)
+			Game.dga_oil_pressure = maxf(Game.dga_oil_pressure, 2.5)
+			Game.dga_switches["etf3"] = true
+			Game.dga_switches["decomp"] = false
 			Game.set_power(Game.generator_fuel > 0.0)
 			Game.audio.play_3d(CLANK_SOUND, gen_pos, 2.0)
 			Game.hud.subtitle(Loc.t(&"sub.gen_repaired"), 4.0)
@@ -4264,52 +4291,25 @@ func _on_generator_used(p: Player) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.gen_need_tools"), 3.5)
 		return
 	if p.held == &"canister":
-		if Game.generator_fuel > 85.0 and not Game.is_prologue():
+		if Game.generator_fuel > 95.0 and not Game.is_prologue():
 			Game.hud.subtitle(Loc.t(&"sub.gen_full"), 3.0)
 			return
 		p.set_held(&"")
-		Game.refuel()
+		Game.refuel(40.0)
 		Game.audio.play_3d(CLANK_SOUND, gen_pos, 0.0)
 		Game.hud.subtitle(Loc.t(&"sub.gen_filled"), 3.0)
 		return
-	if not Game.power_on and not Game.gen_broken:
-		if Game.generator_fuel <= 0.0:
-			Game.hud.subtitle(Loc.t(&"it.gen_no_fuel"), 3.0)
-			return
-		# Запуск генератора вручную (рывок троса стартера)
-		_gen_pull_count += 1
-		var needed := 2 if (Game.is_night() and not _gen_warm and not Game.is_prologue()) else 1
-		if _gen_pull_count < needed:
-			_gen_warm = true
-			if _gen_sputter_player != null:
-				_gen_sputter_player.play()
-			AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
-			Game.audio.play_3d(CLANK_SOUND, gen_pos, 2.0)
-			if _gen_smoke != null:
-				_gen_smoke.restart()
-				_gen_smoke.emitting = true
-			p.shake(0.04, 0.35)
-			Game.vibrate(0.45, 0.6, 0.35)
-			Game.hud.subtitle(Loc.t(&"sub.gen_cord_pull"), 3.0)
-			return
-		_gen_pull_count = 0
-		_gen_warm = true
+	if Game.dga_filter_clogged:
+		Game.dga_filter_clogged = false
 		_gen_stalled = false
-		_gen_stall_timer = Game.rng.randf_range(300.0, 460.0)
-		var start := Voice.sfx(&"gen_start")
-		if start != "":
-			Game.audio.play_3d(start, gen_pos, 2.0, 6.0)
-		else:
-			Game.audio.play_3d(CLANK_SOUND, gen_pos, 1.0)
-			if _gen_sputter_player != null:
-				_gen_sputter_player.play()
-		if _gen_smoke != null:
-			_gen_smoke.emitting = true
-		p.shake(0.06, 0.5)
-		Game.vibrate(0.65, 0.85, 0.5)
-		Game.set_power(true)
-		Game.hud.subtitle(Loc.t(&"sub.gen_restarted"), 3.5)
-		Director.add_tension(-10.0, "генератор запущен")
+		Game.dga_switches["etf3"] = true
+		Game.audio.play_3d(CLANK_SOUND, gen_pos, 1.0)
+		Game.hud.subtitle(Loc.t(&"gen.etf3_cleaned"), 4.5)
+		return
+	# Осмотр корпуса дизеля без запуска «тросом» — единственный пуск на щите ЩСУ-24 справа
+	AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -4.0)
+	var f_txt := Loc.t(&"gen.filter_clogged") if Game.dga_filter_clogged else Loc.t(&"gen.filter_ok")
+	Game.hud.subtitle(Loc.t(&"gen.status_inspect", [int(roundf(Game.generator_fuel)), int(roundf(Game.dga_engine_temp)), f_txt]), 5.0)
 
 
 func _on_barrel_used(_p: Player) -> void:

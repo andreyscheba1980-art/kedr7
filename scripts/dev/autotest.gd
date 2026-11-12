@@ -1598,10 +1598,19 @@ func _inspect_fixes() -> void:
 	st._trigger_generator_stall()
 	await _wait(1.6)
 	assert(not Game.power_on, "Power should be off after generator stall")
-	assert(st._generator_prompt() == Loc.t(&"it.gen_restart"), "Prompt must be restart prompt")
-	while not Game.power_on:
-		st._on_generator_used(Game.player)
-	assert(Game.power_on, "Power should be restored after restart")
+	assert(st._generator_prompt() == Loc.t(&"gen.inspect_prompt"), "Prompt must be inspect prompt")
+	st._on_generator_used(Game.player)
+	assert(not Game.power_on, "Inspecting body should not pull-cord start the diesel")
+	Game.dga_engine_temp = 55.0
+	var dga_ui := GeneratorDGA24UI.new()
+	Game.hud.open_modal(dga_ui)
+	dga_ui._on_starter_pressed()
+	await _wait(1.3)
+	assert(Game.dga_engine_running, "Diesel should catch during hot start on ShSU-24")
+	dga_ui._on_toggle_ap50()
+	dga_ui._close()
+	Game.hud.close_modal()
+	assert(Game.power_on, "Power should be restored after ShSU-24 AP-50 breaker engage")
 	print("[test] Generator stall & restart mechanics fully verified!")
 
 	# Проверка свободного физического прохода через двери (выход из дома и вход в дизельную будку):

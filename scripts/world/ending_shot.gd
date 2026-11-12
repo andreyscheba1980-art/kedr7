@@ -57,6 +57,8 @@ func run(id: StringName) -> void:
 			await _evac_crawler()
 		&"mimic_trap":
 			await _mimic_trap()
+		&"mi8_escape":
+			await _mi8_escape()
 	await _coda(id)
 	await _fade_to(1.0, 1.2)
 	for n in _extra:
@@ -490,3 +492,71 @@ func _mimic_trap() -> void:
 	)
 	_caption(Loc.t(&"end.mimic_trap.cap"))
 	await _wait(4.5)
+
+
+func _mi8_escape() -> void:
+	_moon(0.45, 42.0)
+	var hp := Yard.HELIPAD
+	var heli: Node3D = null
+	if Game.yard != null:
+		heli = Game.yard.find_child("HeliNode", true, false) as Node3D
+	if heli == null:
+		heli = Node3D.new()
+		heli.position = hp
+		var hm := Props.mi8_helicopter()
+		heli.add_child(hm)
+		Game.level.add_child(heli)
+		_extra.append(heli)
+
+	var spot := heli.find_child("SearchlightSpot", true, false) as SpotLight3D
+	if spot == null:
+		spot = SpotLight3D.new()
+		spot.position = Vector3(0.0, 1.8, -3.5)
+		spot.light_color = Color(1.0, 0.96, 0.82)
+		spot.light_energy = 14.0
+		spot.spot_range = 48.0
+		spot.spot_angle = 32.0
+		heli.add_child(spot)
+		_extra.append(spot)
+		spot.look_at(Vector3(10.0, 1.5, 2.0), Vector3.UP)
+
+	var dust := heli.find_child("RotorDustGPUParticles", true, false) as CPUParticles3D
+	if dust != null:
+		dust.amount = 56
+		dust.emitting = true
+
+	# Неподвижный силуэт Ырки у калитки метеостанции, смотрящий в небо
+	var yrka_fig := Node3D.new()
+	yrka_fig.position = Vector3(17.5, 0.0, 5.2)
+	var torso := Geo.box_mesh(Vector3(0.45, 2.3, 0.3), Palette.m(&"dark"))
+	torso.position = Vector3(0, 1.15, 0)
+	yrka_fig.add_child(torso)
+	Game.level.add_child(yrka_fig)
+	_extra.append(yrka_fig)
+
+	# 1. 0.0s - 2.5s: Посадка по трапу внутрь грузовой кабины Ми-8
+	var ramp_p0 := hp + Vector3(-5.0, 1.1, 2.4)
+	var ramp_p1 := hp + Vector3(-1.8, 1.6, 0.4)
+	_fade_to(0.0, 0.9)
+	await _dolly(ramp_p0, ramp_p1, hp + Vector3(0.0, 1.5, -0.5), hp + Vector3(1.0, 1.6, 0.0), 2.5)
+	Game.audio.play_2d("res://assets/audio/door.ogg", 2.0)
+	_cam.fov = 60.0
+
+	# 2. 2.5s - 6.0s: Внешний ракурс у края площадки, отрыв от земли в снежном вихре
+	var ext_cam_pos := hp + Vector3(14.0, 1.8, -12.0)
+	var start_hp := heli.position
+	await _dolly(ext_cam_pos, ext_cam_pos + Vector3(1.5, 0.8, 1.0), start_hp + Vector3(0, 1.8, 0), start_hp + Vector3(0, 6.2, 0), 3.5, func(k: float) -> void:
+		var ease_k := smoothstep(0.0, 1.0, k)
+		heli.position = start_hp + Vector3(0.0, 4.8 * ease_k, 0.0)
+		heli.rotation_degrees.x = lerpf(0.0, -8.0, ease_k)
+	)
+
+	# 3. 6.0s - 11.5s: Вид из иллюминатора на удаляющуюся станцию, жаровни и фигуру у забора
+	var station_focus := Vector3(12.0, 1.2, 2.0)
+	_caption(Loc.t(&"end.mi8_escape.cap"))
+	await _dolly(heli.position + Vector3(1.4, 0.6, 0.0), hp + Vector3(8.0, 44.0, 38.0), station_focus, station_focus + Vector3(4.0, 0.0, 2.0), 5.5, func(k: float) -> void:
+		var lift := smoothstep(0.0, 1.0, k)
+		heli.position = start_hp + Vector3(6.5 * lift, lerpf(4.8, 46.0, lift), 36.0 * lift)
+		heli.rotation_degrees.x = lerpf(-8.0, -14.0, lift)
+	)
+	await _wait(1.2)

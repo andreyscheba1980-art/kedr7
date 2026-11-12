@@ -560,7 +560,7 @@ func _update_whiteout_disorientation(delta: float) -> void:
 	whiteout_intensity = move_toward(whiteout_intensity, target_whiteout, delta * 0.35)
 
 	# Залипание стрелки компаса Адрианова на морозе без встряхивания
-	if outside and Game.temp < -20.0:
+	if outside and Game.air_temp().x < -20.0:
 		if absf(compass_stuck) < 0.05 and randf() < delta * 0.035:
 			_drift_dir = -1.0 if randf() > 0.5 else 1.0
 			compass_stuck = _drift_dir * randf_range(0.35, 0.85)

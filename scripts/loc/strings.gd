@@ -2922,7 +2922,60 @@ The operator is not to be informed about the object.
 	&"end.mi8_escape.title": ["КОНЦОВКА: ПОЛЯРНАЯ АВИАЦИЯ СССР", "ENDING: SOVIET POLAR AVIATION"],
 	&"end.mi8_escape.1": ["Тяжёлая створка грузового отсека Ми-8 захлопнулась за твоей спиной. Запах керосина, горячего масла и тепло кабинного калорифера отрезали ледяную ночь.", "The heavy cargo door of the Mi-8 slammed shut behind you. The smell of kerosene, warm oil, and the cabin heater heat severed the freezing night."],
 	&"end.mi8_escape.2": ["Командир Савушкин прибавил шаг винта. Земля под колёсами ушла вниз. В иллюминаторе среди бурана остался лишь тусклый огонёк станции «Кедр-7»... и тонкий тёмный силуэт у калитки, запрокинувший голову в небо.", "Commander Savushkin pulled collective. The ground fell away. In the cabin porthole amidst the blizzard remained only the dim beacon of Kedr-7... and a slender dark silhouette at the gate, its head tilted back toward the sky."],
-	&"case.verdict.mi8_escape": ["Дежурный наблюдатель Мальцев успешно эвакуирован бортом Ми-8 СССР-22481. Журнал ТМ-1 и архивные кассеты доставлены в Ивдель.", "Duty observer Maltsev successfully evacuated aboard Mi-8 USSR-22481. TM-1 log and archive tapes delivered to Ivdel."]
+	&"case.verdict.mi8_escape": ["Дежурный наблюдатель Мальцев успешно эвакуирован бортом Ми-8 СССР-22481. Журнал ТМ-1 и архивные кассеты доставлены в Ивдель.", "Duty observer Maltsev successfully evacuated aboard Mi-8 USSR-22481. TM-1 log and archive tapes delivered to Ivdel."],
+
+	# --- Шов А: ДГА-24М и ЩСУ-24 ---
+	&"gen.inspect_prompt": ["[E] Осмотреть дизель 4Ч 10.5/13 (пуск — на щите ЩСУ-24 справа)", "[E] Inspect 4Ch 10.5/13 diesel (start on ShSU-24 switchboard right)"],
+	&"gen.status_inspect": ["ДГА-24М: топливо %d%% | блок %d°C | %s. Управление пуском — щит ЩСУ-24.", "DGA-24M: fuel %d%% | block %d°C | %s. Start controls on ShSU-24 switchboard."],
+	&"gen.filter_ok": ["ЭТФ-3 чистый", "ETF-3 clean"],
+	&"gen.filter_clogged": ["ЭТФ-3 запарафинен (требует слива!)", "ETF-3 clogged with paraffin (bleed needed!)"],
+	&"gen.etf3_clean": ["[Зажать E] Прочистить и слить отстой фильтра ЭТФ-3", "[Hold E] Bleed and clean ETF-3 fuel filter"],
+	&"gen.etf3_cleaned": ["Конденсат и парафин слиты из отстойника ЭТФ-3. Можно запускать на щите ЩСУ-24.", "Condensate and paraffin bled from ETF-3 sediment bowl. Ready to start on ShSU-24."],
+	&"dga24.err_no_fuel": ["Нет солярки в баке! Стартер крутит вхолостую. Залейте канистру в корпус дизеля.", "No diesel fuel in tank! Starter cranks dry. Refuel the diesel housing with a canister."],
+	&"dga24.err_filter_clogged": ["Фильтр ЭТФ-3 забит льдом/парафином! Осмотрите корпус ДГА-24М и слейте отстой.", "ETF-3 filter clogged with ice/paraffin! Bleed the sediment bowl on the diesel housing."],
+	&"dga24.story_hint": ["Режим «Повесть»: тумблеры готовы. Нажмите [5] Стартер СТ-721 и [7] Автомат АП-50.", "Story mode: switches ready. Press [5] Starter ST-721 then [7] Breaker AP-50."],
+	&"dga24.hot_hint": ["Дизель ещё тёплый (%d°C): быстрый пуск в 2 шага — [5] Стартер СТ-721, затем [7] Автомат АП-50.", "Engine still warm (%d°C): 2-click hot start — [5] Starter ST-721, then [7] Breaker AP-50."],
+	&"dga24.cold_hint": ["Холодный пуск (%d°C): ЭТФ-3 [6] → РНМ-1 [2] → ПЛ-64/СН-150 [1][4] → Декомп. [3] + СТ-721 [5] → АП-50 [7].", "Cold start (%d°C): ETF-3 [6] → RNM-1 [2] → PL-64/SN-150 [1][4] → Decomp [3] + ST-721 [5] → AP-50 [7]."],
+	&"dga24.paraffin_stall": ["На морозе -38°C фильтр ЭТФ-3 схватился парафином — АП-50 выбило, дизель заглох!", "In -38°C frost the ETF-3 filter clogged with paraffin — AP-50 tripped and the diesel stalled!"],
+
+	# --- Шов Б: Эвакуация Ми-8Т ---
+	&"radio.mi8_no_helipad": ["— Кедр-7, борт 22481: по докладу вертолётный крест завален снегом! Расчистите площадку!", "— Kedr-7, flight 22481: landing cross is buried in snow! Clear the helipad first!"],
+	&"radio.mi8_no_lights": ["— Кедр-7, идём по приборам в молоке! Зажгите 4 жаровни по периметру и магниевый факел ПСНД!", "— Kedr-7, flying blind on instruments! Light 4 fire-pots and the PSND magnesium flare!"],
+	&"radio.mi8_already_crashed": ["(В эфире на 3215 кГц только треск статики — борт СССР-22481 разбился за хребтом...)", "(Only static crackles on 3215 kHz — flight USSR-22481 went down behind the ridge...)"],
+	&"radio.mi8_departed": ["— Кедр-7, топливо на исходе, мы уходим на Ивдель! Ищите другой выход!", "— Kedr-7, bingo fuel, diverting to Ivdel! Find another way out!"],
+	&"radio.mi8_already_coming": ["— Кедр-7, подтверждаю посадку, держите створ открытым!", "— Kedr-7, landing confirmed, keep the approach lane clear!"],
+	&"radio.mi8_qfe_prompt": ["Передайте давление площадки (мм рт. ст. по барографу М-22А):", "Transmit pad pressure (mmHg from M-22A barograph):"],
+	&"radio.qfe_opt_clean": ["Давление площадки %d, полоса чистая, огни горят.", "Pad pressure %d, strip clear, perimeter fires lit."],
+	&"radio.qfe_opt_clear": ["Давление площадки %d, ветер северо-западный.", "Pad pressure %d, wind northwest."],
+	&"radio.qfe_opt_low_vis": ["Давление площадки %d, видимость менее ста.", "Pad pressure %d, visibility under one hundred."],
+	&"radio.mi8_approaching": ["— Кедр-7, давление %d принято! Выставляю ВД-10, заходим на огни! Расчётное время — 15 секунд.", "— Kedr-7, pressure %d copied! Setting VD-10, descending on your lights! Touchdown in 15 seconds."],
+	&"radio.mi8_crash_comms": ["— Высотомер врёт! Скала прямо по курсу—! (Глухой взрыв за северным гребнем и обрыв несущей)", "— Altimeter's wrong! Ridge dead ahead—! (A muffled explosion behind the northern ridge, dead carrier)"],
+	&"sub.mi8_landed": ["Ми-8Т СССР-22481 сел на площадку! Бегите к трапу, борт ждёт не дольше 3 минут!", "Mi-8T USSR-22481 touched down! Run to the ramp — crew can wait at most 3 minutes!"],
+	&"sub.mi8_departed": ["Борт СССР-22481 выработал резерв топлива и поднялся в метель без вас...", "Flight USSR-22481 hit reserve fuel limit and lifted off into the blizzard without you..."],
+	&"it.mi8_board_locked": ["Борт Ми-8Т ещё не на площадке", "Mi-8T is not on the pad yet"],
+	&"end.mi8_escape.cap": ["БОРТ СССР-22481 · ВЫСОТА 400 М · КУРС НА ИВДЕЛЬ", "FLIGHT USSR-22481 · ALTITUDE 400M · HEADING TO IVDEL"],
+
+	# --- Шов В: Штольня №4 (ШИ-11, СРП-68, СВ-20, гипоксия) ---
+	&"it.shi11_pickup": ["[E] Взять переносной интерферометр ШИ-11 для замеров в забое", "[E] Pick up portable SHI-11 interferometer for adit measurements"],
+	&"sub.shi11_picked": ["ШИ-11 взят. Снимите показания на замерных пикетах в среднем штреке и у забоя.", "SHI-11 picked up. Take readings at the survey pickets in mid-drift and the deep face."],
+	&"it.shi11_picket": ["[E] Снять замер интерферометром ШИ-11 (Пикет %d)", "[E] Take SHI-11 interferometer reading (Picket %d)"],
+	&"mine.shi11_picket1": ["ШИ-11 (Пикет 1, вход): CH4 0.2%, CO2 0.4%. Полосы ровные — прибор исправен.", "SHI-11 (Picket 1, entry): CH4 0.2%, CO2 0.4%. Fringes sharp — instrument calibrated."],
+	&"mine.shi11_picket2": ["УЛИКА В ТМ-1: Смещение спектра на пикете 2 вызвано не газом, а стоячей волной 7 Гц из забоя.", "EVIDENCE IN TM-1: Spectrum drift at picket 2 is caused not by gas, but a 7 Hz standing wave."],
+	&"mine.shi11_picket3": ["УЛИКА В ТМ-1: Полосы ШИ-11 у забоя сошлись в вертикальный зрачок! Аномальное преломление зафиксировано.", "EVIDENCE IN TM-1: SHI-11 fringes at the face warped into a slit pupil! Anomalous refraction logged."],
+	&"mine.core_rack_once": ["УЛИКА В ТМ-1: Керны глубины -40 м полые и резонируют при бурении — порода скрывает полость.", "EVIDENCE IN TM-1: Cores from -40m are hollow and resonate — the rock hides a chamber."],
+	&"mine.core_rack_repeat": ["Ящики керна экспедиции Дубова: диаметр 59 мм, пометка СКВ-4.", "Dubov expedition core boxes: 59mm gabbro-magnetite, marked SKV-4."],
+	&"mine.srp68_once": ["УЛИКА В ТМ-1: Гамма-фон 8 мкР/ч (ниже нормы!). Авария 1979 г. была не радиационной, а электромагнитной.", "EVIDENCE IN TM-1: Gamma 8 uR/h (below background!). The 1979 incident was electromagnetic, not nuclear."],
+	&"mine.srp68_repeat": ["СРП-68-01: 8 мкР/ч, периодические наводки от импульсов в забое.", "SRP-68-01: 8 uR/h, intermittent EM spikes from the deep face."],
+	&"mine.sv20_filter_on": ["Подключён самоспасатель и шлем СВ-20: запас чистого воздуха в забое увеличен.", "Self-rescuer and SV-20 headset engaged: breathable air time in deep face extended."],
+	&"mine.hypoxia_warn": ["ДУХОТА! Концентрация CO2 критическая — срочно вернитесь к вентиляции у входа!", "SUFFOCATION! Critical CO2 buildup — return toward the adit entrance immediately!"],
+	&"mine.hypoxia_passout": ["Вы потеряли сознание от нехватки кислорода в забое и очнулись в доме (+1 час).", "You blacked out from hypoxia in the adit and came to back in the cabin (+1 hour)."],
+
+	# --- Шов Г: Динамический статус смены в ТМ-1 ---
+	&"objective.restore_power": ["ПРИОРИТЕТ: АВАРИЯ ПИТАНИЯ — проверьте топливо ДГА-24М и включите щит ЩСУ-24.", "PRIORITY: POWER OUTAGE — check DGA-24M fuel and engage ShSU-24 switchboard."],
+	&"objective.take_readings": ["СРОК НАБЛЮДЕНИЯ: Снимите показания (метеобудка, барограф М-22А, ветер М-63, снег).", "OBSERVATION DUE: Take readings (shelter thermometers, M-22A barograph, wind, snow)."],
+	&"objective.send_report": ["СВОДКА ГОТОВА: Передайте метеосводку по телетайпу или рации (6880 кГц).", "REPORT READY: Transmit synoptic report via radio (6880 kHz)."],
+	&"objective.evac_prep": ["ЭВАКУАЦИЯ МИ-8: Жаровни (%d/4) · Факел ПСНД (%d/1) · Связь 3215 кГц с бортом 22481.", "MI-8 EVAC: Fire-pots (%d/4) · PSND flare (%d/1) · Radio Savushkin on 3215 kHz."],
+	&"objective.await_next_shift": ["Дежурство по графику. Поддерживайте печь и следите за эфиром до следующей сводки.", "Watch on schedule. Keep the stove fed and monitor radio until next observation."]
 }
 
 

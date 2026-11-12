@@ -279,6 +279,7 @@ func _process(delta: float) -> void:
 	# Уличные кошмары: появление сущностей и пугающая атмосфера в тайге
 	_process_outdoor_horror(delta)
 	_process_snow_survey_stalking(delta)
+	_process_mi8_helipad(delta)
 
 	if _pilot_balloon_node != null and is_instance_valid(_pilot_balloon_node):
 		_pilot_balloon_node.position += Vector3(0.32 * delta, 0.72 * delta, -0.22 * delta)
@@ -4036,6 +4037,12 @@ var _helipad_drift: Interactable
 var _heli_node: Node3D
 var _heli_audio: AudioStreamPlayer3D
 var _heli_crate_it: Interactable
+var _heli_evac_it: Interactable
+var _heli_searchlight: SpotLight3D
+var _heli_dust: CPUParticles3D
+var _mi8_crash_fx_done := false
+var _mi8_crash_timer := -1.0
+var _mi8_supply_flyby_done := false
 
 
 func _build_helipad() -> void:
@@ -4067,52 +4074,49 @@ func _build_helipad() -> void:
 	var cross_b := Geo.box_mesh(Vector3(1.2, 0.04, 8.0), Palette.m(&"wood"))
 	cross_b.position = HELIPAD + Vector3(0, 0.02, 0)
 	add_child(cross_b)
-	# Под сугробом креста не видно — края торчали сквозь снег и мерцали
 	cross_a.visible = Game.helipad_cleared
 	cross_b.visible = Game.helipad_cleared
 
-	# 3. Сугроб над крестом вертодрома — пологий намёт, как остальные сугробы двора (была коробка с углами)
-	if Game.helipad_cleared:
-		_build_helipad_heli()
-		return
-	var mound := Props.snow_mound_mesh(2)
-	var drift_mesh := MeshInstance3D.new()
-	drift_mesh.mesh = mound
-	drift_mesh.material_override = Palette.m(&"drift")
-	drift_mesh.position = HELIPAD + Vector3(0, -0.12, 0)
-	drift_mesh.scale = Vector3(3.6, 0.42, 3.4)
-	add_child(drift_mesh)
-	# Намёт неровный: пара перемётов сверху — в осях сугроба (гаснут вместе с ним)
-	for e: Array in [[Vector3(0.35, 0.55, -0.2), Vector3(0.45, 0.6, 0.35)], [Vector3(-0.3, 0.5, 0.3), Vector3(0.4, 0.55, 0.3)], [Vector3(0.05, 0.62, 0.05), Vector3(0.3, 0.5, 0.45)]]:
-		var lump := MeshInstance3D.new()
-		lump.mesh = mound
-		lump.material_override = Palette.m(&"drift")
-		lump.position = e[0]
-		lump.scale = e[1]
-		drift_mesh.add_child(lump)
+	# 3. Сугроб над крестом вертодрома (только пока не расчищено)
+	if not Game.helipad_cleared:
+		var mound := Props.snow_mound_mesh(2)
+		var drift_mesh := MeshInstance3D.new()
+		drift_mesh.mesh = mound
+		drift_mesh.material_override = Palette.m(&"drift")
+		drift_mesh.position = HELIPAD + Vector3(0, -0.12, 0)
+		drift_mesh.scale = Vector3(3.6, 0.42, 3.4)
+		add_child(drift_mesh)
+		for e: Array in [[Vector3(0.35, 0.55, -0.2), Vector3(0.45, 0.6, 0.35)], [Vector3(-0.3, 0.5, 0.3), Vector3(0.4, 0.55, 0.3)], [Vector3(0.05, 0.62, 0.05), Vector3(0.3, 0.5, 0.45)]]:
+			var lump := MeshInstance3D.new()
+			lump.mesh = mound
+			lump.material_override = Palette.m(&"drift")
+			lump.position = e[0]
+			lump.scale = e[1]
+			drift_mesh.add_child(lump)
 
-	var drift_it := Geo.interactable(self, Vector3(6.4, 0.7, 6.0), HELIPAD + Vector3(0, 0.35, 0), null, "", func(_p: Player) -> void:
-		Game.helipad_cleared = true
-		drift_mesh.visible = false
-		cross_a.visible = true
-		cross_b.visible = true
-		Game.hud.subtitle(Loc.t(&"sub.helipad_ready"), 4.0)
-		Game.audio.play_3d("res://assets/audio/snow_fall.ogg", HELIPAD, 0.0)
-		# Расчищенный сугроб больше не стена: невидимая коробка 6×6 м закрывала вертолёт и его ящик
-		_helipad_drift.collision_layer = 0
-	)
-	drift_it.prompt_provider = func() -> String:
-		return "" if Game.helipad_cleared else Loc.t(&"task.helipad_prep")
-	_helipad_drift = drift_it
-	_build_helipad_heli()
+		var drift_it := Geo.interactable(self, Vector3(6.4, 0.7, 6.0), HELIPAD + Vector3(0, 0.35, 0), null, "", func(_p: Player) -> void:
+			Game.helipad_cleared = true
+			drift_mesh.visible = false
+			cross_a.visible = true
+			cross_b.visible = true
+			Game.hud.subtitle(Loc.t(&"sub.helipad_ready"), 4.0)
+			Game.audio.play_3d("res://assets/audio/snow_fall.ogg", HELIPAD, 0.0)
+			_helipad_drift.collision_layer = 0
+			_build_helipad_heli()
+		)
+		drift_it.prompt_provider = func() -> String:
+			return "" if Game.helipad_cleared else Loc.t(&"task.helipad_prep")
+		_helipad_drift = drift_it
 
-	# 4 посадочные жаровни вертодрома: посадочный треугольник + хвостовой костёр
+	# 4. Посадочные жаровни (всегда строятся, даже если крест уже расчищен в прошлой смене!)
 	var pot_offsets: Array[Vector3] = [
 		Vector3(0.0, 0.0, -5.5),
 		Vector3(-4.5, 0.0, 3.5),
 		Vector3(4.5, 0.0, 3.5),
 		Vector3(0.0, 0.0, 7.5)
 	]
+	var saved_pots_all := bool(SaveGame.flags.get("helipad_pots_all_lit", false))
+	var saved_pots_cnt := int(SaveGame.flags.get("helipad_firepots_lit_count", 0))
 	for p_idx in range(4):
 		var pot_pos := HELIPAD + pot_offsets[p_idx]
 		var pot := Props.helipad_firepot()
@@ -4122,7 +4126,7 @@ func _build_helipad() -> void:
 		var pot_light := OmniLight3D.new()
 		pot_light.position = pot_pos + Vector3(0, 0.45, 0)
 		pot_light.light_color = Color(1.0, 0.62, 0.22)
-		pot_light.light_energy = 0.0
+		pot_light.light_energy = 3.5 if (saved_pots_all or p_idx < saved_pots_cnt) else 0.0
 		pot_light.omni_range = 14.0
 		pot_light.shadow_enabled = false
 		add_child(pot_light)
@@ -4132,35 +4136,37 @@ func _build_helipad() -> void:
 				return
 			pot_light.light_energy = 3.5
 			var cur_lit := int(SaveGame.flags.get("helipad_firepots_lit_count", 0)) + 1
-			SaveGame.flags["helipad_firepots_lit_count"] = cur_lit
+			SaveGame.flags["helipad_firepots_lit_count"] = mini(cur_lit, 4)
 			AudioDirector.play_raw("res://assets/audio/stove_add.ogg", 0.0)
 			Game.audio.play_3d("res://assets/audio/stove_add.ogg", pot_pos, 0.0, 15.0)
 			if cur_lit >= 4:
 				SaveGame.flags["helipad_pots_all_lit"] = true
 				Game.hud.subtitle(Loc.t(&"it.helipad_pots_lit"), 4.5)
+			SaveGame.write()
 		)
 		it_pot.prompt_provider = func() -> String:
 			if pot_light.light_energy > 0.1:
 				return ""
 			var cur := int(SaveGame.flags.get("helipad_firepots_lit_count", 0)) + 1
-			return Loc.t(&"it.helipad_firepot", [cur])
+			return Loc.t(&"it.helipad_firepot", [mini(cur, 4)])
 		it_pot.name = "FirePot_%d" % p_idx
 
-	# Патрон сигнальный ночной/дневной ПСНД (магниевый красный огонь 20 000 свечей)
+	# 5. Патрон сигнальный ночной/дневной ПСНД (магниевый красный огонь 20 000 свечей)
 	var psnd := Props.psnd_flare()
 	var psnd_pos := HELIPAD + Vector3(-5.2, 0.35, -4.8)
 	psnd.position = psnd_pos
 	add_child(psnd)
 
+	var psnd_lit_saved := bool(SaveGame.flags.get("psnd_flare_lit", false))
 	var psnd_light := OmniLight3D.new()
 	psnd_light.position = psnd_pos + Vector3(0, 0.5, 0)
 	psnd_light.light_color = Color(1.0, 0.12, 0.12)
-	psnd_light.light_energy = 0.0
+	psnd_light.light_energy = 16.0 if psnd_lit_saved else 0.0
 	psnd_light.omni_range = 28.0
 	psnd_light.shadow_enabled = true
 	add_child(psnd_light)
 
-	var it_psnd := Geo.interactable(self, Vector3(0.8, 0.8, 0.8), psnd_pos, null, Loc.t(&"it.psnd_flare_use"), func(_p: Player) -> void:
+	var it_psnd := Geo.interactable(self, Vector3(0.8, 0.8, 0.8), psnd_pos, null, "", func(_p: Player) -> void:
 		if psnd_light.light_energy > 0.1:
 			return
 		psnd_light.light_energy = 16.0
@@ -4169,70 +4175,190 @@ func _build_helipad() -> void:
 		Game.audio.play_3d("res://assets/audio/flare.ogg", psnd_pos, 4.0, 35.0)
 		Game.hud.subtitle(Loc.t(&"sub.psnd_flare_blinding"), 5.5)
 		Game.hud.flash_red(0.4, 0.6)
+		SaveGame.write()
 	)
+	it_psnd.prompt_provider = func() -> String:
+		return "" if psnd_light.light_energy > 0.1 else Loc.t(&"it.psnd_flare_use")
 	it_psnd.name = "PSNDFlare"
 
-	# Измеритель ВНГО ИВО-1М у метеоплощадки
+	# 6. Измеритель ВНГО ИВО-1М и щит видимости М-37
 	var ivo := Props.ivo1m_cloudmeter()
 	ivo.position = PLOT + Vector3(5.5, 0.0, 3.2)
 	add_child(ivo)
 	var it_ivo := Geo.interactable(self, Vector3(1.0, 1.4, 1.0), PLOT + Vector3(5.5, 0.7, 3.2), null, "", func(_p: Player) -> void:
 		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
-		Game.hud.subtitle(Loc.t(&"it.ivo1m_inspect", ["ВНГО = 180 м (Низкая слоисто-дождевая облачность)"]), 4.5)
+		Game.hud.subtitle(Loc.t(&"it.ivo1m_inspect", ["180 м"]), 4.5)
 	)
 	it_ivo.prompt_provider = func() -> String: return Loc.t(&"it.ivo1m_inspect", ["180 м"])
 	it_ivo.name = "IVO1M_Meter"
 
-	# Щит видимости М-37 на границе двора
 	var m37 := Props.m37_visibility_shield()
 	m37.position = PLOT + Vector3(-22.0, 0.0, 16.0)
 	add_child(m37)
 	var it_m37 := Geo.interactable(self, Vector3(1.5, 2.0, 0.8), PLOT + Vector3(-22.0, 1.0, 16.0), null, "", func(_p: Player) -> void:
 		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
-		Game.hud.subtitle(Loc.t(&"it.m37_inspect", ["Метеорологическая дальность видимости = 800 м"]), 4.5)
+		Game.hud.subtitle(Loc.t(&"it.m37_inspect", ["800 м"]), 4.5)
 	)
 	it_m37.prompt_provider = func() -> String: return Loc.t(&"it.m37_inspect", ["800 м"])
 	it_m37.name = "M37_Shield"
 
+	_build_helipad_heli()
+
 
 func _build_helipad_heli() -> void:
-	# 4. Появление вертолёта Ми-8 снабжения и эвакуации (Ночь 5 или День 5)
-	if Game.night >= 5 and Game.helipad_cleared:
-		_heli_node = Node3D.new()
-		_heli_node.position = HELIPAD
-		add_child(_heli_node)
-
-		var heli_mesh := Props.mi8_helicopter()
-		_heli_node.add_child(heli_mesh)
-
-		_heli_audio = AudioStreamPlayer3D.new()
-		_heli_audio.stream = AudioDirector.cached_stream("res://assets/audio/engine_loop.ogg")
-		_heli_audio.unit_size = 6.0
-		_heli_audio.max_distance = 60.0
-		_heli_audio.volume_db = -4.0
-		_heli_audio.bus = &"SFX"
-		_heli_audio.autoplay = true
-		_heli_node.add_child(_heli_audio)
-
-		# Сброшенный ящик снабжения
-		var crate_model := Props.supply_crate()
-		crate_model.position = Vector3(2.6, 0, 1.2)
-		_heli_node.add_child(crate_model)
-
-		_heli_crate_it = Geo.interactable(_heli_node, Vector3(1.2, 1.0, 1.2), Vector3(2.6, 0.5, 1.2), null, Loc.t(&"it.heli_crate"), func(_p: Player) -> void:
-			Game.flares += 4
-			Game.canisters_left += 1
-			Game.vibrate(0.4, 0.2, 0.25)
-			Game.hud.subtitle(Loc.t(&"sub.heli_keeper"), 5.0)
-			_heli_crate_it.queue_free()
-		)
-
-		# Трап эвакуации на борт Ми-8 (активен на 7-й смене)
-		if Game.night == 7:
-			var evac_it := Geo.interactable(_heli_node, Vector3(2.5, 2.0, 2.5), Vector3(-1.8, 0.8, 0.0), null, Loc.t(&"it.mi8_board"), func(_p: Player) -> void:
-				EventBus.ending_chosen.emit(&"mi8_escape")
+	# Ночи 1–4: вертолётная логика неактивна
+	if Game.night < 5:
+		return
+	# Ночи 5–6: пролётный сброс снабжения без припаркованного вертолёта на земле
+	if Game.night in [5, 6]:
+		if Game.helipad_cleared and not Game.has_flag("supply_drop_collected") and _heli_crate_it == null:
+			var crate_root := Node3D.new()
+			crate_root.name = "SupplyCrate_Parachute"
+			crate_root.position = HELIPAD
+			add_child(crate_root)
+			var crate_model := Props.supply_crate()
+			crate_model.position = Vector3(2.6, 0.0, 1.2)
+			crate_root.add_child(crate_model)
+			_heli_crate_it = Geo.interactable(crate_root, Vector3(1.2, 1.0, 1.2), Vector3(2.6, 0.5, 1.2), null, Loc.t(&"it.heli_crate"), func(_p: Player) -> void:
+				Game.flares += 4
+				Game.canisters_left += 1
+				Game.set_flag("supply_drop_collected", true)
+				Game.vibrate(0.4, 0.2, 0.25)
+				Game.hud.subtitle(Loc.t(&"sub.heli_keeper"), 5.0)
+				crate_root.queue_free()
+				_heli_crate_it = null
 			)
-			evac_it.name = "Mi8EvacRamp"
+		return
+	# Ночь 7: меш Ми-8Т спавнится ТОЛЬКО когда mi8_state переходит в HOVER_LANDING / LANDED_WAITING
+	if Game.night >= 7 and (Game.mi8_state == Game.Mi8State.HOVER_LANDING or Game.mi8_state == Game.Mi8State.LANDED_WAITING):
+		_spawn_night7_mi8_actor()
+
+
+func _spawn_night7_mi8_actor() -> void:
+	if _heli_node != null and is_instance_valid(_heli_node):
+		return
+	_heli_node = Node3D.new()
+	_heli_node.name = "HeliNode"
+	_heli_node.position = HELIPAD + (Vector3(0, 14.0, 0) if Game.mi8_state == Game.Mi8State.HOVER_LANDING else Vector3.ZERO)
+	add_child(_heli_node)
+
+	var heli_mesh := Props.mi8_helicopter()
+	_heli_node.add_child(heli_mesh)
+
+	_heli_searchlight = SpotLight3D.new()
+	_heli_searchlight.name = "SearchlightSpot"
+	_heli_searchlight.position = Vector3(0.0, 1.8, -3.5)
+	_heli_searchlight.light_color = Color(1.0, 0.96, 0.82)
+	_heli_searchlight.light_energy = 12.0
+	_heli_searchlight.spot_range = 42.0
+	_heli_searchlight.spot_angle = 32.0
+	_heli_node.add_child(_heli_searchlight)
+	_heli_searchlight.look_at(HELIPAD + Vector3(0, 0.2, -12.0), Vector3.UP)
+
+	_heli_dust = CPUParticles3D.new()
+	_heli_dust.name = "RotorDustGPUParticles"
+	_heli_dust.amount = 28
+	_heli_dust.lifetime = 1.4
+	_heli_dust.direction = Vector3(0, 0.2, 1.0)
+	_heli_dust.spread = 180.0
+	_heli_dust.initial_velocity_min = 4.0
+	_heli_dust.initial_velocity_max = 9.0
+	var dm := QuadMesh.new()
+	dm.size = Vector2(0.8, 0.8)
+	dm.material = Player.puff_material(0.35)
+	_heli_dust.mesh = dm
+	_heli_dust.position = Vector3(0, 0.4, 0)
+	_heli_node.add_child(_heli_dust)
+
+	_heli_audio = AudioStreamPlayer3D.new()
+	_heli_audio.stream = AudioDirector.cached_stream("res://assets/audio/engine_loop.ogg")
+	_heli_audio.unit_size = 7.0
+	_heli_audio.max_distance = 85.0
+	_heli_audio.volume_db = -2.0
+	_heli_audio.pitch_scale = 1.12
+	_heli_audio.bus = &"SFX"
+	_heli_audio.autoplay = true
+	_heli_node.add_child(_heli_audio)
+
+	_heli_evac_it = Geo.interactable(_heli_node, Vector3(2.5, 2.0, 2.5), Vector3(-1.8, 0.8, 0.0), null, "", func(_p: Player) -> void:
+		if Game.mi8_state != Game.Mi8State.LANDED_WAITING:
+			Game.hud.subtitle(Loc.t(&"it.mi8_board_locked"), 2.5)
+			return
+		EventBus.ending_chosen.emit(&"mi8_escape")
+	)
+	_heli_evac_it.prompt_provider = func() -> String:
+		return Loc.t(&"it.mi8_board") if Game.mi8_state == Game.Mi8State.LANDED_WAITING else Loc.t(&"it.mi8_board_locked")
+	_heli_evac_it.name = "Mi8EvacRamp"
+
+
+func schedule_mi8_crash() -> void:
+	_mi8_crash_timer = 10.0
+	_mi8_crash_fx_done = false
+
+
+func _process_mi8_helipad(delta: float) -> void:
+	if Game.night in [5, 6] and Game.helipad_cleared and not _mi8_supply_flyby_done and Game.is_outside() and not Game.has_flag("supply_drop_collected"):
+		_mi8_supply_flyby_done = true
+		Game.audio.play_3d("res://assets/audio/engine_loop.ogg", HELIPAD + Vector3(0, 28.0, 0), -6.0, 90.0)
+	if Game.night < 7:
+		return
+
+	match Game.mi8_state:
+		Game.Mi8State.APPROACHING:
+			Game.mi8_state_timer -= delta
+			if Game.mi8_state_timer <= 0.0:
+				Game.mi8_state = Game.Mi8State.HOVER_LANDING
+				Game.mi8_state_timer = 8.0
+				_spawn_night7_mi8_actor()
+		Game.Mi8State.HOVER_LANDING:
+			_spawn_night7_mi8_actor()
+			Game.mi8_state_timer -= delta
+			if _heli_node != null and is_instance_valid(_heli_node):
+				var frac := clampf(1.0 - (Game.mi8_state_timer / 8.0), 0.0, 1.0)
+				_heli_node.position = HELIPAD + Vector3(0, lerpf(14.0, 0.0, smoothstep(0.0, 1.0, frac)), 0)
+			if Game.mi8_state_timer <= 0.0:
+				Game.mi8_state = Game.Mi8State.LANDED_WAITING
+				Game.mi8_state_timer = 180.0
+				if _heli_node != null and is_instance_valid(_heli_node):
+					_heli_node.position = HELIPAD
+				if Game.hud != null:
+					Game.hud.subtitle(Loc.t(&"sub.mi8_landed"), 7.0)
+		Game.Mi8State.LANDED_WAITING:
+			Game.mi8_state_timer -= delta
+			if Game.mi8_state_timer <= 0.0:
+				Game.mi8_state = Game.Mi8State.DEPARTED
+				if _heli_node != null and is_instance_valid(_heli_node):
+					var tw := _heli_node.create_tween()
+					tw.tween_property(_heli_node, "position", HELIPAD + Vector3(0, 42.0, 50.0), 6.0)
+					tw.tween_callback(_heli_node.queue_free)
+				if Game.hud != null:
+					Game.hud.subtitle(Loc.t(&"sub.mi8_departed"), 6.5)
+		Game.Mi8State.CRASHED:
+			if not _mi8_crash_fx_done and _mi8_crash_timer > 0.0:
+				_mi8_crash_timer -= delta
+				if _mi8_crash_timer <= 0.0:
+					_play_mi8_crash_fx()
+
+
+func _play_mi8_crash_fx() -> void:
+	_mi8_crash_fx_done = true
+	var crash_pos := HELIPAD + Vector3(0.0, 4.0, -58.0)
+	Game.audio.play_2d("res://assets/audio/flare.ogg", 5.0)
+	Game.audio.play_2d("res://assets/audio/clank.ogg", 4.0)
+	Game.audio.play_3d("res://assets/audio/generator_sputter.ogg", crash_pos, 4.0, 110.0)
+	if Game.player != null:
+		Game.player.shake(0.18, 1.8)
+	if Game.hud != null:
+		Game.hud.flash_red(0.6, 0.8)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_crash_comms"), 8.0, 2)
+	var fire_glow := OmniLight3D.new()
+	fire_glow.position = crash_pos + Vector3(0, 5.0, 0)
+	fire_glow.light_color = Color(1.0, 0.28, 0.05)
+	fire_glow.light_energy = 14.0
+	fire_glow.omni_range = 75.0
+	fire_glow.shadow_enabled = false
+	add_child(fire_glow)
+	Director.add_tension(35.0, "крушение Ми-8 за северным гребнем")
 
 
 # --- Обустройство дороги от дома к метеокорпусу (Station Road Dressing) -------

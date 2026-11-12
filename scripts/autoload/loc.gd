@@ -28,7 +28,9 @@ func t(key: StringName, args: Array = []) -> String:
 		push_warning("Loc: нет строки '%s'" % key)
 		return String(key)
 	var pair: Array = entry
-	var s: String = pair[_idx] if _idx < pair.size() else pair[0]
+	var s: String = String(pair[_idx]) if _idx < pair.size() else ""
+	if s == "" and pair.size() > 0:
+		s = String(pair[0])
 	s = s if args.is_empty() else s % args
 	if not Settings.keybinds.is_empty() and s.contains("["):
 		s = _real_keys(s)

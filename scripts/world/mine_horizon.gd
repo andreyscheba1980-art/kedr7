@@ -17,7 +17,9 @@ var _surface: Vector3
 var _drip_t := 3.0
 var _creak_t := 9.0
 var _scared := {}
-var _co2_timer := 0.0
+var _hypoxia := 0.0
+var _hypoxia_warned := false
+var _shi11_node: Node3D = null
 var _rustle_t := 0.0
 var _valenki_active := false
 var _valenki_event_done := false
@@ -214,37 +216,58 @@ func _build_inside() -> void:
 	add_child(cb79)
 
 	var it_rack := Geo.interactable(self, Vector3(1.4, 1.2, 1.4), ROOT + Vector3(16.5, 0.7, -15.5), null, Loc.t(&"it.adit_core_rack"), func(_p: Player) -> void:
-		Game.hud.show_note(Loc.t(&"note.adit_core_anomaly"))
-		Director.add_tension(10.0, "осмотр аномального керна в штольне")
-		SaveGame.write())
+		_on_mine_object_used(&"core_rack", 6.0, &"core_acoustic_cavities", "mine.core_rack", Loc.t(&"note.adit_core_anomaly")))
 	it_rack.name = "AditCoreRack"
 
-	# Шахтный оптический интерферометр ШИ-11 на верстаке у ствола
-	var shi11 := Props.shi11_interferometer()
-	shi11.position = ROOT + Vector3(1.2, 0.75, -5.5)
-	add_child(shi11)
-	var it_shi := Geo.interactable(self, Vector3(0.6, 0.5, 0.6), ROOT + Vector3(1.2, 0.75, -5.5), null, Loc.t(&"it.shi11_interferometer"), func(_p: Player) -> void:
+	# Переносной интерферометр ШИ-11: можно снять замер на входе или взять в забой на пикеты 2 и 3
+	_shi11_node = Props.shi11_interferometer()
+	_shi11_node.position = ROOT + Vector3(1.2, 0.75, -5.5)
+	add_child(_shi11_node)
+	var it_shi := Geo.interactable(self, Vector3(0.6, 0.5, 0.6), ROOT + Vector3(1.2, 0.75, -5.5), null, "", func(_p: Player) -> void:
+		if not Game.has_shi11_in_mine:
+			Game.has_shi11_in_mine = true
+			_shi11_node.visible = false
+			AudioDirector.play_raw("res://assets/audio/clank.ogg", -4.0)
+			Game.hud.subtitle(Loc.t(&"sub.shi11_picked"), 4.5)
 		EventBus.ui_requested.emit(&"interferometer")
 	)
+	it_shi.prompt_provider = func() -> String:
+		return Loc.t(&"it.shi11_picket", [1]) if Game.has_shi11_in_mine else Loc.t(&"it.shi11_pickup")
 	it_shi.name = "MineSHI11"
 
-	# Радиометр СРП-68-01 с зондом БДГ-1 около кернохранилища
+	# Пикеты 2 и 3 для замера переносным ШИ-11 в среднем штреке и глубоком забое
+	for picket_def: Array in [[2, Vector3(0.4, 0.9, -24.0)], [3, Vector3(-0.4, 0.9, -41.5)]]:
+		var pk_idx: int = int(picket_def[0])
+		var pk_pos: Vector3 = ROOT + picket_def[1]
+		var it_pk := Geo.interactable(self, Vector3(1.1, 1.2, 1.1), pk_pos, null, "", func(_p: Player) -> void:
+			if not Game.has_shi11_in_mine:
+				Game.hud.subtitle(Loc.t(&"it.shi11_pickup"), 3.0)
+				return
+			EventBus.ui_requested.emit(&"interferometer")
+		)
+		it_pk.prompt_provider = func() -> String:
+			return Loc.t(&"it.shi11_picket", [pk_idx]) if Game.has_shi11_in_mine else ""
+		it_pk.name = "MinePicket_%d" % pk_idx
+
+	# Радиометр СРП-68-01 с зондом БДГ-1 около кернохранилища (одноразовая улика, без спама)
 	var srp := Props.srp68_radiometer()
 	srp.position = ROOT + Vector3(15.2, 0.65, -15.2)
 	add_child(srp)
 	var it_srp := Geo.interactable(self, Vector3(0.6, 0.5, 0.6), ROOT + Vector3(15.2, 0.65, -15.2), null, Loc.t(&"it.srp68_inspect"), func(_p: Player) -> void:
 		AudioDirector.play_raw("res://assets/audio/clank.ogg", -4.0)
-		AudioDirector.play_raw("res://assets/audio/radio_anomaly.ogg", 0.0)
-		Game.hud.subtitle(Loc.t(&"srp68.reading_spike"), 5.5)
-		Director.add_tension(12.0, "зашкал радиометра СРП-68-01")
+		AudioDirector.play_raw("res://assets/audio/radio_anomaly.ogg", -2.0)
+		_on_mine_object_used(&"srp68", 5.0, &"srp68_zero_gamma", "mine.srp68")
 	)
 	it_srp.name = "MineSRP68"
 
-	# Сейсмоприёмник СВ-20, вбитый штырём в скалу основного штрека
+	# Сейсмоприёмник СВ-20 + шахтный самоспасатель (снижает темп удушья CO2 в забое)
 	var sv20 := Props.sv20_geophone()
 	sv20.position = ROOT + Vector3(-1.1, 0.35, -20.0)
 	add_child(sv20)
 	var it_sv := Geo.interactable(self, Vector3(0.5, 0.5, 0.5), ROOT + Vector3(-1.1, 0.35, -20.0), null, Loc.t(&"it.sv20_listen"), func(_p: Player) -> void:
+		if not Game.mine_air_filter_active:
+			Game.mine_air_filter_active = true
+			Game.hud.subtitle(Loc.t(&"mine.sv20_filter_on"), 4.5)
 		EventBus.ui_requested.emit(&"seismograph")
 	)
 	it_sv.name = "MineSV20"
@@ -310,15 +333,32 @@ func _on_cache(_p: Player) -> void:
 	SaveGame.write()
 
 
+func _on_mine_object_used(obj_id: StringName, tension_once: float, evidence_id: StringName, msg_key: String, note_text := "") -> void:
+	var insp := Game.mine_inspected
+	var sid := String(obj_id)
+	if not bool(insp.get(sid, false)):
+		insp[sid] = true
+		Game.mine_inspected = insp
+		if tension_once > 0.0:
+			Director.add_tension(tension_once, "улика в штольне: " + sid)
+		Game.add_evidence(evidence_id)
+		if note_text != "":
+			Game.hud.show_note(note_text)
+		Game.hud.subtitle(Loc.t(StringName(msg_key + "_once")), 6.0)
+	else:
+		Game.hud.subtitle(Loc.t(StringName(msg_key + "_repeat")), 4.0)
+
+
 func _process(delta: float) -> void:
 	if Game.player == null or not zone_has(Game.player.global_position):
 		if Game.player != null and not is_nan(Game.player.yaw_limit_base):
 			Game.player.yaw_limit_base = NAN
+		_hypoxia = move_toward(_hypoxia, 0.0, 10.0 * delta)
 		return
 	var pp := Game.player.global_position
 	var local := pp - ROOT
 
-	# 1. Ночь 3: Просадка потолка до 1.45м, шарканье брезента рюкзака и гипоксия от CO2
+	# 1. Просадка потолка в штреке и независимая от Director шкала гипоксии CO2 (_hypoxia 0..100)
 	var in_deep_adit := local.z < -15.0
 	if Game.night >= 3 and in_deep_adit:
 		Game.player.target_head_y = 1.15
@@ -328,35 +368,48 @@ func _process(delta: float) -> void:
 			if _rustle_t <= 0.0:
 				_rustle_t = randf_range(1.8, 3.5)
 				Game.audio.play_3d("res://assets/sfx/cc0/coat_rustle.ogg", pp + Vector3(0, 0.3, 0), -4.0, 6.0)
-
-		# Накопление «мертвого воздуха» (CO2)
-		_co2_timer += delta
-		var co2_factor := clampf(1.0 - (_co2_timer / 90.0), 0.08, 1.0)
-		if _lbvk_flame_light != null:
-			if local.z < -39.0 or Game.yrka_nearby:
-				# Аномалия «Отзвук» / Ырка: неестественное фиолетово-зелёное пламя
-				_lbvk_flame_light.light_color = Color(0.45, 0.15, 0.92)
-				_lbvk_flame_light.light_energy = 1.6 + 0.3 * sin(_co2_timer * 8.0)
-			else:
-				_lbvk_flame_light.light_energy = 1.2 * co2_factor
-				_lbvk_flame_light.light_color = Color(1.0, 0.8 * co2_factor, 0.4 + (1.0 - co2_factor) * 0.45)
-		if _co2_timer >= 60.0 and not Game.has_flag("adit_dead_air_warned"):
-			Game.set_flag("adit_dead_air_warned", true)
-			Game.hud.subtitle(Loc.t(&"sub.adit_dead_air"), 5.0)
-		if _co2_timer >= 90.0:
-			Game.player.whiteout_panic = clampf(Game.player.whiteout_panic + delta * 0.12, 0.0, 0.75)
 	else:
 		if not (local.z < -35.2 and local.z > -39.2):
 			Game.player.target_head_y = 1.58
 			Game.player.speed_mult = 1.0
-		_co2_timer = maxf(_co2_timer - delta * 2.5, 0.0)
-		if _lbvk_flame_light != null:
-			if Game.yrka_nearby:
-				_lbvk_flame_light.light_color = Color(0.45, 0.15, 0.92)
-				_lbvk_flame_light.light_energy = 1.5
-			else:
-				_lbvk_flame_light.light_energy = 1.2
-				_lbvk_flame_light.light_color = Color(1.0, 0.8, 0.4)
+
+	if local.z < -25.0:
+		var rate := 0.65 if Game.mine_air_filter_active else 2.2
+		_hypoxia = minf(_hypoxia + rate * delta, 100.0)
+		if _hypoxia > 40.0 and randf() < delta * 0.25:
+			Game.audio.play_2d("res://assets/audio/cough.ogg", -6.0)
+		if _hypoxia > 75.0 and not _hypoxia_warned:
+			_hypoxia_warned = true
+			Game.hud.subtitle(Loc.t(&"mine.hypoxia_warn"), 5.0)
+		Game.player.whiteout_panic = clampf((_hypoxia - 35.0) / 80.0, 0.0, 0.72)
+		if _hypoxia >= 100.0:
+			_hypoxia = 0.0
+			_hypoxia_warned = false
+			Game.player.whiteout_panic = 0.0
+			Game.player.global_position = Vector3(3.0, 0.05, 2.6)
+			Game.player.yaw_limit_base = NAN
+			Game.player.target_head_y = 1.58
+			Game.player.speed_mult = 1.0
+			Game.zone = &"room"
+			Game.shift_minutes += 60.0
+			Director.add_tension(15.0, "потеря сознания от гипоксии в штольне")
+			Game.hud.subtitle(Loc.t(&"mine.hypoxia_passout"), 6.0)
+			return
+	elif local.z >= -20.0:
+		_hypoxia = move_toward(_hypoxia, 0.0, 8.0 * delta)
+		if _hypoxia < 50.0:
+			_hypoxia_warned = false
+		if _hypoxia <= 35.0:
+			Game.player.whiteout_panic = move_toward(Game.player.whiteout_panic, 0.0, delta * 0.3)
+
+	if _lbvk_flame_light != null:
+		var co2_factor := clampf(1.0 - (_hypoxia / 100.0), 0.10, 1.0)
+		if local.z < -39.0 or Game.yrka_nearby:
+			_lbvk_flame_light.light_color = Color(0.45, 0.15, 0.92)
+			_lbvk_flame_light.light_energy = 1.6 + 0.3 * sin(Time.get_ticks_msec() * 0.008)
+		else:
+			_lbvk_flame_light.light_energy = 1.2 * co2_factor
+			_lbvk_flame_light.light_color = Color(1.0, 0.8 * co2_factor, 0.4 + (1.0 - co2_factor) * 0.45)
 
 	# 2. Ночь 5: Лаз через завал (ограничение поворота ±28°, осыпание породы при шуме, валенки на выходе)
 	var in_crawl := (local.z < -35.2 and local.z > -39.2 and absf(local.x) < 1.2)

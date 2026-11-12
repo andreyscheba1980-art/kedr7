@@ -574,15 +574,17 @@ func transmit() -> void:
 		Game.audio.play_3d("res://assets/audio/clank.ogg", global_position + Vector3.UP * 0.2, 2.0, 4.0)
 		Game.hud.subtitle(Loc.t(&"radio.variometer_unmatched"), 4.0)
 		return
-	if Game.night == 7 and Game.final_call and not _field:
-		if not SaveGame.flags.get("mi8_contacted", false):
-			SaveGame.flags["mi8_contacted"] = true
-			_run_mi8_evac_exchange()
-			return
-		_challenge_night7_crawler()
+	if Game.night == 7 and not _field and absf(freq - 3215.0) < 35.0:
+		_handle_night7_mi8_radio()
 		return
 	if Game.final_call and strength_of(&"mainland") >= 0.75 and not _busy:
 		EventBus.ending_chosen.emit(&"answer")   # ночь 7: отвечаем на зов даже поверх голоса в эфире
+		return
+	if Game.final_call and strength_of(&"echo") >= 0.75 and not _busy:
+		EventBus.ending_chosen.emit(&"echo")
+		return
+	if Game.night == 7 and Game.final_call and not _field:
+		_challenge_night7_crawler()
 		return
 	if _busy or is_voice_busy() or voice_override:
 		if is_voice_busy():
@@ -715,36 +717,72 @@ func _challenge_night7_crawler() -> void:
 	_busy = false
 
 
+func _handle_night7_mi8_radio() -> void:
+	if _busy or is_voice_busy():
+		Game.hud.subtitle(Loc.t(&"radio.wait_voice"), 1.5)
+		return
+	match Game.mi8_state:
+		Game.Mi8State.CRASHED:
+			Game.audio.play_3d("res://assets/audio/static_loop.ogg", global_position + Vector3.UP * 0.2, -4.0, 5.0)
+			Game.hud.subtitle(Loc.t(&"radio.mi8_already_crashed"), 5.5)
+			return
+		Game.Mi8State.DEPARTED:
+			Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 0.0, 5.0)
+			Game.hud.subtitle(Loc.t(&"radio.mi8_departed"), 5.5)
+			return
+		Game.Mi8State.APPROACHING, Game.Mi8State.HOVER_LANDING, Game.Mi8State.LANDED_WAITING:
+			Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 1.0, 5.0)
+			Game.hud.subtitle(Loc.t(&"radio.mi8_already_coming"), 4.5)
+			return
+	if not Game.helipad_cleared:
+		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 1.0, 5.0)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_no_helipad"), 5.5)
+		return
+	if not bool(SaveGame.flags.get("helipad_pots_all_lit", false)) or not bool(SaveGame.flags.get("psnd_flare_lit", false)):
+		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 1.0, 5.0)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_no_lights"), 6.0)
+		return
+	_run_mi8_evac_exchange()
+
+
 func _run_mi8_evac_exchange() -> void:
 	_busy = true
+	SaveGame.flags["mi8_contacted"] = true
 	Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
-	Game.hud.subtitle(Loc.t(&"radio.mi8_call"), 7.0)
-	await get_tree().create_timer(4.5, false).timeout
+	Game.hud.subtitle(Loc.t(&"radio.mi8_call"), 6.5)
+	await get_tree().create_timer(4.0, false).timeout
 	if not is_inside_tree():
 		_busy = false
 		return
-	var choice: int = await TalkChoiceUI.ask([
-		Loc.t(&"radio.mi8_opt_correct"),
-		Loc.t(&"radio.mi8_opt_hpa_fail"),
-		Loc.t(&"radio.mi8_opt_downwind_fail")
-	], 18.0)
-	if choice == 0:
+	var p_mm := int(roundf(Game.pressure_at(Game.shift_minutes / 60.0)))
+	var p_hpa := int(roundf(float(p_mm) * 1.33322))
+	var opts: Array[Dictionary] = [
+		{"ok": true, "text": Loc.t(&"radio.qfe_opt_clean", [p_mm])},
+		{"ok": false, "text": Loc.t(&"radio.qfe_opt_clear", [p_mm - 18])},
+		{"ok": false, "text": Loc.t(&"radio.qfe_opt_low_vis", [p_hpa])},
+	]
+	opts.shuffle()
+	var labels: Array[String] = []
+	for o: Dictionary in opts:
+		labels.append(String(o["text"]))
+	var choice: int = await TalkChoiceUI.ask(labels, 22.0)
+	var valid := choice >= 0 and choice < opts.size() and bool(opts[choice]["ok"])
+	if valid:
 		Game.audio.play_3d("res://assets/audio/voice_mainland.ogg", global_position + Vector3.UP * 0.2, 2.0, 5.0)
-		Game.hud.subtitle(Loc.t(&"radio.mi8_landing_ok"), 6.5)
+		Game.hud.subtitle(Loc.t(&"radio.mi8_approaching", [p_mm]), 6.5)
+		Game.mi8_state = Game.Mi8State.APPROACHING
+		Game.mi8_state_timer = 15.0
 		SaveGame.flags["mi8_landing_ready"] = true
 		SaveGame.flags["mi8_landed"] = true
 		EventBus.sound_triggered.emit(&"mi8_landed")
-	elif choice == 1:
-		Game.audio.play_2d("res://assets/audio/flare.ogg", 6.0)
-		Game.audio.play_2d("res://assets/audio/clank.ogg", 4.0)
-		Game.hud.subtitle(Loc.t(&"radio.mi8_crash_mast"), 7.5)
-		Director.add_tension(50.0, "катастрофа Ми-8 на мачте Унжа-1")
-		SaveGame.flags["mi8_crashed"] = true
 	else:
-		Game.audio.play_2d("res://assets/audio/generator_sputter.ogg", 4.0)
-		Game.hud.subtitle(Loc.t(&"radio.mi8_vortex_crash"), 7.5)
-		Director.add_tension(45.0, "вихревое кольцо Ми-8")
+		Game.mi8_state = Game.Mi8State.CRASHED
 		SaveGame.flags["mi8_crashed"] = true
+		Game.hud.subtitle(Loc.t(&"radio.mi8_crash_mast"), 6.0)
+		if Game.yard != null and Game.yard.has_method(&"schedule_mi8_crash"):
+			Game.yard.schedule_mi8_crash()
+		else:
+			Director.add_tension(35.0, "катастрофа Ми-8")
 	_busy = false
 
 

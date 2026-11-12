@@ -69,6 +69,57 @@ var activity: StringName = &"idle"
 
 var generator_fuel := 70.0
 var power_on := true
+var dga_engine_temp: float = 68.0
+var dga_oil_pressure: float = 3.0
+var dga_filter_clogged: bool = false
+var dga_ap50_engaged: bool = true
+var dga_engine_running: bool = true
+var dga_switches: Dictionary = {
+	"pl64": false,
+	"rnm1": false,
+	"decomp": false,
+	"sn150": false,
+	"etf3": true,
+}
+var dga_pl64_used_before_start: bool = false
+var dga_paraffin_triggered_tonight: bool = false
+
+enum Mi8State {
+	ABSENT = 0,
+	APPROACHING = 1,
+	HOVER_LANDING = 2,
+	LANDED_WAITING = 3,
+	CRASHED = 4,
+	DEPARTED = 5,
+}
+var mi8_state: int = Mi8State.ABSENT
+var mi8_state_timer: float = 0.0
+var has_shi11_in_mine: bool = false
+var mine_air_filter_active: bool = false
+
+var yrka_nearby: bool:
+	get:
+		return yrka != null and is_instance_valid(yrka) and yrka.enabled and (yrka.threat >= 65.0 or yrka.stage >= 3)
+
+var shi11_eye_seen: bool:
+	get: return bool(SaveGame.flags.get("shi11_eye_seen", false))
+	set(v):
+		SaveGame.flags["shi11_eye_seen"] = v
+		SaveGame.write()
+
+var clue_shi11_infrasound: bool:
+	get: return bool(SaveGame.flags.get("clue_shi11_infrasound", false))
+	set(v):
+		SaveGame.flags["clue_shi11_infrasound"] = v
+		SaveGame.write()
+
+var mine_inspected: Dictionary:
+	get:
+		var v: Variant = SaveGame.flags.get("mine_inspected", {})
+		return v if v is Dictionary else {}
+	set(v):
+		SaveGame.flags["mine_inspected"] = v
+		SaveGame.write()
 var canisters_left := 3
 var stove_wood := 60.0
 var stove_heat := 0.0                   ## жар кладки, 0..100
@@ -314,6 +365,26 @@ func setup_phase(kind: StringName, index: int) -> void:
 	warmth = 100.0
 	flash_charge = 100.0
 	power_on = true
+	dga_engine_temp = 68.0 if (kind == &"day" or index <= 1) else 56.0
+	dga_oil_pressure = 3.1
+	dga_filter_clogged = false
+	dga_ap50_engaged = true
+	dga_engine_running = true
+	dga_switches = {
+		"pl64": false,
+		"rnm1": false,
+		"decomp": false,
+		"sn150": false,
+		"etf3": true,
+	}
+	dga_pl64_used_before_start = false
+	dga_paraffin_triggered_tonight = false
+	mi8_state = Mi8State.ABSENT
+	mi8_state_timer = 0.0
+	SaveGame.flags.erase("mi8_crashed")
+	SaveGame.flags.erase("mi8_contacted")
+	has_shi11_in_mine = false
+	mine_air_filter_active = false
 	tutorial.clear()
 	day_goal_done = false
 	gen_broken = false
@@ -594,26 +665,56 @@ func clock_k() -> float:
 # --- Хозяйство ---------------------------------------------------------------
 
 func _tick_generator(delta: float) -> void:
-	if not power_on:
+	if not dga_engine_running and not power_on:
 		return
-	var load_k := IDLE_FUEL_K if house_switch_off else 1.0   # свет в доме погашен — дизель на холостом
-	generator_fuel = maxf(generator_fuel - FUEL_DRAIN_PER_SEC * (1.8 if fuel_sputter else 1.0) * load_k * delta, 0.0)   # густая солярка — дизель жрёт больше
+	var drain: float = 0.0
+	if dga_engine_running and not dga_ap50_engaged and not power_on:
+		drain = 0.015
+	else:
+		var load_k := IDLE_FUEL_K if house_switch_off else 1.0   # свет в доме погашен — дизель на холостом
+		drain = 0.045 * (1.6 if fuel_sputter else 1.0) * load_k
+	generator_fuel = maxf(generator_fuel - drain * delta, 0.0)
 	if generator_fuel <= 0.0:
+		dga_engine_running = false
+		dga_ap50_engaged = false
 		set_power(false)
 
 
-func refuel() -> void:
-	generator_fuel = 100.0
-	if not gen_broken:
+func refuel(amount := 100.0) -> void:
+	generator_fuel = minf(generator_fuel + amount, 100.0)
+	if is_prologue() and not gen_broken and not dga_filter_clogged:
 		set_power(true)
 	complete_step(&"refuel")
 
 
 func set_power(on: bool) -> void:
+	dga_ap50_engaged = on
+	if on:
+		dga_engine_running = true
+		dga_oil_pressure = maxf(dga_oil_pressure, 2.5)
+		dga_switches["etf3"] = true
+		dga_switches["decomp"] = false
+	elif generator_fuel <= 0.0 or gen_broken or dga_filter_clogged:
+		dga_engine_running = false
 	if power_on == on:
 		return
 	power_on = on
 	EventBus.power_changed.emit(on)
+
+
+func add_evidence(id: StringName) -> bool:
+	var raw: Variant = SaveGame.flags.get("evidence_ids", [])
+	var ids: Array = raw.duplicate() if raw is Array else []
+	var s_id := String(id)
+	if ids.has(s_id):
+		return false
+	ids.append(s_id)
+	SaveGame.flags["evidence_ids"] = ids
+	SaveGame.flags["evidence"] = int(SaveGame.flags.get("evidence", 0)) + 1
+	if anomalies != null and anomalies.has_method(&"note"):
+		anomalies.note(id, true)
+	SaveGame.write()
+	return true
 
 
 func add_wood() -> void:
