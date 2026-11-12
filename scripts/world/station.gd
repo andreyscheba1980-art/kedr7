@@ -92,9 +92,9 @@ const FOG_CLEAR_COL := Color(0.7, 0.76, 0.86)   ## ясно: дымка голу
 const FOG_NIGHT_COL := Color(0.032, 0.052, 0.08)   ## лунная дымка: дальний лес — слоями силуэтов, а не светлой стеной
 ## Ночь: без фонаря видно только силуэты на фоне неба, окна и огни; снег под ногами — еле-еле.
 const NIGHT_AMB_COL := Color(0.03, 0.06, 0.11)
-const NIGHT_AMB := 0.06
+const NIGHT_AMB := 0.085
 const PROLOGUE_FOG := Color(0.085, 0.115, 0.16)
-const NIGHT_MOON := 0.05
+const NIGHT_MOON := 0.08
 const MOON_CLEAR := 0.3          ## ясная ночь: снег светится синим, от елей — чёрные тени
 var _moon_gap := 1.0             ## 1 — луна открыта, 0 — ушла за тучу
 var _swinging_bulb: Node3D
@@ -1084,7 +1084,8 @@ func _build_environment() -> void:
 	_sky_light.shadow_caster_mask = 1 | LAYER_OUT
 	# 4 каскада — только «Ультра»: каждый каскад — ещё один проход всей наружной сцены
 	_sky_light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if Settings.quality < 3 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	_sky_light.directional_shadow_max_distance = 28.0 if Settings.quality < 2 else (40.0 if Settings.quality == 2 else 65.0)
+	_sky_light.directional_shadow_blend_splits = true
+	_sky_light.directional_shadow_max_distance = 45.0 if Settings.quality < 2 else (65.0 if Settings.quality == 2 else 95.0)
 	_sky_light.shadow_bias = 0.04
 	add_child(_sky_light)
 
@@ -2199,8 +2200,8 @@ func _build_living_quarters() -> void:
 	)
 
 	# 6. Освещение жилой комнаты
-	var ceiling := Geo.omni(self, Vector3(0.5, 2.65, 3.3), 6.0, 1.05, Color(1.0, 0.74, 0.46))
-	ceiling.omni_attenuation = 1.7   # свет лампы падает быстро: середина комнаты в тёплом пятне, углы тонут
+	var ceiling := Geo.omni(self, Vector3(0.5, 2.65, 3.3), 8.8, 2.05, Color(1.0, 0.78, 0.52))
+	ceiling.omni_attenuation = 1.2   # тёплое освещение жилой комнаты: читаются стены, стол и шкаф, углы мягко темнеют
 	ceiling.shadow_enabled = false
 	Geo.bulb(ceiling, &"bulb")
 	register_lamp(ceiling)
@@ -2614,7 +2615,7 @@ func _build_corridor() -> void:
 	add_child(_swinging_bulb)
 	Geo.cylinder(_swinging_bulb, 0.007, 0.58, Vector3(0.0, -0.29, 0.0), Palette.m(&"dark"), false)
 	var socket := Geo.cylinder(_swinging_bulb, 0.022, 0.06, Vector3(0.0, -0.58, 0.0), Palette.m(&"metal"), false)
-	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.64, 0.0), 7.5, 0.9, Color(1.0, 0.86, 0.68))
+	var bulb_omni := Geo.omni(_swinging_bulb, Vector3(0.0, -0.64, 0.0), 9.0, 1.65, Color(1.0, 0.86, 0.68))
 	bulb_omni.shadow_enabled = Settings.quality >= 2   # скользящие тени по коридору — с высокого пресета
 	_bulb_omni = bulb_omni
 	bulb_omni.shadow_bias = 0.12

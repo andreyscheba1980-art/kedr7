@@ -126,7 +126,7 @@ func _tick_dynamic_res(delta: float) -> void:
 	if not Settings.auto_res:
 		_dyn_scale = top
 	elif fps < 46.0 and (Settings.fps_limit == 0 or Settings.fps_limit > 50):
-		_dyn_scale = maxf(_dyn_scale - 0.05, 0.75)
+		_dyn_scale = maxf(_dyn_scale - 0.04, 0.88)
 	elif fps >= 57.0:
 		_dyn_scale = minf(_dyn_scale + 0.05, top)
 	_dyn_scale = minf(_dyn_scale, top)

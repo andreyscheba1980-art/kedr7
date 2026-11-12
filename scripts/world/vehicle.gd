@@ -9,7 +9,7 @@ extends Node3D
 
 const ENGINE := "res://assets/audio/engine_loop.ogg"
 const CABIN_SEAT_LOCAL := Vector3(0.50, 0.42, -0.95)
-const CABIN_DRIVER_LOCAL := Vector3(-0.52, 0.10, -0.95)
+const CABIN_DRIVER_LOCAL := Vector3(-0.52, 0.03, -0.95)
 const DRIVE_TIME := 58.0          ## сколько едем по зимнику до перемёта (разговор, «попутчик», стуки)
 const BACK_M := 220.0             ## откуда начинаем — метров дальше по дороге от места, где сядем
 const DIG_SPOTS := [Vector3(-1.45, 0.0, -2.4), Vector3(1.45, 0.0, -2.4)]   ## перемёт у передних катков (оси тягача)
@@ -289,30 +289,31 @@ func _build_cabin() -> void:
 	_cab_snow.mesh = sq
 	_cab_snow.position = Vector3(0, 1.25, -3.6)
 	c.add_child(_cab_snow)
-	# Михалыч курит: огонёк у губ, дым тянется к щели двери
-	var cig := CABIN_DRIVER_LOCAL + Vector3(0.12, 1.02, -0.32)
-	var ember := Geo.block(c, Vector3(0.008, 0.008, 0.03), cig, Palette.glow(&"amber"), false)
+	# Михалыч курит: огонёк у губ, дым мягкими струйками тянется к форточке
+	var cig := CABIN_DRIVER_LOCAL + Vector3(0.05, 1.06, -0.14)
+	var ember := Geo.block(c, Vector3(0.007, 0.007, 0.028), cig, Palette.glow(&"amber"), false)
 	ember.name = "Cigarette"
 	var smoke := CPUParticles3D.new()
-	smoke.amount = 16
-	smoke.lifetime = 2.6
-	smoke.direction = Vector3(0.3, 1, 0.2)
-	smoke.spread = 18.0
-	smoke.initial_velocity_min = 0.08
-	smoke.initial_velocity_max = 0.18
-	smoke.gravity = Vector3(0.05, 0.04, 0.03)
-	smoke.scale_amount_min = 0.6
-	smoke.scale_amount_max = 2.4
+	smoke.amount = 14
+	smoke.lifetime = 2.4
+	smoke.direction = Vector3(0.25, 1, 0.15)
+	smoke.spread = 14.0
+	smoke.initial_velocity_min = 0.06
+	smoke.initial_velocity_max = 0.14
+	smoke.gravity = Vector3(0.04, 0.04, 0.02)
+	smoke.scale_amount_min = 0.5
+	smoke.scale_amount_max = 1.8
 	var smq := QuadMesh.new()
-	smq.size = Vector2(0.05, 0.05)
+	smq.size = Vector2(0.032, 0.032)
 	var smm := StandardMaterial3D.new()
 	smm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	smm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	smm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	smm.albedo_color = Color(0.7, 0.7, 0.72, 0.22)
+	smm.albedo_texture = Atmosphere.glare_texture()
+	smm.albedo_color = Color(0.75, 0.75, 0.78, 0.14)
 	smq.material = smm
 	smoke.mesh = smq
-	smoke.position = cig + Vector3(0, 0.02, 0)
+	smoke.position = cig + Vector3(0, 0.015, 0)
 	c.add_child(smoke)
 	# Вспышка спички в начале рейса — Михалыч прикуривает папиросу «Прима»
 	var match_light := OmniLight3D.new()
@@ -333,7 +334,7 @@ func _build_cabin() -> void:
 	# Михалыч за рычагами
 	_driver_cabin = Creatures.make_human(&"driver", true)
 	_driver_cabin.position = CABIN_DRIVER_LOCAL
-	_driver_cabin.scale = Vector3.ONE * 0.82
+	_driver_cabin.scale = Vector3.ONE * 0.88
 	c.add_child(_driver_cabin)
 	# Шорох рации и дверь
 	_cabin_radio = AudioStreamPlayer3D.new()
@@ -524,6 +525,12 @@ func _on_exit_cabin() -> void:
 	if _cabin_radio != null:
 		_cabin_radio.stop()
 	_cabin_root.visible = false
+	if is_instance_valid(_driver_cabin):
+		_driver_cabin.reparent(_tracked, false)
+		_driver_cabin.position = CABIN_DRIVER_LOCAL
+		_driver_cabin.visible = true
+		var cab_glow := Geo.omni(_tracked, Vector3(-0.35, 1.05, -1.25), 1.4, 0.35, Color(0.35, 0.9, 0.5))
+		cab_glow.shadow_enabled = false
 	if _exterior_mesh != null:
 		_exterior_mesh.visible = true
 	_hull_col.collision_layer = Geo.LAYER_WORLD

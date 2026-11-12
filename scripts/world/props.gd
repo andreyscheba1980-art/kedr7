@@ -3302,7 +3302,7 @@ static func snow_mound_mesh(variant := 0) -> Mesh:
 	var k := MeshKit.new(500 + v)
 	k.mottle = 0.03
 	var ph := float(v) * 2.1
-	k.blob(Vector3.ZERO, Vector3.ONE, Color(0.9, 0.93, 0.98), 7, 14, Basis(), func(d: Vector3) -> float:
+	k.blob(Vector3.ZERO, Vector3.ONE, Color(0.9, 0.93, 0.98), 10, 20, Basis(), func(d: Vector3) -> float:
 		var n := 1.0 + 0.09 * sin(d.x * 4.0 + ph) * cos(d.z * 3.0 - ph) + 0.05 * sin(d.x * 9.0 + d.z * 7.0 + ph)
 		if d.z > 0.0:
 			n *= 1.0 + d.z * 0.28 * (1.0 - absf(d.y))     # язык по ветру

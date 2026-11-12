@@ -161,7 +161,7 @@ own("chest", since(m))
 m = mark()
 limb("neck_c", P("neck", 1), P("neck", 2), 0.055 * THIN, 0.05 * THIN, M["face"], 7)
 if STYLE != "noon" and not TALL:
-    limb("collar", (0, 0, sh_z - 0.02), (0, 0, sh_z + 0.06), 0.14, 0.11, M["coat"], 10)   # воротник
+    limb("collar", (0, 0, sh_z - 0.05), (0, 0, sh_z + 0.045), 0.155, 0.115, M["coat"], 10)   # воротник
 own("neck", since(m))
 
 # --- Голова --------------------------------------------------------------------
@@ -222,7 +222,7 @@ for s, n in ((-1, "L"), (1, "R")):
     m = mark()
     bare = STYLE == "noon" or TALL
     skin_hand = OFFICE
-    limb(f"fore{n}", a1, a2, 0.062 * THIN if not bare else 0.035, 0.058 * THIN if not bare else 0.026, M["coat"] if not bare else M["face"], 7)
+    limb(f"fore{n}", a1, a2 if bare else a2 + Vector((0, 0, -0.035)), 0.062 * THIN if not bare else 0.035, 0.062 * THIN if not bare else 0.026, M["coat"] if not bare else M["face"], 7)
     if TALL and s < 0:
         limb("watch", a2 + Vector((0, 0, 0.05)), a2 + Vector((0, 0, 0.09)), 0.04, 0.04, METAL, 10)
     own(f"forearm.{n}", since(m))
@@ -240,7 +240,7 @@ for s, n in ((-1, "L"), (1, "R")):
     elif skin_hand:
         blob(f"hand{n}", a2 + Vector((0, 0.01, -0.05)), 0.042, M["face"], scale=(0.75, 0.9, 1.3))
     else:
-        blob(f"mitten{n}", a2 + Vector((0, 0.01, -0.06)), 0.05, M["mitten"], scale=(0.9, 0.85, 1.4))
+        blob(f"mitten{n}", a2 + Vector((0, 0.01, -0.035)), 0.055, M["mitten"], scale=(0.95, 0.9, 1.35))
     own(f"hand.{n}", since(m))
 # --- Ноги ------------------------------------------------------------------------
 for s, n in ((-1, "L"), (1, "R")):
@@ -356,12 +356,12 @@ clip("peek", {1: PK, 50: mix(PK, {"head": (2, -14, -28)}), 60: PK, 100: PK})
 
 if STYLE == "driver":
     # Сидит за рычагами ГТ-Т
-    SIT = {"thigh.L": (88, 0, 4), "thigh.R": (88, 0, -4), "shin.L": (-88, 0, 0), "shin.R": (-88, 0, 0), "root@loc": (0, -0.05, 0.0),
-           "upper_arm.L": (40, 0, -6), "upper_arm.R": (40, 0, 6), "forearm.L": (50, 0, 0), "forearm.R": (50, 0, 0), "chest": (-4, 0, 0), "spine": (-4, 0, 0)}
-    clip("sit_drive", {1: SIT, 20: mix(SIT, {"upper_arm.L": (44, 0, -6), "chest": (-5, 0, 0)}), 40: mix(SIT, {"upper_arm.R": (44, 0, 6)}), 60: SIT})
-    T1 = mix(SIT, {"upper_arm.R": (70, 0, 18), "forearm.R": (70, 0, 0), "hand.R": (-20, 0, 0), "head": (6, -12, 0), "chest": (-2, -6, 0)})
-    T2 = mix(SIT, {"upper_arm.R": (55, 0, 26), "forearm.R": (40, 0, 0), "hand.R": (10, 0, 20), "head": (-4, -8, 3), "chest": (-3, -4, 0)})
-    clip("sit_talk", {1: SIT, 8: T1, 16: T2, 24: T1, 32: mix(T2, {"head": (8, -16, 0)}), 44: SIT})
+    SIT = {"thigh.L": (88, 0, 4), "thigh.R": (88, 0, -4), "shin.L": (-88, 0, 0), "shin.R": (-88, 0, 0), "root@loc": (0, -0.02, -0.42),
+           "upper_arm.L": (42, 0, -4), "upper_arm.R": (42, 0, 4), "forearm.L": (48, 0, 0), "forearm.R": (48, 0, 0), "chest": (-4, 0, 0), "spine": (-4, 0, 0)}
+    clip("sit_drive", {1: SIT, 20: mix(SIT, {"upper_arm.L": (45, 0, -4), "chest": (-5, 0, 0)}), 40: mix(SIT, {"upper_arm.R": (45, 0, 4)}), 60: SIT})
+    T1 = mix(SIT, {"upper_arm.R": (46, 0, 8), "forearm.R": (56, 0, 0), "hand.R": (-8, 0, 0), "head": (5, -14, 0), "chest": (-3, -5, 0)})
+    T2 = mix(SIT, {"upper_arm.R": (43, 0, 6), "forearm.R": (46, 0, 0), "hand.R": (4, 0, 8), "head": (-3, -10, 3), "chest": (-4, -3, 0)})
+    clip("sit_talk", {1: SIT, 8: T1, 16: T2, 24: T1, 32: mix(T2, {"head": (6, -16, 0)}), 44: SIT})
     WV = mix(ARMS_DOWN, {"upper_arm.R": (10, 0, 140), "forearm.R": (0, 0, 20), "head": (0, 10, 0)})
     clip("wave", {1: WV, 8: mix(WV, {"forearm.R": (0, 0, -25)}), 16: WV, 24: mix(WV, {"forearm.R": (0, 0, -25)}), 32: WV})
 if STYLE in ("officer", "clerk", "guard", "civil"):

@@ -151,10 +151,10 @@ func _ready() -> void:
 
 	flashlight = SpotLight3D.new()
 	flashlight.light_color = Color(1.0, 0.93, 0.8)
-	flashlight.light_energy = 3.0
-	flashlight.spot_range = 32.0
-	flashlight.spot_angle = 32.0
-	flashlight.spot_attenuation = 1.0
+	flashlight.light_energy = 3.4
+	flashlight.spot_range = 34.0
+	flashlight.spot_angle = 36.0
+	flashlight.spot_attenuation = 1.65
 	flashlight.light_cull_mask = 0xFFFFFFFF
 	flashlight.shadow_caster_mask = 0xFFFFFFFF
 	flashlight.position = _flash_base_pos   # из фонаря в левой руке
