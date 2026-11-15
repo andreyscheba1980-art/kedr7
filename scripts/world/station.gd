@@ -784,7 +784,8 @@ func _process(delta: float) -> void:
 				var t_air := Game.air_temp().x
 				if t_air < -22.0 and randf() < 0.65:
 					# Треск промерзающих бревен в перекрытиях
-					var crack_path := "res://assets/sfx/cc0/log_frost_crack_%d.ogg" % randi_range(1, 5)
+					var idx := randi_range(1, 5)
+					var crack_path := "res://assets/sfx/cc0/log_frost_crack.ogg" if idx == 1 else ("res://assets/sfx/cc0/log_frost_crack_v%d.ogg" % idx)
 					var crack_pos := Vector3(randf_range(-1.0, 9.0), 2.7, randf_range(1.0, 5.0))
 					Game.audio.play_3d(crack_path, crack_pos, -10.0, 3.5)
 				elif Game.weather != null and Game.weather.intensity > 0.4 and randf() < 0.5:

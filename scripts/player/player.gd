@@ -477,22 +477,9 @@ func _physics_process(delta: float) -> void:
 	if Game.is_outside() and global_position.y > 70.0 and not Game.skis_equipped:
 		speed *= 0.78   # крутой каменистый курумник венца цирка: без лыж ноги проваливаются меж валунов
 
-	# Хват за канат леера (ПКМ или Shift в пределах 1.4 м от тропы)
-	var can_grip_rope := Game.is_outside() and _cached_off_path < 1.4
-	var gripping_rope := can_grip_rope and (Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) or Input.is_physical_key_pressed(KEY_SHIFT))
-	if gripping_rope:
-		if not Game.leer_attached:
-			Game.leer_attached = true
-			Game.audio.play_2d("res://assets/audio/clank.ogg", -16.0)
-		speed *= 1.25 # опора на натянутый трос: ускорение против встречного штормового ветра
-		if not _rope_tension_event_done and Game.is_night() and Game.night >= 3 and global_position.x > 32.0 and global_position.x < 50.0 and velocity.length() > 0.4:
-			_rope_tension_event_done = true
-			AudioDirector.play_raw("res://assets/audio/clank.ogg", 2.0, 0.55)
-			Game.audio.play_2d("res://assets/audio/shriek.ogg", -10.0)
-			shake(0.04, 0.45)
-			if Game.hud != null:
-				Game.hud.subtitle(Loc.t(&"sub.rope_twang"), 4.0)
-			Director.add_tension(16.0, "вибрация каната в руках")
+	# Натоптанная тропа: твёрдый плотный снег даёт надёжную опору
+	if Game.is_outside() and _cached_off_path < 1.8:
+		speed *= 1.15
 
 	speed *= speed_mult
 
@@ -599,19 +586,13 @@ func _update_whiteout_disorientation(delta: float) -> void:
 	elif not outside:
 		compass_stuck = move_toward(compass_stuck, 0.0, delta * 0.25)
 
-	if Game.leer_attached:
-		if not outside or _cached_off_path > 2.8:
-			Game.leer_attached = false
-			Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0)
-			if Game.hud != null:
-				Game.hud.subtitle(Loc.t(&"sub.leer_snapped"), 3.5)
-		else:
-			whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 1.5)
-			compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.5)
-			_drift_no_anchor_t = maxf(0.0, _drift_no_anchor_t - delta * 3.0)
-			return
-
-	if in_whiteout and _cached_off_path > 3.2:
+	# Если игрок на натоптанной тропе станции — он чувствует плотный снег под ногами и ориентируется
+	if outside and _cached_off_path <= 2.8:
+		whiteout_panic = move_toward(whiteout_panic, 0.0, delta * 1.5)
+		compass_glitch = move_toward(compass_glitch, 0.0, delta * 2.5)
+		_drift_no_anchor_t = maxf(0.0, _drift_no_anchor_t - delta * 3.0)
+		_whiteout_warned = false
+	elif in_whiteout and _cached_off_path > 3.2:
 		whiteout_panic = minf(whiteout_panic + delta * 0.25, 1.0)
 		compass_glitch = sin(Time.get_ticks_msec() * 0.007) * 1.85 * whiteout_panic + cos(Time.get_ticks_msec() * 0.011) * 0.4
 		if camera != null:
@@ -619,7 +600,7 @@ func _update_whiteout_disorientation(delta: float) -> void:
 		if not _whiteout_warned and Game.hud != null:
 			_whiteout_warned = true
 			Game.hud.subtitle(Loc.t(&"sub.whiteout_lost"), 4.5)
-			Director.add_tension(15.0, "потерян леер в белой тьме")
+			Director.add_tension(15.0, "сбился с тропы в белой тьме")
 		if Game.audio != null and is_instance_valid(Game.audio._heart):
 			Game.audio._heart.volume_db = maxf(Game.audio._heart.volume_db, lerpf(-22.0, -3.0, whiteout_panic))
 
@@ -731,10 +712,6 @@ func _update_steps(delta: float) -> void:
 	var p := Game.audio.play_2d(path, base_vol + vol_offset)
 	if p != null:
 		p.pitch_scale = randf_range(0.82, 0.96) if in_deep else randf_range(0.95, 1.10)
-	if Game.leer_attached and is_out:
-		var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -18.0)
-		if lp != null:
-			lp.pitch_scale = randf_range(1.6, 2.1)
 	if is_out and Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled:
 		Game.yrka.on_player_footstep(global_position, global_basis.z)
 	if is_out and _sprinting and Game.audio != null and Game.audio.has_method(&"record_player_noise"):
@@ -1704,6 +1681,7 @@ func _lay_footprints() -> void:
 		Game.level.add_child(_foot_root)
 		_foot_pool.clear()
 	var fp := Footprints.make(&"snow", pos, atan2(dir.x, dir.y), _foot_left)
+	fp.set_meta("life", 90.0)
 	_foot_root.add_child(fp)
 	_foot_pool.append(fp)
 	if _foot_pool.size() > FOOT_MAX:
@@ -1711,3 +1689,21 @@ func _lay_footprints() -> void:
 		if is_instance_valid(old):
 			old.queue_free()
 	_foot_left = not _foot_left
+
+	# Заметание следов метелью за ~90 секунд
+	if not _foot_pool.is_empty():
+		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.5
+		var sweep_rate: float = 0.20 * (1.0 + w_intensity * 0.8)
+		for i in range(_foot_pool.size() - 1, -1, -1):
+			var item: Node3D = _foot_pool[i]
+			if not is_instance_valid(item):
+				_foot_pool.remove_at(i)
+				continue
+			var cur_life: float = item.get_meta("life", 90.0) - sweep_rate
+			if cur_life <= 0.0:
+				_foot_pool.remove_at(i)
+				item.queue_free()
+			else:
+				item.set_meta("life", cur_life)
+				if cur_life < 15.0:
+					item.modulate.a = clampf(cur_life / 15.0, 0.0, 1.0)

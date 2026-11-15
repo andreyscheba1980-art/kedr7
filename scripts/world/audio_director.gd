@@ -625,6 +625,8 @@ func play_snow_steps(pos: Vector3, count := 2, volume_db := 0.0, unit_size := 4.
 
 
 func play_2d(path: String, volume_db := 0.0, max_duration := 0.0) -> AudioStreamPlayer:
+	if not is_inside_tree():
+		return null
 	_note(path, "2d")
 	var p := AudioStreamPlayer.new()
 	p.stream = get_stream(path)
@@ -655,6 +657,8 @@ static func _fade_and_free_2d(p: AudioStreamPlayer) -> void:
 
 
 func play_3d(path: String, pos: Vector3, volume_db := 0.0, unit_size := 2.0, max_duration := 0.0) -> AudioStreamPlayer3D:
+	if not is_inside_tree() or Game.level == null or not is_instance_valid(Game.level) or not Game.level.is_inside_tree():
+		return null
 	if Game.player != null:
 		_note(path, "%.0f м" % pos.distance_to(Game.player.global_position))
 	if (path.ends_with("voice_mainland.ogg") or path.ends_with("voice_loop.ogg")) and Game.radio != null and is_instance_valid(Game.radio):

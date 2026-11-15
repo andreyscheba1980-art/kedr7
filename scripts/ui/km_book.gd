@@ -309,4 +309,8 @@ func _draw_ink() -> void:
 			ci.draw_string(hf, Vector2(prev.end.x + 2, prev.end.y - 4), ",", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UiStyle.INK_PEN)
 		var last := cell_rect(r, cells.size() - 1)
 		ci.draw_string(tf, Vector2(last.end.x + 8, last.end.y - ch * 0.3), String(rows[r].get("unit", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UiStyle.INK_TYPE)
+	if heading == "" and Game.is_night() and Game.night == 1:
+		var faded_col := Color(0.24, 0.28, 0.38, 0.70)
+		var sem_txt := "Семёнов (02:00): t=-32.4°C, ветер ССВ 14 м/с. На площадке слыш..." if Loc.is_ru() else "Semyonov (02:00): t=-32.4°C, wind NNW 14 m/s. At yard heard..."
+		ci.draw_string(hf, Vector2(56, w.y - 28), sem_txt, HORIZONTAL_ALIGNMENT_LEFT, w.x - 70, 16, faded_col)
 	ci.draw_string(tf, Vector2(56, w.y - 14), Loc.t(&"thermo.keys"), HORIZONTAL_ALIGNMENT_LEFT, w.x - 66, 11, Color(UiStyle.PENCIL, 0.75))

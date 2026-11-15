@@ -47,7 +47,7 @@ func _ready() -> void:
 		Net.host_room(1)
 	elif args.has("--coop-join-room"):
 		_test_join_room()
-	if args.has("--autotest") or args.has("--deathtest") or args.has("--stage") or args.has("--inspect_fixes") or args.has("--tour") or args.has("--film") or args.has("--probe") or args.has("--probe2") or args.has("--polish_test") or all_cmd_args.has("--polish_test") or all_cmd_args.has("--autotest") or args.has("--joypad_test") or all_cmd_args.has("--joypad_test") or args.has("--loadsave") or args.has("--test_cabin") or args.has("--prologue_review"):
+	if args.has("--autotest") or args.has("--deathtest") or args.has("--stage") or args.has("--inspect_fixes") or args.has("--tour") or args.has("--film") or args.has("--probe") or args.has("--probe2") or args.has("--polish_test") or all_cmd_args.has("--polish_test") or all_cmd_args.has("--autotest") or args.has("--joypad_test") or all_cmd_args.has("--joypad_test") or args.has("--loadsave") or args.has("--test_cabin") or args.has("--prologue_review") or args.has("--fullrun"):
 		add_child(AutoTest.new())
 
 
@@ -92,7 +92,7 @@ func _show_menu() -> void:
 	# Первый запуск: язык, потом яркость (в тёмном хорроре без неё половина «ничего не видно»,
 	# половина выкручивает гамму), потом меню. Меню само пересобирается на новом языке по Settings.changed.
 	var cli := OS.get_cmdline_user_args()
-	if cli.has("--tour") or cli.has("--coop-host") or cli.has("--coop-join") or cli.has("--coop-host-room") or cli.has("--coop-join-room") or cli.has("--autotest"):
+	if cli.has("--tour") or cli.has("--coop-host") or cli.has("--coop-join") or cli.has("--coop-host-room") or cli.has("--coop-join-room") or cli.has("--autotest") or cli.has("--fullrun"):
 		return
 	if cli.has("--menushot"):   # кадр главного меню для проверки/обложки: без экранов первого запуска
 		if cli.has("--coopmenu"):

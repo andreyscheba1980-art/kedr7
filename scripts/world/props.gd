@@ -2215,59 +2215,117 @@ static func chimney_ice() -> Node3D:
 	return mi
 
 
-## Советская жалюзийная психрометрическая метеобудка Селянинова
+## Советская жалюзийная психрометрическая метеобудка Селянинова с распашными створками и аутентичным интерьером
 static func meteo_screen() -> Node3D:
-	var glb := _kedr_model("meteo_screen", {"bright": 1.1, "sat": 0.9})
-	if glb != null:
-		return glb
-	var cached := _instance_from_cache(&"meteo_screen", "tex_planks.png")
-	if cached != null:
-		return cached
-	var k := _kit(94, 0.04)
+	var root := MeteoBoothScreen.new()
+	root.name = "MeteoScreen"
+
 	var white := Color(0.86, 0.88, 0.90)
 	var white_wood := Color(0.78, 0.80, 0.82)
 	var brass := Color(0.72, 0.62, 0.32)
-	var dark_interior := Color(0.18, 0.19, 0.20)
+	var iron := Color(0.28, 0.29, 0.30)
+	var snow_white := Color(0.92, 0.94, 0.97)
 
+	# --- 1. Основной каркас и нутро будки ---
+	var k_frame := _kit(94, 0.04)
+
+	# Ножки штатива (4 наклонные стойки с раскосами)
 	for dx: float in [-0.32, 0.32]:
 		for dz: float in [-0.28, 0.28]:
-			k.tube([Vector3(dx * 1.15, 0.0, dz * 1.15), Vector3(dx, 1.25, dz)], [0.032], white, 4)
-	k.tube([Vector3(-0.35, 0.4, -0.30), Vector3(0.35, 0.4, 0.30)], [0.018], white, 4)
-	k.tube([Vector3(-0.35, 0.4, 0.30), Vector3(0.35, 0.4, -0.30)], [0.018], white, 4)
-	k.box(Vector3(0, 0.35, 0.45), Vector3(0.55, 0.04, 0.22), white)
-	k.box(Vector3(0, 0.75, 0.38), Vector3(0.55, 0.04, 0.22), white)
+			k_frame.tube([Vector3(dx * 1.15, 0.0, dz * 1.15), Vector3(dx, 1.25, dz)], [0.032], white, 4)
+	k_frame.tube([Vector3(-0.35, 0.4, -0.30), Vector3(0.35, 0.4, 0.30)], [0.018], white, 4)
+	k_frame.tube([Vector3(-0.35, 0.4, 0.30), Vector3(0.35, 0.4, -0.30)], [0.018], white, 4)
+	k_frame.box(Vector3(0, 0.35, 0.45), Vector3(0.55, 0.04, 0.22), white)
+	k_frame.box(Vector3(0, 0.75, 0.38), Vector3(0.55, 0.04, 0.22), white)
 
-	k.box(Vector3(0, 1.26, 0), Vector3(0.78, 0.04, 0.68), white)
-	k.box(Vector3(0, 1.62, -0.02), Vector3(0.66, 0.66, 0.54), dark_interior)   # темнота в щелях жалюзи
+	# Дно и каркас
+	k_frame.box(Vector3(0, 1.26, 0), Vector3(0.78, 0.04, 0.68), white)
+	# 4 угловые стойки
+	for cx: float in [-0.36, 0.36]:
+		for cz: float in [-0.31, 0.31]:
+			k_frame.box(Vector3(cx, 1.62, cz), Vector3(0.05, 0.72, 0.05), white)
+	# Верхняя и нижняя обвязка
+	for y: float in [1.29, 1.95]:
+		k_frame.box(Vector3(0, y, 0.31), Vector3(0.76, 0.04, 0.05), white)
+		k_frame.box(Vector3(0, y, -0.31), Vector3(0.76, 0.04, 0.05), white)
+		for side: float in [-0.36, 0.36]:
+			k_frame.box(Vector3(side, y, 0), Vector3(0.05, 0.04, 0.64), white)
 
-	# Жалюзи со всех сторон (будка Селянинова): наклонные планки, между ними — темнота внутри
+	# Жалюзи боковые и задние
 	var slat_x := Basis(Vector3.RIGHT, deg_to_rad(40.0))
 	for c in range(9):
 		var ly := 1.33 + float(c) * 0.072
 		for side: float in [-0.365, 0.365]:
-			k.box(Vector3(side, ly, -0.01), Vector3(0.05, 0.026, 0.6), white_wood, Basis(Vector3.FORWARD, deg_to_rad(40.0 * signf(side))))
-		k.box(Vector3(0, ly, -0.315), Vector3(0.68, 0.026, 0.05), white_wood, slat_x.inverse())
-		for dx: float in [-0.17, 0.17]:   # створки дверцы — закрыты
-			k.box(Vector3(dx, ly, 0.305), Vector3(0.3, 0.026, 0.05), white_wood, slat_x)
-	# Каркас: угловые стойки, обвязка, рамки створок, ручка и щеколда
-	for cx: float in [-0.36, 0.36]:
-		for cz: float in [-0.31, 0.31]:
-			k.box(Vector3(cx, 1.62, cz), Vector3(0.05, 0.72, 0.05), white)
-	for y: float in [1.29, 1.95]:
-		k.box(Vector3(0, y, 0.31), Vector3(0.76, 0.04, 0.05), white)
-		k.box(Vector3(0, y, -0.31), Vector3(0.76, 0.04, 0.05), white)
-		for side: float in [-0.36, 0.36]:
-			k.box(Vector3(side, y, 0), Vector3(0.05, 0.04, 0.64), white)
-	for dx: float in [-0.015, 0.015]:
-		k.box(Vector3(dx, 1.62, 0.322), Vector3(0.026, 0.66, 0.03), white)
-	k.box(Vector3(0.06, 1.64, 0.345), Vector3(0.02, 0.09, 0.02), brass)
-	k.box(Vector3(-0.02, 1.7, 0.342), Vector3(0.07, 0.018, 0.015), Color(0.3, 0.3, 0.32))
+			k_frame.box(Vector3(side, ly, -0.01), Vector3(0.05, 0.026, 0.6), white_wood, Basis(Vector3.FORWARD, deg_to_rad(40.0 * signf(side))))
+		k_frame.box(Vector3(0, ly, -0.315), Vector3(0.68, 0.026, 0.05), white_wood, slat_x.inverse())
 
+	# Двойная крыша с воздушной прослойкой и снежной шапкой
 	var roof_tilt := Basis(Vector3.RIGHT, deg_to_rad(-6.0))
-	k.box(Vector3(0, 1.98, 0.02), Vector3(0.88, 0.05, 0.82), white, roof_tilt)
-	k.box(Vector3(0, 2.05, 0.02), Vector3(0.92, 0.04, 0.86), white, roof_tilt)
+	k_frame.box(Vector3(0, 1.98, 0.02), Vector3(0.88, 0.05, 0.82), white, roof_tilt)
+	k_frame.box(Vector3(0, 2.05, 0.02), Vector3(0.92, 0.04, 0.86), white, roof_tilt)
+	k_frame.box(Vector3(0, 2.09, 0.02), Vector3(0.95, 0.06, 0.89), snow_white, roof_tilt)
 
-	return _mi(k, &"meteo_screen", "tex_planks.png")
+	# Внутреннее пространство будки
+	k_frame.box(Vector3(0, 1.62, -0.22), Vector3(0.66, 0.62, 0.02), white) # белёная задняя панель
+	k_frame.box(Vector3(0, 1.33, 0.0), Vector3(0.66, 0.025, 0.44), white_wood) # внутренняя полка
+
+	# Кованый гвоздь для фонаря ФАС-4 (правый верхний угол)
+	k_frame.box(Vector3(0.28, 1.86, 0.12), Vector3(0.014, 0.014, 0.08), iron)
+	k_frame.box(Vector3(0.28, 1.88, 0.16), Vector3(0.018, 0.03, 0.015), iron) # загнутый конец
+
+	# Стаканчик психрометра (под правым термометром)
+	k_frame.box(Vector3(0.09, 1.365, 0.05), Vector3(0.04, 0.05, 0.04), Color(0.8, 0.88, 0.95, 0.6))
+
+	# Волосной гигрометр М-19 на задней панели
+	k_frame.box(Vector3(0.22, 1.62, -0.20), Vector3(0.12, 0.12, 0.022), brass)
+	k_frame.box(Vector3(0.22, 1.62, -0.188), Vector3(0.095, 0.095, 0.008), Color(0.92, 0.92, 0.9))
+
+	# Держатели термометров ТМ-4
+	for tx: float in [-0.09, 0.09]:
+		k_frame.box(Vector3(tx, 1.62, -0.20), Vector3(0.05, 0.46, 0.015), Color(0.93, 0.93, 0.91))
+		k_frame.box(Vector3(tx, 1.36, -0.19), Vector3(0.024, 0.03, 0.024), Color(0.7, 0.1, 0.1) if tx < 0 else Color(0.85, 0.9, 0.96))
+
+	var frame_mi := _mi(k_frame, &"meteo_screen_frame", "tex_planks.png")
+	root.add_child(frame_mi)
+
+	# --- 2. Подвижная левая створка (DoorLeft) ---
+	var pivot_l := Node3D.new()
+	pivot_l.name = "DoorLeft"
+	pivot_l.position = Vector3(-0.35, 1.62, 0.31)
+	var k_door_l := _kit(95, 0.04)
+	k_door_l.box(Vector3(0.015, 0.0, 0.0), Vector3(0.03, 0.64, 0.03), white) # брус у петли
+	k_door_l.box(Vector3(0.335, 0.0, 0.0), Vector3(0.03, 0.64, 0.03), white) # притворный брус
+	k_door_l.box(Vector3(0.175, 0.305, 0.0), Vector3(0.35, 0.03, 0.03), white) # верхний брус
+	k_door_l.box(Vector3(0.175, -0.305, 0.0), Vector3(0.35, 0.03, 0.03), white) # нижний брус
+	for c in range(8):
+		var y := -0.25 + float(c) * 0.072
+		k_door_l.box(Vector3(0.175, y, -0.005), Vector3(0.30, 0.024, 0.04), white_wood, slat_x)
+	var door_l_mi := _mi(k_door_l, &"meteo_screen_door_l", "tex_planks.png")
+	pivot_l.add_child(door_l_mi)
+	root.add_child(pivot_l)
+
+	# --- 3. Подвижная правая створка (DoorRight) ---
+	var pivot_r := Node3D.new()
+	pivot_r.name = "DoorRight"
+	pivot_r.position = Vector3(0.35, 1.62, 0.31)
+	var k_door_r := _kit(96, 0.04)
+	k_door_r.box(Vector3(-0.015, 0.0, 0.0), Vector3(0.03, 0.64, 0.03), white) # брус у петли
+	k_door_r.box(Vector3(-0.335, 0.0, 0.0), Vector3(0.03, 0.64, 0.03), white) # притворный брус
+	k_door_r.box(Vector3(-0.175, 0.305, 0.0), Vector3(0.35, 0.03, 0.03), white) # верхний брус
+	k_door_r.box(Vector3(-0.175, -0.305, 0.0), Vector3(0.35, 0.03, 0.03), white) # нижний брус
+	for c in range(8):
+		var y := -0.25 + float(c) * 0.072
+		k_door_r.box(Vector3(-0.175, y, -0.005), Vector3(0.30, 0.024, 0.04), white_wood, slat_x)
+	# Ручка латунная
+	k_door_r.box(Vector3(-0.29, 0.02, 0.032), Vector3(0.02, 0.08, 0.02), brass)
+	# Латунный крючок-защелка
+	k_door_r.box(Vector3(-0.34, 0.08, 0.03), Vector3(0.06, 0.016, 0.014), iron)
+	var door_r_mi := _mi(k_door_r, &"meteo_screen_door_r", "tex_planks.png")
+	pivot_r.add_child(door_r_mi)
+	root.add_child(pivot_r)
+
+	root.setup(pivot_l, pivot_r)
+	return root
 
 
 ## Советская деревянная снегомерная рейка М-103
@@ -5509,5 +5567,168 @@ static func geodetic_signal_tower() -> Node3D:
 	ice_block.name = "DrumRimeIce"
 
 	return root
+
+
+## Штабель 200-литровых бочек «Арктика» (ГОСТ 305-82 / ДТ-З-0.2 / ОГНЕОПАСНО).
+## Уложены пирамидой в лафетах на деревянных лежнях вдоль тропы к метеоплощадке.
+## Полые бочки глухо резонируют на порывах полярного ветра.
+static func arktika_drum_stack() -> Node3D:
+	var root := Node3D.new()
+	root.name = "ArktikaDrumStack"
+
+	var k := _kit(82, 0.05)
+	var timber := Color(0.32, 0.25, 0.18)
+	var steel_red := Color(0.78, 0.22, 0.15)
+	var white_band := Color(0.86, 0.87, 0.85)
+	var iron_rim := Color(0.16, 0.17, 0.18)
+	var black_stencil := Color(0.10, 0.10, 0.11)
+	var snow := Color(0.88, 0.92, 0.96)
+
+	# 1. Три опорных деревянных бруса-лежня на снегу
+	k.box(Vector3(0, 0.08, -0.32), Vector3(2.1, 0.16, 0.18), timber)
+	k.box(Vector3(0, 0.08, 0.32), Vector3(2.1, 0.16, 0.18), timber)
+	# Деревянные клинья-подпорки
+	for sx in [-0.95, -0.32, 0.32, 0.95]:
+		k.box(Vector3(sx, 0.18, -0.32), Vector3(0.08, 0.08, 0.12), timber)
+		k.box(Vector3(sx, 0.18, 0.32), Vector3(0.08, 0.08, 0.12), timber)
+
+	# Вспомогательная функция отрисовки лежащей горизонтально 200л бочки (радиус 0.29, длина 0.88)
+	var make_horiz_barrel = func(pos: Vector3) -> void:
+		var z_min := pos.z - 0.44
+		var z_max := pos.z + 0.44
+		# Корпус бочки с красно-белыми полосами «Арктика»
+		k.tube([Vector3(pos.x, pos.y, z_min), Vector3(pos.x, pos.y, z_min + 0.25)], [0.29], steel_red, 12, true, false)
+		k.tube([Vector3(pos.x, pos.y, z_min + 0.25), Vector3(pos.x, pos.y, z_max - 0.25)], [0.29], white_band, 12, false, false)
+		k.tube([Vector3(pos.x, pos.y, z_max - 0.25), Vector3(pos.x, pos.y, z_max)], [0.29], steel_red, 12, false, true)
+		# Зиги (ребра жесткости) и завальцованные буртики
+		for zz in [z_min + 0.03, z_min + 0.32, z_max - 0.32, z_max - 0.03]:
+			k.tube([Vector3(pos.x, pos.y, zz - 0.015), Vector3(pos.x, pos.y, zz + 0.015)], [0.302], iron_rim, 12, false, false)
+		# Трафаретная надпись «ГОСТ 305-82» и «ОГНЕОПАСНО» на белой полосе
+		k.box(Vector3(pos.x, pos.y + 0.292, pos.z - 0.08), Vector3(0.24, 0.005, 0.08), black_stencil)
+		k.box(Vector3(pos.x, pos.y + 0.292, pos.z + 0.08), Vector3(0.28, 0.005, 0.06), black_stencil)
+		# Шапка намёрзшего снега сверху
+		k.box(Vector3(pos.x, pos.y + 0.285, pos.z), Vector3(0.35, 0.03, 0.72), snow)
+
+	# Нижний ярус пирамиды (3 бочки)
+	make_horiz_barrel.call(Vector3(-0.62, 0.37, 0.0))
+	make_horiz_barrel.call(Vector3(0.00, 0.37, 0.0))
+	make_horiz_barrel.call(Vector3(0.62, 0.37, 0.0))
+
+	# Средний ярус (2 бочки в углублениях)
+	make_horiz_barrel.call(Vector3(-0.31, 0.88, 0.0))
+	make_horiz_barrel.call(Vector3(0.31, 0.88, 0.0))
+
+	# Верхний ярус (1 бочка)
+	make_horiz_barrel.call(Vector3(0.00, 1.39, 0.0))
+
+	# 2 стоящие пустые бочки рядом (одна с открытой горловиной, гудящей на ветру)
+	for b in [Vector3(1.35, 0.44, -0.32), Vector3(1.35, 0.44, 0.35)]:
+		k.tube([Vector3(b.x, 0, b.z), Vector3(b.x, 0.26, b.z)], [0.29], steel_red, 12, true, false)
+		k.tube([Vector3(b.x, 0.26, b.z), Vector3(b.x, 0.62, b.z)], [0.29], white_band, 12, false, false)
+		k.tube([Vector3(b.x, 0.62, b.z), Vector3(b.x, 0.88, b.z)], [0.29], steel_red, 12, false, true)
+		k.box(Vector3(b.x + 0.12, 0.885, b.z), Vector3(0.08, 0.03, 0.08), iron_rim) # сливная пробка
+		k.box(Vector3(b.x, 0.89, b.z), Vector3(0.38, 0.03, 0.38), snow)
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = k.commit()
+	var m_mat := StandardMaterial3D.new()
+	m_mat.albedo_color = Color(0.85, 0.85, 0.86)
+	m_mat.roughness = 0.55
+	mi.material_override = m_mat
+	root.add_child(mi)
+
+	# Коллизия пирамиды бочек
+	var body := StaticBody3D.new()
+	body.collision_layer = Geo.LAYER_WORLD
+	body.collision_mask = 0
+	var col_shape := CollisionShape3D.new()
+	var box_shape := BoxShape3D.new()
+	box_shape.size = Vector3(2.4, 1.8, 1.4)
+	col_shape.shape = box_shape
+	col_shape.position = Vector3(0.2, 0.9, 0.0)
+	body.add_child(col_shape)
+	root.add_child(body)
+
+	return root
+
+
+## Тяжёлая железная цепь на воротах сарая со звеньями и кованым навесным замком.
+static func shed_chain() -> Node3D:
+	var root := Node3D.new()
+	root.name = "ShedChain"
+
+	var k := _kit(44, 0.03)
+	var iron := Color(0.22, 0.23, 0.25)
+	var rust := Color(0.38, 0.28, 0.22)
+
+	# Звенья цепи, натянутые между ручками двух створок ворот
+	var pts: PackedVector3Array = [
+		Vector3(-0.25, 1.35, 0.08),
+		Vector3(-0.16, 1.28, 0.14),
+		Vector3(0.0, 1.24, 0.18),
+		Vector3(0.16, 1.28, 0.14),
+		Vector3(0.25, 1.35, 0.08)
+	]
+	k.tube(pts, [0.022], iron, 6)
+	# Свисающий хвост цепи
+	k.tube([Vector3(0.0, 1.24, 0.18), Vector3(0.02, 1.05, 0.20), Vector3(0.0, 0.88, 0.18)], [0.018], rust, 5)
+	# Амбарный замок
+	k.box(Vector3(0.0, 1.15, 0.21), Vector3(0.08, 0.10, 0.04), rust)
+	k.tube([Vector3(-0.025, 1.20, 0.21), Vector3(-0.025, 1.26, 0.21), Vector3(0.025, 1.26, 0.21), Vector3(0.025, 1.20, 0.21)], [0.01], iron, 6)
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = k.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.55, 0.52, 0.50)
+	mat.roughness = 0.7
+	mi.material_override = mat
+	root.add_child(mi)
+
+	return root
+
+
+## Столб ЛЭП с выносным кронштейном и подвесным светильником СПО-200.
+static func spo200_pole(height := 5.4) -> Node3D:
+	var root := Node3D.new()
+	root.name = "SPO200Pole"
+
+	# 1. Базовый деревянный столб с креозотовым комлем и изоляторами
+	var base_pole := utility_pole(height)
+	root.add_child(base_pole)
+
+	# 2. Выносной стальной трубчатый кронштейн «гусак» (вылет 1.6м в сторону тропы)
+	var k_bracket := _kit(28, 0.04)
+	var steel := Color(0.26, 0.28, 0.30)
+	var rust := Color(0.35, 0.28, 0.22)
+	var arm_y := height - 0.20
+	var pts_arm: PackedVector3Array = [
+		Vector3(0, arm_y, 0),
+		Vector3(0.45, arm_y + 0.35, 0),
+		Vector3(1.15, arm_y + 0.28, 0),
+		Vector3(1.60, arm_y, 0)
+	]
+	k_bracket.tube(pts_arm, [0.032, 0.026], steel, 8)
+	# Подкос кронштейна
+	k_bracket.tube([Vector3(0, arm_y - 0.75, 0), Vector3(0.85, arm_y + 0.15, 0)], [0.022], rust, 6)
+	# Хомут крепления к столбу
+	k_bracket.box(Vector3(0, arm_y, 0), Vector3(0.38, 0.08, 0.38), steel)
+	k_bracket.box(Vector3(0, arm_y - 0.75, 0), Vector3(0.38, 0.08, 0.38), steel)
+
+	var b_mi := MeshInstance3D.new()
+	b_mi.mesh = k_bracket.commit()
+	var b_mat := StandardMaterial3D.new()
+	b_mat.albedo_color = Color(0.65, 0.62, 0.60)
+	b_mat.roughness = 0.65
+	b_mi.material_override = b_mat
+	root.add_child(b_mi)
+
+	# 3. Подвесной светильник СПО-200 на шарнире
+	var lamp := PendulumLamp.new()
+	lamp.position = Vector3(1.60, arm_y - 5.2, 0) # позиционируем шарнир на конце кронштейна
+	lamp.name = "PendulumFixture"
+	root.add_child(lamp)
+
+	return root
+
 
 

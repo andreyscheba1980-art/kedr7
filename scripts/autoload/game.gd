@@ -134,6 +134,7 @@ var memory_goal := ""           ## цель во флешбэке Семёнов
 var story_goal := ""            ## сюжетная цель (вылазка в шахту и т. п.) — поверх обычных
 var flash_charge := 100.0
 var fatigue := 0.0                  ## скрытая усталость: ложные звуки и галлюцинации
+var retinal_dazzle := 0.0           ## ослепление сетчатки при взгляде на яркий светильник СПО-200 (~4с адаптации)
 var synoptic: Synoptic
 var readings: Dictionary = {}
 ## Книжка КМ-1: что дежурный сам вписал с прибора и что прибор показывал на самом деле в тот миг.
@@ -619,6 +620,8 @@ func _process(delta: float) -> void:
 	_tick_generator(delta * ck)
 	_tick_heat(delta * ck)
 	_tick_fatigue(delta)
+	if retinal_dazzle > 0.0:
+		retinal_dazzle = maxf(retinal_dazzle - delta * 0.25, 0.0)
 	if is_night() and shift_minutes >= NIGHT_END_MIN and cfg.get("finale", &"") == &"":
 		end_shift()
 	elif is_day():

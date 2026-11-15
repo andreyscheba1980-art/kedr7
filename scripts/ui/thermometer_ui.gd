@@ -39,12 +39,24 @@ var _wipe := false
 var _mouse := Vector2.ZERO
 var _breath_timer := 0.0
 var _breath_warned := false
+var _lantern_on_nail := false
+var _nail_btn: Button
+var _shake_btn: Button
+var _max_t: float = 0.0
+var _max_shaken := false
+var _glare_mat: StandardMaterial3D
+var _nail_audio: AudioStreamPlayer
+var _creepy_t := 0.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_truth = Game.air_temp()
 	_shown = _truth
+	if Game.is_night() and Game.night == 4:
+		_shown.x = -31.6 # Ночь 4: ртуть залипает на отметке 00:00 (-31.6°C)
+	elif Game.is_night() and Game.night == 7:
+		_shown.x = 52.0  # Ночь 7: ртуть кипит в капилляре (+52°C)
 	if Game.yard != null and Game.yard.has_method(&"claim_fever") and Game.yard.claim_fever():
 		_fever = true
 		_shown.x = FEVER
@@ -53,8 +65,29 @@ func _ready() -> void:
 	_start_t = clampf(_truth.x + randf_range(-4.0, 4.0), T_MIN + 8.0, T_MAX - 8.0)
 
 	title_plate(self, Loc.t(&"thermo.title"))
-	_mode_btn = UiStyle.text_button(Loc.p("[Tab] ТМ-9 (спиртовой -70°C)", "[Tab] TM-9 (spirit -70°C)"), _toggle_tm9)
-	UiKit.place(self, _mode_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -210, 266)
+	_max_t = clampf(_truth.x + 3.4 + (0.4 if Game.night == 2 else 0.0), T_MIN + 6.0, T_MAX - 5.0)
+	if Game.is_night() and Game.night == 5:
+		get_tree().create_timer(1.2, false).timeout.connect(func() -> void:
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.psychrometer_dark_liquid"), 5.0)
+		)
+	_mode_btn = UiStyle.text_button(Loc.p("[Tab] ТМ-9 (-70°C)", "[Tab] TM-9 (-70°C)"), _toggle_tm9)
+	UiKit.place(self, _mode_btn, 0.5, 0.5, 0.5, 0.5, -500, 230, -260, 266)
+	_nail_btn = UiStyle.text_button(Loc.t(&"thermo.nail_hang"), _toggle_lantern_nail)
+	UiKit.place(self, _nail_btn, 0.5, 0.5, 0.5, 0.5, -250, 230, 20, 266)
+	_shake_btn = UiStyle.text_button(Loc.t(&"thermo.shake_max"), _shake_max_thermo)
+	UiKit.place(self, _shake_btn, 0.5, 0.5, 0.5, 0.5, 30, 230, 310, 266)
+
+	_nail_audio = AudioStreamPlayer.new()
+	if ResourceLoader.exists("res://assets/sfx/cc0/wind_indoor_loop.ogg"):
+		_nail_audio.stream = load("res://assets/sfx/cc0/wind_indoor_loop.ogg")
+	elif ResourceLoader.exists("res://assets/audio/wind_loop.ogg"):
+		_nail_audio.stream = load("res://assets/audio/wind_loop.ogg")
+	_nail_audio.volume_db = -80.0
+	_nail_audio.bus = &"Master"
+	add_child(_nail_audio)
+	_nail_audio.play()
+
 	_build_rig()
 	_close = Closeup3D.new()
 	Game.level.add_child(_close)
@@ -86,6 +119,8 @@ func _exit_tree() -> void:
 	var bm := _booth_model()
 	if bm != null:
 		bm.visible = true
+	if _nail_audio != null and is_instance_valid(_nail_audio):
+		_nail_audio.queue_free()
 	if _close != null and is_instance_valid(_close):
 		_close.queue_free()
 	if _rig != null and is_instance_valid(_rig):
@@ -195,6 +230,120 @@ func _build_rig() -> void:
 		_rig.add_child(fr)
 		_frost.append(fr)
 
+		if wet:
+			if Game.is_night() and Game.night == 5:
+				var wl := Label3D.new()
+				wl.text = "В СТАКАНЧИКЕ — ТЁПЛАЯ ТЁМНАЯ ЖИЖА..." if Loc.is_ru() else "WARM DARK LIQUID IN CUP..."
+				wl.font_size = 22
+				wl.pixel_size = 0.0003
+				wl.modulate = Color(0.85, 0.25, 0.20)
+				wl.position = Vector3(x, _base.y - LEN * 0.5 - 0.065, _base.z + 0.015)
+				_rig.add_child(wl)
+			elif _truth.x <= -10.0:
+				var wl := Label3D.new()
+				wl.text = "ФИТИЛЬ ОБМЁРЗ (см. § 16)" if Loc.is_ru() else "WICK FROZEN (see § 16)"
+				wl.font_size = 24
+				wl.pixel_size = 0.0003
+				wl.modulate = Color(0.42, 0.48, 0.58)
+				wl.position = Vector3(x, _base.y - LEN * 0.5 - 0.065, _base.z + 0.015)
+				_rig.add_child(wl)
+
+	# Волосной гигрометр М-19 (справа от термометров)
+	var hx: float = _base.x + SEP * 2.3
+	var hygro_body := CylinderMesh.new()
+	hygro_body.top_radius = 0.052
+	hygro_body.bottom_radius = 0.052
+	hygro_body.height = 0.018
+	var hm := MeshInstance3D.new()
+	hm.mesh = hygro_body
+	var hmat := StandardMaterial3D.new()
+	hmat.albedo_color = Color(0.68, 0.58, 0.28)
+	hmat.metallic = 0.75
+	hmat.roughness = 0.35
+	hm.material_override = hmat
+	hm.rotation.x = deg_to_rad(90.0)
+	hm.position = Vector3(hx, _base.y, _base.z + 0.01)
+	_rig.add_child(hm)
+
+	var rh := int(Game.synoptic.humidity if Game.synoptic != null else 82)
+	var dial_tex := Closeup3D.canvas_tex(_rig, Vector2i(256, 256), func(c: Control) -> void: _draw_hygrometer(c, rh))
+	var dial_q := QuadMesh.new()
+	dial_q.size = Vector2(0.096, 0.096)
+	var dial_mi := MeshInstance3D.new()
+	dial_mi.mesh = dial_q
+	var dial_mat := StandardMaterial3D.new()
+	dial_mat.albedo_texture = dial_tex
+	dial_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_plates.append(dial_mat)
+	dial_mi.material_override = dial_mat
+	dial_mi.position = Vector3(hx, _base.y, _base.z + 0.021)
+	_rig.add_child(dial_mi)
+
+	var hl := Label3D.new()
+	hl.text = "ГИГРОМЕТР М-19" if Loc.is_ru() else "HYGROMETER M-19"
+	hl.font = UiStyle.plate_font()
+	hl.font_size = 28
+	hl.pixel_size = 0.00032
+	hl.modulate = Color(0.2, 0.15, 0.08)
+	hl.position = Vector3(hx, _base.y + 0.075, _base.z + 0.005)
+	_rig.add_child(hl)
+
+	# Максимальный ртутный термометр ТМ-1 (горизонтально-наклонный вверху)
+	var max_tex := Closeup3D.canvas_tex(_rig, Vector2i(512, 64), func(c: Control) -> void: _draw_horizontal_scale(c, _max_t, -30.0, 40.0, "ТМ-1 МАКС. °C"))
+	var max_q := QuadMesh.new()
+	max_q.size = Vector2(0.24, 0.035)
+	var max_mi := MeshInstance3D.new()
+	max_mi.mesh = max_q
+	var max_mat := StandardMaterial3D.new()
+	max_mat.albedo_texture = max_tex
+	max_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_plates.append(max_mat)
+	max_mi.material_override = max_mat
+	max_mi.position = Vector3(_base.x - 0.02, _base.y + LEN * 0.5 + 0.05, _base.z + 0.005)
+	max_mi.rotation.z = deg_to_rad(-4.0)
+	_rig.add_child(max_mi)
+
+	# Минимальный спиртовой термометр ТМ-2 (внизу на полке со штифтиком)
+	var min_t := -60.0 if (Game.is_night() and Game.night == 7) else (_truth.x - 1.8)
+	var min_tex := Closeup3D.canvas_tex(_rig, Vector2i(512, 64), func(c: Control) -> void: _draw_horizontal_scale(c, min_t, -60.0, 20.0, "ТМ-2 МИН. °C", true))
+	var min_q := QuadMesh.new()
+	min_q.size = Vector2(0.24, 0.035)
+	var min_mi := MeshInstance3D.new()
+	min_mi.mesh = min_q
+	var min_mat := StandardMaterial3D.new()
+	min_mat.albedo_texture = min_tex
+	min_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_plates.append(min_mat)
+	min_mi.material_override = min_mat
+	min_mi.position = Vector3(_base.x - 0.02, _base.y - LEN * 0.5 - 0.02, _base.z + 0.01)
+	_rig.add_child(min_mi)
+
+	# Кованый гвоздь для подвешивания фонаря ФАС-4
+	var nail_box := BoxMesh.new()
+	nail_box.size = Vector3(0.012, 0.012, 0.07)
+	var nail_mi := MeshInstance3D.new()
+	nail_mi.mesh = nail_box
+	var nail_mat := StandardMaterial3D.new()
+	nail_mat.albedo_color = Color(0.25, 0.26, 0.28)
+	nail_mat.metallic = 0.8
+	nail_mat.roughness = 0.5
+	nail_mi.material_override = nail_mat
+	nail_mi.position = Vector3(_base.x + SEP * 2.8, _base.y + LEN * 0.44, _base.z + 0.04)
+	_rig.add_child(nail_mi)
+
+	# Блик на стекле капилляра при прямом взгляде
+	var glare_q := QuadMesh.new()
+	glare_q.size = Vector2(0.18, LEN * 0.7)
+	var glare_mi := MeshInstance3D.new()
+	glare_mi.mesh = glare_q
+	_glare_mat = StandardMaterial3D.new()
+	_glare_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.0)
+	_glare_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_glare_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glare_mi.material_override = _glare_mat
+	glare_mi.position = Vector3(_base.x, _base.y, _base.z + 0.028)
+	_rig.add_child(glare_mi)
+
 
 ## Шкала во весь термометр: −60 внизу, +40 вверху; спиртовой столбик до value.
 func _draw_scale(c: Control, value: float, t_lo: float, t_hi: float) -> void:
@@ -230,6 +379,51 @@ func _draw_scale(c: Control, value: float, t_lo: float, t_hi: float) -> void:
 			c.draw_circle(Vector2(cx, top + 1.0), 3.2, Color(0.6, 0.05, 0.05))
 	if t_lo <= T_MIN:
 		c.draw_string(pf, Vector2(cx + 14, h - 14), "°C", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, ink)
+
+
+func _draw_horizontal_scale(c: Control, value: float, t_lo: float, t_hi: float, title: String, with_pin: bool = false) -> void:
+	var w := c.size.x
+	var h := c.size.y
+	var ink := Color(0.12, 0.12, 0.14)
+	var pf := UiStyle.plate_font()
+	c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(0.95, 0.95, 0.92))
+	c.draw_string(pf, Vector2(10, 16), title, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
+	var x_of := func(t: float) -> float: return (t - t_lo) / (t_hi - t_lo) * (w - 40.0) + 20.0
+	var cy := h * 0.65
+	c.draw_line(Vector2(20, cy), Vector2(w - 20, cy), Color(0.8, 0.84, 0.88), 6.0)
+	var vx: float = clampf(x_of.call(value), 20.0, w - 20.0)
+	c.draw_line(Vector2(20, cy), Vector2(vx, cy), Color(0.72, 0.08, 0.08) if not with_pin else Color(0.15, 0.35, 0.65), 4.5)
+	if with_pin:
+		c.draw_rect(Rect2(vx - 6, cy - 3, 6, 6), Color(0.12, 0.12, 0.15))
+	for t in range(int(t_lo), int(t_hi) + 1, 10):
+		var x: float = x_of.call(float(t))
+		c.draw_line(Vector2(x, cy - 6), Vector2(x, cy + 6), ink, 1.6)
+		c.draw_string(pf, Vector2(x - 10, cy - 8), str(t), HORIZONTAL_ALIGNMENT_CENTER, -1, 11, ink)
+
+
+func _draw_hygrometer(c: Control, rh: int) -> void:
+	var w := c.size.x
+	var h := c.size.y
+	var center := Vector2(w * 0.5, h * 0.5)
+	var radius := w * 0.44
+	var ink := Color(0.12, 0.12, 0.14)
+	var pf := UiStyle.plate_font()
+	c.draw_circle(center, radius, Color(0.94, 0.94, 0.91))
+	c.draw_arc(center, radius - 2.0, 0, TAU, 64, ink, 2.5)
+	for pct in range(0, 101, 10):
+		var ang := deg_to_rad(135.0 + float(pct) / 100.0 * 270.0)
+		var p1 := center + Vector2(cos(ang), sin(ang)) * (radius - 12.0)
+		var p2 := center + Vector2(cos(ang), sin(ang)) * (radius - 4.0)
+		c.draw_line(p1, p2, ink, 2.0 if pct % 20 == 0 else 1.2)
+		if pct % 20 == 0:
+			var txt_pos := center + Vector2(cos(ang), sin(ang)) * (radius - 26.0) - Vector2(10, -6)
+			c.draw_string(pf, txt_pos, str(pct), HORIZONTAL_ALIGNMENT_CENTER, -1, 15, ink)
+	c.draw_string(pf, center + Vector2(-12, 24), "%", HORIZONTAL_ALIGNMENT_CENTER, -1, 18, ink)
+	c.draw_string(pf, center + Vector2(-30, -18), "ВОЛОСНОЙ", HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(0.35, 0.35, 0.35))
+	var arrow_ang := deg_to_rad(135.0 + clampf(float(rh), 0.0, 100.0) / 100.0 * 270.0)
+	var arrow_tip := center + Vector2(cos(arrow_ang), sin(arrow_ang)) * (radius - 10.0)
+	c.draw_line(center, arrow_tip, Color(0.1, 0.1, 0.12), 2.5)
+	c.draw_circle(center, 4.0, Color(0.1, 0.1, 0.12))
 
 
 ## Кнопки «Записать» / «Закрыть» под книжкой — общие для всех приборов.
@@ -324,6 +518,20 @@ func _process(delta: float) -> void:
 	_hint.text = Loc.t(&"thermo.hint") if _close.can_see() else Loc.t(&"thermo.hint_dark")
 	_check_fever()
 
+	if _nail_audio != null and is_instance_valid(_nail_audio):
+		var target_vol: float = -14.0 if _lantern_on_nail else -80.0
+		_nail_audio.volume_db = lerpf(_nail_audio.volume_db, target_vol, clampf(delta * 4.0, 0.0, 1.0))
+		if _lantern_on_nail:
+			_creepy_t -= delta
+			if _creepy_t <= 0.0:
+				_creepy_t = randf_range(8.0, 16.0)
+				Game.audio.play_2d("res://assets/audio/step_snow_1.ogg", -18.0, randf_range(0.8, 1.1))
+
+	if _glare_mat != null:
+		var center_dist: float = absf(_mouse.x - size.x * 0.5)
+		var glare_k: float = clampf(1.0 - (center_dist / 110.0), 0.0, 0.65)
+		_glare_mat.albedo_color = Color(1.0, 1.0, 1.0, glare_k)
+
 
 var _wipe_t := 0.0
 
@@ -379,6 +587,40 @@ func _gui_input(event: InputEvent) -> void:
 				_wipe = mb.pressed
 
 
+func _toggle_lantern_nail() -> void:
+	_lantern_on_nail = not _lantern_on_nail
+	Game.audio.play_2d("res://assets/audio/clank.ogg", -8.0, 1.4)
+	if _lantern_on_nail:
+		_close.set_spot_pose(Vector3(0.24, 0.22, 0.12), Vector3(-0.45, -0.6, 0.0))
+		if _nail_btn != null:
+			_nail_btn.text = Loc.t(&"thermo.nail_take")
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.p("ФАС-4 повешен на гвоздь будки. Руки свободны, но за спиной — тьма.", "FAS-4 hung on booth nail. Hands free, but darkness is at your back."), 3.5)
+	else:
+		_close.reset_spot_pose()
+		if _nail_btn != null:
+			_nail_btn.text = Loc.t(&"thermo.nail_hang")
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.p("Фонарь снят с гвоздя в руку.", "Lantern taken back in hand."), 2.5)
+
+
+func _shake_max_thermo() -> void:
+	if _max_shaken:
+		return
+	_max_shaken = true
+	_max_t = _truth.x
+	Game.audio.play_2d("res://assets/sfx/ice_hit.ogg", -6.0, 1.8)
+	if _close != null and is_instance_valid(_close.cam):
+		var orig_y := _close.cam.position.y
+		var tw := create_tween()
+		tw.tween_property(_close.cam, "position:y", orig_y - 0.025, 0.08)
+		tw.tween_property(_close.cam, "position:y", orig_y, 0.14)
+	if _shake_btn != null:
+		_shake_btn.text = Loc.p("ТМ-1 стряхнут", "TM-1 shaken")
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.p("Резкий кистевой взмах — ртутный столбик ТМ-1 сброшен.", "Sharp wrist flick — TM-1 mercury reset."), 3.0)
+
+
 func _toggle_tm9() -> void:
 	_use_tm9 = not _use_tm9
 	Game.audio.play_2d(PEN_SFX, -8.0)
@@ -422,8 +664,11 @@ func handle_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_TAB:
 		_toggle_tm9()
 		return
-	if event.is_action_pressed(&"flashlight") and Game.player != null:
-		Game.player.toggle_flashlight()
+	if (event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_F) or event.is_action_pressed(&"flashlight"):
+		_toggle_lantern_nail()
+		return
+	if event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_R:
+		_shake_max_thermo()
 		return
 	if (event is InputEventKey and event.pressed and ((event as InputEventKey).keycode == KEY_ENTER or (event as InputEventKey).keycode == KEY_KP_ENTER)) \
 			or (event is InputEventJoypadButton and event.pressed and (event as InputEventJoypadButton).button_index == JOY_BUTTON_Y):

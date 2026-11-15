@@ -167,7 +167,7 @@ func _tick_attic_talreps(delta: float, yrka_near: bool) -> void:
 func _tick_keyhole_whistle(delta: float, yrka_near: bool) -> void:
 	var player_near_door: bool = Game.player != null and Game.player.global_position.distance_to(DOOR_KEYHOLE_POS) < 6.0
 	var yrka_at_door: bool = yrka_near and Game.yrka != null and is_instance_valid(Game.yrka) and \
-		Game.yrka.global_position.distance_to(DOOR_KEYHOLE_POS) < 3.5
+		Game.yrka.creature_pos.distance_to(DOOR_KEYHOLE_POS) < 3.5
 
 	if yrka_at_door:
 		# Тело подошло к двери снаружи — щель перекрыта, свист сквозняка обрывается в мёртвую тишину!

@@ -95,7 +95,6 @@ func _generate_aftermath() -> void:
 		&"chimney_ice",
 		&"frozen_crow",
 		&"scratches_wall",
-		&"safety_rope_snap",
 	]
 	chore_pool.shuffle()
 	# Сначала — то, что вызвала эта ночь (осада → окно, диверсия → дизель, буран → мачта)

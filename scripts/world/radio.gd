@@ -634,6 +634,12 @@ func transmit() -> void:
 	Game.clear_readings()
 	Net.on_report_sent()
 	Game.hud.subtitle(Loc.t(&"radio.report_out"), 3.5)
+	if Game.is_night() and Game.night == 7:
+		get_tree().create_timer(0.55, false).timeout.connect(func() -> void:
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.p("(в наушниках с задержкой 0.5 с глухо звучит твой собственный голос...)", "(your own voice echoes back in the headset with a 0.5s delay...)"), 4.0)
+				Game.audio.play_2d("res://assets/audio/whisper.ogg", -8.0)
+		)
 	await get_tree().create_timer(4.0, false).timeout
 	var reply_id := &"ml_prologue"
 	if not prologue:

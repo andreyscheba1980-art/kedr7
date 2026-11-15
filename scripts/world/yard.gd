@@ -121,6 +121,11 @@ const HUNTER_SPRUCE_POS := Vector3(22.0, 0.0, -28.0)
 var _frozen_hunter_node: Node3D = null
 var _hunter_aura_noticed := false
 var _zherdyai_step_timer := 0.0
+var _cleared_anchors: Dictionary = {}
+var _diesel_zone_noticed := false
+var _night6_tracks_spawned := false
+var _night6_return_tracks_spawned := false
+var _bare_tracks_root: Node3D = null
 
 
 func _ready() -> void:
@@ -162,23 +167,9 @@ func _ready() -> void:
 	_build_ground()
 	_build_wall_drifts()
 	_build_forest_haze()
-	# Леер (натянутый трос со столбами и флажками) — спасение дежурного в буран
-	# Трос натянут вдоль каждой открытой тропы — карта, бонус «у троса» и сам трос совпадают.
+	# Натоптанные снежные тропы между объектами станции (чистый открытый двор без визуального мусора)
 	for p in paths:
 		_build_trail(p)
-		var rl := p
-		if Game.is_prologue() and p == PrologueTrail.route():
-			# Леер просеки начинается у вездехода, а не внутри кабины (трос шёл сквозь голову Михалыча)
-			var drop := Vehicle.drop_pos()
-			var k0 := 0
-			while k0 < rl.size() - 2 and Vector2(rl[k0].x - drop.x, rl[k0].z - drop.z).length() < 6.5:
-				k0 += 1
-			rl = rl.slice(k0)
-		_build_rope_line(rl, route_of(p))
-	# Щиты-указатели горели в метель, как вывески. Дорогу теперь читают по цвету флажков на леере
-	# и по схеме [M]; маленькие таблички остались только в сюжетном режиме — он и так ведёт за руку.
-	if Game.is_story():
-		_build_signs()
 	_build_meteo()
 	_build_mast()
 	_build_shed()
@@ -276,6 +267,17 @@ func _process(delta: float) -> void:
 			_hunter_aura_noticed = true
 			Game.hud.subtitle(Loc.t(&"sub.hunter_aura"), 4.0, 0)
 			Director.add_tension(5.0, "аура замёрзшего охотника")
+
+	# Зона дизельной (5–20м): глухая вибрация ДГА-24 и запах солярки
+	if Game.player != null and not _diesel_zone_noticed:
+		var p_pos := Game.player.global_position
+		if p_pos.distance_to(Vector3(18.0, 0.0, -4.0)) < 7.5 and Game.power_on:
+			_diesel_zone_noticed = true
+			Game.hud.subtitle(Loc.t(&"sub.diesel_zone"), 4.5)
+
+	# Аномалия Ночи 6: цепочка босых следов от будки в метель
+	_process_night6_bare_tracks(delta)
+
 	# Уличные кошмары: появление сущностей и пугающая атмосфера в тайге
 	_process_outdoor_horror(delta)
 	_process_snow_survey_stalking(delta)
@@ -549,7 +551,7 @@ func _build_ground() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 11
 	var drift := Props.snow_mound_mesh(2)
-	for i in range(140):
+	for i in range(36):
 		var p := HOUSE_CENTER + Vector3(rng.randf_range(-65, 85), 0, rng.randf_range(-75, 65))
 		# Исключаем дом станции со всеми комнатами (включая жилую комн., радиорубку, сени) с запасом на радиус сугроба
 		if p.x >= -7.5 and p.x <= 22.0 and p.z >= -10.5 and p.z <= 11.5:
@@ -572,6 +574,10 @@ func _build_ground() -> void:
 		mi.position = p
 		mi.scale = Vector3(rng.randf_range(1.4, 4.5), rng.randf_range(0.2, 0.55), rng.randf_range(1.2, 3.2))
 		mi.rotation.y = rng.randf() * TAU
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visibility_range_end = 50.0
+		mi.visibility_range_end_margin = 8.0
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		add_child(mi)
 
 
@@ -646,97 +652,14 @@ func route_of(line: PackedVector3Array) -> Dictionary:
 	return {}
 
 
-func _build_rope_line(line: PackedVector3Array, route: Dictionary = {}) -> void:
-	var flag_col: Color = route.get("color", Color(0, 0, 0, 0))
-	var flag_shape: int = route.get("shape", 0)
-	line = _offset_line(line, 1.0)
-	var posts: Array[Vector3] = []
-	for i in range(line.size() - 1):
-		var a := line[i]
-		var b := line[i + 1]
-		var n := maxi(1, ceili(a.distance_to(b) / POST_STEP))
-		for k in range(n):
-			posts.append(Terrain.at(a.lerp(b, float(k) / n)))   # вешка — на снегу, и на склоне тоже
-	posts.append(Terrain.at(line[line.size() - 1]))
-
-	# Вешки ставили на глаз: каждая чуть кренится и разной высоты; трос провисает между ними дугой.
-	# На развилках трос разорван — несколько лееров не перекрещиваются сеткой.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(absf(line[0].x * 31.0 + line[0].z * 17.0)) + posts.size()
-	var tops: Array[Vector3] = []
-	var is_disoriented := Game.is_night() and Game.night >= 4 and Game.weather != null and Game.weather.blizzard
-	for i in range(posts.size()):
-		var p := posts[i]
-		var shifted := false
-		if is_disoriented and i >= 3 and i <= 6 and posts.size() > 8:
-			var p_next: Vector3 = posts[mini(i + 1, posts.size() - 1)]
-			var p_prev: Vector3 = posts[maxi(i - 1, 0)]
-			var tangent := (p_next - p_prev).normalized()
-			var normal := Vector3(-tangent.z, 0, tangent.x)
-			var offset_val := sin(float(i - 3) / 3.0 * PI) * 5.5
-			p = Terrain.at(p + normal * offset_val)
-			shifted = true
-		var post := Props.rope_post(i % 2 == 0 and flag_col.a > 0.0, flag_col, flag_shape)
-		post.position = p
-		var sy := rng.randf_range(0.92, 1.06)
-		post.scale = Vector3(1.0, sy, 1.0)
-		post.rotation = Vector3(rng.randf_range(-0.05, 0.05), rng.randf_range(-PI, PI), rng.randf_range(-0.05, 0.05))
-		if shifted:
-			post.rotation.z += 0.22 # наклонена от натяжения троса в сугроб
-			post.set_meta(&"shifted", true)
-		add_child(post)
-		_rope_nodes.append(post)
-		var it_post := Interactable.new()
-		it_post.collision_layer = Geo.LAYER_INTERACT
-		it_post.position = Vector3(0, 0.9, 0)
-		it_post.add_child(Geo.box_shape(Vector3(0.55, 1.3, 0.55)))
-		it_post.prompt_provider = func() -> String:
-			if post.has_meta(&"shifted"):
-				return Loc.t(&"it.stake_inspect")
-			return Loc.t(&"it.leer_detach") if Game.leer_attached else Loc.t(&"it.leer_attach")
-		it_post.used.connect(func(pl: Player) -> void:
-			if post.has_meta(&"shifted"):
-				Game.hud.subtitle(Loc.t(&"sub.stake_shifted"), 6.0)
-				Director.add_tension(8.0, "смещенная вешка леера")
-				return
-			_on_leer_post_used(pl)
-		)
-		post.add_child(it_post)
-		tops.append(post.transform * Vector3(0, 1.05, 0))
-		if i > 0 and not _near_fork((posts[i - 1] + p) * 0.5):
-			_rope_span(tops[i - 1], tops[i])
+func _build_rope_line(_line: PackedVector3Array, _route: Dictionary = {}) -> void:
+	pass
 
 
-## Трос между вешками: провисает по цепной линии (парабола 5 кусков, S = 0.22..0.38 м).
-func _rope_span(a: Vector3, b: Vector3) -> void:
-	var span_dist := a.distance_to(b)
-	var sag := clampf(0.14 + span_dist * 0.032, 0.22, 0.38)
-	var n := 5
-	var prev := a
-	var mid_pt := Vector3.ZERO
-	for k in range(1, n + 1):
-		var t := float(k) / float(n)
-		var cur := a.lerp(b, t) + Vector3(0, -4.0 * sag * t * (1.0 - t), 0)
-		if k == 3:
-			mid_pt = cur
-		var seg_len := prev.distance_to(cur)
-		var dir := (cur - prev).normalized()
-		var seg := Geo.box_mesh(Vector3(0.022, 0.022, seg_len + 0.01), Palette.m(&"rope"))
-		seg.position = (prev + cur) * 0.5
-		seg.rotation = Vector3(-asin(clampf(dir.y, -1.0, 1.0)), atan2(dir.x, dir.z), 0.0)
-		add_child(seg)
-		_rope_nodes.append(seg)
-		prev = cur
-
-	# На отдельных пролётах каната — акустический или визуальный маяк (жестянка / кумачовый лоскут)
-	if span_dist > 5.5 and mid_pt != Vector3.ZERO:
-		var marker := Geo.box_mesh(Vector3(0.04, 0.12, 0.04), Palette.m(&"metal" if mid_pt.x < 30.0 else &"carpet"))
-		marker.position = mid_pt - Vector3(0, 0.06, 0)
-		add_child(marker)
-		_rope_nodes.append(marker)
+func _rope_span(_a: Vector3, _b: Vector3) -> void:
+	pass
 
 
-## Развилка: здесь сходятся несколько лееров — трос не тянем, чтобы не было сетки из верёвок.
 func _near_fork(p: Vector3) -> bool:
 	for f: Vector3 in [JUNCTION, FORK, MAST_FORK]:
 		if _flat_dist(p, f) < 3.2:
@@ -745,79 +668,15 @@ func _near_fork(p: Vector3) -> bool:
 
 
 func _on_leer_post_used(_p: Player) -> void:
-	if Consequences.rope_broken() and not Game.leer_attached:
-		Game.hud.subtitle(Loc.t(&"cons.rope_attach"), 3.5)   # леер оборван — днём не срастил
-		return
-	Game.leer_attached = not Game.leer_attached
-	var lp := Game.audio.play_2d("res://assets/audio/clank.ogg", -6.0)
-	if lp != null:
-		lp.pitch_scale = 1.85 if Game.leer_attached else 1.15
-	if Game.hud != null:
-		Game.hud.subtitle(Loc.t(&"sub.leer_attached") if Game.leer_attached else Loc.t(&"sub.leer_detached"), 3.5)
+	pass
 
 
-
-## Таблички на развилках: стоят на самой ветке, лицом к развилке. Видны только в свете.
 func _build_signs() -> void:
-	_sign(JUNCTION, FORK, &"sign.meteo_mast")
-	_sign(JUNCTION, Vector3(26, 0, 12), &"sign.shed")
-	_sign(JUNCTION, Vector3(32, 0, 4.5), &"sign.helipad")
-	_sign(DOOR_OUT, Vector3(16, 0, 14), &"sign.wood")
-	_sign(FORK, Vector3(40, 0, -14), &"sign.meteo")
-	_sign(FORK, MAST_FORK, &"sign.mast")
-	if izba_open:
-		_sign(MAST_FORK, Vector3(10, 0, -25), &"sign.izba")
-	if open_sites.get("repeater", false):
-		_sign(Vector3(50, 0, -24), Vector3(58, 0, -40), &"sign.repeater")
-	if open_sites.get("lake", false):
-		_sign(Vector3(10.0, 0, 28.0), Vector3(-10, 0, 34), &"sign.lake")
-	if open_sites.get("bunker", false):
-		_sign(Vector3(36, 0, 24), Vector3(46, 0, 18), &"sign.bunker")
-	if open_sites.get("zimnik", false):
-		_sign(IZBA + Vector3(3.6, 0, 0), Vector3(-14, 0, -40), &"sign.zimnik")
+	pass
 
 
-func _sign(at: Vector3, toward: Vector3, key: StringName) -> void:
-	var dir := (toward - at)
-	dir.y = 0.0
-	dir = dir.normalized()
-	var side := dir.cross(Vector3.UP).normalized()
-	var text := Loc.t(key)
-	# Доска по длине надписи, столбы — по краям, чтобы не перечёркивали текст.
-	# Ширина — по настоящей ширине строк в шрифте (раньше считали по числу букв, и широкие
-	# «Ш», «Щ», «Д» со скобками вылезали за край: «ВЕРТОДРОМ (ПЛОЩАДКА)» без скобки)
-	var font: Font = ThemeDB.fallback_font
-	var longest := 0.0
-	for line in text.split("\n"):
-		longest = maxf(longest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 40).x * 0.0055)
-	var lines := text.split("\n").size()
-	var w := maxf(0.6, longest + 0.3)
-	var h := 0.2 + lines * 0.2
-	# Табличка — на обочине (со стороны, противоположной тросу), а не поперёк тропы.
-	var pos := at + dir * 1.8 + side * (TRAIL_W * 0.5 + 0.15 + w * 0.5)
-	var root := Node3D.new()
-	add_child(root)
-	_sign_nodes.append(root)
-	root.position = pos
-	root.look_at(pos - dir, Vector3.UP)        # лицом к развилке
-	root.scale = Vector3.ONE * 0.6             # маленькая обветренная табличка, а не вывеска
-	for sx: float in [-w / 2.0 + 0.04, w / 2.0 - 0.04]:
-		Geo.block(root, Vector3(0.06, 1.55 + h / 2.0, 0.06), Vector3(sx, (1.55 + h / 2.0) / 2.0, 0.045), Palette.m(&"weathered"), false)
-	Geo.block(root, Vector3(w, h, 0.03), Vector3(0, 1.55, 0), Palette.m(&"white"), false)
-	for back in [false, true]:
-		var l := Label3D.new()
-		l.text = text
-		l.font_size = 40
-		l.pixel_size = 0.0055
-		l.line_spacing = -6.0
-		l.modulate = Color(0.12, 0.1, 0.1)
-		l.outline_size = 0
-		l.shaded = true
-		l.double_sided = false   # иначе текст просвечивает зеркально с обратной стороны
-		l.position = Vector3(0, 1.55, 0.02 if back else -0.02)
-		if not back:
-			l.rotation.y = PI
-		root.add_child(l)
+func _sign(_at: Vector3, _toward: Vector3, _key: StringName) -> void:
+	pass
 
 
 # --- Аэрологический корпус и приборная площадка ---------------------------------------------
@@ -830,14 +689,19 @@ func _build_meteo() -> void:
 
 	# Действующая советская психрометрическая будка Селянинова
 	var booth_pos := METEO + M_BOOTH
-	var booth_prop := Props.meteo_screen()
+	var booth_prop: MeteoBoothScreen = Props.meteo_screen() as MeteoBoothScreen
 	booth_prop.position = booth_pos
 	booth_prop.name = "BoothModel"
 	add_child(booth_prop)
+	if Game.air_temp().x <= -30.0 and not Game.has_flag("booth_unfrozen"):
+		booth_prop.is_frozen = true
+
 	# Крупный кадр термометров (ThermometerUI): шкалу читаешь сам и вписываешь в книжку КМ-1.
-	var booth_it := Geo.interactable(self, Vector3(0.65, 0.55, 0.55), booth_pos + Vector3(0.0, 1.55, 0.0), null, "", func(_p: Player) -> void:
-		EventBus.ui_requested.emit(&"thermometer"))
+	var booth_it := Geo.interactable(self, Vector3(0.75, 0.65, 0.65), booth_pos + Vector3(0.0, 1.55, 0.1), null, "", func(_p: Player) -> void:
+		_interact_meteo_booth(booth_prop, booth_pos))
 	booth_it.prompt_provider = func() -> String:
+		if booth_prop != null and is_instance_valid(booth_prop) and booth_prop.is_frozen and not booth_prop.is_open:
+			return Loc.t(&"it.booth_frozen")
 		return Loc.t(&"it.booth_done") if Game.readings.get(&"temp", false) else Loc.t(&"it.booth")
 	booth_it.name = "BoothThermo"
 	# Задание «откопать будку»: сугроб закрывает термометры, пока не разгребёшь лопатой.
@@ -885,6 +749,12 @@ func _build_meteo() -> void:
 		return Loc.t(&"it.stake_done") if Game.readings.get(&"snow", false) else Loc.t(&"it.stake")
 	stake_it.name = "SnowStake"
 	SiteDressing.meteo_plot_decor(self, PLOT, 4.5)
+
+	# Действующий советский флюгер Вильда с доской и 8-штифтовой дугой на приборной площадке
+	var wild_vane := WildVaneProp.new()
+	wild_vane.position = PLOT + Vector3(2.4, Terrain.height(PLOT.x + 2.4, PLOT.z + 1.8), 1.8)
+	wild_vane.name = "WildVaneYard"
+	add_child(wild_vane)
 
 	# Анеморумбометр и флюгер — на мачте на кровле корпуса: обледенел — лезть на крышу и сбивать лёд.
 	# Показание ветра снимают внутри, с пульта в аппаратной (датчик на крыше, стрелка — на пульте).
@@ -1061,6 +931,18 @@ func _build_mast() -> void:
 		ice.position = anchor.lerp(top, 0.12)
 		ice.look_at(top, Vector3.UP)
 		_ice_nodes.append(ice)
+
+		var anc_it := Geo.interactable(self, Vector3(1.2, 1.4, 1.2), anchor + Vector3(0, 0.6, 0), null, "", func(_p: Player) -> void:
+			_strike_guy_wire(anchor, ice, k)
+		)
+		anc_it.name = "GuyWireAnchor_%d" % k
+		anc_it.prompt_provider = func() -> String:
+			if Game.antenna_iced:
+				var p := Game.player
+				if p != null and (p.held == &"crowbar" or p.held == &"tools" or p.held == &"shovel"):
+					return Loc.t(&"it.guy_wire_ice")
+				return Loc.p("Оттяжка мачты: обледенела и гудит (нужен инструмент)", "Guy wire: iced and singing (tool needed)")
+			return Loc.p("Талреп оттяжки: натянут", "Guy turnbuckle: tensioned")
 	var base_ice := Props.mast_ice_base()
 	base_ice.position = MAST + Vector3(0, 0.65, 0)
 	add_child(base_ice)
@@ -1215,7 +1097,65 @@ func _on_mast_ground_used(_p: Player) -> void:
 	_check_routine_scare_mast()
 
 
+func _strike_guy_wire(anchor: Vector3, ice_node: Node3D, k: int) -> void:
+	if not Game.antenna_iced:
+		Game.hud.subtitle(Loc.p("Талреп натянут, струна оттяжки звенит чистым металлическим тоном.", "Turnbuckle is tensioned, the wire rings with a clean metallic tone."), 3.5)
+		return
+	var p := Game.player
+	var has_tool: bool = p != null and (p.held == &"crowbar" or p.held == &"tools" or p.held == &"shovel")
+	if not has_tool:
+		Game.hud.subtitle(Loc.p("Оттяжка вибрирует от ледяного панциря. Нужен лом или топорик, чтобы сколоть наледь.", "The guy wire vibrates under an ice casing. Need a crowbar or hatchet to chip the ice off."), 4.0)
+		return
+
+	# Удар по оттяжке
+	Game.audio.play_3d(HIT_SOUND, anchor + Vector3(0, 1.2, 0), 2.5)
+	Game.audio.play_3d(CLANK_SOUND, anchor + Vector3(0, 0.5, 0), 0.0)
+	_spawn_wire_ice_particles(anchor + Vector3(0, 1.0, 0))
+
+	if p != null:
+		p.shake(0.06, 0.35)
+		p.crank_flash(-8.0) # мигание нити накаливания ФАС-4 от механического удара
+		Game.add_fatigue(2.5)
+
+	if is_instance_valid(ice_node):
+		ice_node.visible = false
+	_cleared_anchors[k] = true
+
+	if _cleared_anchors.size() >= 3:
+		Game.set_antenna_iced(false)
+		Game.hud.subtitle(Loc.t(&"sub.guy_wire_done"), 5.0)
+		Director.add_tension(-15.0, "оттяжки мачты очищены от наледи")
+	else:
+		Game.hud.subtitle(Loc.t(&"sub.guy_wire_hit") + " (%d/3)" % _cleared_anchors.size(), 4.0)
+
+
+func _spawn_wire_ice_particles(pos: Vector3) -> void:
+	var sp := CPUParticles3D.new()
+	sp.amount = 25
+	sp.lifetime = 0.9
+	sp.one_shot = true
+	sp.explosiveness = 0.95
+	sp.position = pos
+	sp.direction = Vector3(0, -1, 0)
+	sp.spread = 55.0
+	sp.gravity = Vector3(0, -9.8, 0)
+	sp.initial_velocity_min = 2.0
+	sp.initial_velocity_max = 4.5
+	var sm := BoxMesh.new()
+	sm.size = Vector3(0.035, 0.035, 0.035)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.85, 0.92, 0.98, 0.8)
+	mat.roughness = 0.2
+	sm.material = mat
+	sp.mesh = sm
+	add_child(sp)
+	sp.emitting = true
+	get_tree().create_timer(1.2, false).timeout.connect(sp.queue_free)
+
+
 func _on_antenna_iced(iced: bool) -> void:
+	if not iced:
+		_cleared_anchors.clear()
 	for n in _ice_nodes:
 		n.visible = iced
 
@@ -1318,6 +1258,25 @@ func _build_shed() -> void:
 		_shed_padlock.position = pad_pos
 		add_child(_shed_padlock)
 		_shed_padlock_it = Geo.interactable(self, Vector3(0.5, 0.5, 0.5), pad_pos, null, Loc.t(&"it.frozen_padlock"), _on_shed_padlock_used)
+
+	# Тяжёлая железная цепь на воротах склада ГСМ со скрипом и постукиванием
+	var chain := Props.shed_chain()
+	chain.position = shed_center + Vector3(-total_len / 2.0 - 0.04, 0.0, 0.0)
+	add_child(chain)
+
+	var chain_it := Geo.interactable(self, Vector3(0.9, 1.2, 0.9), chain.position + Vector3(0, 1.2, 0), null, Loc.t(&"it.shed_chain"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.shed_chain"), 4.5)
+	)
+	chain_it.name = "ShedChainInteractable"
+
+	var chain_audio := AudioStreamPlayer3D.new()
+	chain_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/door_rattle.ogg") if ResourceLoader.exists("res://assets/sfx/cc0/door_rattle.ogg") else AudioDirector.cached_stream("res://assets/audio/clank.ogg")
+	chain_audio.position = chain.position + Vector3(0, 1.2, 0)
+	chain_audio.volume_db = -18.0
+	chain_audio.unit_size = 5.0
+	chain_audio.max_distance = 18.0
+	chain_audio.bus = &"SFX"
+	add_child(chain_audio)
 
 	# Занос/сугроб перед входом в сарай (начиная со второй ночи/дня)
 	var shed_drift_pos := shed_center + Vector3(-total_len / 2.0 - 0.7, 0.0, 0.0)
@@ -1677,6 +1636,48 @@ func _on_drift_dug(_p: Player) -> void:
 		Game.tasks.complete(&"meteo_dig")
 	set_task_prop(&"meteo_dig", false)
 	Game.hud.subtitle(Loc.t(&"sub.drift_done"), 3.0)
+
+
+func _interact_meteo_booth(booth_prop: MeteoBoothScreen, booth_pos: Vector3) -> void:
+	if booth_prop == null or not is_instance_valid(booth_prop):
+		EventBus.ui_requested.emit(&"thermometer")
+		return
+
+	if not booth_prop.is_open:
+		if booth_prop.is_frozen:
+			var held: StringName = Game.player.held if Game.player != null else &""
+			if held == &"crowbar" or held == &"axe" or held == &"shovel":
+				Game.audio.play_3d("res://assets/sfx/ice_hit.ogg", booth_pos, 0.0, 8.0, 1.2)
+				Game.hud.subtitle(Loc.t(&"sub.booth_hit"), 4.0)
+				Director.add_tension(6.0, "стук по будке Селянинова")
+				booth_prop.is_frozen = false
+				Game.set_flag("booth_unfrozen", true)
+			elif held == &"knife" or held == &"matches":
+				Game.audio.play_3d("res://assets/sfx/door_handle.ogg", booth_pos, 0.0, 6.0, 1.4)
+				Game.hud.subtitle(Loc.t(&"sub.booth_knife"), 4.0)
+				booth_prop.is_frozen = false
+				Game.set_flag("booth_unfrozen", true)
+			else:
+				Game.audio.play_3d("res://assets/sfx/breath_close.ogg", booth_pos, 0.0, 6.0, 1.0)
+				Game.hud.subtitle(Loc.t(&"sub.booth_breathe"), 4.0)
+				booth_prop.is_frozen = false
+				Game.set_flag("booth_unfrozen", true)
+				Game.set_flag("booth_breath_frost", true)
+
+		booth_prop.open_doors(true)
+		Game.audio.play_3d("res://assets/sfx/door_handle.ogg", booth_pos, -2.0)
+		Game.audio.play_3d("res://assets/sfx/house_creak.ogg", booth_pos, -6.0)
+
+		if Game.synoptic != null and Game.synoptic.wind_speed > 11.0:
+			get_tree().create_timer(0.35, false).timeout.connect(func() -> void:
+				if is_instance_valid(self):
+					Game.audio.play_3d("res://assets/sfx/door_knock.ogg", booth_pos, 0.0, 8.0, 1.2)
+					Game.hud.subtitle(Loc.t(&"sub.booth_wind_gust"), 4.0))
+
+		get_tree().create_timer(0.5, false).timeout.connect(func() -> void:
+			EventBus.ui_requested.emit(&"thermometer"))
+	else:
+		EventBus.ui_requested.emit(&"thermometer")
 
 
 func _on_mast_panel(_p: Player) -> void:
@@ -2813,13 +2814,14 @@ func _build_forest() -> void:
 			if rng.randf() < 0.12:
 				edge_points.append(p)
 		kinds.append(kind)
-		var cs := CollisionShape3D.new()
-		var sh := CylinderShape3D.new()
-		sh.radius = 0.3 * s
-		sh.height = 3.0
-		cs.shape = sh
-		cs.position = p + Vector3(0, 1.5, 0)
-		bodies.add_child(cs)
+		if d_house < 55.0 or _dist_to(_all_paths, p) < 10.0:
+			var cs := CollisionShape3D.new()
+			var sh := CylinderShape3D.new()
+			sh.radius = 0.3 * s
+			sh.height = 3.0
+			cs.shape = sh
+			cs.position = p + Vector3(0, 1.5, 0)
+			bodies.add_child(cs)
 	_build_windfall(edge_points, rng)
 
 	# Гранёные заснеженные ели (SpruceMesh): четыре вида — густая, стройная, молодая, сухостой.
@@ -3004,6 +3006,53 @@ func _csg(parent: Node, size: Vector3, pos: Vector3, mat: Material, subtract := 
 		b.material = mat
 	parent.add_child(b)
 	return b
+
+
+func _process_night6_bare_tracks(delta: float) -> void:
+	if not Game.is_night() or Game.night != 6:
+		return
+	var booth_pos := METEO + M_BOOTH
+	# До 02:00: следы босых ног ведут от будки во тьму тайги
+	if not _night6_tracks_spawned:
+		_night6_tracks_spawned = true
+		_bare_tracks_root = Node3D.new()
+		_bare_tracks_root.name = "Night6BareTracks"
+		add_child(_bare_tracks_root)
+		var out_route := PackedVector3Array([
+			booth_pos + Vector3(0, 0, 0.5),
+			booth_pos + Vector3(6.0, 0, 8.0),
+			booth_pos + Vector3(14.0, 0, 18.0),
+			booth_pos + Vector3(25.0, 0, 32.0)
+		])
+		Footprints.trail(_bare_tracks_root, &"bare", out_route, 0.02, 0.52)
+
+	# После 02:00: следы возвращаются, но шаг втрое длиннее (1.55 м)!
+	if Game.after_hour(2) and not _night6_return_tracks_spawned:
+		_night6_return_tracks_spawned = true
+		var return_route := PackedVector3Array([
+			booth_pos + Vector3(25.0, 0, 32.0),
+			booth_pos + Vector3(14.0, 0, 18.0),
+			booth_pos + Vector3(6.0, 0, 8.0),
+			booth_pos + Vector3(0, 0, 0.5),
+			DOOR_OUT
+		])
+		Footprints.trail(_bare_tracks_root, &"bare", return_route, 0.02, 1.55)
+		if Game.player != null and Game.player.global_position.distance_to(booth_pos) < 14.0:
+			Game.hud.subtitle(Loc.t(&"sub.night6_bare_tracks"), 5.5)
+			Director.add_tension(15.0, "босые следы с шагом 1.5 метра")
+
+	# Заметание следов ветром за ~90 секунд
+	if _bare_tracks_root != null and is_instance_valid(_bare_tracks_root):
+		for ch in _bare_tracks_root.get_children():
+			for fp in ch.get_children():
+				if not (fp is Node3D):
+					continue
+				var life: float = fp.get_meta("life", 120.0) - delta
+				fp.set_meta("life", life)
+				if life < 20.0:
+					(fp as Node3D).scale *= 0.99
+				if life <= 0.0:
+					fp.queue_free()
 
 
 # --- Уличные кошмары и сущности ----------------------------------------------
@@ -3706,6 +3755,7 @@ func _build_catenary_wire(a: Array, b: Array, sag: float) -> void:
 	mat.albedo_color = wire_col
 	mat.roughness = 0.8
 	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 
 
@@ -4364,23 +4414,11 @@ func _play_mi8_crash_fx() -> void:
 # --- Обустройство дороги от дома к метеокорпусу (Station Road Dressing) -------
 
 func _build_station_road_dressing() -> void:
-	# 1. Дощатые настилы / трапы (Plank Walkways) вдоль основной дороги к метеокорпусу:
+	# 1. Дощатые настилы / трапы (Plank Walkways) только у входных крылец зданий:
 	var trail_segments: Array[Array] = [
-		[Vector3(15.2, 0.0, 3.5), JUNCTION],
-		[JUNCTION, FORK],
-		[FORK, Vector3(40.0, 0.0, -14.0)],
-		[Vector3(40.0, 0.0, -14.0), Vector3(50.0, 0.0, -24.0)],
-		[Vector3(50.0, 0.0, -24.0), Vector3(58.0, 0.0, -28.5)],
-		[Vector3(58.0, 0.0, -28.5), Vector3(72.0, 0.0, -29.5)],
-		[Vector3(72.0, 0.0, -29.5), Vector3(84.0, 0.0, -27.6)],
-		[Vector3(84.0, 0.0, -27.6), CORPUS_PORCH],
-		# К калитке приборной площадки
-		[Vector3(58.0, 0.0, -28.5), Vector3(57.5, 0.0, -22.0)],
-		[Vector3(57.5, 0.0, -22.0), PLOT + Vector3(-5.6, 0.0, 0.0)],
-		# К дизельной / сараю ГСМ
-		[JUNCTION, Vector3(26.0, 0.0, 12.0)],
-		[Vector3(26.0, 0.0, 12.0), Vector3(36.0, 0.0, 24.0)],
-		[Vector3(36.0, 0.0, 24.0), SHED + Vector3(-4.9, 0.0, 0.0)],
+		[Vector3(15.2, 0.0, 3.5), Vector3(17.2, 0.0, 3.5)],          # Крыльцо жилого дома
+		[Vector3(84.5, 0.0, -27.6), CORPUS_PORCH],                   # Вход на крыльцо метеокорпуса
+		[Vector3(37.5, 0.0, 24.5), SHED + Vector3(-4.9, 0.0, 0.0)],  # Трап у сарая
 	]
 	for seg: Array in trail_segments:
 		var p0: Vector3 = seg[0]
@@ -4397,6 +4435,34 @@ func _build_station_road_dressing() -> void:
 		walkway.position = mid
 		walkway.rotation.y = atan2(d.x, d.z)
 		add_child(walkway)
+
+	# Штабель 200-литровых бочек «Арктика» (ГОСТ 305-82) на 28-м метре маршрута
+	var drum_stack := Props.arktika_drum_stack()
+	var ds_pos := Vector3(38.0, Terrain.height(38.0, -11.0), -11.0)
+	drum_stack.position = ds_pos
+	drum_stack.rotation.y = deg_to_rad(-22.0)
+	add_child(drum_stack)
+	var drum_it := Geo.interactable(self, Vector3(2.6, 2.0, 2.0), ds_pos + Vector3(0, 1.0, 0), null, Loc.t(&"it.arktika_barrels"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.arktika_barrels"), 5.0)
+	)
+	drum_it.name = "ArktikaBarrelsRoute"
+
+	var drum_wind := AudioStreamPlayer3D.new()
+	drum_wind.stream = AudioDirector.cached_stream("res://assets/audio/echo_loop.ogg")
+	drum_wind.volume_db = -22.0
+	drum_wind.unit_size = 5.0
+	drum_wind.max_distance = 16.0
+	drum_wind.bus = &"SFX"
+	drum_wind.position = ds_pos + Vector3(1.3, 0.8, 0)
+	add_child(drum_wind)
+	drum_wind.play()
+
+	# Уличный светильник СПО-200 на столбе на 56-м метре (маятник света над тропой к будке)
+	var spo_pos := Vector3(56.0, Terrain.height(56.0, -26.0), -26.0)
+	var spo_pole := Props.spo200_pole(5.4)
+	spo_pole.position = spo_pos
+	spo_pole.rotation.y = deg_to_rad(-45.0)
+	add_child(spo_pole)
 
 	# Поющий провод ЛЭП на ветру
 	var wire_sing := AudioStreamPlayer3D.new()
@@ -4454,17 +4520,6 @@ func _build_station_road_dressing() -> void:
 	pipe2.position = Vector3(48.0, Terrain.height(48.0, 39.0), 39.0)
 	pipe2.rotation.y = deg_to_rad(-45.0)
 	add_child(pipe2)
-
-	# 4. Деревянный указатель маршрута на развилке (сдвинут на обочину, не перекрывает настил)
-	var sign_pos := Vector3(25.0, Terrain.height(25.0, 5.5), 5.5)
-	var sign_prop := Props.arrow_sign(Loc.t(&"it.sign_meteo_route"))
-	sign_prop.position = sign_pos
-	sign_prop.rotation.y = deg_to_rad(-25.0)
-	add_child(sign_prop)
-	var sign_it := Geo.interactable(self, Vector3(1.8, 1.6, 1.8), sign_pos + Vector3(0, 1.0, 0), null, Loc.t(&"it.sign_meteo_route"), func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.t(&"sub.sign_meteo_route"), 5.0)
-	)
-	sign_it.name = "SignMeteoRoute"
 
 	# 5. Гусеничный трактор ТДТ-55 (на тракторной стоянке у сарая дизельной, не посреди двора)
 	var tractor_pos := Vector3(44.0, Terrain.height(44.0, 30.0), 30.0)
@@ -4637,19 +4692,6 @@ func _build_yard_clutter() -> void:
 	var kindling := Props.woodbox(3)
 	kindling.position = kindling_pos
 	add_child(kindling)
-
-	# 5. Дополнительная линия снегозащитных щитов вдоль северного поля
-	var fence_pts: Array[Vector3] = [
-		Vector3(48.0, 0.0, -35.0),
-		Vector3(50.5, 0.0, -36.5),
-		Vector3(53.0, 0.0, -38.0),
-	]
-	for fp in fence_pts:
-		var fence := Props.snow_fence(2.6, 1.7)
-		fence.position = Vector3(fp.x, Terrain.height(fp.x, fp.z), fp.z)
-		fence.rotation.y = deg_to_rad(-38.0)
-		add_child(fence)
-		SiteDressing.drift(self, fence.position + Vector3(0.4, 0, -0.6), 2.8, 0.7, 1.2, -38.0)
 
 
 

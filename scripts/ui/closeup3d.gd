@@ -54,6 +54,18 @@ func setup(eye: Vector3, target: Vector3, fov: float, axis := Vector3.UP, lo := 
 			_container.stretch_shrink = 1
 
 
+func set_spot_pose(pos: Vector3, rot: Vector3) -> void:
+	if _spot != null:
+		_spot.position = pos
+		_spot.rotation = rot
+
+
+func reset_spot_pose() -> void:
+	if _spot != null:
+		_spot.position = Vector3(-0.08, -0.05, 0.0)
+		_spot.rotation = Vector3.ZERO
+
+
 func _exit_tree() -> void:
 	if _container != null and is_instance_valid(_container) and _prev_shrink > 0:
 		_container.stretch_shrink = _prev_shrink

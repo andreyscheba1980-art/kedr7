@@ -88,6 +88,11 @@ var _contact_lesson := false
 
 ## Уровень 1: «Невидимый агент» (Математика в памяти)
 var virtual_pos := Vector2(35.0, -75.0)   ## координаты твари в тайге
+var creature_pos: Vector3:
+	get:
+		if _creature != null and is_instance_valid(_creature) and _creature.visible:
+			return _creature.global_position
+		return Vector3(virtual_pos.x, 0.0, virtual_pos.y)
 var _target_noise_pos := Vector2.ZERO
 var _has_noise_target := false
 var _patrol_idx := 0

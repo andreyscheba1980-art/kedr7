@@ -214,7 +214,10 @@ func _process(delta: float) -> void:
 		var tension_factor := Director.tension / 100.0 if Game.is_night() else 0.0
 		var fatigue_factor := Game.fatigue / 100.0 if Game.is_night() else 0.0
 		var vig_target := clampf(tension_factor * 0.55 + fatigue_factor * 0.35, 0.0, 0.82)
-		_dark_vignette.modulate.a = lerpf(_dark_vignette.modulate.a, vig_target, minf(delta * 2.0, 1.0))
+		if Game.retinal_dazzle > 0.0:
+			vig_target = maxf(vig_target, Game.retinal_dazzle)
+		var k_vig := 4.5 if Game.retinal_dazzle > _dark_vignette.modulate.a else 2.0
+		_dark_vignette.modulate.a = lerpf(_dark_vignette.modulate.a, vig_target, minf(delta * k_vig, 1.0))
 	_update_flash(delta)
 	_update_breath(delta)
 	if _held_label != null:
