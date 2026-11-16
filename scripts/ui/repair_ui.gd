@@ -34,6 +34,10 @@ var _status := ""
 
 ## kind: &"rhythm" или &"sequence"; steps — подписи шагов (для sequence — по одному на клавишу).
 static func open(kind: StringName, title_key: StringName, on_done: Callable, need := 3, steps: Array = []) -> void:
+	if not Flags.on(&"board_repair"):
+		if on_done.is_valid():
+			on_done.call()
+		return
 	_req = {"kind": kind, "title": Loc.t(title_key), "done": on_done, "need": need, "steps": steps}
 	EventBus.ui_requested.emit(&"repair")
 

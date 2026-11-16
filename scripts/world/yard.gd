@@ -87,6 +87,7 @@ var _mast_ground_sparks: CPUParticles3D
 var _mast_ground_sound: AudioStreamPlayer3D
 var _mast_shadow: MeshInstance3D
 var _mast_shadow_mat: StandardMaterial3D
+var _mast_beacon_mesh: MeshInstance3D
 var _zimnik_cd := 0.0
 var _t := 0.0
 var _shed_tracks_done := false
@@ -212,6 +213,8 @@ func _ready() -> void:
 	_build_frozen_hunter()
 	_build_station_road_dressing()
 	_build_yard_clutter()
+	const FootstepsTrailClass = preload("res://scripts/world/footsteps_trail.gd")
+	add_child(FootstepsTrailClass.new())
 	if (Game.is_day() and Game.phase_index == 1) or (Game.is_night() and Game.night >= 2):
 		_build_footprints()
 	EventBus.antenna_iced_changed.connect(_on_antenna_iced)
@@ -238,6 +241,15 @@ func _process(delta: float) -> void:
 		for h in _mast_halos:
 			if h != null:
 				h.visible = halo_on
+	if _mast_beacon_mesh != null and _mast_beacon_mesh.material_override != null:
+		var b_mat := _mast_beacon_mesh.material_override as StandardMaterial3D
+		if _mast_lamp_out or Game.is_daylight():
+			_mast_beacon_mesh.visible = false
+		else:
+			var pulse := 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.004)
+			var vis := Storm.clarity * Storm.clarity * pulse
+			b_mat.albedo_color.a = vis
+			_mast_beacon_mesh.visible = vis > 0.02
 	if _repeater_light != null:
 		var rep_e := 1.0 if fmod(_t + 0.7, 2.2) < 0.4 else 0.0
 		if _repeater_light.light_energy != rep_e:
@@ -1036,6 +1048,21 @@ func _build_mast() -> void:
 	]
 	Geo.bulb(_mast_light, &"red", 0.14)
 	Game.level.register_lamp(_mast_light)
+
+	# Штормовой янтарный маяк (навигационный ориентир в метели)
+	var beacon_quad := QuadMesh.new()
+	beacon_quad.size = Vector2(4.5, 4.5)
+	_mast_beacon_mesh = MeshInstance3D.new()
+	_mast_beacon_mesh.mesh = beacon_quad
+	_mast_beacon_mesh.position = MAST + Vector3(0, 16.83, 0)
+	var b_mat := StandardMaterial3D.new()
+	b_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	b_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	b_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	b_mat.disable_fog = true
+	b_mat.albedo_color = Color(1.0, 0.65, 0.15, 0.0)
+	_mast_beacon_mesh.material_override = b_mat
+	add_child(_mast_beacon_mesh)
 
 
 static func _make_mast_shadow_texture() -> ImageTexture:

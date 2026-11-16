@@ -1001,7 +1001,8 @@ func _update_debug() -> void:
 		"ctx: %s   fatigue %.0f" % [ctx.describe(), Game.fatigue],
 		"scares: %d   seed: %d   fuel: %.0f%%" % [Director.scares_played, Game.run_seed, Game.generator_fuel],
 		"fps %d   frame %.1f ms   draw calls %d   render %dx%d" % [Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)), int(get_viewport().get_visible_rect().size.x) / Settings.render_shrink(), int(get_viewport().get_visible_rect().size.y) / Settings.render_shrink()],
-		"warmth %.0f  flash %.0f  stove %.0f  storm %.2f  rope %.1f m" % [Game.warmth, Game.flash_charge, Game.stove_wood, Game.weather.intensity if Game.weather != null else 0.0, Game.yard.distance_to_path(Game.player.global_position) if Game.yard != null and Game.player != null else 0.0],
+		"STORM clarity: %.2f (int: %.2f)  ATTENTION: %.1f (tier %d)" % [Storm.clarity, Storm.intensity, Attention.value, Attention.tier],
+		"warmth %.0f  flash %.0f  stove %.0f  lost_time: %.1f s" % [Game.warmth, Game.flash_charge, Game.stove_wood, float(Game.player.get("nav_sense").lost_time) if Game.player != null and Game.player.get("nav_sense") != null else 0.0],
 		"Yrka: %.0f (%+.1f/s) %s" % [Game.yrka.threat, Game.yrka.rate, Game.yrka.stage_name()] if Game.yrka != null else "",
 		"",
 	]

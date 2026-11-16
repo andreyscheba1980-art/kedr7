@@ -63,6 +63,8 @@ func _process(delta: float) -> void:
 		elif Game.synoptic != null and Game.synoptic.front_type == &"storm":
 			max_fog = 0.26
 		var outdoor_fog := FOG_DAY if Game.is_daylight() else lerpf(FOG_CALM, max_fog, intensity)
+		if not Game.is_daylight() and not Game.is_indoors():
+			outdoor_fog = lerpf(max_fog, 0.025, Storm.clarity)
 		var target_fog := FOG_INDOOR if Game.is_indoors() else outdoor_fog
 		_env.fog_density = lerpf(_env.fog_density, target_fog, minf(delta * 3.0, 1.0))
 		# Небо затягивает: днём пасмурно, ночью — ясно до первой метели.

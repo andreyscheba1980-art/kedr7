@@ -686,13 +686,13 @@ func _compute_rate() -> float:
 		r += 0.3          # жучок привлекает
 	if p.is_sprinting() and threat >= WHISTLE_AT:
 		r += 1.0          # правило 6: свист — не беги, бег он слышит
-	# Если игрок держится за леер (спасательный трос), угроза растёт медленнее
-	if Game.yard != null:
-		var dist_to_rope := Game.yard.distance_to_path(p_pos)
-		if dist_to_rope < 2.5:
-			r *= 0.65
-		elif dist_to_rope > 6.0:
-			r += 1.25     # сошёл с леера в темноту и сугробы
+	# Чувство ориентирования: если игрок потерял ориентиры в метели, угроза растёт быстрее
+	if p.get("nav_sense") != null:
+		var lost: float = float(p.get("nav_sense").get("lost_time"))
+		if lost < 4.0:
+			r *= 0.7   # ориентиры видны/слышны (крыльцо, маяк, дизель)
+		elif lost > 8.0:
+			r += 1.25 * clampf((lost - 8.0) / 10.0, 0.0, 2.0) # затерялся в белой мгле
 	if Game.after_hour(2):
 		r *= 1.25          # сбалансировано, чтобы успевать делать ночные дела
 	if Game.after_hour(3):

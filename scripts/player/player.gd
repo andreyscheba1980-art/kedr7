@@ -114,6 +114,10 @@ var _drift_dir := 1.0              ## направление увода по к�
 var _circle_warned := false
 var kettle_heat_timer := 0.0       ## таймер тепла чайника на морозе (секунды)
 
+var nav_sense: Node = null
+var _last_yaw: float = 0.0
+var _snap_cd: float = 0.0
+
 # Динамические психосоматические модификаторы (Deep Phobia Engine)
 var fov_offset: float = 0.0
 var stamina_drain_mult: float = 1.0
@@ -232,6 +236,10 @@ func _ready() -> void:
 	_build_flash_dust()
 	_build_flashlight_beam()
 	_build_breath_emitter()
+	const NavigationSenseClass = preload("res://scripts/player/navigation_sense.gd")
+	nav_sense = NavigationSenseClass.new()
+	nav_sense.name = "NavigationSense"
+	add_child(nav_sense)
 	Game.player = self
 	if Game.is_prologue_trail() and not Game.has_flag("in_cabin") and Game.has_flag("left_cabin"):
 		flashlight.visible = true
@@ -412,6 +420,18 @@ func _physics_process(delta: float) -> void:
 		_slope_roll = lerpf(_slope_roll, target_slope_roll, minf(delta * 6.0, 1.0))
 	else:
 		_slope_roll = lerpf(_slope_roll, 0.0, minf(delta * 4.0, 1.0))
+
+	# Отслеживание резкого разворота в темноте снаружи (триггер внимания Ырки)
+	if delta > 0.0:
+		var yaw_speed := absf(angle_difference(_last_yaw, rotation.y)) / delta
+		_last_yaw = rotation.y
+		if _snap_cd > 0.0:
+			_snap_cd -= delta
+		if Game.is_outside() and not Game.is_daylight() and yaw_speed > 4.2 and _snap_cd <= 0.0:
+			Attention.add(6.0)
+			_snap_cd = 1.0
+		if flashlight != null and flashlight.visible and Game.is_outside() and not Game.is_daylight():
+			Attention.add(0.4 * delta)
 
 	var dir := Vector3.ZERO
 	_sprinting = false
@@ -1004,6 +1024,8 @@ func _update_extra_step(delta: float) -> void:
 		var step_thresh := 2.2
 		if Game.psychosomatic != null and Game.psychosomatic.has_method(&"get_extra_step_threshold"):
 			step_thresh = float(Game.psychosomatic.call(&"get_extra_step_threshold"))
+		if Attention.tier >= 1:
+			step_thresh = minf(step_thresh, 1.3)
 		if _walk_outside_time > step_thresh and not _extra_step_pending and Game.is_outside() and Game.is_night():
 			_extra_step_pending = true
 			_play_delayed_extra_step()
@@ -1013,7 +1035,10 @@ func _update_extra_step(delta: float) -> void:
 func _play_delayed_extra_step() -> void:
 	var delay := 0.42
 	var behind_dist := 2.2
-	if Game.psychosomatic != null and Game.psychosomatic.has_method(&"get_delayed_step_params"):
+	if Attention.tier >= 1:
+		delay = randf_range(0.35, 0.65)
+		behind_dist = randf_range(1.6, 2.6)
+	elif Game.psychosomatic != null and Game.psychosomatic.has_method(&"get_delayed_step_params"):
 		var p: Vector2 = Game.psychosomatic.call(&"get_delayed_step_params")
 		delay = p.x
 		behind_dist = p.y
@@ -1024,6 +1049,7 @@ func _play_delayed_extra_step() -> void:
 	var behind := global_position + global_transform.basis.z * behind_dist   # +Z тела — это за спиной
 	var snd: String = STEPS_SNOW[randi() % STEPS_SNOW.size()]
 	Game.audio.play_3d(snd, behind, -4.0, 6.0)
+	Attention.add(2.0)
 	Director.add_tension(8.0, "шаг за спиной")
 
 

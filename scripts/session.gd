@@ -595,6 +595,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _open_ui(id: StringName) -> void:
+	if not Flags.on(id):
+		return
 	var ui: Control
 	match id:
 		&"map":

@@ -137,6 +137,9 @@ var _susedko_timer := 45.0
 var _susedko_peeking := false
 var _window_wiped := false
 var _wipe_it: Interactable
+var _north_frost_mat: ShaderMaterial = null
+var _window_wiped_radius := 0.0
+var _attn_event_timer := 25.0
 var _house_draft_sfx_timer := 0.0
 var _creak_t := 60.0   ## дом «садится» на морозе — скрип брёвен, просто фон
 var _attic_searched := false
@@ -226,6 +229,7 @@ func _ready() -> void:
 	EventBus.chimney_iced_changed.connect(_on_chimney_iced)
 	EventBus.clock_minute.connect(_on_clock_minute)
 	_on_chimney_iced(Game.chimney_iced)
+	AudioMix.set_indoor(1.0 if not door_open else 0.0)
 
 
 var _last_pips_hour := -1
@@ -428,10 +432,20 @@ func _process(delta: float) -> void:
 		var threat_near := (Game.events != null and Game.events.knocking) or (Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and Game.yrka.threat >= 68.0)
 		if gen_running:
 			var ui_open := Game.player != null and Game.player.mode == Player.Mode.UI and Game.zone == &"gen_shack"
-			_gen_engine_player.attenuation_filter_cutoff_hz = 20500.0 if (ui_open or shack_door_open or Game.zone == &"gen_shack") else 3200.0
 			target_eng_vol = -3.5 if ui_open else -5.5
 			if not shack_door_open and not ui_open and Game.zone != &"gen_shack":
 				target_eng_vol -= 5.0
+			
+			# Учёт сноса звука дизеля ветром (звуковая навигация в метели)
+			var cam := get_viewport().get_camera_3d() if get_viewport() != null else null
+			var carry := 0.0
+			if cam != null:
+				var to_cam := (cam.global_position - _gen_engine_player.global_position).normalized()
+				carry = Storm.wind_dir.dot(to_cam)
+			target_eng_vol += carry * 5.0
+			var base_cutoff := 20500.0 if (ui_open or shack_door_open or Game.zone == &"gen_shack") else lerpf(1500.0, 5000.0, carry * 0.5 + 0.5)
+			_gen_engine_player.attenuation_filter_cutoff_hz = base_cutoff
+
 			var base_pitch := 1.02 if (Game.dga_ap50_engaged or Game.power_on) else 0.84
 			if threat_near:
 				_gen_engine_player.pitch_scale = lerpf(_gen_engine_player.pitch_scale, 0.65, minf(delta * 2.0, 1.0))
@@ -546,6 +560,25 @@ func _process(delta: float) -> void:
 		if absf(cov - _frost_cov) > 0.004 and _frost_mat != null:
 			_frost_cov = move_toward(_frost_cov, cov, delta * 0.05)
 			_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
+			if _north_frost_mat != null:
+				_north_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
+
+		# Управление таянием и повторным замерзанием протёртого окна
+		if _north_frost_mat != null and _window_wiped_radius > 0.0:
+			if Game.stove_wood <= 0.0 or Game.house_cold > 0.4:
+				_window_wiped_radius = maxf(0.0, _window_wiped_radius - delta * 0.006)
+				if _window_wiped_radius <= 0.02:
+					_window_wiped = false
+					_window_wiped_radius = 0.0
+					if is_instance_valid(_wipe_it):
+						_wipe_it.collision_layer = 1
+			else:
+				_window_wiped_radius = minf(0.48, _window_wiped_radius + delta * 0.002)
+			_north_frost_mat.set_shader_parameter(&"clear_radius", _window_wiped_radius)
+
+	# Фаза 3: Внимание Ырки и события изоляции
+	if Game.is_night() and not is_backdrop and Game.clock_running:
+		_process_attention_events(delta)
 
 	# Барограф М-22 как сейсмо-детектор аномалий и скачков давления
 	if Game.is_night() and not is_backdrop:
@@ -1935,7 +1968,12 @@ func _window_frost(glass_pos: Vector3, size: Vector3, inward: Vector3, along_x: 
 	q.size = Vector2(size.x if along_x else size.z, size.y)
 	var mi := MeshInstance3D.new()
 	mi.mesh = q
-	mi.material_override = _frost_mat
+	var is_north := absf(glass_pos.x - 9.2) < 0.5 and absf(glass_pos.z - (-2.0)) < 0.5
+	if is_north:
+		_north_frost_mat = _frost_mat.duplicate() as ShaderMaterial
+		mi.material_override = _north_frost_mat
+	else:
+		mi.material_override = _frost_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var thick := minf(size.x, size.z)
 	mi.position = glass_pos + inward * (thick * 0.5 + 0.006)
@@ -2577,14 +2615,15 @@ func _build_radio_room() -> void:
 
 	# Протирка стекла северного окна от инея и наледи
 	_wipe_it = Geo.interactable(self, Vector3(0.9, 0.6, 0.3), Vector3(9.2, 1.45, -1.95), null, "", func(_p: Player) -> void:
-		if not _window_wiped:
-			_window_wiped = true
-			if is_instance_valid(_wipe_it):
-				_wipe_it.collision_layer = 0
-			Game.audio.play_2d("res://assets/audio/step_snow_1.ogg", -2.0)
-			Game.hud.subtitle(Loc.t(&"sub.window_wiped"), 3.5)
-		else:
-			Game.hud.subtitle(Loc.t(&"sub.window_wiped"), 2.0)
+		_window_wiped = true
+		_window_wiped_radius = 0.38
+		if _north_frost_mat != null:
+			_north_frost_mat.set_shader_parameter(&"clear_center", Vector2(0.5, 0.5))
+			_north_frost_mat.set_shader_parameter(&"clear_radius", _window_wiped_radius)
+		if is_instance_valid(_wipe_it):
+			_wipe_it.collision_layer = 0
+		Game.audio.play_2d("res://assets/audio/step_snow_1.ogg", -2.0)
+		Game.hud.subtitle(Loc.p("Протёр рукавом кружок на замёрзшем стекле.", "Wiped a circle on the frozen glass with my sleeve."), 3.5)
 	)
 	_wipe_it.name = "WindowWipe"
 	_wipe_it.prompt_provider = func() -> String:
@@ -3445,8 +3484,8 @@ func _build_generator_shack() -> void:
 		eng_s = eng_s.duplicate()
 		(eng_s as AudioStreamOggVorbis).loop = true
 	_gen_engine_player.stream = eng_s
-	_gen_engine_player.unit_size = 4.5
-	_gen_engine_player.max_distance = 45.0
+	_gen_engine_player.unit_size = 5.0
+	_gen_engine_player.max_distance = 65.0
 	_gen_engine_player.volume_db = -80.0
 	_gen_engine_player.bus = &"SFX"
 	_gen_engine_player.autoplay = true
@@ -3814,6 +3853,7 @@ func set_door_open(open: bool) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.phobia_door_hesitate"), 3.0)
 		await get_tree().create_timer(0.32, false).timeout
 	door_open = open
+	AudioMix.set_indoor(0.0 if open else 1.0)
 	if not open and Game.radio != null and Game.radio.tube_synth != null:
 		Game.radio.tube_synth.trigger_tube_microphonics(1.0)
 	if open:
@@ -3910,6 +3950,74 @@ func jiggle_door_handle() -> void:
 	var tw := create_tween()
 	tw.tween_property(_door_hinge, "rotation:y", deg_to_rad(1.8), 0.12)
 	tw.tween_property(_door_hinge, "rotation:y", deg_to_rad(0.0), 0.12)
+
+
+func _process_attention_events(delta: float) -> void:
+	_attn_event_timer -= delta
+	if _attn_event_timer > 0.0:
+		return
+
+	var tier: int = Attention.tier
+	if tier == 0:
+		_attn_event_timer = Game.rng.randf_range(40.0, 70.0)
+		return
+
+	if tier == 1:
+		_attn_event_timer = Game.rng.randf_range(25.0, 45.0)
+		if randf() < 0.5:
+			# Внезапный провал ветра (вакуум)
+			AudioDirector.play_raw("res://assets/audio/sub_drop.ogg", -4.0)
+			AudioMix.set_indoor(1.0)
+			if AudioMix.filter != null:
+				AudioMix.filter.cutoff_hz = 400.0
+			var t := get_tree()
+			if t != null:
+				t.create_timer(3.2).timeout.connect(func() -> void:
+					if is_instance_valid(self):
+						AudioMix.set_indoor(0.0 if door_open else 1.0)
+				)
+			if Game.is_home() and randf() < 0.45:
+				Game.hud.subtitle(Loc.p("Ветер за стеной вдруг оборвался. Полная тишина.", "The wind outside suddenly cut out. Dead silence."), 3.5)
+		else:
+			# Одиночный скрип или шаг в снегу за стеной
+			var wall_pos: Vector3 = Vector3(9.2, 0.2, -2.5) if randf() < 0.5 else Vector3(-2.8, 0.2, 3.3)
+			Game.audio.play_3d("res://assets/audio/step_snow_%d.ogg" % randi_range(1, 4), wall_pos, -2.0, 8.0)
+
+	elif tier == 2:
+		_attn_event_timer = Game.rng.randf_range(20.0, 35.0)
+		var choice := randi() % 3
+		if choice == 0 and window_spots.size() > 0:
+			var ws: Dictionary = window_spots[randi() % window_spots.size()]
+			var glass_p: Vector3 = ws.get("glass", Vector3(9.2, 1.45, -2.0))
+			Game.audio.play_3d("res://assets/audio/knock.ogg", glass_p, 0.0, 7.0)
+			if Game.is_home():
+				Game.hud.subtitle(Loc.p("Тихий резкий стук в стекло...", "A quiet, sharp tap on the glass..."), 3.0)
+		elif choice == 1:
+			var scratch_pos: Vector3 = Vector3(3.5, 0.1, 2.5)
+			Game.audio.play_3d("res://assets/audio/tree_creak.ogg", scratch_pos, -3.0, 6.0)
+		else:
+			jiggle_door_handle()
+			var d_pos := _door_hinge.global_position if _door_hinge != null else Vector3(14.5, 0.0, 2.6)
+			if Game.is_home() and Game.player != null and Game.player.global_position.distance_to(d_pos) < 6.0:
+				Game.hud.subtitle(Loc.p("Кто-то мягко толкнул входную дверь снаружи.", "Someone gently pushed the outer door from outside."), 3.5)
+
+	elif tier >= 3:
+		_attn_event_timer = Game.rng.randf_range(15.0, 25.0)
+		if _window_wiped and Storm.clarity > 0.4 and _window_shadow != null:
+			_window_shadow.visible = true
+			_window_shadow.position = Vector3(9.2, 1.4, -6.0)
+			var t := get_tree()
+			if t != null:
+				t.create_timer(2.2).timeout.connect(func() -> void:
+					if is_instance_valid(_window_shadow):
+						_window_shadow.visible = false
+				)
+			if Game.is_home() and Game.player != null and Game.player.is_looking_at(Vector3(9.2, 1.4, -2.0), 45.0):
+				Game.hud.subtitle(Loc.p("В просвете метели у леса — силуэт. Стоит и смотрит.", "In the blizzard gap by the trees — a silhouette. Standing and watching."), 4.0)
+		else:
+			Game.audio.play_3d("res://assets/audio/ice_hit.ogg", Vector3(6.0, 2.2, 2.0), 2.0, 12.0)
+			if Game.is_home():
+				Game.hud.subtitle(Loc.p("Тяжёлый глухой удар в стену сруба!", "A heavy, dull thud against the cabin log wall!"), 3.0)
 
 
 func _flash_window_face() -> void:
@@ -4260,7 +4368,7 @@ func _update_woodbox_visual() -> void:
 
 
 func _open_darkroom() -> void:
-	if Game.hud == null:
+	if not Flags.on(&"photolab") or Game.hud == null:
 		return
 	var dr := DarkroomUI.new()
 	Game.hud.open_modal(dr)

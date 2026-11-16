@@ -6,11 +6,16 @@ render_mode blend_mix, cull_disabled, depth_draw_never, diffuse_lambert, specula
 uniform sampler2D frost_tex : filter_linear_mipmap;
 uniform float coverage = 0.25;
 uniform vec3 tint : source_color = vec3(0.82, 0.9, 1.0);
+uniform vec2 clear_center = vec2(-1.0);   // точка, протёртая рукавом
+uniform float clear_radius = 0.0;
 
 void fragment() {
 	vec4 t = texture(frost_tex, UV);
 	float a = smoothstep(t.r - 0.07, t.r + 0.02, coverage);
 	a *= mix(0.5, 1.0, t.g);
+	if (clear_radius > 0.0) {
+		a *= smoothstep(clear_radius, clear_radius + 0.06, distance(UV, clear_center));
+	}
 	ALBEDO = tint;
 	ALPHA = a * 0.9;
 	ROUGHNESS = 0.6;

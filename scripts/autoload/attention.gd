@@ -1,0 +1,28 @@
+# res://scripts/autoload/attention.gd
+extends Node
+
+## «Внимание» Ырки (Phase 3 core).
+## Шкала внимания (0..100) и уровни тревоги (tiers 0..3).
+signal tier_changed(tier: int)
+
+const TIERS := [20.0, 45.0, 75.0]
+var value := 0.0
+var tier := 0
+
+func reset() -> void:
+	value = 0.0
+	tier = 0
+	tier_changed.emit(0)
+
+func add(a: float) -> void:
+	value = clampf(value + a, 0.0, 100.0)
+
+func _process(dt: float) -> void:
+	value = maxf(0.0, value - 1.5 * dt)  # тайга «забывает» со временем
+	var t := 0
+	for th in TIERS:
+		if value >= th:
+			t += 1
+	if t != tier:
+		tier = t
+		tier_changed.emit(t)

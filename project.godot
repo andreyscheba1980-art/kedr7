@@ -26,6 +26,10 @@ driver/enable_input=true
 
 [autoload]
 
+Flags="*res://scripts/autoload/flags.gd"
+Storm="*res://scripts/autoload/storm.gd"
+Attention="*res://scripts/autoload/attention.gd"
+AudioMix="*res://scripts/autoload/audio_mix.gd"
 Loc="*res://scripts/autoload/loc.gd"
 Settings="*res://scripts/autoload/settings.gd"
 SaveGame="*res://scripts/autoload/save_game.gd"

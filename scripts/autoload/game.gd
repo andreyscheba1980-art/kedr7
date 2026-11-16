@@ -410,6 +410,7 @@ func setup_phase(kind: StringName, index: int) -> void:
 	padlock_shack_frozen = true
 	padlock_thaw_t = 0.0
 	flares = (4 if is_story() else 2 if SaveGame.difficulty == "hard" else 3) if SaveGame.items.has(&"flare_gun") else 0
+	Attention.reset()
 	if kind == &"night":
 		cfg = Phases.night(index)
 		night = index
