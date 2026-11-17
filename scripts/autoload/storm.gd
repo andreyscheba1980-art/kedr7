@@ -12,6 +12,10 @@ var clarity := 0.0     # 0 = белая стена, 1 = просвет
 var _gap_timer := 5.0
 var _gap_left := 0.0
 
+func force_gap(duration: float) -> void:
+	_gap_left = maxf(_gap_left, duration)
+	_gap_timer = maxf(_gap_timer, duration + 6.0)
+
 func _process(delta: float) -> void:
 	_gap_timer -= delta
 	if _gap_timer <= 0.0:

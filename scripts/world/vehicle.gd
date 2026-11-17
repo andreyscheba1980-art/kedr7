@@ -10,9 +10,8 @@ extends Node3D
 const ENGINE := "res://assets/audio/engine_loop.ogg"
 const CABIN_SEAT_LOCAL := Vector3(0.50, 0.42, -0.95)
 const CABIN_DRIVER_LOCAL := Vector3(-0.52, 0.03, -0.95)
-const DRIVE_TIME := 58.0          ## сколько едем по зимнику до перемёта (разговор, «попутчик», стуки)
+const DRIVE_TIME := 32.0          ## сколько едем по зимнику до высадки
 const BACK_M := 220.0             ## откуда начинаем — метров дальше по дороге от места, где сядем
-const DIG_SPOTS := [Vector3(-1.45, 0.0, -2.4), Vector3(1.45, 0.0, -2.4)]   ## перемёт у передних катков (оси тягача)
 const STEP_M := 2.0
 
 static var _instance: Vehicle
@@ -65,19 +64,10 @@ var _can_exit := false:
 			Game.hud.set_prompt(Loc.t(&"cab.exit"))
 var _driving := false
 var _leaving := false
+var _reversing := false
 var _yaw_set := false
-var _dug := 0                      ## сколько гусениц откопано
-var _dig_nodes: Array[Node3D] = []
-var _talk_done := false
-var _gave_up := false
 var _engine_dead := false
 var _beams: Array[Light3D] = []
-var _alone_said := false
-var _leash_hinted := false
-var _rush := false                 ## после стуков Михалыч гонит — и с ходу в перемёт
-var _hand: Node3D                  ## ладонь за инеем окна двери
-var _door_print: Vector3           ## где снаружи у двери кончаются босые следы
-const LEASH_M := 30.0      ## пока Михалыч не договорил, дальше от тягача не уйти: иначе вся просека — молча
 
 
 # --- API для пролога и игрока ------------------------------------------------------
@@ -641,7 +631,7 @@ func _say(key: StringName, look_yaw: float, wait: float) -> bool:
 	return _in_cabin and is_inside_tree()
 
 
-## Полминуты в кабине: едем, три реплики, тормоз, «дальше пешком».
+## Полминуты в кабине: едем, скупой разговор, остановка у развилки, напутствие, «дальше пешком».
 func _run_cabin() -> void:
 	await get_tree().process_frame     # карточка загрузки и холодный старт включаются в этом же кадре
 	await get_tree().process_frame
@@ -649,57 +639,65 @@ func _run_cabin() -> void:
 		await get_tree().process_frame
 	_driving = true
 	_talking = true
-	await get_tree().create_timer(2.0, false).timeout
-	# Разговор в кабине: кто ты, зачем сюда, что было с Семёновым, байки про ырку — и уговор про три гудка.
-	# [ключ, куда смотрит Михалыч (°), минимум секунд]. Реплики Виктора — Михалыч смотрит на дорогу.
-	# Посередине — крючок: человек у обочины, рация зовёт позывным станции, три стука в окно.
-	for ln: Array in [[&"cab.1", -42.0, 3.0], [&"cab.2", -12.0, 2.4], [&"cab.3", -36.0, 3.2]]:
-		if not await _say(ln[0], ln[1], ln[2]):
-			_talking = false
-			return
-		await get_tree().create_timer(0.35, false).timeout
-	if not await _hook_figure():
+	AudioMix.set_indoor(0.85)
+	await get_tree().create_timer(1.8, false).timeout
+
+	# Михалыч курит, неторопливый северный разговор
+	if not await _say(&"cab.1", -42.0, 3.0):
 		_talking = false
 		return
-	# Виктор заговаривает о другом — лишь бы не молчать
-	for ln: Array in [
-		[&"cab.4", -10.0, 2.6], [&"cab.5", -36.0, 2.8], [&"cab.6", -12.0, 2.2], [&"cab.7", -40.0, 3.4],
-		[&"cab.11", -38.0, 3.5], [&"cab.12", -10.0, 3.2], [&"cab.13", -40.0, 3.0],
-		[&"cab.14", -10.0, 2.2], [&"cab.15", -36.0, 3.8], [&"cab.16", -10.0, 2.0],
-		[&"cab.17", -42.0, 4.2], [&"cab.18", -46.0, 4.4]
-	]:
-		if not await _say(ln[0], ln[1], ln[2]):
-			_talking = false
-			return
-		await get_tree().create_timer(0.35, false).timeout
-	await _hook_knock()
-	_talking = false
-	while _driving and _in_cabin:
-		await get_tree().process_frame
-	# Перемёт: тягач зарывается носом в сугроб, лязг металла, дизель взвывает
-	AudioDirector.play_raw("res://assets/audio/ice_hit_v2.ogg", 3.0)
-	AudioDirector.play_raw("res://assets/audio/sub_drop.ogg", 2.2)
-	AudioDirector.play_raw("res://assets/audio/clank.ogg", 3.0)
-	if _warn_mat != null:
-		_warn_mat.emission_energy_multiplier = 3.5
-	_pendant_vel += Vector2(6.5, 3.2)
-	var tw := create_tween().set_parallel(true)
-	tw.tween_property(self, "_lever_pull", deg_to_rad(-28.0), 0.30).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(_tracked, "rotation:z", deg_to_rad(6.5), 0.45).set_trans(Tween.TRANS_BACK)
-	tw.tween_property(_tracked, "position:y", -0.40, 0.45)
-	if Game.player != null:
-		Game.player.shake(0.22, 0.85)
-	create_tween().tween_property(_engine, "pitch_scale", 1.45, 0.6)
-	_spray(1.6)
-	await get_tree().create_timer(1.6, false).timeout
-	create_tween().tween_property(_engine, "pitch_scale", 0.8, 1.0)
-	create_tween().tween_property(self, "_lever_pull", 0.0, 0.8)
 	await get_tree().create_timer(0.8, false).timeout
+
+	if not await _say(&"cab.stove_hint", -38.0, 3.4):
+		_talking = false
+		return
+	await get_tree().create_timer(1.0, false).timeout
+
+	if not await _say(&"cab.diesel_hint", -40.0, 3.4):
+		_talking = false
+		return
+	await get_tree().create_timer(1.2, false).timeout
+
+	# Рация: шорох эфира, странный посторонний звук — Михалыч глушит ударом кулака
+	if _cabin_radio != null and _in_cabin:
+		_cabin_radio.volume_db = -8.0
+		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", _cabin_radio.global_position, -4.0, 3.0)
+		await get_tree().create_timer(2.2, false).timeout
+		if _driver_cabin != null:
+			_driver_cabin.head_look_target_yaw = deg_to_rad(28.0)
+		AudioDirector.play_raw("res://assets/audio/clank.ogg", 1.5)
+		_cabin_radio.stop()
+		var dial := _cabin_root.get_node_or_null("RadioDial") as Node3D
+		if dial != null:
+			dial.visible = false
+		await get_tree().create_timer(1.2, false).timeout
+
+	if not await _say(&"cab.prev_hint", 0.0, 3.2):
+		_talking = false
+		return
+
+	# Едем до точки высадки
+	while _driving and _in_cabin and _s > _drop_i + 0.1:
+		await get_tree().process_frame
+
+	_driving = false
+	_talking = false
+
+	# Мягкий тормоз тягача
+	AudioDirector.play_raw("res://assets/audio/clank_v4.ogg", -4.0)
+	create_tween().tween_property(_engine, "pitch_scale", 0.85, 0.8)
+	await get_tree().create_timer(0.8, false).timeout
+
+	# Напутствие перед высадкой
+	if not await _say(&"cab.halt_hint", -44.0, 4.5):
+		return
+	await get_tree().create_timer(0.5, false).timeout
+
+	if not await _say(&"cab.items_hint", -48.0, 3.6):
+		return
+
 	_can_exit = true
-	if not await _say(&"cab.stuck", -48.0, 3.6):
-		return
-	if not await _say(&"cab.10", -36.0, 3.8):
-		return
+	_talk_over = true
 	if Game.hud != null and _in_cabin:
 		Game.hud.set_prompt(Loc.t(&"cab.exit"))
 
@@ -710,36 +708,45 @@ func _on_exit_cabin() -> void:
 	_in_cabin = false
 	_can_exit = false
 	_driving = false
+	_talk_over = true
 	Game.set_flag("in_cabin", false)
 	Game.set_flag("left_cabin", true)
-	# Снаряжение уже на станции (завезли с прошлым бортом): фонарь и планшет — при себе
+	Game.set_flag("dig_pending", false)
+	# Снаряжение: фонарь, планшет, термос, спички
 	for f in ["has_trunk", "trunk_delivered", "has_fas4", "has_tablet"]:
 		Game.set_flag(f, true)
 	Game.complete_step(&"driver")
+
 	AudioDirector.play_raw("res://assets/sfx/door_handle.ogg", 2.0)
 	AudioDirector.play_raw("res://assets/audio/door.ogg", 2.5)
 	AudioDirector.play_raw("res://assets/audio/gust.ogg", 2.0)
+
 	if _cabin_radio != null:
 		_cabin_radio.stop()
 	if _cab_hum != null:
 		_cab_hum.stop()
 	if _cab_wind != null:
 		_cab_wind.stop()
-	_cabin_root.visible = false
+	if _cabin_root != null:
+		_cabin_root.visible = false
+
 	if is_instance_valid(_driver_cabin):
 		_driver_cabin.reparent(_tracked, false)
 		_driver_cabin.position = CABIN_DRIVER_LOCAL
 		_driver_cabin.visible = true
 		var cab_glow := Geo.omni(_tracked, Vector3(-0.35, 1.05, -1.25), 1.4, 0.35, Color(0.35, 0.9, 0.5))
 		cab_glow.shadow_enabled = false
+
 	if _exterior_mesh != null:
 		_exterior_mesh.visible = true
 	_hull_col.collision_layer = Geo.LAYER_WORLD
-	_engine.volume_db = -2.0
-	_engine.pitch_scale = 0.85
+
+	# Удар мороза: срез внутреннего звука в 0
+	AudioMix.set_indoor(0.0)
+
 	var right := _tracked.global_basis.x
 	right.y = 0.0
-	var out := Terrain.at(_body.position + right.normalized() * 2.6 + Vector3(0, 0, 0))
+	var out := Terrain.at(_body.position + right.normalized() * 2.6)
 	if Game.player != null:
 		Game.player.velocity = Vector3.ZERO
 		Game.player.global_position = out + Vector3(0, 0.05, 0)
@@ -747,292 +754,41 @@ func _on_exit_cabin() -> void:
 		Game.player.rotation.y = atan2(-to_station.x, -to_station.z) + deg_to_rad(25.0)
 		Game.player.head.position.y = 1.58
 		Game.player.set_flashlight(true)
-		Game.player.shake(0.04, 0.3)
+		Game.player.shake(0.06, 0.45)
+		Game.warmth = 85.0
+
+	# Учебный просвет: первый луч маяка сквозь метель
+	Storm.force_gap(4.5)
+
 	if Game.hud != null:
 		Game.hud.set_prompt("")
-		Game.hud.subtitle(Loc.t(&"obj.dig") + " (0/%d)" % DIG_SPOTS.size(), 4.0)
-	_engine.volume_db = -6.0
-	Game.set_flag("dig_pending", true)
-	_build_dig_spots()
-	_build_evidence()
-	_talk_while_digging()
+		Game.hud.subtitle(Loc.t(&"obj.prologue_walk"), 4.0)
+
+	_reverse_away()
 
 
-## Перемёт под передними катками: два сугроба, их надо откопать лопатой (удерживать [E]).
-func _build_dig_spots() -> void:
-	var mound := Props.snow_mound_mesh(1)   # намёт с языком, а не снежок
-	for i in DIG_SPOTS.size():
-		var local: Vector3 = DIG_SPOTS[i]
-		var at := _tracked.to_global(local)
-		at.y = Terrain.height(at.x, at.z)
-		var m := MeshInstance3D.new()
-		m.mesh = mound
-		m.material_override = Palette.m(&"drift")
-		m.scale = Vector3(0.9, 0.55, 1.4)
-		m.position = at + Vector3(0, 0.1, 0)
-		m.rotation.y = _tracked.global_rotation.y
-		add_child(m)
-		_dig_nodes.append(m)
-		var it := Geo.interactable(self, Vector3(1.6, 1.0, 2.0), at + Vector3(0, 0.45, 0), null, "", Callable())
-		it.hold_time = 1.0
-		it.hold_sound = "res://assets/sfx/cc0/step_crust_1.ogg"
-		it.prompt_provider = func() -> String: return Loc.t(&"cab.dig") if m.visible else ""
-		it.used.connect(func(_p: Player) -> void:
-			if not m.visible:
-				return
-			m.visible = false
-			it.collision_layer = 0
-			_dug += 1
-			AudioDirector.play_raw("res://assets/audio/ice_hit.ogg", 1.8)
-			Game.audio.play_3d(SFX_SNOW_FALL, at + Vector3(0, 0.5, 0), 1.0, 8.0)
-			if Game.player != null:
-				Game.player.shake(0.03, 0.25)
-			if _dug < DIG_SPOTS.size():
-				if Game.hud != null:
-					Game.hud.subtitle(Loc.t(&"obj.dig") + " (%d/%d)" % [_dug, DIG_SPOTS.size()], 3.0)
-			_maybe_try())
-
-
-const SFX_SNOW_FALL := "res://assets/audio/snow_fall.ogg"
-
-
-# --- Крючок пролога: «попутчик» -----------------------------------------------------
-
-## В свете фар у обочины стоит человек — у столба «40», в старом ватнике, не голосует, просто стоит.
-## Михалыч не тормозит и не поворачивает головы. Проезжаем — фары мигают, голова того поворачивается
-## вслед за кабиной. Оглянешься — никого. Потом рация: позывной станции, «подберите… у сорокового».
-## Михалыч молча выключает. Ложь «никого нет» — первая; правило «не отзывайся» — уже работает.
-func _hook_figure() -> bool:
-	var ahead := 30.0 / STEP_M
-	var sf := _s - ahead
-	if sf < _drop_i + 6.0 or _road.size() < 4:
-		return _in_cabin and is_inside_tree()
-	var i := clampi(floori(sf), 1, _road.size() - 1)
-	var p := _road[i]
-	var dir := _road[i - 1] - _road[i]          # по ходу: индексы убывают к высадке
-	dir.y = 0.0
-	dir = dir.normalized()
-	var right := Vector3(-dir.z, 0, dir.x)
-	var at := Terrain.at(p + right * 2.7)
-	# Человек в старом пальто и шапке (модели «hunter» в игре нет — была болванка-силуэт, в фарах не читалась)
-	var fig := Creatures.make_human(&"civil")
-	fig.name = "RoadsideMan"
-	add_child(fig)
-	fig.global_position = at
-	fig.look_at(Vector3(at.x, at.y, at.z) - dir * 8.0 - right * 2.7, Vector3.UP)   # навстречу, на дорогу
-	if fig.has_clip(&"still"):
-		fig.pose_override = &"still"
-	fig.twitch = 0.0
-	var post := Props.km_post()
-	if post != null:
-		add_child(post)
-		post.global_position = Terrain.at(p + right * 2.4 + dir * 0.9)
-		post.rotation.y = atan2(-dir.x, -dir.z)
-	var t := 0.0
-	while _in_cabin and is_inside_tree() and _body.global_position.distance_to(at) > 19.0 and t < 14.0:
-		t += get_process_delta_time()
-		await get_tree().process_frame
-	_track_figure(fig, at, dir)
-	if not await _say(&"hk.see", 6.0, 2.6):
-		return false
-	if not await _say(&"hk.no", 0.0, 2.2):        # смотрит прямо на дорогу
-		return false
-	if not await _say(&"hk.stop", 0.0, 2.4):
-		return false
-	if not await _say(&"hk.drive", 0.0, 4.0):
-		return false
-	await get_tree().create_timer(1.2, false).timeout
-	# Рация: сквозь шум — позывной станции и чужой, замёрзший голос
-	if _cabin_radio != null and _in_cabin:
-		_cabin_radio.volume_db = -8.0
-		Game.audio.play_3d("res://assets/audio/radio_anomaly.ogg", _cabin_radio.global_position, -4.0, 3.0)
-		var dial := _cabin_root.get_node_or_null("RadioDial") as Node3D
-		Game.hud.subtitle(Loc.t(&"hk.radio"), 5.0)
-		await get_tree().create_timer(5.2, false).timeout
-		if _driver_cabin != null:
-			_driver_cabin.head_look_target_yaw = deg_to_rad(28.0)   # к рации
-		await get_tree().create_timer(0.7, false).timeout
-		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -2.0)
-		_cabin_radio.stop()
-		if dial != null:
-			dial.visible = false
-		Game.hud.subtitle(Loc.t(&"hk.off"), 2.6)
-		await get_tree().create_timer(2.8, false).timeout
-	if not await _say(&"hk.callsign", -10.0, 3.0):
-		return false
-	await get_tree().create_timer(1.6, false).timeout     # молчит
-	if not await _say(&"hk.semyonov", 0.0, 4.2):
-		return false
-	Game.hud.subtitle(Loc.t(&"hk.th"), 3.6)
-	await get_tree().create_timer(3.8, false).timeout
-	Director.add_tension(8.0, "пролог: человек у обочины")
-	return _in_cabin and is_inside_tree()
-
-
-## Пока проезжаем — голова того поворачивается вслед за кабиной; фары мигают; потом его нет.
-func _track_figure(fig: CreatureRig, at: Vector3, dir: Vector3) -> void:
-	var flick := false
-	var gone_t := -1.0
-	while is_instance_valid(fig) and is_inside_tree():
-		var cab := _tracked.to_global(CABIN_SEAT_LOCAL)
-		var loc := fig.global_basis.inverse() * (cab - (at + Vector3(0, 1.6, 0)))
-		fig.head_look_target_yaw = clampf(atan2(-loc.x, -loc.z), -1.5, 1.5)
-		var along := (at - _body.global_position).dot(dir)
-		if not flick and along < 5.0:
-			flick = true
-			Game.audio.play_3d("res://assets/audio/tree_creak_v2.ogg", at + Vector3(0, 1.5, 0), -4.0, 6.0)
-			for b in _beams:
-				var e := b.light_energy
-				var tw := b.create_tween()
-				tw.tween_property(b, "light_energy", e * 0.15, 0.06)
-				tw.tween_property(b, "light_energy", e, 0.05)
-				tw.tween_property(b, "light_energy", e * 0.3, 0.08).set_delay(0.12)
-				tw.tween_property(b, "light_energy", e, 0.1)
-		if along < -4.0 and gone_t < 0.0:
-			gone_t = 1.4
-		if gone_t >= 0.0:
-			gone_t -= get_process_delta_time()
-			if gone_t <= 0.0:
-				fig.queue_free()     # оглянулся — у столба никого
-				return
-		await get_tree().process_frame
-
-
-## Три стука в стекло твоей двери. За инеем — бледная ладонь, снаружи. Михалыч шёпотом: не поворачивайся.
-## На третьем ладонь сползает вниз — Михалыч бьёт по газу. Тягач с ходу зарывается в перемёт.
-func _hook_knock() -> void:
-	if not _in_cabin or not is_inside_tree():
-		return
-	await get_tree().create_timer(1.8, false).timeout
-	_hand = _build_hand()
-	var win := _tracked.to_global(Vector3(1.2, 1.22, -1.12))
-	for k in 3:
-		if not _in_cabin:
-			return
-		if k == 0:
-			_hand.visible = true
-		Game.audio.play_3d("res://assets/audio/knock.ogg" if k != 1 else "res://assets/audio/knock_v2.ogg", win, -2.0 + k * 2.0, 3.0)
-		_hand.position.x = 1.192
-		var tw := _hand.create_tween()
-		tw.tween_property(_hand, "position:x", 1.2, 0.12)
-		if Game.player != null:
-			Game.player.shake(0.015, 0.15)
-		if k == 0:
-			await get_tree().create_timer(0.5, false).timeout
-			if _driver_cabin != null:
-				_driver_cabin.head_look_target_yaw = 0.0
-			Voice.say(&"hk.dont", 3.4)
-			await get_tree().create_timer(1.1, false).timeout
-		else:
-			await get_tree().create_timer(1.5, false).timeout
-	# Ладонь сползает по стеклу и пропадает
-	var slide := _hand.create_tween().set_parallel(true)
-	slide.tween_property(_hand, "position:y", _hand.position.y - 0.28, 1.4).set_ease(Tween.EASE_IN)
-	for mi in _hand.find_children("*", "MeshInstance3D", true, false):
-		var m := (mi as MeshInstance3D).material_override as StandardMaterial3D
-		if m != null:
-			slide.tween_property(m, "albedo_color:a", 0.0, 1.6)
-	await get_tree().create_timer(1.0, false).timeout
-	if not _in_cabin:
-		return
-	Voice.say(&"hk.hold", 1.8)
-	_rush = true
-	create_tween().tween_property(_engine, "pitch_scale", 1.35, 0.5)
-	await get_tree().create_timer(0.6, false).timeout
-
-
-## Ладонь — бледная, расплывчатая за инеем: прижата снаружи к стеклу двери, пальцы длинные.
-func _build_hand() -> Node3D:
-	var h := Node3D.new()
-	h.name = "HandOnGlass"
-	_cabin_root.add_child(h)
-	h.position = Vector3(1.2, 1.2, -1.1)
-	var d := Props.hand_decal(&"glass", 0.34)
-	d.rotation.y = -PI * 0.5        # лицом в кабину (−X)
-	h.add_child(d)
-	h.visible = false
-	return h
-
-
-## Снаружи: босые следы из леса к двери — и ни одного обратно; на стекле — оттаявший отпечаток ладони.
-func _build_evidence() -> void:
-	var right := _tracked.global_basis.x
-	right.y = 0.0
-	right = right.normalized()
-	var back := _tracked.global_basis.z
-	back.y = 0.0
-	back = back.normalized()
-	var door := _tracked.to_global(Vector3(1.75, 0.0, -1.15))
-	door.y = Terrain.height(door.x, door.z)
-	_door_print = door
-	var pts := PackedVector3Array([door + right * 14.0 + back * 6.0, door + right * 7.0 + back * 2.0, door + right * 0.6])
-	for k in pts.size():
-		pts[k] = Terrain.at(pts[k])
-	Footprints.trail(self, &"bare", pts, 0.0, 0.66)
-	# Отпечаток на стекле снаружи: оттаявшая в инее пятерня, подтёки вниз
-	var pr := Props.hand_decal(&"thaw", 0.36)
-	pr.name = "HandPrint"
-	_tracked.add_child(pr)
-	pr.position = Vector3(1.235, 1.1, -1.1)
-	pr.rotation.y = PI * 0.5        # лицом наружу (+X)
-
-
-## Пока Виктор копает — Михалыч из кабины коротко подсказывает.
-func _talk_while_digging() -> void:
-	await get_tree().create_timer(0.4, false).timeout
-	if not is_inside_tree() or _leaving:
-		return
-	Voice.say(&"cab.dig_hint", 2.6, 1, [], _tracked.global_position)
-
-
-## Откопано — Михалыч сразу пробует газовать, трак лопается, дальше пешком.
-func _maybe_try() -> void:
+func _reverse_away() -> void:
 	if _leaving:
 		return
-	if _dug < DIG_SPOTS.size() and not _gave_up:
-		return
 	_leaving = true
-	Game.set_flag("dig_pending", false)
-	Voice.say(&"cab.try", 1.6, 1, [], _tracked.global_position)
-	_exhaust.amount = 40
-	_exhaust.initial_velocity_max = 5.0
-	create_tween().tween_property(_engine, "pitch_scale", 1.5, 0.5)
-	_spray(1.2)
+	_reversing = true
+	await get_tree().create_timer(1.8, false).timeout
+	if not is_inside_tree():
+		return
+	if _engine != null:
+		create_tween().tween_property(_engine, "pitch_scale", 1.15, 1.0)
+		create_tween().tween_property(_engine, "volume_db", -4.0, 1.0)
 	var tw := create_tween()
-	for k in 3:
-		tw.tween_property(_tracked, "rotation:z", deg_to_rad(3.5 if k % 2 == 0 else 6.0), 0.2)
-	await get_tree().create_timer(1.0, false).timeout
-	if not is_inside_tree():
-		return
-	AudioDirector.play_raw("res://assets/audio/clank_v4.ogg", 4.5)
-	AudioDirector.play_raw("res://assets/audio/ice_hit_v3.ogg", 3.2)
-	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", _body.global_position + Vector3(0, 1, 0), -1.0, 15.0)
-	if Game.player != null:
-		Game.player.shake(0.14, 0.6)
-	create_tween().tween_property(_engine, "pitch_scale", 0.78, 1.0)
-	_exhaust.amount = 16
-	_exhaust.initial_velocity_max = 2.0
-	_finish_talk(true)
-
-
-func _finish_talk(tried: bool) -> void:
-	if tried:
-		Voice.say(&"cab.track", 2.2, 1, [], _tracked.global_position)
-		await get_tree().create_timer(2.4, false).timeout
-		if not is_inside_tree():
-			return
-	Voice.say(&"cab.stay", 3.2, 1, [], _tracked.global_position)
-	await get_tree().create_timer(3.4, false).timeout
-	if not is_inside_tree():
-		return
-	Voice.say(&"driver.pro3", 3.6, 1, [], _tracked.global_position)
-	await get_tree().create_timer(3.8, false).timeout
-	if not is_inside_tree():
-		return
-	Voice.say(&"driver.pro4", 3.6, 1, [], _tracked.global_position)
-	if Game.hud != null:
-		Game.hud.subtitle(Loc.t(&"obj.prologue_walk"), 4.0)
-	_talk_over = true
+	tw.tween_property(_engine, "volume_db", -52.0, 16.0)
+	var t := 0.0
+	while t < 16.0 and is_inside_tree():
+		var dt := get_process_delta_time()
+		t += dt
+		_s = minf(_s + (BACK_M / DRIVE_TIME / STEP_M) * 0.85 * dt, _road.size() - 1)
+		_place(_s, true)
+		await get_tree().process_frame
+	if is_inside_tree():
+		queue_free()
 
 
 ## Договорил ли Михалыч: до этого события просеки ждут, чтобы не перебить его реплики.
@@ -1040,82 +796,26 @@ static func talk_over() -> bool:
 	return _talk_over or _instance == null or not is_instance_valid(_instance)
 
 
-## Снег из-под гусениц — веером в стороны.
-func _spray(dur: float) -> void:
-	for side: float in [-1.0, 1.0]:
-		var p := CPUParticles3D.new()
-		p.one_shot = true
-		p.amount = 60
-		p.lifetime = 1.2
-		p.explosiveness = 0.1
-		p.direction = Vector3(side, 0.7, 0.6)
-		p.spread = 30.0
-		p.initial_velocity_min = 2.0
-		p.initial_velocity_max = 5.0
-		p.gravity = Vector3(0, -7.0, 0)
-		p.scale_amount_min = 0.4
-		p.scale_amount_max = 1.2
-		var qm := QuadMesh.new()
-		qm.size = Vector2(0.16, 0.16)
-		p.mesh = qm
-		var m := StandardMaterial3D.new()
-		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m.albedo_color = Color(0.9, 0.93, 1.0, 0.8)
-		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-		p.material_override = m
-		p.position = Vector3(side * 1.3, 0.4, -1.4)
-		_tracked.add_child(p)
-		p.emitting = true
-		get_tree().create_timer(dur + 1.4, false).timeout.connect(p.queue_free)
-
-
-## Дизель глохнет сам — гул за спиной обрывается, фары гаснут (событие просеки).
+## Дизель глохнет сам — гул за спиной обрывается, фары гаснут.
 static func engine_die() -> void:
 	if _instance == null or not is_instance_valid(_instance) or _instance._engine_dead:
 		return
 	var v := _instance
 	v._engine_dead = true
-	Game.audio.play_3d("res://assets/sfx/gen_stall.ogg", v._body.global_position + Vector3(0, 1, 0), 2.0, 40.0)
-	v.create_tween().tween_property(v._engine, "pitch_scale", 0.3, 1.0)
-	await v.get_tree().create_timer(1.0, false).timeout
-	if not is_instance_valid(v):
-		return
-	v._engine.stop()
-	v._exhaust.emitting = false
-	for b in v._beams:
-		b.visible = false
-
-
-## Мягкий поводок: игрок, ушедший раньше, чем Михалыч договорил, упирается в 30 м от тягача. Без него
-## быстрый игрок доходил до дома под разговор — и события просеки (ждущие конца разговора) пропадали.
-func _leash() -> void:
-	pass
+	if v._engine != null:
+		v.create_tween().tween_property(v._engine, "volume_db", -50.0, 1.5)
 
 
 func _process(delta: float) -> void:
 	if Game.player == null or _road.is_empty():
 		return
-	if not _in_cabin and Game.has_flag("left_cabin") and _body != null:
-		var far := Game.player.global_position.distance_to(_body.global_position)
-		if not _leaving and _dug < DIG_SPOTS.size() and far > 26.0 and not _gave_up:
-			_gave_up = true       # ушёл, не докопав: газовать некому помогать
-			_maybe_try()
-		if far > 26.0 and _talk_over and not _alone_said:
-			_alone_said = true
-			var pt := get_tree().root.find_child("PrologueTrail", true, false)
-			if pt != null and pt.has_method(&"on_vehicle_left"):
-				pt.on_vehicle_left()
-		if not _engine_dead and _engine != null:
-			_engine.volume_db = lerpf(-6.0, -30.0, clampf((far - 10.0) / 120.0, 0.0, 1.0))
+	if _reversing:
+		return
 	if _driving:
-		# Подъезд к высадке: плавно тормозим к концу
 		var remain := _s - _drop_i
-		var v := clampf(remain / 1.5, 0.5, 1.0) * (BACK_M / DRIVE_TIME) / STEP_M   # в перемёт — с ходу
-		if _rush:
-			v *= 2.0           # после стуков — гонит, не глядя, и с ходу в перемёт
-		elif _talking and remain < 5.0:
-			v *= 0.12          # разговор не закончен — у высадки ползём, а не встаём молча
+		var v := clampf(remain / 1.5, 0.5, 1.0) * (BACK_M / DRIVE_TIME) / STEP_M
+		if _talking and remain < 5.0:
+			v *= 0.12
 		_s = maxf(_s - v * delta, _drop_i)
 		_place(_s, true)
 		_tracked.rotation.z = sin(Time.get_ticks_msec() * 0.0022) * deg_to_rad(0.9)
@@ -1125,7 +825,7 @@ func _process(delta: float) -> void:
 		if not hold:
 			if not _yaw_set:
 				_yaw_set = true
-				Game.player.rotation.y = _tracked.global_rotation.y   # смотрим вперёд, по ходу тягача
+				Game.player.rotation.y = _tracked.global_rotation.y
 			Game.player.global_position = _tracked.to_global(CABIN_SEAT_LOCAL)
 			Game.player.velocity = Vector3.ZERO
 		var vib := sin(Time.get_ticks_msec() * 0.035) * (0.005 if _driving else 0.002)

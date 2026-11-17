@@ -3165,7 +3165,10 @@ func _build_front_door() -> void:
 	var door := Interactable.new()
 	door.collision_layer = Geo.LAYER_WORLD
 	door.position = Vector3(0.0, 1.0, 0.5)
-	door.prompt_provider = func() -> String: return Loc.t(&"it.door_close") if door_open else Loc.t(&"it.door_open")
+	door.prompt_provider = func() -> String:
+		if Game.is_prologue() and not Game.has_flag("prologue_arrived") and door_open:
+			return Loc.t(&"it.door_log")
+		return Loc.t(&"it.door_close") if door_open else Loc.t(&"it.door_open")
 	door.add_child(Geo.box_shape(Vector3(0.24, 2.0, 1.0), Vector3(0.08, 0, 0)))
 	# Дверь из Блендера (tools/blender/front_door.py): снаружи дерматин с гвоздями, внутри доски и засов
 	var door_model := Props._kedr_model("front_door", {"center": false})
@@ -3911,7 +3914,13 @@ func _trigger_wind_door_burst() -> void:
 
 # --- Взаимодействия ----------------------------------------------------------
 
-func _on_door_used(_p: Player) -> void:
+func _on_door_used(p: Player) -> void:
+	if Game.is_prologue() and not Game.has_flag("prologue_arrived") and door_open:
+		set_door_open(false)
+		if p != null and p.held == &"":
+			p.set_held(&"wood")
+		Game.hud.subtitle(Loc.t(&"sub.door_closed_prologue"), 5.0)
+		return
 	set_door_open(not door_open)
 
 
@@ -4278,6 +4287,8 @@ func _build_pzs35_searchlight() -> void:
 
 
 func _stove_prompt() -> String:
+	if Game.is_prologue() and Game.stove_wood <= 0.0:
+		return Loc.t(&"it.stove_prologue")
 	if Game.player != null and Game.player.held == &"wood":
 		return Loc.t(&"it.stove_add")
 	if Game.chimney_iced and Game.stove_wood > 0.0:
@@ -4286,6 +4297,11 @@ func _stove_prompt() -> String:
 
 
 func _on_stove_used(p: Player) -> void:
+	if Game.is_prologue() and Game.stove_wood <= 0.0:
+		if p != null and p.held == &"wood":
+			p.set_held(&"")
+		_light_prologue_stove()
+		return
 	if Game.stove_wood > 0.0:
 		Gear.refill_thermos()   # чай в термос — с горячей плиты
 	# Забит дымоход — печь можно залить из чайника: угар прекратится, но дом начнёт остывать.
@@ -4543,6 +4559,8 @@ func _bed_prompt() -> String:
 		if not Game.has_flag("prologue_arrived"):
 			if door_open:
 				return Loc.t(&"sub.bed_door_open")
+			if Game.stove_wood <= 0.0:
+				return Loc.t(&"it.bed_stove_cold")
 			return Loc.t(&"it.bed_sleep_arrival")
 		return Loc.t(&"it.bed_rest") if Game.tutorial_done() else Loc.t(&"it.bed")
 	if Game.is_day():
@@ -4597,6 +4615,9 @@ func _on_bed_used(_p: Player) -> void:
 		if not Game.has_flag("prologue_arrived"):
 			if door_open:
 				Game.hud.subtitle(Loc.t(&"sub.bed_door_open"), 3.5)
+				return
+			if Game.stove_wood <= 0.0 and not OS.get_cmdline_user_args().has("--autotest"):
+				Game.hud.subtitle(Loc.t(&"sub.stove_cold_bed"), 3.5)
 				return
 			_sleep_to_night1()
 			return
