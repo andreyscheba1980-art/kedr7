@@ -38,6 +38,7 @@ Game="*res://scripts/autoload/game.gd"
 Director="*res://scripts/director/director.gd"
 Mic="*res://scripts/autoload/mic_manager.gd"
 Net="*res://scripts/autoload/net.gd"
+AssetLint="*res://scripts/dev/asset_lint.gd"
 
 [display]
 
@@ -55,6 +56,7 @@ import/blender/enabled=false
 3d_physics/layer_1="world"
 3d_physics/layer_2="glass"
 3d_physics/layer_3="player"
+3d_physics/layer_4="interact"
 
 [rendering]
 

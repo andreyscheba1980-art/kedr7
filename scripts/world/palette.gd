@@ -40,6 +40,8 @@ const COLORS := {
 	&"rust": Color(0.48, 0.22, 0.12),
 	&"metal_dark": Color(0.12, 0.13, 0.14),
 	&"lead": Color(0.28, 0.30, 0.32),
+	&"roof": Color(0.48, 0.18, 0.14),
+	&"paint_green": Color(0.24, 0.32, 0.22),
 }
 
 ## Текстура и сколько метров на один её повтор.
@@ -95,8 +97,14 @@ static func m(key: StringName) -> Material:
 		mat.set_shader_parameter(&"tex", load(TEX_DIR + "tex_plaster.png"))
 		_cache[key] = mat
 		return mat
+	if not COLORS.has(key):
+		push_error("Palette: неизвестный id '%s'" % key)
+		var err_mat := StandardMaterial3D.new()
+		err_mat.albedo_color = Color.MAGENTA if OS.is_debug_build() else Color(0.22, 0.22, 0.24)
+		_cache[key] = err_mat
+		return err_mat
 	mat.shader = load(PS1_SHADER)
-	mat.set_shader_parameter(&"albedo", COLORS.get(key, Color.MAGENTA))
+	mat.set_shader_parameter(&"albedo", COLORS.get(key, Color(0.22, 0.22, 0.24)))
 	if TEXTURES.has(key):
 		var t: Array = TEXTURES[key]
 		mat.set_shader_parameter(&"tex", load(TEX_DIR + String(t[0])))

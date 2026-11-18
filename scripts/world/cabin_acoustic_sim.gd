@@ -138,7 +138,7 @@ func _tick_window_rattle(delta: float, yrka_near: bool) -> void:
 		else:
 			# Если за окном Ырка — поток перекрыт телом, стекло не дрожит, раздаётся сухой писк нажима ногтя
 			_window_audio.stop()
-			_window_audio.stream = AudioDirector.cached_stream("res://assets/sfx/claw_scrape_1.wav")
+			_window_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/claw_scrape_1.wav")
 			_window_audio.volume_db = -5.0
 			_window_audio.pitch_scale = randf_range(1.2, 1.45)
 			_window_audio.play()

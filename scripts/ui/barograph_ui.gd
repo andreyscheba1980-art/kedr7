@@ -224,7 +224,17 @@ func _build_rig() -> void:
 	var rod := Geo.box_mesh(Vector3(0.0025, 0.0025, 1.0), _m(Color(0.12, 0.12, 0.13), 0.4))
 	rod.name = "Rod"
 	_arm.add_child(rod)
-	var nib := Geo.box_mesh(Vector3(0.006, 0.01, 0.006), _m(Color(0.32, 0.1, 0.45), 0.3))
+	var nib_mat := StandardMaterial3D.new()
+	nib_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	nib_mat.albedo_color = Color(0.12, 0.10, 0.18)
+	var nib_cyl := CylinderMesh.new()
+	nib_cyl.top_radius = 0.0004
+	nib_cyl.bottom_radius = 0.0018
+	nib_cyl.height = 0.012
+	var nib := MeshInstance3D.new()
+	nib.mesh = nib_cyl
+	nib.material_override = nib_mat
+	nib.rotation.x = deg_to_rad(90.0)
 	nib.name = "Nib"
 	_arm.add_child(nib)
 	# Колпак: стекло в латунной рамке

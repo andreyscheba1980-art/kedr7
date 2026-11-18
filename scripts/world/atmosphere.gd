@@ -318,6 +318,7 @@ func _build_prints() -> void:
 	mm.visible_instance_count = 0
 	var mat := Footprints.material(&"snow").duplicate() as StandardMaterial3D
 	mat.vertex_color_use_as_albedo = true       # прозрачность каждого следа — в цвете экземпляра
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	mat.albedo_color = Color(0.32, 0.4, 0.55, 1.0)
 	_prints = MultiMeshInstance3D.new()
 	_prints.multimesh = mm
@@ -338,7 +339,7 @@ func _step_print(p: Player) -> void:
 		return
 	dir = dir.normalized()
 	var side := Vector3(-dir.z, 0, dir.x) * (0.11 if _left else -0.11)
-	var t := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)), Vector3(pos.x, 0.008, pos.z) + side)
+	var t := Transform3D(Basis(Vector3.UP, atan2(dir.x, dir.z)), Vector3(pos.x, pos.y + 0.012, pos.z) + side)
 	if _left:
 		t.basis = t.basis.scaled(Vector3(-1, 1, 1))
 	_left = not _left
@@ -380,13 +381,13 @@ func _build_trodden() -> void:
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.use_colors = true
 	var pm := PlaneMesh.new()
-	pm.size = Vector2(1.15, 1.15)
+	pm.size = Vector2(0.55, 0.55)
 	mm.mesh = pm
 	mm.instance_count = TREAD_MAX
 	mm.visible_instance_count = 0
 	var g := Gradient.new()
-	g.set_color(0, Color(1, 1, 1, 1))
-	g.set_color(1, Color(1, 1, 1, 0))
+	g.set_color(0, Color(1, 1, 1, 0.6))
+	g.set_color(1, Color(1, 1, 1, 0.0))
 	var gt := GradientTexture2D.new()
 	gt.gradient = g
 	gt.fill = GradientTexture2D.FILL_RADIAL
@@ -397,6 +398,7 @@ func _build_trodden() -> void:
 	m.vertex_color_use_as_albedo = true
 	m.albedo_color = Color(0.34, 0.42, 0.58)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 	m.roughness = 0.6
 	_trodden = MultiMeshInstance3D.new()
 	_trodden.multimesh = mm
@@ -446,7 +448,7 @@ func _settle_trodden(dt: float, storm: float) -> void:
 		var x := float(parts[0].to_int()) * TREAD_CELL
 		var z := float(parts[1].to_int()) * TREAD_CELL
 		var y := Terrain.height(x, z) if Terrain.ready() else 0.0
-		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, float(hash(k) % 628) * 0.01), Vector3(x, y + 0.04, z)))
+		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, float(hash(k) % 628) * 0.01), Vector3(x, y + 0.02, z)))
 		mm.set_instance_color(i, Color(1, 1, 1, clampf((v - 0.12) * 1.4, 0.0, 0.8)))
 		i += 1
 	mm.visible_instance_count = i

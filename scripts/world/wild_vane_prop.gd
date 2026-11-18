@@ -64,7 +64,8 @@ func _build_vane() -> void:
 	var mast_mi := MeshInstance3D.new()
 	mast_mi.mesh = k_mast.commit()
 	var m_mat := StandardMaterial3D.new()
-	m_mat.albedo_color = Color(0.65, 0.67, 0.70)
+	m_mat.vertex_color_use_as_albedo = true
+	m_mat.albedo_color = Color.WHITE
 	m_mat.roughness = 0.6
 	mast_mi.material_override = m_mat
 	add_child(mast_mi)

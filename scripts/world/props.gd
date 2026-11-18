@@ -5632,7 +5632,8 @@ static func arktika_drum_stack() -> Node3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = k.commit()
 	var m_mat := StandardMaterial3D.new()
-	m_mat.albedo_color = Color(0.85, 0.85, 0.86)
+	m_mat.vertex_color_use_as_albedo = true
+	m_mat.albedo_color = Color.WHITE
 	m_mat.roughness = 0.55
 	mi.material_override = m_mat
 	root.add_child(mi)

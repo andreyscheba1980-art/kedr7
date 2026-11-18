@@ -174,6 +174,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.is_action_pressed(&"map"):
 			get_viewport().set_input_as_handled()
 			_show_map()
-		elif event.is_action_pressed(&"journal"):
+		elif InputMap.has_action(&"journal") and event.is_action_pressed(&"journal"):
 			get_viewport().set_input_as_handled()
 			_show_journal()

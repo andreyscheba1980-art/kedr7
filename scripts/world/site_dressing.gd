@@ -29,7 +29,7 @@ static func drift(yard: Node3D, pos: Vector3, len: float, height: float, wid: fl
 	var mi := MeshInstance3D.new()
 	mi.mesh = _drift_mesh
 	mi.material_override = Palette.m(&"drift")
-	mi.position = pos + Vector3(0, -height * 0.25, 0)
+	mi.position = pos + Vector3(0, -height * 0.45, 0)
 	mi.rotation.y = deg_to_rad(yaw_deg)
 	mi.scale = Vector3(len, height, wid)
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

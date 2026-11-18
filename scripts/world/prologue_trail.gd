@@ -349,7 +349,7 @@ func _build_stakes() -> void:
 		pole.name = "TrailStake_%d" % idx
 		pole.rotation.z = deg_to_rad(randf_range(-3.0, 3.0))
 		pole.rotation.x = deg_to_rad(randf_range(-3.0, 3.0))
-		var rag := Geo.box_mesh(Vector3(0.18, 0.28, 0.02), Palette.m(&"roof"))
+		var rag := Geo.box_mesh(Vector3(0.18, 0.28, 0.02), Palette.m(&"red"))
 		rag.position = at + Vector3(side.x * 0.08, 1.62, side.z * 0.08)
 		rag.rotation = Vector3(deg_to_rad(15.0), atan2(d.x, d.z) + deg_to_rad(20.0), deg_to_rad(10.0))
 		add_child(rag)

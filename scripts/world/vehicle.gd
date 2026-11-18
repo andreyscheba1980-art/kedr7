@@ -728,7 +728,22 @@ func _on_exit_cabin() -> void:
 	if _cab_wind != null:
 		_cab_wind.stop()
 	if _cabin_root != null:
-		_cabin_root.visible = false
+		_cabin_root.queue_free()
+		_cabin_root = null
+	_frost_tex.clear()
+	_wipers.clear()
+	_speedo_needle = null
+	_tach_needle = null
+	_oil_needle = null
+	_water_needle = null
+	_amp_needle = null
+	_pendant = null
+	_lever_l = null
+	_lever_r = null
+	_cab_snow = null
+	_cabin_radio = null
+	_cab_hum = null
+	_cab_wind = null
 
 	if is_instance_valid(_driver_cabin):
 		_driver_cabin.reparent(_tracked, false)

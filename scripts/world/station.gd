@@ -3111,7 +3111,7 @@ func _build_vestibule() -> void:
 	var mirror_frame := Geo.box_mesh(Vector3(0.04, 0.58, 0.44), Palette.m(&"wood"))
 	mirror_frame.position = Vector3(12.0, 1.5, 1.55)
 	add_child(mirror_frame)
-	var mirror_glass := Geo.box_mesh(Vector3(0.01, 0.50, 0.36), Palette.m(&"glass"))
+	var mirror_glass := Geo.box_mesh(Vector3(0.01, 0.50, 0.36), Palette.glass())
 	mirror_glass.position = Vector3(12.02, 1.5, 1.55)
 	add_child(mirror_glass)
 

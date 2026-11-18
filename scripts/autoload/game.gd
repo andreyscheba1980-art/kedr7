@@ -1511,6 +1511,7 @@ func _setup_input() -> void:
 	_bind(&"coop_talk", [KEY_C])        # рация коопа «Две вахты» (держать)
 	_bind(&"coop_phrase", [KEY_X])      # готовые фразы в рацию (для тех, кто без микрофона)
 	_bind(&"intercepts", [KEY_J])
+	_bind(&"journal", [KEY_J, KEY_F9])
 	_bind(&"photo", [KEY_Z])            # «Зенит-Е»: держать — видоискатель, отпустить — кадр
 	_bind(&"whistle", [KEY_H])          # свист Найде: коротко — «ко мне / сидеть», держать — «домой»
 	_bind(&"debug_overlay", [KEY_F3])
@@ -1593,7 +1594,7 @@ func _setup_input() -> void:
 
 ## Действия, которые игрок может переназначить (Настройки → Клавиши). Стрелки для ходьбы остаются всегда.
 const REBINDABLE: Array[StringName] = [&"move_forward", &"move_back", &"move_left", &"move_right", &"interact",
-	&"flashlight", &"crank", &"sprint", &"hold_breath", &"drop", &"tasks", &"map", &"codebook", &"intercepts",
+	&"flashlight", &"crank", &"sprint", &"hold_breath", &"drop", &"tasks", &"map", &"codebook", &"intercepts", &"journal",
 	&"transmit", &"record", &"flare", &"coop_talk", &"coop_phrase", &"photo", &"whistle"]
 const _ARROWS := {&"move_forward": KEY_UP, &"move_back": KEY_DOWN, &"move_left": KEY_LEFT, &"move_right": KEY_RIGHT}
 
@@ -1789,7 +1790,7 @@ func _setup_default_key(action: StringName) -> void:
 	var defaults := {&"move_forward": [KEY_W, KEY_UP], &"move_back": [KEY_S, KEY_DOWN], &"move_left": [KEY_A, KEY_LEFT],
 		&"move_right": [KEY_D, KEY_RIGHT], &"interact": [KEY_E], &"flashlight": [KEY_F], &"crank": [KEY_Q], &"drop": [KEY_G],
 		&"tasks": [KEY_TAB], &"map": [KEY_M], &"codebook": [KEY_B], &"transmit": [KEY_R], &"record": [KEY_T],
-		&"sprint": [KEY_SHIFT], &"hold_breath": [KEY_SPACE], &"flare": [KEY_V], &"intercepts": [KEY_J], &"coop_talk": [KEY_C], &"coop_phrase": [KEY_X], &"photo": [KEY_Z], &"whistle": [KEY_H]}
+		&"sprint": [KEY_SHIFT], &"hold_breath": [KEY_SPACE], &"flare": [KEY_V], &"intercepts": [KEY_J], &"journal": [KEY_J, KEY_F9], &"coop_talk": [KEY_C], &"coop_phrase": [KEY_X], &"photo": [KEY_Z], &"whistle": [KEY_H]}
 	_bind(action, defaults.get(action, []))
 
 
