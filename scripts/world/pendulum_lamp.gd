@@ -144,17 +144,33 @@ static func _make_shadow_texture() -> ImageTexture:
 
 func _process(delta: float) -> void:
 	# 1. Питание лампы (зависит от генератора станции)
+	# Фонарь СПО-200 не работает как постоянный маяк: виден по просветам Storm.clarity и иногда моргает
 	var powered := Game.power_on and not Game.gen_broken and Game.generator_fuel > 0.0
-	if _spot != null:
-		_spot.visible = powered
-	if _omni != null:
-		_omni.visible = powered
-	if _bulb_mesh != null:
-		var bm := _bulb_mesh.material_override as StandardMaterial3D
-		if bm != null:
-			bm.albedo_color = Color(1.0, 0.96, 0.82) if powered else Color(0.25, 0.24, 0.22)
-
-	if not powered:
+	var flicker := 1.0
+	if powered:
+		var sec := Time.get_ticks_msec() * 0.001
+		if fmod(sec, 8.4) < 0.12 or fmod(sec + 3.7, 13.1) < 0.08:
+			flicker = 0.15
+		var storm_vis := clampf(0.25 + Storm.clarity * 0.75, 0.2, 1.0)
+		if _spot != null:
+			_spot.visible = true
+			_spot.light_energy = LIGHT_ENERGY * flicker * storm_vis
+		if _omni != null:
+			_omni.visible = true
+			_omni.light_energy = 0.8 * flicker * storm_vis
+		if _bulb_mesh != null:
+			var bm := _bulb_mesh.material_override as StandardMaterial3D
+			if bm != null:
+				bm.albedo_color = Color(1.0, 0.96, 0.82) * (0.3 + 0.7 * flicker)
+	else:
+		if _spot != null:
+			_spot.visible = false
+		if _omni != null:
+			_omni.visible = false
+		if _bulb_mesh != null:
+			var bm := _bulb_mesh.material_override as StandardMaterial3D
+			if bm != null:
+				bm.albedo_color = Color(0.25, 0.24, 0.22)
 		if _sourceless_shadow != null:
 			_sourceless_shadow.visible = false
 		return

@@ -2141,6 +2141,9 @@ func _stage_day6() -> void:
 
 
 func _run() -> void:
+	var args := OS.get_cmdline_user_args() + OS.get_cmdline_args()
+	if args.has("fast"):
+		Engine.time_scale = 3.0
 	await _wait(2.5)
 	await _shot("menu")
 	var menu: Node = _app.get("_menu")

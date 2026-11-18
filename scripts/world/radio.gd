@@ -452,6 +452,10 @@ func set_freq(f: float) -> void:
 	var nf := clampf(f, F_MIN, F_MAX)
 	if active and absf(nf - freq) > 0.01:
 		_tune_idle = 0.0
+		var step_old := int(floor(freq / 2.0))
+		var step_new := int(floor(nf / 2.0))
+		if step_old != step_new:
+			Game.audio.play_3d("res://assets/audio/clank.ogg", global_position + Vector3.UP * 0.2, -20.0, 3.0, randf_range(1.8, 2.4))
 	freq = nf
 
 

@@ -62,7 +62,7 @@ static func material(kind: StringName) -> StandardMaterial3D:
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	match kind:
 		&"snow", &"bare":
-			m.albedo_color = Color(0.22, 0.28, 0.42, 0.75)    # тень во вмятине: синее и темнее снега, но не дыра
+			m.albedo_color = Color(0.35, 0.42, 0.54, 0.55)    # мягкая тень во вмятине снега
 			m.roughness = 1.0
 		_:
 			m.albedo_color = Color(0.07, 0.06, 0.05, 0.8)

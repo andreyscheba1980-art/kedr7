@@ -571,6 +571,10 @@ func _check_fever() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_cancel") or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT):
+		closed.emit()
+		accept_event()
+		return
 	if event is InputEventMouseMotion:
 		_mouse = (event as InputEventMouseMotion).position
 	elif event is InputEventMouseButton:

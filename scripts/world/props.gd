@@ -3655,13 +3655,6 @@ static func retro_transistor_radio() -> Node3D:
 ## Советский недельный барограф М-22 (ГОСТ 7193-79) под стеклянным колпаком.
 ## Литое чугунное основание, стопка анероидных коробок, часовой барабан с лентой и пером.
 static func barograph() -> Node3D:
-	var sov := _soviet_model("SM_M22AN_Barograph")
-	if sov != null:
-		return sov
-	var glb := _kedr_model("barograph_m22")
-	if glb != null:
-		glb.add_child(_barograph_glass(Vector3(0.312, 0.148, 0.152), 0.112))
-		return glb
 	var root := Node3D.new()
 	var k := _kit(88, 0.03)
 
@@ -3707,12 +3700,12 @@ static func barograph() -> Node3D:
 	# 6. Латунная табличка прибора
 	k.box(Vector3(0.0, 0.022, 0.091), Vector3(0.12, 0.016, 0.002), brass)
 
-	# 7. Стеклянный колпак (рёбра и ручка)
-	k.box(Vector3(0, 0.10, 0), Vector3(0.32, 0.004, 0.16), glass_edge)
+	# 7. Латунный каркас стеклянного колпака (стойки и ручка)
+	k.box(Vector3(0, 0.032, 0), Vector3(0.32, 0.004, 0.16), glass_edge)
 	k.box(Vector3(0, 0.185, 0), Vector3(0.32, 0.004, 0.16), glass_edge)
 	for cx: float in [-0.158, 0.158]:
 		for cz: float in [-0.078, 0.078]:
-			k.box(Vector3(cx, 0.10, cz), Vector3(0.005, 0.165, 0.005), glass_edge)
+			k.tube([Vector3(cx, 0.032, cz), Vector3(cx, 0.185, cz)], [0.004, 0.004], glass_edge, 6)
 	# Ручка для поднятия колпака
 	k.box(Vector3(0, 0.192, 0), Vector3(0.04, 0.012, 0.015), brass)
 
@@ -3722,7 +3715,7 @@ static func barograph() -> Node3D:
 	mi.material_override = mat
 	root.add_child(mi)
 
-	root.add_child(_barograph_glass(Vector3(0.315, 0.155, 0.155), 0.108))
+	root.add_child(_barograph_glass(Vector3(0.315, 0.152, 0.155), 0.108))
 	return root
 
 
@@ -3735,8 +3728,11 @@ static func _barograph_glass(size: Vector3, y: float) -> MeshInstance3D:
 	glass_box.position = Vector3(0, y, 0)
 	var gmat := StandardMaterial3D.new()
 	gmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	gmat.albedo_color = Color(0.70, 0.88, 0.92, 0.22)
-	gmat.roughness = 0.1
+	gmat.albedo_color = Color(0.70, 0.88, 0.92, 0.13)
+	gmat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	gmat.cull_mode = BaseMaterial3D.CULL_BACK
+	gmat.render_priority = 1
+	gmat.roughness = 0.05
 	glass_box.material_override = gmat
 	glass_box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return glass_box
@@ -5728,6 +5724,228 @@ static func spo200_pole(height := 5.4) -> Node3D:
 	lamp.position = Vector3(1.60, arm_y - 5.2, 0) # позиционируем шарнир на конце кронштейна
 	lamp.name = "PendulumFixture"
 	root.add_child(lamp)
+
+	return root
+
+
+## Новогодняя 3-литровая стеклянная банка с еловыми ветками, дождиком и советскими игрушками
+static func table_fir_jar() -> Node3D:
+	var root := Node3D.new()
+	root.name = "TableFirJar"
+
+	# Стеклянная банка (3 литра)
+	var jar_mat := StandardMaterial3D.new()
+	jar_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	jar_mat.albedo_color = Color(0.78, 0.92, 0.88, 0.45)
+	jar_mat.roughness = 0.15
+	jar_mat.metallic_specular = 0.85
+	jar_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	Geo.cylinder(root, 0.08, 0.22, Vector3(0, 0.11, 0), jar_mat, false)
+
+	# Горлышко банки
+	Geo.cylinder(root, 0.055, 0.04, Vector3(0, 0.23, 0), jar_mat, false)
+
+	# Вода на дне банки
+	var water_mat := StandardMaterial3D.new()
+	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water_mat.albedo_color = Color(0.65, 0.82, 0.85, 0.6)
+	water_mat.roughness = 0.1
+	Geo.cylinder(root, 0.075, 0.09, Vector3(0, 0.045, 0), water_mat, false)
+
+	# Еловые ветки (3 лапы из банки)
+	var needle_mat := StandardMaterial3D.new()
+	needle_mat.albedo_color = Color(0.12, 0.26, 0.14)
+	needle_mat.roughness = 0.9
+
+	var branch_angles := [-0.35, 0.15, 0.42]
+	var branch_yaws := [0.2, 2.1, -1.8]
+	for b in 3:
+		var branch := Node3D.new()
+		branch.position = Vector3(0.0, 0.22, 0.0)
+		branch.rotation = Vector3(branch_angles[b], branch_yaws[b], branch_angles[b] * 0.7)
+		root.add_child(branch)
+
+		var stem := Geo.box_mesh(Vector3(0.012, 0.26, 0.012), Palette.m(&"wood"))
+		stem.position.y = 0.12
+		branch.add_child(stem)
+
+		for tier in 3:
+			var w := 0.18 - tier * 0.04
+			var h := 0.07
+			var foliage := Geo.box_mesh(Vector3(w, h, w * 0.7), needle_mat)
+			foliage.position.y = 0.10 + tier * 0.06
+			foliage.rotation.y = float(tier) * 0.4
+			branch.add_child(foliage)
+
+			var snow_frost := Geo.box_mesh(Vector3(w * 0.9, 0.015, w * 0.65), Palette.m(&"snow"))
+			snow_frost.position.y = 0.10 + tier * 0.06 + h * 0.5 + 0.005
+			branch.add_child(snow_frost)
+
+	# Серебристый «дождик» (мишура) — сверкающие ленточки
+	var tinsel_mat := StandardMaterial3D.new()
+	tinsel_mat.albedo_color = Color(0.92, 0.95, 1.0)
+	tinsel_mat.roughness = 0.1
+	tinsel_mat.metallic = 0.9
+	tinsel_mat.metallic_specular = 1.0
+	tinsel_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+
+	for r in 5:
+		var ang := float(r) * TAU / 5.0 + 0.15
+		var tinsel := Geo.box_mesh(Vector3(0.004, 0.22, 0.008), tinsel_mat)
+		tinsel.position = Vector3(cos(ang) * 0.07, 0.18, sin(ang) * 0.07)
+		tinsel.rotation.z = 0.08 * sin(ang)
+		root.add_child(tinsel)
+
+	# 1. Советская стеклянная ёлочная игрушка — «Золотая шишка»
+	var cone_mat := StandardMaterial3D.new()
+	cone_mat.albedo_color = Color(0.95, 0.78, 0.22)
+	cone_mat.roughness = 0.2
+	cone_mat.metallic = 0.7
+	cone_mat.metallic_specular = 0.9
+	var cone_toy := Geo.box_mesh(Vector3(0.035, 0.06, 0.035), cone_mat)
+	cone_toy.position = Vector3(0.09, 0.26, 0.04)
+	cone_toy.rotation.z = deg_to_rad(12.0)
+	root.add_child(cone_toy)
+
+	# 2. Советская ёлочная игрушка — «Красный шар»
+	var red_mat := StandardMaterial3D.new()
+	red_mat.albedo_color = Color(0.85, 0.14, 0.18)
+	red_mat.roughness = 0.15
+	red_mat.metallic = 0.6
+	red_mat.metallic_specular = 0.95
+	var red_toy := Geo.box_mesh(Vector3(0.04, 0.045, 0.04), red_mat)
+	red_toy.position = Vector3(-0.08, 0.24, -0.05)
+	root.add_child(red_toy)
+
+	return root
+
+
+## Праздничный натюрморт заброшенного праздника: сморщенный мандарин, бутылка шампанского и гранёный стакан
+static func new_year_still_life() -> Node3D:
+	var root := Node3D.new()
+	root.name = "NewYearStillLife"
+
+	# Бутылка «Советского шампанского» (тёмно-зелёное стекло, фольга на горлышке)
+	var bottle_mat := StandardMaterial3D.new()
+	bottle_mat.albedo_color = Color(0.12, 0.24, 0.14)
+	bottle_mat.roughness = 0.2
+	bottle_mat.metallic_specular = 0.8
+	Geo.cylinder(root, 0.042, 0.22, Vector3(0, 0.11, 0), bottle_mat, false)
+
+	Geo.cylinder(root, 0.016, 0.10, Vector3(0, 0.26, 0), bottle_mat, false)
+
+	var foil_mat := StandardMaterial3D.new()
+	foil_mat.albedo_color = Color(0.94, 0.82, 0.28)
+	foil_mat.metallic = 0.85
+	foil_mat.roughness = 0.25
+	Geo.cylinder(root, 0.018, 0.065, Vector3(0, 0.28, 0), foil_mat, false)
+
+	var label := Geo.box_mesh(Vector3(0.086, 0.07, 0.086), Palette.m(&"paper"))
+	label.position.y = 0.11
+	root.add_child(label)
+
+	# Засохший тёмно-оранжевый мандарин со сморщенной кожурой
+	var mandarin_mat := StandardMaterial3D.new()
+	mandarin_mat.albedo_color = Color(0.86, 0.44, 0.08)
+	mandarin_mat.roughness = 0.95
+	var mandarin := Geo.box_mesh(Vector3(0.062, 0.046, 0.062), mandarin_mat)
+	mandarin.position = Vector3(0.12, 0.023, 0.03)
+	mandarin.rotation.y = 0.35
+	root.add_child(mandarin)
+
+	var sticker_mat := StandardMaterial3D.new()
+	sticker_mat.albedo_color = Color(0.1, 0.32, 0.16)
+	var sticker := Geo.box_mesh(Vector3(0.016, 0.002, 0.016), sticker_mat)
+	sticker.position = Vector3(0.12, 0.047, 0.03)
+	sticker.rotation.y = deg_to_rad(45.0)
+	root.add_child(sticker)
+
+	# Советский гранёный стакан (14 граней) с недопитым напитком
+	var glass_mat := StandardMaterial3D.new()
+	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glass_mat.albedo_color = Color(0.85, 0.92, 0.95, 0.42)
+	glass_mat.roughness = 0.2
+	Geo.cylinder(root, 0.034, 0.09, Vector3(-0.09, 0.045, 0.06), glass_mat, false)
+
+	var drink_mat := StandardMaterial3D.new()
+	drink_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	drink_mat.albedo_color = Color(0.85, 0.65, 0.25, 0.7)
+	drink_mat.roughness = 0.1
+	Geo.cylinder(root, 0.031, 0.025, Vector3(-0.09, 0.015, 0.06), drink_mat, false)
+
+	return root
+
+
+## Вырезанная из бумаги новогодняя снежинка на оконном стекле
+static func paper_snowflake() -> Node3D:
+	var root := Node3D.new()
+	root.name = "PaperSnowflake"
+
+	var snow_mat := StandardMaterial3D.new()
+	snow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	snow_mat.albedo_color = Color(0.96, 0.96, 0.98, 0.88)
+	snow_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	snow_mat.roughness = 0.95
+
+	for i in 3:
+		var beam := Geo.box_mesh(Vector3(0.15, 0.018, 0.002), snow_mat)
+		beam.rotation.z = float(i) * PI / 3.0
+		root.add_child(beam)
+		for side in [-0.045, 0.045]:
+			var notch := Geo.box_mesh(Vector3(0.002, 0.04, 0.002), snow_mat)
+			notch.position = Vector3(cos(float(i) * PI / 3.0) * side, sin(float(i) * PI / 3.0) * side, 0.0)
+			notch.rotation.z = float(i) * PI / 3.0 + deg_to_rad(45.0)
+			root.add_child(notch)
+
+	return root
+
+
+## Советская новогодняя гирлянда «Золотой фонарик» над радиостанцией
+static func soviet_garland() -> Node3D:
+	var root := Node3D.new()
+	root.name = "SovietGarland"
+
+	var bulb_colors := [
+		Color(0.95, 0.22, 0.18), # Рубиновый
+		Color(0.98, 0.82, 0.25), # Янтарный
+		Color(0.22, 0.88, 0.45), # Изумрудный
+		Color(0.25, 0.65, 0.95), # Лазурный
+	]
+
+	var n_bulbs := 12
+	var width := 1.9
+	var drop := 0.22
+
+	for i in n_bulbs:
+		var t := float(i) / float(n_bulbs - 1)
+		var x := (t - 0.5) * width
+		var y := -4.0 * drop * t * (1.0 - t)
+		var col: Color = bulb_colors[i % bulb_colors.size()]
+
+		var b_mat := StandardMaterial3D.new()
+		b_mat.albedo_color = col
+		b_mat.emission_enabled = true
+		b_mat.emission = col
+		b_mat.emission_energy_multiplier = 1.2
+		b_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+
+		var bulb := Geo.box_mesh(Vector3(0.035, 0.05, 0.035), b_mat)
+		bulb.position = Vector3(x, y - 0.025, 0.0)
+		bulb.rotation.z = (t - 0.5) * 0.4
+		root.add_child(bulb)
+
+		var cap := Geo.box_mesh(Vector3(0.02, 0.015, 0.02), Palette.m(&"metal"))
+		cap.position = Vector3(x, y, 0.0)
+		root.add_child(cap)
+
+	var omni := OmniLight3D.new()
+	omni.name = "GarlandGlow"
+	omni.light_color = Color(1.0, 0.82, 0.52)
+	omni.light_energy = 0.35
+	omni.omni_range = 2.4
+	omni.shadow_enabled = false
+	omni.position = Vector3(0.0, -0.15, 0.1)
+	root.add_child(omni)
 
 	return root
 

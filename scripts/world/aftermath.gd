@@ -55,20 +55,25 @@ func _exit_tree() -> void:
 		Consequences.carry_unrepaired(active_chores, repaired_chores)
 
 
-## Где тварь ждала на привычных тропах — круги босых следов и мысль при осмотре.
+## Где тварь ждала на привычных тропах — линия ожидания (шаги туда-обратно) и мысль при осмотре.
 func _spawn_waited_tracks(yard: Node3D) -> void:
+	if day_index <= 0:
+		return
 	for w: Array in Consequences.take_waited():
 		var c := Vector3(float(w[0]), 0.0, float(w[1]))
-		var ring := PackedVector3Array()
-		for i in 9:
-			var a := i * TAU / 8.0
-			var q := c + Vector3(cos(a) * 2.2, 0, sin(a) * 2.2)
-			q.y = Terrain.height(q.x, q.z) + 0.03
-			ring.append(q)
+		var pacing := PackedVector3Array()
+		var angle := float(hash(w) % 314) * 0.02
+		var dir := Vector3(cos(angle), 0, sin(angle))
+		pacing.append(c - dir * 1.5)
+		pacing.append(c - dir * 0.5)
+		pacing.append(c + dir * 0.5)
+		pacing.append(c + dir * 1.5)
+		pacing.append(c + dir * 0.7)
+		pacing.append(c - dir * 0.7)
 		var node := Node3D.new()
 		node.name = "WaitedTracks"
 		yard.add_child(node)
-		Footprints.trail(node, &"bare", ring, ring[0].y, 0.5)
+		Footprints.trail(node, &"bare", pacing, Terrain.height(c.x, c.z) + 0.02, 0.45)
 		var cy := Terrain.height(c.x, c.z)
 		var it := Geo.interactable(node, Vector3(3.0, 1.2, 3.0), Vector3(c.x, cy + 0.6, c.z), null, Loc.t(&"it.footprints"), func(_p: Player) -> void:
 			Game.hud.subtitle(Loc.t(&"cons.waited"), 6.0)
@@ -111,8 +116,10 @@ func _generate_aftermath() -> void:
 
 
 func _spawn_footprints(yard: Yard) -> void:
+	if day_index <= 0:
+		return
 	# Босые следы у порога генерируются, если ночью были стуки, осада или гости
-	var had_night_visitor: bool = day_index in [2, 4, 6] or bool(SaveGame.flags.get("door_knocked", false)) or bool(SaveGame.flags.get("had_night_siege", false)) or _rng.randf() < 0.75
+	var had_night_visitor: bool = day_index in [2, 4, 6] or bool(SaveGame.flags.get("door_knocked", false)) or bool(SaveGame.flags.get("had_night_siege", false)) or (day_index >= 1 and _rng.randf() < 0.5)
 	if not had_night_visitor:
 		return
 

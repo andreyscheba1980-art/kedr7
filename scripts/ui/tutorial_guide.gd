@@ -132,6 +132,9 @@ func _target() -> Vector3:
 
 
 func _update_marker(delta: float) -> void:
+	if Game.is_indoors():
+		_hide_marker()
+		return
 	var t := _target()
 	if t == Vector3.INF:
 		_hide_marker()
@@ -156,8 +159,8 @@ func _make_marker() -> MeshInstance3D:
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.no_depth_test = true
-	m.disable_fog = true
+	m.no_depth_test = false
+	m.disable_fog = false
 	m.albedo_texture = _dot_texture()
 	m.albedo_color = Color(1.0, 0.72, 0.3, 0.0)
 	var mi := MeshInstance3D.new()

@@ -104,16 +104,16 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_truth = depth()
 	ThermometerUI.title_plate(self, Loc.t(&"snow.title"))
-	var stake := Yard.METEO + Yard.M_ROD
+	var stake := Yard.rod_pos()
 	var face_z := stake.z + 0.0178
 	var start := randf_range(0.05, 0.35)
-	var eye := Vector3(stake.x + 0.12, start, face_z + 0.42)
+	var eye := Vector3(stake.x + 0.12, stake.y + start, face_z + 0.42)
 	_close = Closeup3D.new()
 	Game.level.add_child(_close)
-	_close.setup(eye, Vector3(stake.x + 0.12, start, stake.z), 36.0, Vector3.UP, 0.08 - start, (H_TOTAL - _truth) / 100.0 - 0.1 - start, 0.0)
+	_close.setup(eye, Vector3(stake.x + 0.12, stake.y + start, stake.z), 36.0, Vector3.UP, 0.08 - start, (H_TOTAL - _truth) / 100.0 - 0.1 - start, 0.0)
 	var vis := (H_TOTAL - _truth) / 100.0
 	_frost = Closeup3D.Frost.new(Vector2(FACE_W + 0.01, vis), InstrumentView.frost_for_weather(Game.air_temp().x) * 0.8, Vector2i(10, 160))
-	_frost.position = Vector3(stake.x, vis * 0.5, face_z + 0.004)
+	_frost.position = Vector3(stake.x, stake.y + vis * 0.5, face_z + 0.004)
 	Game.level.add_child(_frost)
 
 	_book = KMBook.new()
@@ -150,6 +150,10 @@ func _process(delta: float) -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_cancel") or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT):
+		closed.emit()
+		accept_event()
+		return
 	if event is InputEventMouseMotion:
 		_mouse = (event as InputEventMouseMotion).position
 	elif event is InputEventMouseButton:

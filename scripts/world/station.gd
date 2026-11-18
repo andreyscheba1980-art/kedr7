@@ -1870,6 +1870,21 @@ func _build_porch(collision_only := false) -> void:
 	porch_ice.rotation.y = deg_to_rad(90.0)
 	add_child(porch_ice)
 
+	# Вывеска кордона «КЕДР-7» над крыльцом
+	var sign_board := Geo.box_mesh(Vector3(0.04, 0.22, 1.1), Palette.m(&"wood"))
+	sign_board.position = Vector3(x0 + 1.44, 2.26, 3.1)
+	add_child(sign_board)
+	var sign_text := Label3D.new()
+	sign_text.text = "КЕДР-7"
+	sign_text.font_size = 28
+	sign_text.pixel_size = 0.0045
+	sign_text.modulate = Color(0.92, 0.88, 0.78, 0.95)
+	sign_text.outline_modulate = Color(0.12, 0.08, 0.06, 0.95)
+	sign_text.outline_size = 6
+	sign_text.position = Vector3(x0 + 1.47, 2.26, 3.1)
+	sign_text.rotation.y = deg_to_rad(90.0)
+	add_child(sign_text)
+
 
 func _window(glass_pos: Vector3, size: Vector3, inward: Vector3, wname: String) -> void:
 	var body := StaticBody3D.new()
@@ -2249,6 +2264,30 @@ func _build_living_quarters() -> void:
 	teapot_living.scale = Vector3(0.7, 0.7, 0.7)
 	add_child(teapot_living)
 
+	# Новогодняя банка с еловыми ветками на обеденном столе
+	var fir_jar := Props.table_fir_jar()
+	fir_jar.position = Vector3(0.95, 0.75, 3.75)
+	add_child(fir_jar)
+	Geo.interactable(fir_jar, Vector3(0.35, 0.45, 0.35), Vector3(0.0, 0.2, 0.0), null, Loc.t(&"it.fir_jar"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.fir_jar"), 4.5)
+	)
+
+	# Новогодний натюрморт Семёнова: высохший мандарин, бутылка шампанского и стакан
+	var ny_still := Props.new_year_still_life()
+	ny_still.position = Vector3(1.42, 0.75, 3.7)
+	add_child(ny_still)
+	Geo.interactable(ny_still, Vector3(0.35, 0.35, 0.35), Vector3(0.0, 0.15, 0.0), null, Loc.t(&"it.ny_table"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.ny_table"), 4.5)
+	)
+
+	# Бумажная резная снежинка на южном окне жилой комнаты
+	var sf_living := Props.paper_snowflake()
+	sf_living.position = Vector3(0.5, 1.45, 6.58)
+	add_child(sf_living)
+	Geo.interactable(sf_living, Vector3(0.3, 0.3, 0.1), Vector3.ZERO, null, Loc.t(&"it.snowflake"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.snowflake"), 4.0)
+	)
+
 	# Стулья у стола
 	var chair1 := _collider(Vector3(0.45, 0.45, 0.45), Vector3(1.2, 0.225, 3.2))
 	chair1.add_child(Props.chair())
@@ -2260,8 +2299,9 @@ func _build_living_quarters() -> void:
 	table_lamp.position = Vector3(0.72, 0.75, 4.35)
 	table_lamp.rotation.y = deg_to_rad(-45.0)
 	add_child(table_lamp)
-	var l_table := Geo.omni(self, Vector3(0.85, 1.15, 4.2), 3.4, 0.95, Color(1.0, 0.82, 0.52))
-	l_table.shadow_enabled = false
+	var l_table := Geo.omni(self, Vector3(0.85, 1.15, 4.2), 2.4, 0.95, Color(1.0, 0.82, 0.52))
+	l_table.omni_attenuation = 2.0
+	l_table.shadow_enabled = true
 	register_lamp(l_table)
 
 	var table_dust := CPUParticles3D.new()
@@ -2372,8 +2412,9 @@ func _build_radio_room() -> void:
 	_collider(Vector3(2.4, 0.75, 1.0), Vector3(9.2, 0.375, -1.3))
 	_place(Props.desk(), Vector3(9.2, 0.0, -1.3))
 
-	# Радиостанция Р-250 «Кит»
-	var radio_set := Geo.interactable(self, Vector3(0.9, 0.45, 0.4), Vector3(9.2, 0.96, -1.5), null, Loc.t(&"it.radio"), _on_radio_used)
+	# Радиостанция Р-250 «Кит» (сдвинута к правому краю стола, чуть развернута к оператору)
+	var radio_set := Geo.interactable(self, Vector3(0.9, 0.45, 0.4), Vector3(9.45, 0.96, -1.48), null, Loc.t(&"it.radio"), _on_radio_used)
+	radio_set.rotation_degrees.y = -5.0
 	radio_set.name = "RadioSet"
 	radio_set.prompt_provider = func() -> String:
 		if Game.is_day() and Game.aftermath != null and Game.aftermath.is_call_ringing():
@@ -2387,15 +2428,46 @@ func _build_radio_room() -> void:
 	handset.position = Vector3(7.72, 0.77, -0.92)
 	handset.rotation_degrees = Vector3(0, 15.0, 0)
 	add_child(handset)
-	# Подсветка шкалы-барабана: тёплое пятно на шкале, будто лампочки за ней
-	var scale_lamp := OmniLight3D.new()
-	scale_lamp.light_color = Color(1.0, 0.68, 0.32)
-	scale_lamp.light_energy = 0.35
-	scale_lamp.omni_range = 0.32
-	scale_lamp.shadow_enabled = false
-	scale_lamp.position = Vector3(-0.17, 0.07, 0.3)
-	radio_set.add_child(scale_lamp)
-	register_lamp(scale_lamp)
+	# Подсветка оптической шкалы верньера
+	var dial := OmniLight3D.new()
+	dial.light_color = Color(1.0, 0.72, 0.28)
+	dial.light_energy = 0.35
+	dial.omni_range = 1.1
+	dial.shadow_enabled = false
+	dial.position = Vector3(-0.15, 0.06, 0.25)
+	radio_set.add_child(dial)
+	register_lamp(dial)
+
+	# Магический глаз 6Е5С настройки
+	var magic_eye := MeshInstance3D.new()
+	var eye_qm := QuadMesh.new()
+	eye_qm.size = Vector2(0.045, 0.045)
+	magic_eye.mesh = eye_qm
+	var eye_mat := ShaderMaterial.new()
+	eye_mat.shader = load("res://assets/shaders/magic_eye_6e5s.gdshader") as Shader
+	eye_mat.set_shader_parameter("tune", 0.2)
+	magic_eye.material_override = eye_mat
+	magic_eye.position = Vector3(0.24, 0.08, 0.21)
+	radio_set.add_child(magic_eye)
+
+	# Советская новогодняя гирлянда «Золотой фонарик» над радиостанцией
+	var garland := Props.soviet_garland()
+	garland.position = Vector3(9.2, 2.05, -1.8)
+	add_child(garland)
+	var g_glow := garland.get_node_or_null("GarlandGlow") as OmniLight3D
+	if g_glow != null:
+		register_lamp(g_glow)
+	Geo.interactable(garland, Vector3(1.8, 0.4, 0.3), Vector3(0.0, -0.1, 0.0), null, Loc.t(&"it.ny_garland"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.ny_garland"), 4.0)
+	)
+
+	# Бумажная резная снежинка на северном окне радиорубки
+	var sf_north := Props.paper_snowflake()
+	sf_north.position = Vector3(9.2, 1.45, -1.98)
+	add_child(sf_north)
+	Geo.interactable(sf_north, Vector3(0.3, 0.3, 0.1), Vector3.ZERO, null, Loc.t(&"it.snowflake"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.snowflake"), 4.0)
+	)
 
 	# Бланк заявки на снабжение (пайки → ящик с вертолёта)
 	var form := Geo.interactable(self, Vector3(0.28, 0.05, 0.22), Vector3(8.8, 0.78, -1.0), null, Loc.t(&"it.supply_form"), func(_p: Player) -> void:

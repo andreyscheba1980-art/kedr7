@@ -56,7 +56,7 @@ var _notes_vbox: VBoxContainer
 var _tab_btn_tasks: Button
 var _tab_btn_cov: Button
 var _sub_token := 0
-
+var _sub_tween: Tween
 var _sub_priority := 0
 var _sub_until := 0
 var _modal: Control
@@ -325,21 +325,26 @@ func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Colo
 	else:
 		_subtitle.remove_theme_stylebox_override("normal")
 
-	# Телетайпная дешифрация (машинопись текста) с характерной псевдоречью (Speech Chatter)
+	if _sub_tween != null and _sub_tween.is_valid():
+		_sub_tween.kill()
+
+	# Телетайпная дешифрация (машинопись текста) ТОЛЬКО для радиоэфира и мистического шёпота
 	var total_chars := display_text.length()
-	if total_chars <= 4 or OS.get_name() == "headless":
-		_subtitle.visible_characters = -1
-	else:
+	if (is_radio or is_whisper) and total_chars > 4 and OS.get_name() != "headless":
 		_subtitle.visible_characters = 0
 		var type_speed := 36.0
 		var type_dur := clampf(float(total_chars) / type_speed, 0.35, minf(duration * 0.75, 4.0))
-		var tw := create_tween()
-		tw.tween_property(_subtitle, "visible_characters", total_chars, type_dur)
+		_sub_tween = create_tween()
+		_sub_tween.tween_property(_subtitle, "visible_characters", total_chars, type_dur)
 		var speaker := SpeechChatter.detect_speaker(display_text)
 		SpeechChatter.play_line_chatter(self, speaker, display_text, type_dur, token)
+	else:
+		_subtitle.visible_characters = -1
 
 	await get_tree().create_timer(duration, false).timeout
 	if token == _sub_token:
+		if _sub_tween != null and _sub_tween.is_valid():
+			_sub_tween.kill()
 		_subtitle.text = ""
 		_subtitle.visible_characters = -1
 		_subtitle.remove_theme_stylebox_override("normal")

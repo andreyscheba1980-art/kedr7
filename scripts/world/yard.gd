@@ -50,6 +50,14 @@ const TRAIL_W := 1.4
 const PORCH_SAFE_RADIUS := 5.5
 const LEAN_YARD := true
 
+const GLADES := [
+	{"c": Vector3(10.0, 0.0, 4.0), "r": 12.5},    # жилой дворик (компактная поляна в кольце вековых елей)
+	{"c": Vector3(66.0, 0.0, -22.0), "r": 15.0},  # метеополяна (= PLOT)
+	{"c": Vector3(24.0, 0.0, -62.0), "r": 12.0},  # мачта
+]
+const ALLEY_HALF := 4.0     # ширина просеки 8 м
+const WALL_W := 8.0         # толщина стены леса
+
 static func _gnd(v: Vector3) -> Vector3:
 	return Vector3(v.x, Terrain.height(v.x, v.z), v.z)
 
@@ -129,6 +137,9 @@ var _diesel_zone_noticed := false
 var _night6_tracks_spawned := false
 var _night6_return_tracks_spawned := false
 var _bare_tracks_root: Node3D = null
+var _creak_t := 12.0
+var _shed_tin_t := 7.0
+var _snow_drop_cd := 0.0
 
 
 func _ready() -> void:
@@ -176,6 +187,7 @@ func _ready() -> void:
 	_build_meteo()
 	_build_mast()
 	_build_shed()
+	_build_snow_drop_triggers()
 	_restore_placed_pickups()
 	FarSites.build(self)
 	Supply.place_crate(self)
@@ -213,14 +225,17 @@ func _ready() -> void:
 		_build_expedition_cart()
 	else:
 		_build_lean_fuel_drums()
+	_build_signpost(JUNCTION + Vector3(0.8, 0.0, 1.2))
+	_build_notice_board(Vector3(16.2, 0.0, 1.4))
+	_build_doghouse(Vector3(19.2, 0.0, 10.5))
+	_build_frozen_clothesline(Vector3(-2.0, 0.0, -6.0))
+	_build_old_fence()
 	_build_taiga_landmarks()
 	_build_snow_survey_route()
 	_build_helipad()
 	_build_frozen_hunter()
 	_build_station_road_dressing()
 	_build_yard_clutter()
-	const FootstepsTrailClass = preload("res://scripts/world/footsteps_trail.gd")
-	add_child(FootstepsTrailClass.new())
 	if (Game.is_day() and Game.phase_index == 1) or (Game.is_night() and Game.night >= 2):
 		_build_footprints()
 	EventBus.antenna_iced_changed.connect(_on_antenna_iced)
@@ -252,6 +267,362 @@ func _build_lean_fuel_drums() -> void:
 	b3.position.y = Terrain.height(b3.position.x, b3.position.z) + 0.42
 	b3.rotation.z = deg_to_rad(90.0)
 	add_child(b3)
+
+
+func _build_signpost(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	var root := Node3D.new()
+	root.position = Vector3(pos.x, gy, pos.z)
+	add_child(root)
+
+	var post_h := 2.2
+	var post_mesh := Geo.box_mesh(Vector3(0.14, post_h, 0.14), Palette.m(&"wood"))
+	post_mesh.position = Vector3(0.0, post_h * 0.5, 0.0)
+	root.add_child(post_mesh)
+
+	var roof_l := Geo.box_mesh(Vector3(0.24, 0.03, 0.16), Palette.m(&"plank"))
+	roof_l.position = Vector3(-0.06, post_h + 0.05, 0.0)
+	roof_l.rotation.z = deg_to_rad(28.0)
+	root.add_child(roof_l)
+	var roof_r := Geo.box_mesh(Vector3(0.24, 0.03, 0.16), Palette.m(&"plank"))
+	roof_r.position = Vector3(0.06, post_h + 0.05, 0.0)
+	roof_r.rotation.z = deg_to_rad(-28.0)
+	root.add_child(roof_r)
+	var snow_cap := Geo.box_mesh(Vector3(0.26, 0.06, 0.18), Palette.m(&"snow"))
+	snow_cap.position = Vector3(0.0, post_h + 0.1, 0.0)
+	root.add_child(snow_cap)
+
+	var to_meteo := (PLOT - pos).normalized()
+	var yaw_meteo := atan2(to_meteo.x, to_meteo.z)
+	var arrow_meteo := _build_arrow_board(0.65, 0.14, Palette.m(&"weathered"), Palette.m(&"trim_paint"))
+	arrow_meteo.position = Vector3(0.0, 1.85, 0.0)
+	arrow_meteo.rotation.y = yaw_meteo
+	root.add_child(arrow_meteo)
+
+	var to_shed := (SHED - pos).normalized()
+	var yaw_shed := atan2(to_shed.x, to_shed.z)
+	var arrow_shed := _build_arrow_board(0.60, 0.13, Palette.m(&"weathered"), Palette.m(&"weathered"))
+	arrow_shed.position = Vector3(0.0, 1.55, 0.0)
+	arrow_shed.rotation.y = yaw_shed
+	root.add_child(arrow_shed)
+
+	var to_taiga := (ZIMNIK - pos).normalized()
+	var yaw_taiga := atan2(to_taiga.x, to_taiga.z)
+	var arrow_taiga := _build_arrow_board(0.55, 0.12, Palette.m(&"wood"), Palette.m(&"red"))
+	arrow_taiga.position = Vector3(0.0, 1.25, 0.0)
+	arrow_taiga.rotation.y = yaw_taiga
+	arrow_taiga.rotation.z = deg_to_rad(-6.0)
+	root.add_child(arrow_taiga)
+
+	var skirt := Geo.box_mesh(Vector3(0.55, 0.28, 0.55), Palette.m(&"drift"))
+	skirt.position = Vector3(0.0, 0.12, 0.0)
+	root.add_child(skirt)
+
+	var body := StaticBody3D.new()
+	body.collision_layer = Geo.LAYER_WORLD
+	body.collision_mask = 0
+	body.position = Vector3(0.0, post_h * 0.5, 0.0)
+	body.add_child(Geo.box_shape(Vector3(0.2, post_h, 0.2)))
+	root.add_child(body)
+
+	var it := Interactable.new()
+	it.collision_layer = Geo.LAYER_WORLD
+	it.position = Vector3(0.0, 1.4, 0.0)
+	it.prompt_provider = func() -> String: return Loc.t(&"sign.post_name")
+	it.add_child(Geo.box_shape(Vector3(0.8, 1.8, 0.8)))
+	it.used.connect(func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sign.post_read"), 5.0)
+		Game.audio.play_2d("res://assets/audio/ui_tick.ogg", -6.0)
+	)
+	root.add_child(it)
+
+
+func _build_arrow_board(length: float, height: float, wood_mat: Material, accent_mat: Material) -> Node3D:
+	var n := Node3D.new()
+	var plank_l := length * 0.75
+	var plank := Geo.box_mesh(Vector3(0.04, height, plank_l), wood_mat)
+	plank.position = Vector3(0.0, 0.0, plank_l * 0.5)
+	n.add_child(plank)
+
+	var tip := Geo.box_mesh(Vector3(0.045, height * 0.8, length * 0.25), accent_mat)
+	tip.position = Vector3(0.0, 0.0, plank_l + length * 0.12)
+	n.add_child(tip)
+
+	var snow := Geo.box_mesh(Vector3(0.05, 0.025, length * 0.95), Palette.m(&"snow"))
+	snow.position = Vector3(0.0, height * 0.5 + 0.012, length * 0.5)
+	n.add_child(snow)
+	return n
+
+
+func _build_old_fence() -> void:
+	var fence_rng := RandomNumberGenerator.new()
+	fence_rng.seed = 88
+	var root := Node3D.new()
+	root.name = "OldYardFence"
+	add_child(root)
+
+	var points: Array[Vector3] = []
+	for z in range(6, -8, -2):
+		points.append(Vector3(-4.5, 0.0, float(z)))
+	for x in range(-3, 14, 2):
+		points.append(Vector3(float(x), 0.0, -7.5))
+
+	for i in range(points.size()):
+		var pt := points[i]
+		var gy := Terrain.height(pt.x, pt.z)
+		var post_pos := Vector3(pt.x, gy, pt.z)
+
+		var post := Node3D.new()
+		post.position = post_pos
+		post.rotation.y = fence_rng.randf_range(-0.1, 0.1)
+		post.rotation.z = deg_to_rad(fence_rng.randf_range(-8.0, 8.0))
+		post.rotation.x = deg_to_rad(fence_rng.randf_range(-6.0, 6.0))
+		root.add_child(post)
+
+		var ph := fence_rng.randf_range(1.0, 1.25)
+		var pm := Geo.box_mesh(Vector3(0.1, ph, 0.1), Palette.m(&"wood"))
+		pm.position = Vector3(0.0, ph * 0.5, 0.0)
+		post.add_child(pm)
+
+		var sc := Geo.box_mesh(Vector3(0.14, 0.05, 0.14), Palette.m(&"snow"))
+		sc.position = Vector3(0.0, ph + 0.02, 0.0)
+		post.add_child(sc)
+
+		var d := Geo.box_mesh(Vector3(0.65, 0.35, 0.65), Palette.m(&"drift"))
+		d.position = Vector3(0.0, 0.15, 0.0)
+		post.add_child(d)
+
+		# На угловом столбе у кромки леса — зарубка на уровне глаз
+		if i == 6:
+			var notch := Geo.box_mesh(Vector3(0.12, 0.04, 0.04), Palette.m(&"log_end"))
+			notch.position = Vector3(0.0, 0.85, 0.05)
+			post.add_child(notch)
+			var n_it := Interactable.new()
+			n_it.collision_layer = Geo.LAYER_WORLD
+			n_it.position = Vector3(0.0, 0.85, 0.0)
+			n_it.prompt_provider = func() -> String: return Loc.t(&"it.pine_notch")
+			n_it.add_child(Geo.box_shape(Vector3(0.6, 0.8, 0.6)))
+			n_it.used.connect(func(_p: Player) -> void:
+				Game.hud.subtitle(Loc.t(&"sub.pine_notch"), 4.5)
+				Game.audio.play_2d("res://assets/audio/ice_hit.ogg", -6.0)
+			)
+			post.add_child(n_it)
+
+		if i + 1 < points.size() and i != 6:
+			var next_pt := points[i + 1]
+			var next_gy := Terrain.height(next_pt.x, next_pt.z)
+			var p2 := Vector3(next_pt.x, next_gy, next_pt.z)
+			var dist := post_pos.distance_to(p2)
+			if dist < 3.2:
+				var mid := (post_pos + p2) * 0.5
+				var dir := (p2 - post_pos).normalized()
+				var yaw := atan2(dir.x, dir.z)
+
+				var rails := [0.35, 0.75]
+				for ry in rails:
+					if ry > 0.7 and fence_rng.randf() < 0.25:
+						continue
+					var rail := Geo.box_mesh(Vector3(0.04, 0.08, dist * 0.98), Palette.m(&"weathered"))
+					rail.position = mid + Vector3(0.0, ry, 0.0)
+					rail.rotation.y = yaw
+					root.add_child(rail)
+
+				var pickets := fence_rng.randi_range(1, 3)
+				for k in pickets:
+					if fence_rng.randf() < 0.2:
+						continue
+					var frac := float(k + 1) / float(pickets + 1)
+					var p_mid := post_pos.lerp(p2, frac)
+					var picket := Geo.box_mesh(Vector3(0.03, 0.85, 0.1), Palette.m(&"weathered"))
+					picket.position = p_mid + Vector3(0.0, 0.45, 0.0)
+					picket.rotation.y = yaw
+					picket.rotation.z = deg_to_rad(fence_rng.randf_range(-12.0, 12.0))
+					root.add_child(picket)
+
+
+func _build_notice_board(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	var root := Node3D.new()
+	root.position = Vector3(pos.x, gy, pos.z)
+	root.rotation.y = deg_to_rad(-25.0)
+	add_child(root)
+
+	for sx in [-0.65, 0.65]:
+		var post := Geo.box_mesh(Vector3(0.12, 2.1, 0.12), Palette.m(&"wood"))
+		post.position = Vector3(sx, 1.05, 0.0)
+		root.add_child(post)
+		var skirt := Geo.box_mesh(Vector3(0.35, 0.25, 0.35), Palette.m(&"drift"))
+		skirt.position = Vector3(sx, 0.12, 0.0)
+		root.add_child(skirt)
+
+	var board := Geo.box_mesh(Vector3(1.4, 0.95, 0.04), Palette.m(&"weathered"))
+	board.position = Vector3(0.0, 1.35, 0.0)
+	root.add_child(board)
+
+	var roof_l := Geo.box_mesh(Vector3(1.5, 0.03, 0.35), Palette.m(&"plank"))
+	roof_l.position = Vector3(0.0, 1.95, -0.1)
+	roof_l.rotation.x = deg_to_rad(25.0)
+	root.add_child(roof_l)
+	var roof_r := Geo.box_mesh(Vector3(1.5, 0.03, 0.35), Palette.m(&"plank"))
+	roof_r.position = Vector3(0.0, 1.95, 0.1)
+	roof_r.rotation.x = deg_to_rad(-25.0)
+	root.add_child(roof_r)
+	var snow_roof := Geo.box_mesh(Vector3(1.52, 0.07, 0.45), Palette.m(&"snow"))
+	snow_roof.position = Vector3(0.0, 2.02, 0.0)
+	root.add_child(snow_roof)
+
+	var map_sheet := Geo.box_mesh(Vector3(0.55, 0.72, 0.01), Palette.m(&"paper"))
+	map_sheet.position = Vector3(-0.32, 1.35, 0.025)
+	root.add_child(map_sheet)
+	var star := Geo.box_mesh(Vector3(0.08, 0.08, 0.01), Palette.m(&"red"))
+	star.position = Vector3(-0.35, 1.32, 0.035)
+	root.add_child(star)
+
+	var rules_sheet := Geo.box_mesh(Vector3(0.5, 0.72, 0.01), Palette.m(&"paper"))
+	rules_sheet.position = Vector3(0.35, 1.35, 0.025)
+	root.add_child(rules_sheet)
+
+	var sb := StaticBody3D.new()
+	sb.collision_layer = Geo.LAYER_WORLD
+	sb.collision_mask = 0
+	sb.position = Vector3(0.0, 1.1, 0.0)
+	sb.add_child(Geo.box_shape(Vector3(1.5, 2.2, 0.3)))
+	root.add_child(sb)
+
+	var it := Interactable.new()
+	it.collision_layer = Geo.LAYER_WORLD
+	it.position = Vector3(0.0, 1.35, 0.2)
+	it.prompt_provider = func() -> String: return Loc.t(&"it.notice_board")
+	it.add_child(Geo.box_shape(Vector3(1.4, 1.2, 0.8)))
+	it.used.connect(func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.notice_board"), 6.0)
+		Game.audio.play_2d("res://assets/audio/ui_tick.ogg", -4.0)
+	)
+	root.add_child(it)
+
+
+func _build_doghouse(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	var root := Node3D.new()
+	root.position = Vector3(pos.x, gy, pos.z)
+	root.rotation.y = deg_to_rad(40.0)
+	add_child(root)
+
+	var body_h := 0.75
+	var body := Geo.box_mesh(Vector3(0.85, body_h, 1.05), Palette.m(&"wood"))
+	body.position = Vector3(0.0, body_h * 0.5, 0.0)
+	root.add_child(body)
+
+	var hole := Geo.box_mesh(Vector3(0.36, 0.48, 0.02), Palette.m(&"dark"))
+	hole.position = Vector3(0.0, 0.28, 0.53)
+	root.add_child(hole)
+
+	var r_l := Geo.box_mesh(Vector3(0.55, 0.03, 1.15), Palette.m(&"plank"))
+	r_l.position = Vector3(-0.22, body_h + 0.12, 0.0)
+	r_l.rotation.z = deg_to_rad(28.0)
+	root.add_child(r_l)
+	var r_r := Geo.box_mesh(Vector3(0.55, 0.03, 1.15), Palette.m(&"plank"))
+	r_r.position = Vector3(0.22, body_h + 0.12, 0.0)
+	r_r.rotation.z = deg_to_rad(-28.0)
+	root.add_child(r_r)
+	var r_snow := Geo.box_mesh(Vector3(0.75, 0.08, 1.18), Palette.m(&"snow"))
+	r_snow.position = Vector3(0.0, body_h + 0.22, 0.0)
+	root.add_child(r_snow)
+
+	# Колышек и короткая цепь у входа
+	Geo.cylinder(root, 0.015, 0.2, Vector3(0.15, 0.1, 0.58), Palette.m(&"metal"), false)
+	var chain := Geo.box_mesh(Vector3(0.03, 0.02, 0.25), Palette.m(&"metal"))
+	chain.position = Vector3(0.18, 0.02, 0.55)
+	chain.rotation.y = deg_to_rad(15.0)
+	root.add_child(chain)
+
+	var carabiner := Geo.box_mesh(Vector3(0.03, 0.03, 0.06), Palette.m(&"metal"))
+	carabiner.position = Vector3(0.2, 0.02, 0.45)
+	root.add_child(carabiner)
+
+	Geo.cylinder(root, 0.11, 0.05, Vector3(0.35, 0.025, 0.55), Palette.m(&"metal"), false)
+	Geo.cylinder(root, 0.09, 0.02, Vector3(0.35, 0.04, 0.55), Palette.m(&"floor"), false)
+
+	var bone := Geo.box_mesh(Vector3(0.04, 0.03, 0.18), Palette.m(&"paper"))
+	bone.position = Vector3(0.32, 0.02, 0.38)
+	bone.rotation.y = deg_to_rad(30.0)
+	root.add_child(bone)
+
+	var drift := Geo.box_mesh(Vector3(1.1, 0.45, 0.7), Palette.m(&"drift"))
+	drift.position = Vector3(0.0, 0.2, -0.65)
+	root.add_child(drift)
+
+	var sb := StaticBody3D.new()
+	sb.collision_layer = Geo.LAYER_WORLD
+	sb.collision_mask = 0
+	sb.position = Vector3(0.0, 0.4, 0.0)
+	sb.add_child(Geo.box_shape(Vector3(1.0, 0.9, 1.2)))
+	root.add_child(sb)
+
+	var it := Interactable.new()
+	it.collision_layer = Geo.LAYER_WORLD
+	it.position = Vector3(0.0, 0.5, 0.5)
+	it.prompt_provider = func() -> String: return Loc.t(&"it.doghouse")
+	it.add_child(Geo.box_shape(Vector3(1.1, 1.0, 1.1)))
+	it.used.connect(func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.doghouse"), 5.5)
+		Game.audio.play_2d("res://assets/audio/clank.ogg", -8.0)
+	)
+	root.add_child(it)
+
+
+func _build_frozen_clothesline(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	var root := Node3D.new()
+	root.position = Vector3(pos.x, gy, pos.z)
+	add_child(root)
+
+	var p1 := Geo.box_mesh(Vector3(0.09, 1.9, 0.09), Palette.m(&"wood"))
+	p1.position = Vector3(-1.8, 0.95, 0.0)
+	p1.rotation.z = deg_to_rad(4.0)
+	root.add_child(p1)
+	var p2 := Geo.box_mesh(Vector3(0.09, 1.9, 0.09), Palette.m(&"wood"))
+	p2.position = Vector3(1.8, 0.95, 0.0)
+	p2.rotation.z = deg_to_rad(-5.0)
+	root.add_child(p2)
+
+	var rope := Geo.box_mesh(Vector3(3.6, 0.02, 0.02), Palette.m(&"dark"))
+	rope.position = Vector3(0.0, 1.68, 0.0)
+	root.add_child(rope)
+
+	var coat_body := Geo.box_mesh(Vector3(0.55, 0.72, 0.16), Palette.m(&"dark"))
+	coat_body.position = Vector3(0.0, 1.25, 0.0)
+	coat_body.rotation.x = deg_to_rad(6.0)
+	root.add_child(coat_body)
+
+	var sleeve_l := Geo.box_mesh(Vector3(0.38, 0.16, 0.14), Palette.m(&"dark"))
+	sleeve_l.position = Vector3(-0.42, 1.48, 0.0)
+	sleeve_l.rotation.z = deg_to_rad(28.0)
+	root.add_child(sleeve_l)
+	var sleeve_r := Geo.box_mesh(Vector3(0.38, 0.16, 0.14), Palette.m(&"dark"))
+	sleeve_r.position = Vector3(0.42, 1.48, 0.0)
+	sleeve_r.rotation.z = deg_to_rad(-28.0)
+	root.add_child(sleeve_r)
+
+	var snow_shoulders := Geo.box_mesh(Vector3(0.58, 0.04, 0.18), Palette.m(&"snow"))
+	snow_shoulders.position = Vector3(0.0, 1.62, 0.0)
+	root.add_child(snow_shoulders)
+
+	for cx in [-0.18, 0.18]:
+		var pin := Geo.box_mesh(Vector3(0.03, 0.08, 0.03), Palette.m(&"wood"))
+		pin.position = Vector3(cx, 1.72, 0.0)
+		root.add_child(pin)
+
+	var it := Interactable.new()
+	it.collision_layer = Geo.LAYER_WORLD
+	it.position = Vector3(0.0, 1.3, 0.0)
+	it.prompt_provider = func() -> String: return Loc.t(&"it.frozen_clothes")
+	it.add_child(Geo.box_shape(Vector3(1.2, 1.4, 0.8)))
+	it.used.connect(func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.frozen_clothes"), 5.0)
+		Game.audio.play_2d("res://assets/audio/clank_v2.ogg", -10.0)
+	)
+	root.add_child(it)
 
 
 func _process(delta: float) -> void:
@@ -315,6 +686,7 @@ func _process(delta: float) -> void:
 
 	# Уличные кошмары: появление сущностей и пугающая атмосфера в тайге
 	_process_outdoor_horror(delta)
+	_process_forest_sounds(delta)
 	_process_snow_survey_stalking(delta)
 	_process_mi8_helipad(delta)
 
@@ -695,6 +1067,11 @@ func _near_fork(p: Vector3) -> bool:
 	return false
 
 
+static func rod_pos() -> Vector3:
+	var p := METEO + M_ROD
+	return Vector3(p.x, Terrain.height(p.x, p.z), p.z)
+
+
 # --- Аэрологический корпус и приборная площадка ---------------------------------------------
 
 ## Корпус, ангар, навес, мачта и ограда площадки — модели (tools/blender/corpus*.py) и MeteoCorpus;
@@ -760,7 +1137,7 @@ func _build_meteo() -> void:
 	old_it.name = "OldMeteoScreen"
 
 	# Советская снегомерная рейка М-103
-	var rod := _gnd(METEO + M_ROD)
+	var rod := rod_pos()
 	SnowStakeUI.build_stake(self, rod)   # снег на рейке — ровно на сегодняшней высоте
 	# Крупный кадр рейки (SnowStakeUI): высоту снега читаешь сам — и в книжку КМ-1
 	var stake_it := Geo.interactable(self, Vector3(0.7, 2.2, 0.7), rod + Vector3(0, 1.1, 0), null, "", func(_p: Player) -> void:
@@ -2800,6 +3177,131 @@ func _build_footprints() -> void:
 
 # --- Лес ---------------------------------------------------------------------
 
+func _forest_mask(p: Vector3) -> float:   # -1 = дефолт (шум), 0 = пусто, 1 = стена
+	var d_path := _dist_to(_all_paths, p)
+	if d_path < ALLEY_HALF:
+		return 0.0
+	for g: Dictionary in GLADES:
+		var d := _flat_dist(p, g["c"])
+		if d < g["r"]: return 0.0
+		if d < g["r"] + WALL_W: return 1.0
+	if d_path < ALLEY_HALF + WALL_W:
+		return 1.0
+	return -1.0
+
+
+func _vec_to_path(lines: Array[PackedVector3Array], pos: Vector3) -> Vector3:
+	var px := pos.x
+	var pz := pos.z
+	var best_sq := INF
+	var best_v := Vector3.ZERO
+	for line in lines:
+		var n := line.size()
+		for i in range(n - 1):
+			var a := line[i]
+			var b := line[i + 1]
+			var abx := b.x - a.x
+			var abz := b.z - a.z
+			var apx := px - a.x
+			var apz := pz - a.z
+			var len_sq := abx * abx + abz * abz
+			var t := 0.0 if len_sq <= 0.0 else clampf((apx * abx + apz * abz) / len_sq, 0.0, 1.0)
+			var qx := a.x + t * abx
+			var qz := a.z + t * abz
+			var dx := qx - px
+			var dz := qz - pz
+			var d_sq := dx * dx + dz * dz
+			if d_sq < best_sq:
+				best_sq = d_sq
+				best_v = Vector3(dx, 0.0, dz)
+	return best_v.normalized() if best_sq > 0.0001 else Vector3.ZERO
+
+
+func _process_forest_sounds(delta: float) -> void:
+	_creak_t -= delta
+	if _creak_t <= 0.0 and Game.player != null and Game.is_outside():
+		var g: float = Storm.intensity
+		_creak_t = randf_range(10.0, 26.0) / maxf(g, 0.3)
+		var a := randf() * TAU
+		var pos := Game.player.global_position + Vector3(cos(a), 0, sin(a)) * randf_range(14.0, 28.0)
+		Game.audio.play_3d("res://assets/audio/tree_creak.ogg", pos + Vector3(0, 2.5, 0), -8.0 + g * 4.0, 10.0)
+
+	# Хлопанье оторванного листа жести на крыше сарая при ветре
+	_shed_tin_t -= delta
+	if _shed_tin_t <= 0.0 and Game.player != null and Game.is_outside():
+		var storm_w: float = Storm.intensity
+		_shed_tin_t = randf_range(8.0, 19.0) / maxf(storm_w, 0.35)
+		var tin_pos := SHED + Vector3(-2.0, 3.2, 0.0)
+		var tin_snd: String = "res://assets/audio/clank_v%d.ogg" % randi_range(2, 4)
+		Game.audio.play_3d(tin_snd, tin_pos, -6.0 + storm_w * 3.0, 14.0)
+
+	if _snow_drop_cd > 0.0:
+		_snow_drop_cd -= delta
+
+
+func _snow_drop(at: Vector3) -> void:
+	Game.audio.play_3d("res://assets/audio/snow_fall.ogg", at, -2.0, 12.0)
+	if Game.player != null:
+		Game.player.shake(0.03, 0.25)
+	var burst := CPUParticles3D.new()
+	burst.one_shot = true
+	burst.amount = 30
+	burst.lifetime = 0.9
+	burst.explosiveness = 0.8
+	burst.direction = Vector3(0, -1, 0)
+	burst.spread = 25.0
+	burst.initial_velocity_min = 0.5
+	burst.initial_velocity_max = 1.8
+	burst.gravity = Vector3(0, -6.0, 0)
+	burst.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	burst.emission_sphere_radius = 0.4
+	burst.scale_amount_min = 0.5
+	burst.scale_amount_max = 1.5
+	var q := QuadMesh.new()
+	q.size = Vector2(0.12, 0.12)
+	burst.mesh = q
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	m.albedo_color = Color(0.92, 0.95, 1.0, 0.8)
+	burst.material_override = m
+	burst.position = at
+	add_child(burst)
+	burst.emitting = true
+	get_tree().create_timer(1.2).timeout.connect(burst.queue_free)
+
+
+func _build_snow_drop_triggers() -> void:
+	var trigger_pts: Array[Vector3] = [
+		Vector3(12.0, 0.0, -2.0),
+		Vector3(26.0, 0.0, -8.0),
+		Vector3(28.0, 0.0, -22.0),
+		Vector3(24.0, 0.0, -42.0),
+		Vector3(45.0, 0.0, -18.0),
+		Vector3(30.0, 0.0, 18.0),
+	]
+	for tp in trigger_pts:
+		var area := Area3D.new()
+		area.collision_layer = 0
+		area.collision_mask = Player.LAYER_PLAYER
+		var cs := CollisionShape3D.new()
+		var sh := SphereShape3D.new()
+		sh.radius = 2.5
+		cs.shape = sh
+		area.add_child(cs)
+		var h := Terrain.height(tp.x, tp.z)
+		area.position = Vector3(tp.x, h + 1.0, tp.z)
+		add_child(area)
+		var drop_pos := Vector3(tp.x, h + 3.2, tp.z)
+		area.body_entered.connect(func(body: Node3D) -> void:
+			if body == Game.player and _snow_drop_cd <= 0.0:
+				_snow_drop_cd = 45.0
+				if randf() < 0.35:
+					_snow_drop(drop_pos)
+		)
+
+
 func _build_forest() -> void:
 	SpruceNear.clear_registry()
 	# Фиксированный сид: лес одинаковый в каждом прохождении (рандом — только у директора).
@@ -2824,11 +3326,15 @@ func _build_forest() -> void:
 	var edge_points: Array[Vector3] = []
 	var attempts := 0
 	var tree_count := int(860 * Settings.detail())   # пресет графики: низкое — реже лес
-	while transforms.size() < tree_count and attempts < 30000:
+	while transforms.size() < tree_count and attempts < 40000:
 		attempts += 1
 		var p := center + Vector3(rng.randf_range(-95, 95), 0.0, rng.randf_range(-95, 95))
 		var d_house := _flat_dist(p, HOUSE_CENTER)
-		if d_house < 13.0 or _dist_to(_all_paths, p) < 3.0:
+		var m := _forest_mask(p)
+		if m == 0.0:
+			continue
+		var d_path := _dist_to(_all_paths, p)
+		if d_house < 13.0 or d_path < ALLEY_HALF:
 			continue
 		if _near_corpus(p, 7.0) or _in_shed_box(p) or _flat_dist(p, MAST) < 11.5 or _flat_dist(p, IZBA) < 8.5 or (p.x >= -22.0 and p.x <= -10.0 and p.z >= -36.0 and p.z <= -24.0) or _flat_dist(p, WOODPILE) < 7.5:
 			continue
@@ -2836,14 +3342,19 @@ func _build_forest() -> void:
 			continue
 		if _flat_dist(p, LAKE) < LAKE_R + 4.0 or _flat_dist(p, LAKE_SHACK) < 6.0 or _flat_dist(p, REPEATER) < 9.0 or _flat_dist(p, BUNKER) < 6.0 or _flat_dist(p, HELIPAD) < 9.5:
 			continue
-		var g := groves.get_noise_2d(p.x, p.z)
-		var dens := smoothstep(-0.25, 0.3, g)                 # куртины и промежутки между ними
-		if d_house < 24.0:
-			dens *= 0.4                                       # двор открытый: деревья группками
-		if glades.get_noise_2d(p.x, p.z) > 0.42:
-			dens *= 0.12                                      # поляны
-		if d_house > 55.0:
-			dens = maxf(dens, 0.9)                            # дальняя стена
+
+		var dens: float
+		if m >= 0.0:
+			dens = m
+		else:
+			var g := groves.get_noise_2d(p.x, p.z)
+			dens = smoothstep(-0.25, 0.3, g)                 # куртины и промежутки между ними
+			if d_house < 24.0:
+				dens *= 0.4                                       # двор открытый: деревья группками
+			if glades.get_noise_2d(p.x, p.z) > 0.42:
+				dens *= 0.12                                      # поляны
+			if d_house > 55.0:
+				dens = maxf(dens, 0.9)                            # дальняя стена
 		if rng.randf() > dens:
 			continue
 		var cell := Vector2i(floori(p.x / 1.9), floori(p.z / 1.9))
@@ -2851,7 +3362,13 @@ func _build_forest() -> void:
 			continue
 		occupied[cell] = true
 		var s := rng.randf_range(0.75, 1.6) if d_house < 55.0 else rng.randf_range(1.1, 1.9)
-		var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.25), s))
+		var alley_tilt := Basis()
+		if d_path < 7.0:
+			var to_path := _vec_to_path(_all_paths, p)
+			if to_path.length_squared() > 0.01:
+				var axis := Vector3.UP.cross(to_path).normalized()
+				alley_tilt = Basis(axis, deg_to_rad(rng.randf_range(6.0, 10.0)))
+		var b := alley_tilt * Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s * rng.randf_range(0.9, 1.25), s))
 		transforms.append(Transform3D(b, p))
 		var edge := dens < 0.6 and d_house < 55.0
 		var kind := -1
@@ -3684,6 +4201,31 @@ func _build_backyard_features() -> void:
 	cellar_it.prompt_provider = func() -> String:
 		return Loc.t(&"sub.cellar_empty") if SaveGame.flags.get("cellar_searched", false) else Loc.t(&"it.cellar")
 	cellar_it.name = "CellarHatch"
+
+	if Game.is_night():
+		var steam := CPUParticles3D.new()
+		steam.name = "CellarHatchSteam"
+		steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		steam.emission_box_extents = Vector3(0.4, 0.05, 0.4)
+		steam.position = Vector3(5.25, 0.15, -7.2)
+		steam.amount = 8
+		steam.lifetime = 2.8
+		steam.direction = Vector3(0.0, 1.0, 0.1)
+		steam.spread = 20.0
+		steam.initial_velocity_min = 0.1
+		steam.initial_velocity_max = 0.25
+		steam.gravity = Vector3(0.0, 0.04, 0.0)
+		var sq := QuadMesh.new()
+		sq.size = Vector2(0.22, 0.22)
+		var smat := StandardMaterial3D.new()
+		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		smat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		smat.albedo_color = Color(0.9, 0.92, 0.95, 0.12)
+		smat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		steam.mesh = sq
+		steam.material_override = smat
+		add_child(steam)
 
 	# 2. Следы босых ног и когтей под северным окном радиорубки (X=9.2, Z=-2.7)
 	var track_pts: Array[Vector3] = [
@@ -4574,15 +5116,20 @@ func _build_station_road_dressing() -> void:
 		pipe2.rotation.y = deg_to_rad(-45.0)
 		add_child(pipe2)
 
-	# Гусеничный трактор ТДТ-55 (в просвете маяка, занесенный снегом)
+	# Гусеничный трактор ТДТ-55 (на обочине, занесенный снегом)
 	var tractor := Props.crawler_tractor_tdt55()
 	if LEAN_YARD:
-		var t := _gnd(Vector3(32.0, 0.0, -13.0)) - Vector3(0, 1.0, 0)
+		var t_pos := Vector3(32.0, 0.0, -13.0)
+		var t := Vector3(t_pos.x, Terrain.height(t_pos.x, t_pos.z) - 0.18, t_pos.z)
 		tractor.position = t
 		tractor.rotation.y = deg_to_rad(24.0)
 		add_child(tractor)
-		SiteDressing.drift(self, t + Vector3(-1.5, 1.0, 0.0), 6.0, 1.6, 2.4, 24.0)
-		SiteDressing.drift(self, t + Vector3(1.8, 1.0, 1.0), 4.0, 1.2, 1.8, 40.0)
+		var t_col := Geo.collider(self, Vector3(2.4, 2.2, 4.4), t + Vector3(0, 1.1, 0))
+		t_col.rotation.y = deg_to_rad(24.0)
+		var t_yaw := 24.0
+		SiteDressing.drift(self, t + Vector3(-1.7, 0.1, 0.0), 4.5, 0.8, 1.6, t_yaw)
+		SiteDressing.drift(self, t + Vector3(1.7, 0.1, 0.0), 4.5, 0.8, 1.6, t_yaw)
+		SiteDressing.drift(self, t + Vector3(0.0, 0.05, 2.2), 3.0, 0.5, 1.2, t_yaw)
 	else:
 		var tractor_pos := Vector3(44.0, Terrain.height(44.0, 30.0), 30.0)
 		tractor.position = tractor_pos

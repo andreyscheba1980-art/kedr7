@@ -130,6 +130,10 @@ func _exit_tree() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_cancel") or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT):
+		_close()
+		accept_event()
+		return
 	if event is InputEventMouse:
 		_mouse = (event as InputEventMouse).position
 	var mb := event as InputEventMouseButton

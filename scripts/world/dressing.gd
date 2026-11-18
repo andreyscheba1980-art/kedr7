@@ -15,8 +15,6 @@ static func build(st: Node3D) -> void:
 	_vestibule(st)
 	_shack(st)
 	_yard(st)
-	_yard_more(st)
-	_sites(st)
 
 
 static func _m(st: Node3D, id: String, pos: Vector3, yaw := 0.0, h := -1.0, opts := {}) -> Node3D:
@@ -72,9 +70,9 @@ static func _shack(st: Node3D) -> void:
 	_m(st, "survival/tool-shovel", c + Vector3(-1.38, 1.24, 0.85), 90.0, 1.25, {"tilt": Vector3(0, 0, 171)})   # штык вниз
 	_m(st, "survival/tool-axe", c + Vector3(-1.4, 0.05, 0.45), 90.0, 0.75, {"tilt": Vector3(0, 0, -11)})
 	_m(st, "survival/bucket", c + Vector3(1.15, 0.05, 0.85), 0.0, 0.3)
-	# Снаружи: доски у западной стены, лопата в снегу у двери
-	_m(st, "survival/resource-planks", c + Vector3(-2.0, 0.0, 0.6), 4.0, 0.2, {"collide": true})
-	_m(st, "survival/tool-shovel", c + Vector3(-0.95, 1.05, 1.75), 160.0, 1.25, {"tilt": Vector3(194, 0, 6)})   # воткнута штыком в снег
+	# Внутри дизельной: шкаф управления в углу, ящик с ЗИПом
+	_m(st, "factory/screen-panel-small", c + Vector3(-1.08, 0.05, -0.98), 90.0, 1.25, {"collide": true, "tint": Color(0.55, 0.62, 0.55)})
+	_m(st, "factory/box-small", c + Vector3(-1.1, 0.05, -0.3), 90.0, 0.4, {"tint": Color(0.5, 0.55, 0.45)})
 
 
 static func _yard(st: Node3D) -> void:
@@ -111,86 +109,4 @@ static func _free(p: Vector3, r := 1.8) -> bool:
 	return true
 
 
-## Двор: сугробы-переметы по открытому двору, заснеженные валуны, бурелом на опушке, пни, кругляк.
-static func _yard_more(st: Node3D) -> void:
-	var snow := {"bright": 0.95, "grime": 0.15, "shadow": false}
-	# Переметы по открытому двору на безопасном расстоянии от стен дома и дизельной
-	for d: Array in [
-			["holiday/snow-bunker", Vector3(-7.5, 0, 2.0), 80.0, 0.40],
-			["holiday/snow-bunker", Vector3(-7.2, 0, 6.0), 95.0, 0.35],
-			["holiday/snow-pile", Vector3(1.5, 0, -4.5), 10.0, 0.22],
-			["holiday/snow-bunker", Vector3(8.5, 0, -7.5), 175.0, 0.38],
-			["holiday/snow-flat-large", Vector3(-7.5, 0, 10.5), 20.0, 0.12],
-			["holiday/snow-bunker", Vector3(22.0, 0, 10.5), 140.0, 0.45],
-			["holiday/snow-pile", Vector3(-8.5, 0, -4.0), 60.0, 0.28]]:
-		var p: Vector3 = d[1]
-		if _free(p, 1.5):
-			_m(st, d[0], p - Vector3(0, 0.03, 0), d[2], d[3], snow)
-	# Заснеженные валуны
-	for d: Array in [["holiday/rocks-medium", Vector3(-10.0, 0, 13.0), 30.0, 0.9], ["holiday/rocks-small", Vector3(22.5, 0, -9.5), 110.0, 0.6],
-			["holiday/rocks-small", Vector3(-9.0, 0, -9.5), 200.0, 0.55], ["holiday/rocks-medium", Vector3(26.0, 0, 13.0), 300.0, 0.8]]:
-		var p: Vector3 = d[1]
-		if _free(p, 2.0):
-			_m(st, d[0], p - Vector3(0, 0.1, 0), d[2], d[3], {"collide": true, "bright": 0.62})
-	# Бурелом и пни на опушке
-	for d: Array in [["nature/log_large", Vector3(-12.5, 0, 6.0), 70.0, 0.55], ["nature/log_large", Vector3(27.0, 0, -12.0), 15.0, 0.5],
-			["nature/log_large", Vector3(-6.0, 0, -13.0), 120.0, 0.45], ["nature/stump_oldTall", Vector3(-11.0, 0, 8.5), 0.0, 0.9],
-			["nature/stump_old", Vector3(24.0, 0, 15.5), 40.0, 0.45], ["nature/stump_round", Vector3(-4.5, 0, 14.5), 0.0, 0.4],
-			["nature/stump_roundDetailed", Vector3(19.0, 0, -6.5), 90.0, 0.4], ["nature/stump_old", Vector3(3.0, 0, -12.0), 200.0, 0.5]]:
-		var p: Vector3 = d[1]
-		if _free(p, 1.8):
-			_m(st, d[0], p, d[2], d[3], {"collide": true, "tint": Color(0.75, 0.72, 0.7)})
-	# Сухой куст у ограды, торчащий из снега
-	for p: Vector3 in [Vector3(18.6, 0, 7.8), Vector3(-5.5, 0, 11.0), Vector3(11.0, 0, -9.0)]:
-		if _free(p, 1.2):
-			_m(st, "nature/plant_bush", p - Vector3(0, 0.08, 0), randf() * 360.0, 0.45, {"tint": Color(0.45, 0.38, 0.32), "shadow": false})
-	# Брошенный тягач у кромки двора: снег по гусеницы, на кабине — шапка (пусто было между мачтой и корпусом)
-	var tv := Props.tracked_vehicle()
-	tv.position = Vector3(56.0, -0.25, -18.0)
-	tv.rotation.y = deg_to_rad(25.0)
-	st.add_child(tv)
-	var tv_body := Geo.collider(st, Vector3(2.6, 2.2, 5.4), Vector3(56.0, 1.0, -18.0))
-	tv_body.rotation.y = deg_to_rad(25.0)
-	_m(st, "holiday/snow-bunker", Vector3(57.2, 0, -16.2), 115.0, 0.55, snow)
-	_m(st, "holiday/snow-pile", Vector3(54.6, 0, -20.4), 30.0, 0.3, snow)
-	# Старый флюгер Вильда на покосившемся столбе — прежняя метеоплощадка
-	var vane := Props.wild_vane()
-	vane.position = Vector3(44.0, 0.0, -10.0)
-	vane.rotation = Vector3(0.0, deg_to_rad(-30.0), deg_to_rad(4.0))
-	st.add_child(vane)
-	Geo.collider(st, Vector3(0.4, 3.0, 0.4), Vector3(44.0, 1.5, -10.0))
-	# Скамья у крыльца — курилка (не спавнится в кадре меню)
-	if not bool(st.get("is_backdrop")):
-		_m(st, "town/stall-bench", Vector3(17.9, 0, 5.4), 90.0, 0.45, {"collide": true})
 
-
-## Объекты: поленница — колода с топором и сани; изба — поваленный забор, телега без колеса; сарай — колесо.
-static func _sites(st: Node3D) -> void:
-	var w := Yard.WOODPILE
-	_m(st, "nature/stump_round", w + Vector3(2.6, 0, -2.4), 0.0, 0.55, {"collide": true})
-	_m(st, "survival/tool-axe", w + Vector3(2.6, 0.5, -2.4), 30.0, 0.7, {"tilt": Vector3(0, 0, 22)})
-	_m(st, "holiday/sled", w + Vector3(-2.0, 0, 2.6), 75.0, 0.4, {"collide": true})   # не на тропе к озеру
-	_m(st, "nature/log", w + Vector3(1.6, 0, -3.4), 20.0, 0.25)
-	var iz := Yard.IZBA
-	var fence_pts := [Vector3(-4.5, 0, 5.0), Vector3(-3.5, 0, 5.0), Vector3(-1.5, 0, 5.1), Vector3(1.5, 0, 5.2), Vector3(3.5, 0, 5.0)]
-	for i in fence_pts.size():
-		var p: Vector3 = iz + (fence_pts[i] as Vector3)
-		if _free(p, 1.4):
-			_m(st, "town/fence-broken" if i % 2 == 0 else "town/fence", p, 90.0 + randf_range(-8, 8), 0.9, {"tint": Color(0.6, 0.55, 0.5)})
-	if _free(iz + Vector3(5.5, 0, 2.0), 1.5):
-		var izba_sled := Props.surveyor_sledge()
-		izba_sled.position = iz + Vector3(5.5, 0.0, 2.0)
-		izba_sled.rotation_degrees = Vector3(-6.0, 35.0, 0.0)
-		st.add_child(izba_sled)
-		var sb := StaticBody3D.new()
-		sb.collision_layer = Geo.LAYER_WORLD
-		sb.collision_mask = 0
-		sb.position = iz + Vector3(5.5, 0.35, 2.0)
-		sb.add_child(Geo.box_shape(Vector3(1.6, 0.6, 0.9)))
-		st.add_child(sb)
-	_m(st, "town/wheel", Yard.SHED + Vector3(-4.55, 0, -2.7), 90.0, 0.9, {"tilt": Vector3(0, 0, 14)})   # прислонено к стене снаружи, не в проходе
-	_m(st, "town/planks", Yard.SHED + Vector3(-2.5, 0, 2.5), 10.0, 0.12)
-	# Дизельная: шкаф управления в углу, ящик с ЗИПом
-	var c := Vector3(14.5, 0.05, -13.5)
-	_m(st, "factory/screen-panel-small", c + Vector3(-1.08, 0.05, -0.98), 90.0, 1.25, {"collide": true, "tint": Color(0.55, 0.62, 0.55)})
-	_m(st, "factory/box-small", c + Vector3(-1.1, 0.05, -0.3), 90.0, 0.4, {"tint": Color(0.5, 0.55, 0.45)})

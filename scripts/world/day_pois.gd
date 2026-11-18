@@ -866,6 +866,12 @@ func _build_solar_halo() -> void:
 	var halo_center := sun_dir * 180.0
 	_solar_halo.position = halo_center
 
+	var w := Game.weather.intensity if Game.weather != null else 0.0
+	if w >= 0.5:
+		return
+
+	var glow_shader := load("res://assets/shaders/soft_glow.gdshader") as Shader
+
 	# Два ложных солнца (паргелии) на удалении 22 градуса слева и справа
 	for offset_angle in [-22.0, 22.0]:
 		var parhelion := MeshInstance3D.new()
@@ -873,12 +879,11 @@ func _build_solar_halo() -> void:
 		qm.size = Vector2(16.0, 16.0)
 		parhelion.mesh = qm
 
-		var mat := StandardMaterial3D.new()
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		mat.albedo_color = Color(1.0, 0.94, 0.82, 0.28)
-		mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		var mat := ShaderMaterial.new()
+		mat.shader = glow_shader
+		mat.set_shader_parameter("tint", Vector3(1.0, 0.94, 0.82))
+		mat.set_shader_parameter("intensity", 0.35 * clampf(1.0 - w * 2.0, 0.0, 1.0))
+		mat.set_shader_parameter("sharp", 2.2)
 		parhelion.material_override = mat
 
 		var side_vec := sun_dir.cross(Vector3.UP).normalized()
