@@ -3813,7 +3813,7 @@ func _process_night6_bare_tracks(delta: float) -> void:
 			Director.add_tension(15.0, "босые следы с шагом 1.5 метра")
 
 	# Заметание следов ветром и метелью прямо на глазах
-	var wind_rate: float = 1.0 + (weather.intensity * 1.8 if weather != null else 0.0)
+	var wind_rate: float = 1.0 + (Game.weather.intensity * 1.8 if Game.weather != null else 0.0)
 	if _bare_tracks_root != null and is_instance_valid(_bare_tracks_root):
 		for ch in _bare_tracks_root.get_children():
 			for fp in ch.get_children():
@@ -3859,7 +3859,7 @@ func _process_cellar_window_tracks(delta: float) -> void:
 			Director.add_tension(12.0, "босые следы от ледника к окну")
 
 	if _cellar_window_tracks_root != null and is_instance_valid(_cellar_window_tracks_root):
-		var wind_rate: float = 1.0 + (weather.intensity * 2.1 if weather != null else 0.3)
+		var wind_rate: float = 1.0 + (Game.weather.intensity * 2.1 if Game.weather != null else 0.3)
 		var any_left := false
 		for ch in _cellar_window_tracks_root.get_children():
 			for fp in ch.get_children():
