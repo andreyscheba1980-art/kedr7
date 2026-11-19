@@ -7,39 +7,39 @@ const NIGHTS := {
 	1: {
 		"start_min": 120,              ## 22:00
 		"reports": [240, 360],         ## 00:00, 02:00 (после трёх Большой Земле не отвечают)
-		"min_per_sec": 0.45,           ## 22:00 → 06:00 ≈ 18 минут
-		"base_rate": 0.38, "peak": 62.0, "max_hard": 0,
+		"min_per_sec": 0.72,           ## 22:00 → 06:00 ≈ 11 минут (плотный темп без провисаний)
+		"base_rate": 0.46, "peak": 58.0, "max_hard": 1,
 		"yrka_max": 2,                 ## 0 — нет, 1 — свист, 2 — шаги, 3 — глаза, 4 — погоня
 		"antenna_ice": false,
 		"signals": [&"mainland", &"buzzer", &"numbers"],
-		"gen_start": 80.0, "stove_start": 70.0, "canisters": 3,
-		"first_blizzard": 300.0,
+		"gen_start": 76.0, "stove_start": 66.0, "canisters": 3,
+		"first_blizzard": 180.0,
 		"finale": &"",
 		"radio_ghost": 300,            ## 01:00 — рация сама ловит голос Семёнова (фирменная сцена ночи 1)
 	},
 	2: {
 		"start_min": 120,
 		"reports": [240, 360],
-		"min_per_sec": 0.45,
-		"base_rate": 0.52, "peak": 56.0, "max_hard": 1,
-		"yrka_max": 3,  ## ночь 2: зов и глаза, но без погони — урок правил
+		"min_per_sec": 0.72,
+		"base_rate": 0.56, "peak": 55.0, "max_hard": 1,
+		"yrka_max": 4,  ## ночь 2: угроза реальна, если нарушить правило — игрок чувствует риск уже на 2-й смене
 		"antenna_ice": false,
 		"signals": [&"mainland", &"buzzer", &"numbers", &"semenov", &"morse"],
 		"gen_start": 65.0, "stove_start": 55.0, "canisters": 3,
-		"first_blizzard": 200.0,
+		"first_blizzard": 150.0,
 		"finale": &"",
 		"roof_steps": 330,             ## 01:30 — кто-то ходит по крыше (фирменная сцена ночи 2)
 	},
 	3: {
 		"start_min": 120,
 		"reports": [240, 360],
-		"min_per_sec": 0.45,
-		"base_rate": 0.6, "peak": 55.0, "max_hard": 2,
+		"min_per_sec": 0.72,
+		"base_rate": 0.62, "peak": 54.0, "max_hard": 2,
 		"yrka_max": 4,
 		"antenna_ice": true,
 		"signals": [&"mainland", &"buzzer", &"code", &"semenov", &"morse", &"lullaby", &"alone"],
 		"gen_start": 55.0, "stove_start": 45.0, "canisters": 4,
-		"first_blizzard": 150.0,
+		"first_blizzard": 130.0,
 		"finale": &"door_knock",       ## 05:00 — стук в дверь. Откроешь — смерть, переждёшь — утро
 		"roll_call": 330,              ## 01:30 — перекличка: за Кедр-7 отвечает кто-то другой (фирменная сцена)
 		"orders": [[290, &"real_report"], [445, &"fake_report"]],   ## учит паролю: настоящий — с «Бирюсой», ложный — без
@@ -47,13 +47,13 @@ const NIGHTS := {
 	4: {
 		"start_min": 120,
 		"reports": [240, 360],
-		"min_per_sec": 0.45,
-		"base_rate": 0.62, "peak": 55.0, "max_hard": 2,
+		"min_per_sec": 0.72,
+		"base_rate": 0.65, "peak": 54.0, "max_hard": 2,
 		"yrka_max": 4,
 		"antenna_ice": false,
 		"signals": [&"mainland", &"numbers", &"mother", &"morse", &"alone", &"code"],
 		"gen_start": 60.0, "stove_start": 50.0, "canisters": 4,
-		"first_blizzard": 200.0,
+		"first_blizzard": 150.0,
 		"finale": &"",
 		"knocks": [200, 330],          ## Обмирало у двери (минуты смены)
 		"false_order": 438,            ## 03:18, сразу после удара 03:10 — «Большая Земля» велит идти к мачте (правило 2)
@@ -63,13 +63,13 @@ const NIGHTS := {
 	5: {
 		"start_min": 120,
 		"reports": [240, 360],
-		"min_per_sec": 0.45,
-		"base_rate": 0.66, "peak": 54.0, "max_hard": 2,
+		"min_per_sec": 0.72,
+		"base_rate": 0.68, "peak": 53.0, "max_hard": 2,
 		"yrka_max": 4,
 		"antenna_ice": true,
 		"signals": [&"mainland", &"roll", &"otzvuk", &"lullaby", &"alone", &"code"],
 		"gen_start": 70.0, "stove_start": 45.0, "canisters": 3,
-		"first_blizzard": 150.0,
+		"first_blizzard": 130.0,
 		"finale": &"",
 		"knocks": [380],
 		"gen_break": 250,              ## 00:10 — генератор ломается, нужны инструменты
@@ -80,8 +80,8 @@ const NIGHTS := {
 	6: {
 		"start_min": 120,
 		"reports": [240, 360],
-		"min_per_sec": 0.45,
-		"base_rate": 0.72, "peak": 52.0, "max_hard": 3,
+		"min_per_sec": 0.72,
+		"base_rate": 0.74, "peak": 51.0, "max_hard": 3,
 		"yrka_max": 4,
 		"antenna_ice": true,
 		"signals": [&"mainland", &"mother", &"roll", &"otzvuk", &"semenov", &"alone", &"code"],
@@ -97,13 +97,13 @@ const NIGHTS := {
 	7: {
 		"start_min": 120,
 		"reports": [240],
-		"min_per_sec": 0.45,
-		"base_rate": 0.75, "peak": 52.0, "max_hard": 3,
+		"min_per_sec": 0.72,
+		"base_rate": 0.76, "peak": 50.0, "max_hard": 3,
 		"yrka_max": 4,
 		"antenna_ice": false,
 		"signals": [&"mainland", &"mother", &"roll", &"otzvuk", &"echo", &"alone"],
 		"gen_start": 65.0, "stove_start": 55.0, "canisters": 3,
-		"first_blizzard": 220.0,
+		"first_blizzard": 180.0,
 		"finale": &"choice",           ## с 03:00 — зов; выбрать: ответить, сжечь, уйти
 		"knocks": [300],
 		"yrka_house": true,

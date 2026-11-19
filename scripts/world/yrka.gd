@@ -294,6 +294,7 @@ func _process(delta: float) -> void:
 		return
 
 	# Переходы между стадиями страха вне погони
+	var prev_stage := stage
 	if stage != Stage.RETREAT:
 		if threat >= PRESSURE_AT and max_stage >= 3:
 			stage = Stage.PRESSURE
@@ -307,6 +308,17 @@ func _process(delta: float) -> void:
 		else:
 			stage = Stage.CALM
 			fsm_state = FsmState.PERIMETER_ORBIT
+
+	# Мёртвая тишина метели за секунду до первого зова в затылок
+	if stage == Stage.CALLING and prev_stage != Stage.CALLING and prev_stage != Stage.PRESSURE:
+		if Game.audio != null:
+			Game.audio.trigger_vacuum(2.8)
+
+	# В фазе PRESSURE присутствие твари подсаживает динамо-фонарик, вынуждая крутить трещотку
+	if stage == Stage.PRESSURE and Game.player != null and Game.player.flashlight_on() and Game.flash_charge > 8.0:
+		Game.flash_charge = maxf(Game.flash_charge - 2.2 * delta, 8.0)
+		if Game.player.flashlight != null and randf() < delta * 2.6:
+			Game.player.flashlight.light_energy *= randf_range(0.55, 0.85)
 
 	_update_look_vector_math(delta)
 

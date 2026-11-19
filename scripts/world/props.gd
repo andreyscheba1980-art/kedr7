@@ -5900,15 +5900,15 @@ static func paper_snowflake() -> Node3D:
 	return root
 
 
-## Советская новогодняя гирлянда «Золотой фонарик» над радиостанцией
+## Советская новогодняя гирлянда «Золотой фонарик» над радиостанцией (gl_compatibility: unshaded + soft_glow)
 static func soviet_garland() -> Node3D:
 	var root := Node3D.new()
 	root.name = "SovietGarland"
 
-	var bulb_colors := [
+	var bulb_colors: Array[Color] = [
 		Color(0.95, 0.22, 0.18), # Рубиновый
-		Color(0.98, 0.82, 0.25), # Янтарный
-		Color(0.22, 0.88, 0.45), # Изумрудный
+		Color(0.98, 0.80, 0.24), # Янтарный
+		Color(0.22, 0.86, 0.44), # Изумрудный
 		Color(0.25, 0.65, 0.95), # Лазурный
 	]
 
@@ -5916,27 +5916,71 @@ static func soviet_garland() -> Node3D:
 	var width := 1.9
 	var drop := 0.22
 
+	# Провисший чёрный провод-катенария между гвоздями
+	var wire := _instance_from_cache(&"soviet_garland_wire", "")
+	if wire == null:
+		var kw := _kit(251, 0.03)
+		var pts: Array = []
+		var rads: Array = []
+		for i in 15:
+			var t := float(i) / 14.0
+			pts.append(Vector3((t - 0.5) * (width + 0.12), -4.0 * drop * t * (1.0 - t) + 0.015, 0.0))
+			rads.append(0.0045)
+		kw.tube(pts, rads, Color(0.05, 0.05, 0.06), 4, true, true)
+		wire = _mi(kw, &"soviet_garland_wire", "")
+	root.add_child(wire)
+
+	var glow_shader := load("res://assets/shaders/soft_glow.gdshader") as Shader
+	var halo_quad := QuadMesh.new()
+	halo_quad.size = Vector2(0.16, 0.16)
+	var bulb_mats: Array = []
+	var halo_mats: Array = []
+	var base_colors: Array = []
+
 	for i in n_bulbs:
 		var t := float(i) / float(n_bulbs - 1)
 		var x := (t - 0.5) * width
 		var y := -4.0 * drop * t * (1.0 - t)
 		var col: Color = bulb_colors[i % bulb_colors.size()]
+		base_colors.append(col)
 
 		var b_mat := StandardMaterial3D.new()
 		b_mat.albedo_color = col
-		b_mat.emission_enabled = true
-		b_mat.emission = col
-		b_mat.emission_energy_multiplier = 1.2
 		b_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		bulb_mats.append(b_mat)
 
-		var bulb := Geo.box_mesh(Vector3(0.035, 0.05, 0.035), b_mat)
-		bulb.position = Vector3(x, y - 0.025, 0.0)
-		bulb.rotation.z = (t - 0.5) * 0.4
+		# Гранёный цоколь + фонарик
+		var bulb_sm := SphereMesh.new()
+		bulb_sm.radius = 0.022
+		bulb_sm.height = 0.054
+		bulb_sm.radial_segments = 6
+		bulb_sm.rings = 3
+		var bulb := MeshInstance3D.new()
+		bulb.mesh = bulb_sm
+		bulb.material_override = b_mat
+		bulb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bulb.position = Vector3(x, y - 0.028, 0.0)
+		bulb.rotation.z = (t - 0.5) * 0.35
 		root.add_child(bulb)
 
-		var cap := Geo.box_mesh(Vector3(0.02, 0.015, 0.02), Palette.m(&"metal"))
+		var cap := Geo.box_mesh(Vector3(0.018, 0.016, 0.018), Palette.m(&"metal"))
 		cap.position = Vector3(x, y, 0.0)
 		root.add_child(cap)
+
+		# Мягкий unshaded blend_add ореол вокруг каждой лампочки (без дополнительных Light3D!)
+		if glow_shader != null:
+			var h_mat := ShaderMaterial.new()
+			h_mat.shader = glow_shader
+			h_mat.set_shader_parameter(&"tint", col)
+			h_mat.set_shader_parameter(&"intensity", 0.55)
+			h_mat.set_shader_parameter(&"sharp", 2.8)
+			halo_mats.append(h_mat)
+			var halo := MeshInstance3D.new()
+			halo.mesh = halo_quad
+			halo.material_override = h_mat
+			halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			halo.position = Vector3(x, y - 0.028, 0.01)
+			root.add_child(halo)
 
 	var omni := OmniLight3D.new()
 	omni.name = "GarlandGlow"
@@ -5947,7 +5991,430 @@ static func soviet_garland() -> Node3D:
 	omni.position = Vector3(0.0, -0.15, 0.1)
 	root.add_child(omni)
 
+	root.set_meta(&"bulb_mats", bulb_mats)
+	root.set_meta(&"halo_mats", halo_mats)
+	root.set_meta(&"base_colors", base_colors)
 	return root
+
+
+# ==============================================================================
+# ТАЁЖНЫЙ КОРДОН: новые процедурные пропсы двора (gl_compatibility, MeshKit)
+# ==============================================================================
+
+## Таёжный ледник-погреб со срубным оголовком, вытяжкой и подвижной крышкой.
+## Дочерние узлы под ночные микро-аномалии:
+##   - "HatchLid"  (Node3D)         — наклонная дощатая крышка (может приоткрываться изнутри)
+##   - "Padlock"   (Node3D)         — навесной замок на скобе
+##   - "VentSteam" (CPUParticles3D) — unshaded blend_add пар (выключен в норме)
+static func ice_cellar() -> Node3D:
+	var root := Node3D.new()
+	root.name = "IceCellar"
+
+	var base := _instance_from_cache(&"ice_cellar_base", "tex_wood.png")
+	if base == null:
+		var k := _kit(211, 0.09)
+		var log_c := Color(0.27, 0.21, 0.16)
+		var dark_c := Color(0.03, 0.035, 0.04)
+		var plank_c := Color(0.32, 0.27, 0.22)
+		# Два венца сруба вокруг горловины погреба
+		for row in 2:
+			var y := 0.11 + row * 0.20
+			k.tube([Vector3(-0.85, y, -0.95), Vector3(0.85, y, -0.95)], [0.105, 0.10], log_c, 7)
+			k.tube([Vector3(-0.85, y,  0.95), Vector3(0.85, y,  0.95)], [0.10, 0.105], log_c, 7)
+			k.tube([Vector3(-0.78, y + 0.07, -1.02), Vector3(-0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
+			k.tube([Vector3( 0.78, y + 0.07, -1.02), Vector3( 0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
+		# Наклонная горловина и тёмный провал внутри (виден, когда крышка приоткрыта)
+		k.box(Vector3(0.0, 0.26, -0.45), Vector3(1.36, 0.52, 0.75), plank_c)
+		k.box(Vector3(0.0, 0.14,  0.42), Vector3(1.36, 0.28, 0.82), plank_c * 0.9)
+		k.box(Vector3(0.0, 0.18,  0.02), Vector3(1.16, 0.34, 1.42), dark_c)
+		# Деревянная вытяжная труба сзади с железным дефлектором
+		k.box(Vector3(-0.48, 0.95, -0.78), Vector3(0.22, 1.15, 0.22), plank_c * 0.85)
+		k.box(Vector3(-0.48, 1.56, -0.78), Vector3(0.38, 0.04, 0.38), Color(0.18, 0.19, 0.20))
+		for sx in [-0.11, 0.11]:
+			k.box(Vector3(-0.48 + sx, 1.49, -0.78), Vector3(0.025, 0.14, 0.025), Color(0.18, 0.19, 0.20))
+		base = _mi(k, &"ice_cellar_base", "tex_wood.png")
+	root.add_child(base)
+
+	var snow := _instance_from_cache(&"ice_cellar_snow", "tex_snow.png")
+	if snow == null:
+		var ks := _kit(212, 0.05)
+		var sc := Color(0.76, 0.82, 0.90)
+		ks.blob(Vector3(-0.92, 0.18, -0.10), Vector3(0.55, 0.34, 1.15), sc, 4, 7)
+		ks.blob(Vector3( 0.92, 0.16,  0.05), Vector3(0.52, 0.30, 1.10), sc, 4, 7)
+		ks.blob(Vector3( 0.0,  0.22, -1.12), Vector3(1.05, 0.38, 0.55), sc, 4, 7)
+		ks.blob(Vector3(-0.48, 1.60, -0.78), Vector3(0.20, 0.06, 0.20), sc, 3, 6)
+		snow = _mi(ks, &"ice_cellar_snow", "tex_snow.png")
+	root.add_child(snow)
+
+	# Подвижная наклонная крышка (шарнир по задней кромке)
+	var lid := Node3D.new()
+	lid.name = "HatchLid"
+	lid.position = Vector3(0.0, 0.54, -0.78)
+	lid.rotation.x = deg_to_rad(14.0)
+	var lid_mesh := _instance_from_cache(&"ice_cellar_lid", "tex_planks.png")
+	if lid_mesh == null:
+		var kl := _kit(213, 0.09)
+		var pl := Color(0.35, 0.29, 0.23)
+		var iron := Color(0.15, 0.16, 0.17)
+		for i in 5:
+			var lx := -0.56 + float(i) * 0.28
+			kl.box(Vector3(lx, 0.03, 0.82), Vector3(0.26, 0.055, 1.66), pl)
+		kl.box(Vector3(0.0, 0.065, 0.28), Vector3(1.36, 0.04, 0.12), pl * 0.85)
+		kl.box(Vector3(0.0, 0.065, 1.38), Vector3(1.36, 0.04, 0.12), pl * 0.85)
+		for sx in [-0.46, 0.46]:
+			kl.box(Vector3(sx, 0.075, 0.18), Vector3(0.07, 0.018, 0.42), iron)
+		kl.tube([
+			Vector3(-0.07, 0.06, 1.54), Vector3(-0.07, 0.12, 1.54),
+			Vector3( 0.07, 0.12, 1.54), Vector3( 0.07, 0.06, 1.54),
+		], [0.012], iron, 5)
+		lid_mesh = _mi(kl, &"ice_cellar_lid", "tex_planks.png")
+	lid.add_child(lid_mesh)
+
+	var lock := padlock_chz1(true)
+	lock.name = "Padlock"
+	lock.position = Vector3(0.0, 0.05, 1.64)
+	lid.add_child(lock)
+	root.add_child(lid)
+
+	# Unshaded blend_add пар из щели крышки (включается только во время аномалии cellar_steam)
+	var steam := CPUParticles3D.new()
+	steam.name = "VentSteam"
+	steam.position = Vector3(0.0, 0.34, 0.55)
+	steam.emitting = false
+	steam.amount = 14
+	steam.lifetime = 3.2
+	steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	steam.emission_box_extents = Vector3(0.55, 0.04, 0.18)
+	steam.direction = Vector3(0.0, 1.0, 0.15)
+	steam.spread = 22.0
+	steam.initial_velocity_min = 0.14
+	steam.initial_velocity_max = 0.32
+	steam.gravity = Vector3(0.0, 0.05, 0.0)
+	steam.scale_amount_min = 0.6
+	steam.scale_amount_max = 1.6
+	var sq := QuadMesh.new()
+	sq.size = Vector2(0.32, 0.32)
+	var smat := StandardMaterial3D.new()
+	smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	smat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	smat.albedo_color = Color(0.72, 0.84, 0.92, 0.15)
+	smat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	steam.mesh = sq
+	steam.material_override = smat
+	root.add_child(steam)
+
+	return root
+
+
+## Дровокольный узел: массивная колода с поленьями и отдельным поворотным узлом колуна ("AxePivot").
+static func chopping_block() -> Node3D:
+	var root := Node3D.new()
+	root.name = "ChoppingBlock"
+
+	var stump := _instance_from_cache(&"chop_stump_base", "tex_wood.png")
+	if stump == null:
+		var k := _kit(221, 0.09)
+		var bark := Color(0.22, 0.16, 0.11)
+		var cut := Color(0.56, 0.43, 0.28)
+		var split_c := Color(0.62, 0.50, 0.34)
+		k.tube([Vector3(0, 0.0, 0), Vector3(0, 0.25, 0), Vector3(0, 0.66, 0)], [0.39, 0.34, 0.32], bark, 10)
+		k.tube([Vector3(0, 0.64, 0), Vector3(0, 0.668, 0)], [0.31, 0.305], cut, 10)
+		k.box(Vector3(-0.04, 0.67,  0.02), Vector3(0.46, 0.008, 0.025), Color(0.10, 0.07, 0.05))
+		k.box(Vector3( 0.06, 0.67, -0.04), Vector3(0.022, 0.008, 0.38), Color(0.10, 0.07, 0.05))
+		var billets := [
+			[Vector3(-0.48, 0.07,  0.22), Vector3(0.42, 0.11, 0.13), 28.0],
+			[Vector3( 0.44, 0.08, -0.18), Vector3(0.46, 0.12, 0.14), -42.0],
+			[Vector3( 0.22, 0.07,  0.48), Vector3(0.38, 0.10, 0.12), 75.0],
+		]
+		for b: Array in billets:
+			var rot := Basis(Vector3.UP, deg_to_rad(float(b[2])))
+			k.box(b[0], b[1], split_c, rot)
+			k.box((b[0] as Vector3) + Vector3(0, -0.045, 0), (b[1] as Vector3) * Vector3(1.0, 0.35, 1.04), bark, rot)
+		for i in 6:
+			var ang := float(i) * 1.05 + 0.3
+			var r := 0.42 + float(i % 2) * 0.18
+			k.box(Vector3(cos(ang) * r, 0.015, sin(ang) * r), Vector3(0.14, 0.014, 0.045),
+					split_c * 0.9, Basis(Vector3.UP, ang * 1.7))
+		stump = _mi(k, &"chop_stump_base", "tex_wood.png")
+	root.add_child(stump)
+
+	# Отдельный узел колуна — Anomalies меняет его угол/позицию, когда игрок не смотрит
+	var axe_pivot := Node3D.new()
+	axe_pivot.name = "AxePivot"
+	axe_pivot.position = Vector3(0.02, 0.66, 0.0)
+	axe_pivot.rotation = Vector3(deg_to_rad(8.0), deg_to_rad(25.0), deg_to_rad(-18.0))
+	var axe_mesh := _instance_from_cache(&"chop_axe_head_haft", "tex_wood.png")
+	if axe_mesh == null:
+		var ka := _kit(222, 0.06)
+		var steel := Color(0.24, 0.26, 0.28)
+		var edge := Color(0.50, 0.53, 0.56)
+		var haft := Color(0.44, 0.33, 0.20)
+		ka.box(Vector3(0.0, 0.11, -0.03), Vector3(0.075, 0.14, 0.12), steel)
+		ka.box(Vector3(0.0, 0.03,  0.04), Vector3(0.035, 0.10, 0.14), edge)
+		ka.tube([
+			Vector3(0.0, 0.12, -0.04), Vector3(0.0, 0.38, -0.06),
+			Vector3(0.0, 0.66, -0.02), Vector3(0.0, 0.84, -0.07),
+		], [0.026, 0.024, 0.022, 0.028], haft, 6)
+		axe_mesh = _mi(ka, &"chop_axe_head_haft", "tex_wood.png")
+	axe_pivot.add_child(axe_mesh)
+	root.add_child(axe_pivot)
+
+	return root
+
+
+## Заброшенная собачья будка с реальным внутренним объёмом, пологом, миской и цепью.
+## Дочерние узлы под аномалию dog_chain:
+##   - "ChainSlack" (MeshInstance3D) — цепь кольцами в снегу (норма)
+##   - "ChainTaut"  (MeshInstance3D) — цепь натянута струной в лес (аномалия)
+##   - "InsideEyes" (Node3D)         — два тусклых unshaded-блика в глубине будки
+static func abandoned_doghouse() -> Node3D:
+	var root := Node3D.new()
+	root.name = "AbandonedDoghouse"
+
+	var body := _instance_from_cache(&"doghouse_body", "tex_planks.png")
+	if body == null:
+		var k := _kit(231, 0.10)
+		var wood := Color(0.30, 0.25, 0.20)
+		var dark_in := Color(0.025, 0.025, 0.03)
+		var tarp := Color(0.22, 0.24, 0.19)
+		var iron := Color(0.20, 0.21, 0.22)
+		k.box(Vector3(0.0, 0.04, 0.0), Vector3(0.92, 0.08, 1.12), wood * 0.78)
+		k.box(Vector3(-0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
+		k.box(Vector3( 0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
+		k.box(Vector3( 0.0,  0.42, -0.50), Vector3(0.86, 0.72, 0.06), wood * 0.82)
+		k.box(Vector3(-0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
+		k.box(Vector3( 0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
+		k.box(Vector3( 0.0,  0.66,  0.50), Vector3(0.40, 0.24, 0.06), wood * 0.90)
+		k.box(Vector3( 0.0,  0.38, -0.44), Vector3(0.76, 0.62, 0.04), dark_in)
+		# Рваный промёрзший брезентовый полог над лазом
+		k.box(Vector3(-0.04, 0.49, 0.545), Vector3(0.42, 0.18, 0.025), tarp, Basis(Vector3.RIGHT, deg_to_rad(-16.0)))
+		k.box(Vector3(-0.14, 0.34, 0.560), Vector3(0.18, 0.16, 0.022), tarp * 0.85, Basis(Vector3.FORWARD, deg_to_rad(14.0)))
+		# Двускатная крыша с выносом
+		k.box(Vector3(-0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
+		k.box(Vector3( 0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
+		k.box(Vector3( 0.0,  1.06, 0.04), Vector3(0.10, 0.06, 1.34), wood * 0.75)
+		# Колышек и проржавевшая эмалированная миска со льдом
+		k.tube([Vector3(0.56, 0.0, 0.62), Vector3(0.54, 0.28, 0.62)], [0.024, 0.020], iron, 6)
+		k.tube([Vector3(-0.34, 0.0, 0.78), Vector3(-0.34, 0.075, 0.78)], [0.11, 0.135], Color(0.28, 0.34, 0.32), 8)
+		k.tube([Vector3(-0.34, 0.05, 0.78), Vector3(-0.34, 0.062, 0.78)], [0.105, 0.105], Color(0.55, 0.65, 0.74), 8)
+		body = _mi(k, &"doghouse_body", "tex_planks.png")
+	root.add_child(body)
+
+	var snow := _instance_from_cache(&"doghouse_snow", "tex_snow.png")
+	if snow == null:
+		var ks := _kit(232, 0.05)
+		var sc := Color(0.78, 0.84, 0.92)
+		ks.box(Vector3(-0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
+		ks.box(Vector3( 0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
+		ks.blob(Vector3(0.0, 0.22, -0.78), Vector3(0.68, 0.32, 0.45), sc, 4, 6)
+		snow = _mi(ks, &"doghouse_snow", "tex_snow.png")
+	root.add_child(snow)
+
+	var chain_slack := _instance_from_cache(&"doghouse_chain_slack", "tex_metal.png")
+	if chain_slack == null:
+		var kc := _kit(233, 0.08)
+		var rust := Color(0.28, 0.20, 0.15)
+		kc.tube([
+			Vector3(0.54, 0.20, 0.62), Vector3(0.46, 0.04, 0.74),
+			Vector3(0.26, 0.03, 0.86), Vector3(0.08, 0.03, 0.76),
+			Vector3(0.02, 0.04, 0.56), Vector3(0.00, 0.06, 0.35),
+		], [0.018, 0.018, 0.018, 0.018, 0.018, 0.022], rust, 5)
+		chain_slack = _mi(kc, &"doghouse_chain_slack", "tex_metal.png")
+	chain_slack.name = "ChainSlack"
+	root.add_child(chain_slack)
+
+	var chain_taut := _instance_from_cache(&"doghouse_chain_taut", "tex_metal.png")
+	if chain_taut == null:
+		var kt := _kit(234, 0.08)
+		var rust := Color(0.28, 0.20, 0.15)
+		kt.tube([
+			Vector3(0.54, 0.22, 0.62), Vector3(0.66, 0.26, 1.25),
+			Vector3(0.76, 0.18, 1.95), Vector3(0.84, 0.04, 2.55),
+		], [0.018, 0.018, 0.018, 0.024], rust, 5)
+		chain_taut = _mi(kt, &"doghouse_chain_taut", "tex_metal.png")
+	chain_taut.name = "ChainTaut"
+	chain_taut.visible = false
+	root.add_child(chain_taut)
+
+	var eyes := Node3D.new()
+	eyes.name = "InsideEyes"
+	eyes.position = Vector3(0.0, 0.28, -0.22)
+	eyes.visible = false
+	var emat := StandardMaterial3D.new()
+	emat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	emat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	emat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	emat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	emat.albedo_color = Color(0.95, 0.86, 0.58, 0.72)
+	for sx in [-0.045, 0.045]:
+		var e := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.012
+		sm.height = 0.024
+		sm.radial_segments = 6
+		sm.rings = 3
+		e.mesh = sm
+		e.material_override = emat
+		e.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		e.position = Vector3(sx, 0.0, 0.0)
+		eyes.add_child(e)
+	root.add_child(eyes)
+
+	return root
+
+
+## Стенд кордона «УГМС • КЕДР-7» с процедурной картой просек и листом агитации.
+## Дочерние узлы под аномалию stand_pin:
+##   - "RedPin"       (MeshInstance3D) — булавка «ВЫ ЗДЕСЬ»
+##   - "BloodScratch" (Label3D)        — надпись углём поверх схемы
+static func outpost_stand() -> Node3D:
+	var root := Node3D.new()
+	root.name = "OutpostStand"
+
+	var frame := _instance_from_cache(&"outpost_stand_frame", "tex_wood.png")
+	if frame == null:
+		var k := _kit(241, 0.08)
+		var post_c := Color(0.25, 0.19, 0.14)
+		var board_c := Color(0.20, 0.26, 0.21)
+		var trim_c := Color(0.44, 0.15, 0.12)
+		for sx in [-0.74, 0.74]:
+			k.tube([Vector3(sx, 0.0, 0.0), Vector3(sx, 2.25, 0.0)], [0.075, 0.068], post_c, 7)
+			k.box(Vector3(sx * 0.82, 0.32, 0.0), Vector3(0.06, 0.50, 0.06), post_c * 0.9,
+					Basis(Vector3.FORWARD, deg_to_rad(32.0 * signf(sx))))
+			k.box(Vector3(sx * 0.84, 1.98, 0.0), Vector3(0.05, 0.34, 0.05), post_c * 0.9,
+					Basis(Vector3.FORWARD, deg_to_rad(-38.0 * signf(sx))))
+		k.box(Vector3(0.0, 1.38, 0.0), Vector3(1.44, 1.02, 0.06), board_c)
+		k.box(Vector3(0.0, 1.94, 0.01), Vector3(1.46, 0.14, 0.07), trim_c)
+		k.box(Vector3(0.0, 2.18, -0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
+		k.box(Vector3(0.0, 2.18,  0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
+		frame = _mi(k, &"outpost_stand_frame", "tex_wood.png")
+	root.add_child(frame)
+
+	var cap := _instance_from_cache(&"outpost_stand_snow", "tex_snow.png")
+	if cap == null:
+		var ks := _kit(242, 0.04)
+		var sc := Color(0.78, 0.84, 0.92)
+		ks.box(Vector3(0.0, 2.24, -0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
+		ks.box(Vector3(0.0, 2.24,  0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
+		cap = _mi(ks, &"outpost_stand_snow", "tex_snow.png")
+	root.add_child(cap)
+
+	var canvas := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(1.30, 0.88)
+	canvas.mesh = pm
+	canvas.position = Vector3(0.0, 1.38, 0.036)
+	canvas.rotation.x = deg_to_rad(90.0)
+	var cmat := StandardMaterial3D.new()
+	cmat.albedo_texture = _outpost_board_texture()
+	cmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	cmat.roughness = 0.92
+	canvas.material_override = cmat
+	root.add_child(canvas)
+
+	var pin := MeshInstance3D.new()
+	pin.name = "RedPin"
+	var psm := SphereMesh.new()
+	psm.radius = 0.022
+	psm.height = 0.044
+	psm.radial_segments = 6
+	psm.rings = 3
+	pin.mesh = psm
+	pin.material_override = Palette.glow(&"red")
+	pin.position = Vector3(-0.28, 1.36, 0.045)
+	root.add_child(pin)
+
+	var scratch := Label3D.new()
+	scratch.name = "BloodScratch"
+	scratch.text = "НЕ ВЫХОДИ"
+	scratch.font_size = 34
+	scratch.pixel_size = 0.0028
+	scratch.modulate = Color(0.48, 0.10, 0.08, 0.92)
+	scratch.outline_size = 0
+	scratch.position = Vector3(0.26, 1.24, 0.044)
+	scratch.rotation.z = deg_to_rad(-11.0)
+	scratch.visible = false
+	root.add_child(scratch)
+
+	return root
+
+
+static var _stand_tex_cache: ImageTexture = null
+
+
+static func _outpost_board_texture() -> ImageTexture:
+	if _stand_tex_cache != null:
+		return _stand_tex_cache
+	var w := 128
+	var h := 96
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.18, 0.23, 0.19))
+	var paper := Color(0.76, 0.72, 0.60)
+	var ink := Color(0.16, 0.18, 0.19)
+	var red := Color(0.62, 0.16, 0.13)
+	var hatch := Color(0.11, 0.11, 0.12)
+	# Левый лист: схема кордона и просек
+	img.fill_rect(Rect2i(6, 8, 62, 80), paper)
+	img.fill_rect(Rect2i(32, 44, 10, 8), ink)
+	img.fill_rect(Rect2i(36, 16, 2, 28), ink)
+	img.fill_rect(Rect2i(42, 47, 20, 2), ink)
+	img.fill_rect(Rect2i(36, 52, 2, 28), ink)
+	img.fill_rect(Rect2i(14, 47, 18, 2), red)
+	for i in range(0, 32, 3):
+		for d in range(18):
+			var px := 48 + d
+			var py := 12 + i + int(d / 2)
+			if px < 66 and py < 44:
+				img.set_pixel(px, py, hatch)
+	# Правый лист: советская инструкция ТБ и график смен с зачёркнутой строкой
+	img.fill_rect(Rect2i(74, 8, 48, 80), paper * 0.94)
+	img.fill_rect(Rect2i(74, 8, 48, 12), red)
+	for row in range(26, 78, 6):
+		var rw := 36 if (row % 12 != 0) else 26
+		img.fill_rect(Rect2i(80, row, rw, 2), ink)
+	img.fill_rect(Rect2i(78, 72, 38, 4), hatch)
+	_stand_tex_cache = ImageTexture.create_from_image(img)
+	return _stand_tex_cache
+
+
+## Закрытая тропа в тайгу: покосившийся деревянный шлагбаум с красной полосой и табличкой.
+static func closed_trail_gate() -> Node3D:
+	var root := Node3D.new()
+	root.name = "ClosedTrailGate"
+
+	var gate := _instance_from_cache(&"closed_trail_gate_wood", "tex_wood.png")
+	if gate == null:
+		var k := _kit(247, 0.09)
+		var post_c := Color(0.24, 0.18, 0.13)
+		var bar_w := Color(0.68, 0.66, 0.60)
+		var bar_r := Color(0.56, 0.14, 0.11)
+		k.tube([Vector3(-1.35, 0.0, 0.0), Vector3(-1.38, 1.55, 0.04)], [0.09, 0.08], post_c, 7)
+		k.tube([Vector3( 1.35, 0.0, 0.0), Vector3( 1.28, 1.45, -0.05)], [0.09, 0.08], post_c, 7)
+		# Перекладина с красно-белыми полосами (чуть перекошена)
+		var tilt := Basis(Vector3.FORWARD, deg_to_rad(-5.0))
+		for seg in 6:
+			var sx := -1.15 + float(seg) * 0.46
+			var c := bar_r if seg % 2 == 0 else bar_w
+			k.box(Vector3(sx, 1.05 - float(seg) * 0.02, 0.05), Vector3(0.45, 0.09, 0.07), c, tilt)
+		# Заколоченная доска наискось и табличка в центре
+		k.box(Vector3(0.0, 0.62, 0.07), Vector3(2.4, 0.08, 0.04), post_c * 1.1, Basis(Vector3.FORWARD, deg_to_rad(14.0)))
+		k.box(Vector3(0.0, 1.24, 0.09), Vector3(0.62, 0.28, 0.03), bar_r * 0.85)
+		gate = _mi(k, &"closed_trail_gate_wood", "tex_wood.png")
+	root.add_child(gate)
+
+	var lbl := Label3D.new()
+	lbl.text = "ПРОХОД\nЗАПРЕЩЁН"
+	lbl.font_size = 28
+	lbl.pixel_size = 0.0028
+	lbl.modulate = Color(0.86, 0.82, 0.72)
+	lbl.outline_size = 0
+	lbl.position = Vector3(0.0, 1.24, 0.115)
+	root.add_child(lbl)
+
+	return root
+
 
 
 

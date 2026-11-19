@@ -138,6 +138,9 @@ var _susedko_peeking := false
 var _window_wiped := false
 var _wipe_it: Interactable
 var _north_frost_mat: ShaderMaterial = null
+var garland_prop: Node3D = null
+var _garland_glow: OmniLight3D = null
+var _garland_anomaly_red := false
 var _window_wiped_radius := 0.0
 var _attn_event_timer := 25.0
 var _house_draft_sfx_timer := 0.0
@@ -308,6 +311,7 @@ func _process(delta: float) -> void:
 	_t += delta
 	_tick_creak(delta)
 	_tick_indoor_shadows(delta)
+	_tick_garland()
 	var burning := Game.stove_wood > 0.0
 	if _fire != null:
 		_fire.visible = burning
@@ -1006,6 +1010,48 @@ func _apply_lamps() -> void:
 	var on := outside_lit()
 	for l in _lamps:
 		l.visible = _lamp_on(l, on)
+	_tick_garland()
+
+
+func set_garland_anomaly(red: bool) -> void:
+	_garland_anomaly_red = red
+	_tick_garland()
+
+
+func _tick_garland() -> void:
+	if garland_prop == null or not is_instance_valid(garland_prop):
+		return
+	var powered := lights_lit()
+	var bulb_mats: Array = garland_prop.get_meta(&"bulb_mats", [])
+	var halo_mats: Array = garland_prop.get_meta(&"halo_mats", [])
+	var base_colors: Array = garland_prop.get_meta(&"base_colors", [])
+	var dead_col := Color(0.06, 0.06, 0.06)
+	var anom_col := Color(0.88, 0.07, 0.05)
+	for i in bulb_mats.size():
+		var bm := bulb_mats[i] as StandardMaterial3D
+		if bm == null:
+			continue
+		if not powered:
+			bm.albedo_color = dead_col
+		elif _garland_anomaly_red:
+			bm.albedo_color = anom_col * (0.72 + 0.08 * sin(_t * 1.4))
+		else:
+			var wave := 0.72 + 0.28 * sin(_t * 1.9 + float(i) * 0.85)
+			bm.albedo_color = (base_colors[i] as Color) * wave
+		if i < halo_mats.size():
+			var hm := halo_mats[i] as ShaderMaterial
+			if hm != null:
+				if not powered:
+					hm.set_shader_parameter(&"intensity", 0.0)
+				elif _garland_anomaly_red:
+					hm.set_shader_parameter(&"tint", anom_col)
+					hm.set_shader_parameter(&"intensity", 0.42)
+				else:
+					var hw := 0.38 + 0.22 * sin(_t * 1.9 + float(i) * 0.85)
+					hm.set_shader_parameter(&"tint", base_colors[i] as Color)
+					hm.set_shader_parameter(&"intensity", hw)
+	if _garland_glow != null and is_instance_valid(_garland_glow):
+		_garland_glow.light_color = Color(0.95, 0.14, 0.10) if _garland_anomaly_red else Color(1.0, 0.82, 0.52)
 
 
 ## Мигание света. Корутина — испуги ждут её через await.
@@ -2451,13 +2497,13 @@ func _build_radio_room() -> void:
 	radio_set.add_child(magic_eye)
 
 	# Советская новогодняя гирлянда «Золотой фонарик» над радиостанцией
-	var garland := Props.soviet_garland()
-	garland.position = Vector3(9.2, 2.05, -1.8)
-	add_child(garland)
-	var g_glow := garland.get_node_or_null("GarlandGlow") as OmniLight3D
-	if g_glow != null:
-		register_lamp(g_glow)
-	Geo.interactable(garland, Vector3(1.8, 0.4, 0.3), Vector3(0.0, -0.1, 0.0), null, Loc.t(&"it.ny_garland"), func(_p: Player) -> void:
+	garland_prop = Props.soviet_garland()
+	garland_prop.position = Vector3(9.2, 2.05, -1.8)
+	add_child(garland_prop)
+	_garland_glow = garland_prop.get_node_or_null("GarlandGlow") as OmniLight3D
+	if _garland_glow != null:
+		register_lamp(_garland_glow)
+	Geo.interactable(garland_prop, Vector3(1.8, 0.4, 0.3), Vector3(0.0, -0.1, 0.0), null, Loc.t(&"it.ny_garland"), func(_p: Player) -> void:
 		Game.hud.subtitle(Loc.t(&"sub.ny_garland"), 4.0)
 	)
 

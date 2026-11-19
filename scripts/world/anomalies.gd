@@ -15,8 +15,10 @@ const DEFS := {
 	&"chair": [&"house", 2], &"cup": [&"house", 2], &"teapot": [&"house", 2], &"bucket": [&"house", 2],
 	&"glass2": [&"house", 2], &"photo": [&"house", 3], &"tools": [&"house", 3], &"clock": [&"house", 3],
 	&"pennant": [&"house", 3], &"boots": [&"house", 3], &"calendar": [&"house", 4], &"bed": [&"house", 4], &"journal": [&"house", 4],
-	&"wet_steps": [&"house", 5],
-	&"flag": [&"yard", 2], &"tracks": [&"yard", 3], &"izba_light": [&"yard", 3], &"mast_figure": [&"yard", 5],
+	&"garland_red": [&"house", 2], &"wet_steps": [&"house", 5],
+	&"flag": [&"yard", 2], &"cellar_steam": [&"yard", 2], &"axe_turned": [&"yard", 2],
+	&"tracks": [&"yard", 3], &"dog_chain": [&"yard", 3], &"stand_pin": [&"yard", 3],
+	&"izba_light": [&"yard", 3], &"mast_figure": [&"yard", 5],
 	&"baro_tooth": [&"instr", 2], &"anemo_calm": [&"instr", 3], &"sv20_house": [&"instr", 3], &"therm_366": [&"instr", 4],
 	&"retuned": [&"radio", 2], &"num_name": [&"radio", 3],
 }
@@ -187,6 +189,88 @@ func _build() -> void:
 		fig.add_child(rim)
 		_toggle(&"mast_figure", fig, Yard.MAST + Vector3(0, 7.6, 0.75))
 
+		# Новые микро-аномалии жилого двора: ледник, колун, будка и стенд кордона
+		if yard.cellar_prop != null:
+			var lid := yard.cellar_prop.get_node_or_null("HatchLid") as Node3D
+			var steam := yard.cellar_prop.get_node_or_null("VentSteam") as CPUParticles3D
+			var closed_rx := lid.rotation.x if lid != null else 0.0
+			_apply[&"cellar_steam"] = func() -> void:
+				if is_instance_valid(lid):
+					lid.rotation.x = closed_rx - deg_to_rad(6.5)
+				if is_instance_valid(steam):
+					steam.emitting = true
+			_revert[&"cellar_steam"] = func() -> void:
+				if is_instance_valid(lid):
+					lid.rotation.x = closed_rx
+				if is_instance_valid(steam):
+					steam.emitting = false
+			_pos[&"cellar_steam"] = func() -> Vector3:
+				return yard.cellar_prop.global_position + Vector3(0, 0.6, 0) if is_instance_valid(yard.cellar_prop) else Vector3.INF
+
+		if yard.chop_prop != null:
+			var axe := yard.chop_prop.get_node_or_null("AxePivot") as Node3D
+			var base_xf := axe.transform if axe != null else Transform3D.IDENTITY
+			_apply[&"axe_turned"] = func() -> void:
+				if is_instance_valid(axe):
+					axe.position = Vector3(0.18, 0.65, -0.06)
+					axe.rotation = Vector3(deg_to_rad(-10.0), deg_to_rad(145.0), deg_to_rad(6.0))
+			_revert[&"axe_turned"] = func() -> void:
+				if is_instance_valid(axe):
+					axe.transform = base_xf
+			_pos[&"axe_turned"] = func() -> Vector3:
+				return yard.chop_prop.global_position + Vector3(0, 0.9, 0) if is_instance_valid(yard.chop_prop) else Vector3.INF
+
+		if yard.doghouse_prop != null:
+			var c_slack := yard.doghouse_prop.get_node_or_null("ChainSlack") as Node3D
+			var c_taut := yard.doghouse_prop.get_node_or_null("ChainTaut") as Node3D
+			var eyes := yard.doghouse_prop.get_node_or_null("InsideEyes") as Node3D
+			var dp := yard.doghouse_prop.global_position
+			var fwd := yard.doghouse_prop.global_transform.basis.z
+			var dog_prints := Footprints.trail(yard, &"bare", PackedVector3Array([
+				dp + fwd * 1.1, dp + fwd * 3.1, dp + fwd * 5.4
+			]), 0.0, 0.54)
+			dog_prints.visible = false
+			_apply[&"dog_chain"] = func() -> void:
+				if is_instance_valid(c_slack): c_slack.visible = false
+				if is_instance_valid(c_taut): c_taut.visible = true
+				if is_instance_valid(eyes): eyes.visible = true
+				if is_instance_valid(dog_prints): dog_prints.visible = true
+			_revert[&"dog_chain"] = func() -> void:
+				if is_instance_valid(c_slack): c_slack.visible = true
+				if is_instance_valid(c_taut): c_taut.visible = false
+				if is_instance_valid(eyes): eyes.visible = false
+				if is_instance_valid(dog_prints): dog_prints.visible = false
+			_pos[&"dog_chain"] = func() -> Vector3:
+				return dp + Vector3(0, 0.5, 0)
+
+		if yard.stand_prop != null:
+			var pin := yard.stand_prop.get_node_or_null("RedPin") as Node3D
+			var scrawl_stand := yard.stand_prop.get_node_or_null("BloodScratch") as Node3D
+			var pin_home := pin.position if pin != null else Vector3.ZERO
+			_apply[&"stand_pin"] = func() -> void:
+				if is_instance_valid(pin):
+					pin.position = Vector3(-0.08, 1.56, 0.045)
+				if is_instance_valid(scrawl_stand):
+					scrawl_stand.visible = true
+			_revert[&"stand_pin"] = func() -> void:
+				if is_instance_valid(pin):
+					pin.position = pin_home
+				if is_instance_valid(scrawl_stand):
+					scrawl_stand.visible = false
+			_pos[&"stand_pin"] = func() -> Vector3:
+				return yard.stand_prop.global_position + Vector3(0, 1.4, 0) if is_instance_valid(yard.stand_prop) else Vector3.INF
+
+	# Новогодняя гирлянда в радиорубке: замирает в мёртвом багровом свете
+	if st != null and st.garland_prop != null:
+		_apply[&"garland_red"] = func() -> void:
+			if is_instance_valid(st):
+				st.set_garland_anomaly(true)
+		_revert[&"garland_red"] = func() -> void:
+			if is_instance_valid(st):
+				st.set_garland_anomaly(false)
+		_pos[&"garland_red"] = func() -> Vector3:
+			return st.garland_prop.global_position if is_instance_valid(st) and is_instance_valid(st.garland_prop) else Vector3.INF
+
 	# Приборы и эфир — флаги: их читают барограф, анемометр, термометр и рация.
 	# Календарь в рубке: поверх дат кто-то нацарапал бурым.
 	var scrawl := Label3D.new()
@@ -238,7 +322,7 @@ func _process(delta: float) -> void:
 	_t -= delta
 	if _t > 0.0 or Director.hold:
 		return
-	_t = Game.rng.randf_range(140.0, 230.0) / (1.0 + (Game.night - 2) * 0.08)
+	_t = Game.rng.randf_range(95.0, 165.0) / (1.0 + (Game.night - 2) * 0.1)
 	var open := 0
 	for id: StringName in active:
 		if not active[id]["noted"]:
@@ -256,6 +340,8 @@ func trigger_random(zone_hint := &"") -> bool:
 	var w := PackedFloat32Array()
 	for id: StringName in DEFS:
 		if active.has(id) or id in EVENT_ONLY or int(DEFS[id][1]) > Game.night or not _apply.has(id):
+			continue
+		if id == &"garland_red" and not Game.power_on:
 			continue
 		if not _unseen(id):
 			continue

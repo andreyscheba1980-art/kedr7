@@ -55,8 +55,8 @@ const GLADES := [
 	{"c": Vector3(66.0, 0.0, -22.0), "r": 15.0},  # метеополяна (= PLOT)
 	{"c": Vector3(24.0, 0.0, -62.0), "r": 12.0},  # мачта
 ]
-const ALLEY_HALF := 4.0     # ширина просеки 8 м
-const WALL_W := 8.0         # толщина стены леса
+const ALLEY_HALF := 2.9     # узкая таёжная просека (~5.8 м) под сводом вековых елей
+const WALL_W := 9.0         # плотная стена леса вокруг поляны и просек
 
 static func _gnd(v: Vector3) -> Vector3:
 	return Vector3(v.x, Terrain.height(v.x, v.z), v.z)
@@ -140,6 +140,18 @@ var _bare_tracks_root: Node3D = null
 var _creak_t := 12.0
 var _shed_tin_t := 7.0
 var _snow_drop_cd := 0.0
+var cellar_prop: Node3D = null
+var chop_prop: Node3D = null
+var doghouse_prop: Node3D = null
+var stand_prop: Node3D = null
+var _closed_trail_eyes: Node3D = null
+var _dog_chain_clanked := false
+var _dog_eyes_stare_t := 0.0
+var _dog_eyes_fled := false
+var _cellar_knocked := false
+var _closed_trail_stare_t := 0.0
+var _closed_trail_triggered := false
+static var _trail_mat: ShaderMaterial = null
 
 
 func _ready() -> void:
@@ -154,6 +166,11 @@ func _ready() -> void:
 	paths.append(PackedVector3Array([DOOR_OUT, Vector3(16.0, 0, 14.0), Vector3(10.0, 0, 28.0), WOODPILE + Vector3(0.6, 0, -2.0)]))   # к южному боку поленницы, мимо столба и козел
 	var helipad_path := PackedVector3Array([JUNCTION, Vector3(32, 0, 4.5), HELIPAD + Vector3(-5.0, 0, 0)])
 	paths.append(helipad_path)
+	# Короткая тропа от мостков ДЭС-8 к леднику и тупиковая закрытая просека в тайгу
+	var cellar_path := PackedVector3Array([Vector3(15.6, 0, -6.0), Vector3(10.5, 0, -8.2), Vector3(6.4, 0, -8.8)])
+	var closed_taiga_path := PackedVector3Array([Vector3(15.8, 0, 10.8), Vector3(11.0, 0, 11.4), Vector3(4.0, 0, 11.2), Vector3(-1.8, 0, 10.6), Vector3(-6.8, 0, 8.2), Vector3(-14.5, 0, 7.2)])
+	paths.append(cellar_path)
+	paths.append(closed_taiga_path)
 	_all_paths = paths.duplicate()
 	_all_paths.append(izba_path)
 	if izba_open:
@@ -226,9 +243,11 @@ func _ready() -> void:
 	else:
 		_build_lean_fuel_drums()
 	_build_signpost(JUNCTION + Vector3(0.8, 0.0, 1.2))
-	_build_notice_board(Vector3(16.2, 0.0, 1.4))
-	_build_doghouse(Vector3(19.2, 0.0, 10.5))
-	_build_frozen_clothesline(Vector3(-2.0, 0.0, -6.0))
+	_build_notice_board(Vector3(17.8, 0.0, -0.4))
+	_build_doghouse(Vector3(21.4, 0.0, 9.4))
+	_build_frozen_clothesline(Vector3(-1.2, 0.0, 8.6))
+	_build_near_woodchop(Vector3(11.8, 0.0, 9.4))
+	_build_closed_trail(Vector3(-6.8, 0.0, 8.2))
 	_build_old_fence()
 	_build_taiga_landmarks()
 	_build_snow_survey_route()
@@ -362,10 +381,10 @@ func _build_old_fence() -> void:
 	add_child(root)
 
 	var points: Array[Vector3] = []
-	for z in range(6, -8, -2):
+	for z in range(6, -12, -2):
 		points.append(Vector3(-4.5, 0.0, float(z)))
 	for x in range(-3, 14, 2):
-		points.append(Vector3(float(x), 0.0, -7.5))
+		points.append(Vector3(float(x), 0.0, -11.2))
 
 	for i in range(points.size()):
 		var pt := points[i]
@@ -442,133 +461,121 @@ func _build_old_fence() -> void:
 
 func _build_notice_board(pos: Vector3) -> void:
 	var gy := Terrain.height(pos.x, pos.z)
-	var root := Node3D.new()
-	root.position = Vector3(pos.x, gy, pos.z)
-	root.rotation.y = deg_to_rad(-25.0)
-	add_child(root)
-
-	for sx in [-0.65, 0.65]:
-		var post := Geo.box_mesh(Vector3(0.12, 2.1, 0.12), Palette.m(&"wood"))
-		post.position = Vector3(sx, 1.05, 0.0)
-		root.add_child(post)
-		var skirt := Geo.box_mesh(Vector3(0.35, 0.25, 0.35), Palette.m(&"drift"))
-		skirt.position = Vector3(sx, 0.12, 0.0)
-		root.add_child(skirt)
-
-	var board := Geo.box_mesh(Vector3(1.4, 0.95, 0.04), Palette.m(&"weathered"))
-	board.position = Vector3(0.0, 1.35, 0.0)
-	root.add_child(board)
-
-	var roof_l := Geo.box_mesh(Vector3(1.5, 0.03, 0.35), Palette.m(&"plank"))
-	roof_l.position = Vector3(0.0, 1.95, -0.1)
-	roof_l.rotation.x = deg_to_rad(25.0)
-	root.add_child(roof_l)
-	var roof_r := Geo.box_mesh(Vector3(1.5, 0.03, 0.35), Palette.m(&"plank"))
-	roof_r.position = Vector3(0.0, 1.95, 0.1)
-	roof_r.rotation.x = deg_to_rad(-25.0)
-	root.add_child(roof_r)
-	var snow_roof := Geo.box_mesh(Vector3(1.52, 0.07, 0.45), Palette.m(&"snow"))
-	snow_roof.position = Vector3(0.0, 2.02, 0.0)
-	root.add_child(snow_roof)
-
-	var map_sheet := Geo.box_mesh(Vector3(0.55, 0.72, 0.01), Palette.m(&"paper"))
-	map_sheet.position = Vector3(-0.32, 1.35, 0.025)
-	root.add_child(map_sheet)
-	var star := Geo.box_mesh(Vector3(0.08, 0.08, 0.01), Palette.m(&"red"))
-	star.position = Vector3(-0.35, 1.32, 0.035)
-	root.add_child(star)
-
-	var rules_sheet := Geo.box_mesh(Vector3(0.5, 0.72, 0.01), Palette.m(&"paper"))
-	rules_sheet.position = Vector3(0.35, 1.35, 0.025)
-	root.add_child(rules_sheet)
+	stand_prop = Props.outpost_stand()
+	stand_prop.position = Vector3(pos.x, gy, pos.z)
+	stand_prop.rotation.y = deg_to_rad(14.0)
+	add_child(stand_prop)
 
 	var sb := StaticBody3D.new()
 	sb.collision_layer = Geo.LAYER_WORLD
 	sb.collision_mask = 0
 	sb.position = Vector3(0.0, 1.1, 0.0)
-	sb.add_child(Geo.box_shape(Vector3(1.5, 2.2, 0.3)))
-	root.add_child(sb)
+	sb.add_child(Geo.box_shape(Vector3(1.55, 2.2, 0.35)))
+	stand_prop.add_child(sb)
 
 	var it := Interactable.new()
 	it.collision_layer = Geo.LAYER_WORLD
-	it.position = Vector3(0.0, 1.35, 0.2)
+	it.position = Vector3(0.0, 1.38, 0.22)
 	it.prompt_provider = func() -> String: return Loc.t(&"it.notice_board")
-	it.add_child(Geo.box_shape(Vector3(1.4, 1.2, 0.8)))
+	it.add_child(Geo.box_shape(Vector3(1.45, 1.2, 0.8)))
 	it.used.connect(func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.t(&"sub.notice_board"), 6.0)
+		Game.hud.subtitle(Loc.t(&"sub.notice_board"), 5.0)
 		Game.audio.play_2d("res://assets/audio/ui_tick.ogg", -4.0)
 	)
-	root.add_child(it)
+	stand_prop.add_child(it)
 
 
 func _build_doghouse(pos: Vector3) -> void:
 	var gy := Terrain.height(pos.x, pos.z)
-	var root := Node3D.new()
-	root.position = Vector3(pos.x, gy, pos.z)
-	root.rotation.y = deg_to_rad(40.0)
-	add_child(root)
-
-	var body_h := 0.75
-	var body := Geo.box_mesh(Vector3(0.85, body_h, 1.05), Palette.m(&"wood"))
-	body.position = Vector3(0.0, body_h * 0.5, 0.0)
-	root.add_child(body)
-
-	var hole := Geo.box_mesh(Vector3(0.36, 0.48, 0.02), Palette.m(&"dark"))
-	hole.position = Vector3(0.0, 0.28, 0.53)
-	root.add_child(hole)
-
-	var r_l := Geo.box_mesh(Vector3(0.55, 0.03, 1.15), Palette.m(&"plank"))
-	r_l.position = Vector3(-0.22, body_h + 0.12, 0.0)
-	r_l.rotation.z = deg_to_rad(28.0)
-	root.add_child(r_l)
-	var r_r := Geo.box_mesh(Vector3(0.55, 0.03, 1.15), Palette.m(&"plank"))
-	r_r.position = Vector3(0.22, body_h + 0.12, 0.0)
-	r_r.rotation.z = deg_to_rad(-28.0)
-	root.add_child(r_r)
-	var r_snow := Geo.box_mesh(Vector3(0.75, 0.08, 1.18), Palette.m(&"snow"))
-	r_snow.position = Vector3(0.0, body_h + 0.22, 0.0)
-	root.add_child(r_snow)
-
-	# Колышек и короткая цепь у входа
-	Geo.cylinder(root, 0.015, 0.2, Vector3(0.15, 0.1, 0.58), Palette.m(&"metal"), false)
-	var chain := Geo.box_mesh(Vector3(0.03, 0.02, 0.25), Palette.m(&"metal"))
-	chain.position = Vector3(0.18, 0.02, 0.55)
-	chain.rotation.y = deg_to_rad(15.0)
-	root.add_child(chain)
-
-	var carabiner := Geo.box_mesh(Vector3(0.03, 0.03, 0.06), Palette.m(&"metal"))
-	carabiner.position = Vector3(0.2, 0.02, 0.45)
-	root.add_child(carabiner)
-
-	Geo.cylinder(root, 0.11, 0.05, Vector3(0.35, 0.025, 0.55), Palette.m(&"metal"), false)
-	Geo.cylinder(root, 0.09, 0.02, Vector3(0.35, 0.04, 0.55), Palette.m(&"floor"), false)
-
-	var bone := Geo.box_mesh(Vector3(0.04, 0.03, 0.18), Palette.m(&"paper"))
-	bone.position = Vector3(0.32, 0.02, 0.38)
-	bone.rotation.y = deg_to_rad(30.0)
-	root.add_child(bone)
-
-	var drift := Geo.box_mesh(Vector3(1.1, 0.45, 0.7), Palette.m(&"drift"))
-	drift.position = Vector3(0.0, 0.2, -0.65)
-	root.add_child(drift)
+	doghouse_prop = Props.abandoned_doghouse()
+	doghouse_prop.position = Vector3(pos.x, gy, pos.z)
+	doghouse_prop.rotation.y = deg_to_rad(-140.0)
+	add_child(doghouse_prop)
 
 	var sb := StaticBody3D.new()
 	sb.collision_layer = Geo.LAYER_WORLD
 	sb.collision_mask = 0
-	sb.position = Vector3(0.0, 0.4, 0.0)
-	sb.add_child(Geo.box_shape(Vector3(1.0, 0.9, 1.2)))
-	root.add_child(sb)
+	sb.position = Vector3(0.0, 0.48, 0.0)
+	sb.add_child(Geo.box_shape(Vector3(1.0, 0.96, 1.2)))
+	doghouse_prop.add_child(sb)
 
 	var it := Interactable.new()
 	it.collision_layer = Geo.LAYER_WORLD
-	it.position = Vector3(0.0, 0.5, 0.5)
+	it.position = Vector3(0.0, 0.5, 0.55)
 	it.prompt_provider = func() -> String: return Loc.t(&"it.doghouse")
 	it.add_child(Geo.box_shape(Vector3(1.1, 1.0, 1.1)))
 	it.used.connect(func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.t(&"sub.doghouse"), 5.5)
+		Game.hud.subtitle(Loc.t(&"sub.doghouse"), 4.5)
 		Game.audio.play_2d("res://assets/audio/clank.ogg", -8.0)
 	)
-	root.add_child(it)
+	doghouse_prop.add_child(it)
+
+
+func _build_near_woodchop(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	chop_prop = Props.chopping_block()
+	chop_prop.position = Vector3(pos.x, gy, pos.z)
+	chop_prop.rotation.y = deg_to_rad(-25.0)
+	add_child(chop_prop)
+
+	var sb := StaticBody3D.new()
+	sb.collision_layer = Geo.LAYER_WORLD
+	sb.collision_mask = 0
+	sb.position = Vector3(0.0, 0.35, 0.0)
+	sb.add_child(Geo.box_shape(Vector3(0.8, 0.72, 0.8)))
+	chop_prop.add_child(sb)
+
+	var it := Geo.interactable(chop_prop, Vector3(0.95, 1.15, 0.95), Vector3(0.0, 0.55, 0.0), null, Loc.t(&"it.axe_stump"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.axe_stump"), 4.0)
+	)
+	it.name = "NearAxeStump"
+
+
+func _build_closed_trail(pos: Vector3) -> void:
+	var gy := Terrain.height(pos.x, pos.z)
+	var gate := Props.closed_trail_gate()
+	gate.position = Vector3(pos.x, gy, pos.z)
+	gate.rotation.y = deg_to_rad(82.0)
+	add_child(gate)
+
+	var sb := StaticBody3D.new()
+	sb.collision_layer = Geo.LAYER_WORLD
+	sb.collision_mask = 0
+	sb.position = Vector3(0.0, 0.8, 0.0)
+	sb.add_child(Geo.box_shape(Vector3(2.8, 1.6, 0.28)))
+	gate.add_child(sb)
+
+	var it := Geo.interactable(gate, Vector3(2.6, 1.5, 0.8), Vector3(0.0, 0.9, 0.2), null, Loc.t(&"it.closed_trail"), func(_p: Player) -> void:
+		Game.hud.subtitle(Loc.t(&"sub.closed_trail"), 4.5)
+	)
+	it.name = "ClosedTrailGateIt"
+
+	# Пара холодных глаз в глубине закрытой просеки (вспыхивает один раз за ночь, если долго светить в темноту)
+	_closed_trail_eyes = Node3D.new()
+	_closed_trail_eyes.name = "ClosedTrailWatcherEyes"
+	var ey := Terrain.height(-14.5, 7.2)
+	_closed_trail_eyes.position = Vector3(-14.5, ey + 1.62, 7.2)
+	_closed_trail_eyes.rotation.y = deg_to_rad(82.0)
+	_closed_trail_eyes.visible = false
+	var glow_sh := load("res://assets/shaders/soft_glow.gdshader") as Shader
+	var qm := QuadMesh.new()
+	qm.size = Vector2(0.085, 0.085)
+	for sx in [-0.055, 0.055]:
+		var emi := MeshInstance3D.new()
+		emi.mesh = qm
+		emi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if glow_sh != null:
+			var sm := ShaderMaterial.new()
+			sm.shader = glow_sh
+			sm.set_shader_parameter(&"tint", Color(0.86, 0.94, 0.78))
+			sm.set_shader_parameter(&"intensity", 1.15)
+			sm.set_shader_parameter(&"sharp", 3.0)
+			emi.material_override = sm
+		else:
+			emi.material_override = Palette.glow(&"eyes", true)
+		emi.position = Vector3(sx, 0.0, 0.0)
+		_closed_trail_eyes.add_child(emi)
+	add_child(_closed_trail_eyes)
 
 
 func _build_frozen_clothesline(pos: Vector3) -> void:
@@ -686,6 +693,7 @@ func _process(delta: float) -> void:
 
 	# Уличные кошмары: появление сущностей и пугающая атмосфера в тайге
 	_process_outdoor_horror(delta)
+	_process_yard_suspense(delta)
 	_process_forest_sounds(delta)
 	_process_snow_survey_stalking(delta)
 	_process_mi8_helipad(delta)
@@ -700,6 +708,68 @@ func _process(delta: float) -> void:
 			Game.balloon_launched = false
 			_pilot_balloon_node.queue_free()
 			_pilot_balloon_node = null
+
+
+## Реактивный ночной саспенс двора без скримеров: вакуум ветра, звон цепи, гаснущие от фонаря глаза и стук из ледника.
+func _process_yard_suspense(delta: float) -> void:
+	if not Game.is_night() or Game.player == null or not Game.is_outside():
+		return
+	var p := Game.player
+	var p_pos := p.global_position
+	var anom := Game.anomalies
+
+	# 1. Будка с натянутой цепью: при приближении — вакуум метели и тихий звон; луч фонаря спугивает глаза внутри
+	if anom != null and anom.is_active(&"dog_chain") and doghouse_prop != null and is_instance_valid(doghouse_prop):
+		var dp := doghouse_prop.global_position
+		var d_dog := p_pos.distance_to(dp)
+		if not _dog_chain_clanked and d_dog < 9.5:
+			_dog_chain_clanked = true
+			if Game.audio != null:
+				Game.audio.trigger_vacuum(3.5)
+				Game.audio.play_3d("res://assets/audio/clank_v3.ogg", dp + Vector3(0, 0.25, 0), -10.0, 8.0)
+		var eyes := doghouse_prop.get_node_or_null("InsideEyes") as Node3D
+		if eyes != null and eyes.visible and not _dog_eyes_fled and d_dog < 12.0 and p.flashlight_on() and p.is_looking_at(dp + Vector3(0, 0.3, 0), 18.0):
+			_dog_eyes_stare_t += delta
+			if _dog_eyes_stare_t >= 0.55:
+				_dog_eyes_fled = true
+				eyes.visible = false
+				if Game.audio != null:
+					Game.audio.play_3d("res://assets/audio/knock_v4.ogg", dp + Vector3(0, 0.3, 0), -12.0, 6.0)
+				Director.add_tension(7.0, "глаза в будке")
+
+	# 2. Запертый ледник с паром: глухой двойной стук из-под крышки при приближении
+	if anom != null and anom.is_active(&"cellar_steam") and cellar_prop != null and is_instance_valid(cellar_prop):
+		var cp := cellar_prop.global_position
+		if not _cellar_knocked and p_pos.distance_to(cp) < 5.8:
+			_cellar_knocked = true
+			if Game.audio != null:
+				Game.audio.trigger_vacuum(2.6)
+				Game.audio.play_3d("res://assets/audio/knock_v2.ogg", cp + Vector3(0, 0.35, 0), -10.0, 6.0)
+			var t := get_tree().create_timer(0.45, false)
+			t.timeout.connect(func() -> void:
+				if is_instance_valid(self) and Game.audio != null:
+					Game.audio.play_3d("res://assets/audio/knock_v2.ogg", cp + Vector3(0, 0.35, 0), -11.0, 6.0)
+			)
+
+	# 3. Закрытая тропа в тайгу: если светить за шлагбаум > 2.5 с, в глубине просеки на миг вспыхивают глаза
+	if not _closed_trail_triggered and _closed_trail_eyes != null and is_instance_valid(_closed_trail_eyes):
+		var gate_pos := Vector3(-6.8, 0.0, 8.2)
+		if p_pos.distance_to(gate_pos) < 8.5 and p.flashlight_on() and p.is_looking_at(_closed_trail_eyes.global_position, 22.0):
+			_closed_trail_stare_t += delta
+			if _closed_trail_stare_t >= 2.5:
+				_closed_trail_triggered = true
+				_closed_trail_eyes.visible = true
+				if Game.audio != null:
+					Game.audio.trigger_vacuum(2.4)
+				var hide_t := get_tree().create_timer(1.25, false)
+				hide_t.timeout.connect(func() -> void:
+					if is_instance_valid(_closed_trail_eyes):
+						_closed_trail_eyes.visible = false
+					if is_instance_valid(self) and Game.audio != null:
+						Game.audio.play_3d("res://assets/audio/tree_creak_v2.ogg", Vector3(-14.5, 2.0, 7.2), -8.0, 12.0)
+				)
+		else:
+			_closed_trail_stare_t = maxf(_closed_trail_stare_t - delta * 0.5, 0.0)
 
 
 # --- API ---------------------------------------------------------------------
@@ -1005,29 +1075,87 @@ func _offset_line(line: PackedVector3Array, off: float) -> PackedVector3Array:
 	return out
 
 
-## Натоптанная тропа: полосы утоптанного снега вдоль путей (текстура в координатах полосы).
+## Бесшовная натоптанная тропа: единая лента по рельефу Terrain.height с blend_mul и view-space bias (без z-fighting).
 func _build_trail(line: PackedVector3Array) -> void:
-	var mat := Creatures._mat(&"trail", Palette.COLORS[&"snow"] * (1.6 / 1.5), "tex_trail.png", 0.0)
-	mat.set_shader_parameter(&"tex_scale", TRAIL_W)
+	if line.size() < 2:
+		return
+	if _trail_mat == null:
+		_trail_mat = ShaderMaterial.new()
+		_trail_mat.shader = load("res://assets/shaders/trodden_path.gdshader") as Shader
+		_trail_mat.set_shader_parameter(&"rut_tint", Color(0.66, 0.70, 0.76))
+		_trail_mat.set_shader_parameter(&"strength", 0.78)
+		_trail_mat.render_priority = 1
+
+	# Сэмплируем полилинию с шагом ~1.8 м, чтобы лента точно повторяла рельеф без провалов и стыков
+	var pts: Array[Vector3] = []
+	var dists: Array[float] = []
+	var total := 0.0
 	for i in range(line.size() - 1):
 		var a := line[i]
 		var b := line[i + 1]
-		var seg_len := a.distance_to(b)
-		if seg_len < 0.1:
+		var seg := Vector2(b.x - a.x, b.z - a.z).length()
+		if seg < 0.05:
 			continue
-		var pm := PlaneMesh.new()
-		pm.size = Vector2(TRAIL_W, seg_len + TRAIL_W * 0.6)   # с нахлёстом на стыках
-		pm.subdivide_depth = maxi(1, int(seg_len / 2.0))
-		var mi := MeshInstance3D.new()
-		mi.mesh = pm
-		mi.material_override = mat
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mi.position = (a + b) * 0.5 + Vector3(0, 0.008 + 0.001 * (i % 3), 0)
-		var dir := (b - a).normalized()
-		var yaw := atan2(dir.x, dir.z)
-		var pitch := -asin(clampf(dir.y, -1.0, 1.0))
-		mi.rotation = Vector3(pitch, yaw, 0.0)
-		add_child(mi)
+		var steps := maxi(1, int(ceilf(seg / 1.8)))
+		var start_k := 0 if pts.is_empty() else 1
+		for k in range(start_k, steps + 1):
+			var frac := float(k) / float(steps)
+			var p := a.lerp(b, frac)
+			p.y = Terrain.height(p.x, p.z) + 0.012
+			pts.append(p)
+			dists.append(total + seg * frac)
+		total += seg
+	if pts.size() < 2:
+		return
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var half_w := TRAIL_W * 0.55
+	var left_v: Array[Vector3] = []
+	var right_v: Array[Vector3] = []
+	var alphas: Array[float] = []
+
+	for i in range(pts.size()):
+		var fwd := Vector3.ZERO
+		if i > 0:
+			fwd += (pts[i] - pts[i - 1])
+		if i + 1 < pts.size():
+			fwd += (pts[i + 1] - pts[i])
+		fwd.y = 0.0
+		fwd = fwd.normalized() if fwd.length_squared() > 0.0001 else Vector3.FORWARD
+		var side := Vector3(-fwd.z, 0.0, fwd.x)
+		var pl := pts[i] - side * half_w
+		var pr := pts[i] + side * half_w
+		pl.y = Terrain.height(pl.x, pl.z) + 0.012
+		pr.y = Terrain.height(pr.x, pr.z) + 0.012
+		left_v.append(pl)
+		right_v.append(pr)
+		var end_fade := minf(clampf(dists[i] / 0.85, 0.0, 1.0), clampf((total - dists[i]) / 0.85, 0.0, 1.0))
+		alphas.append(end_fade)
+
+	for i in range(pts.size() - 1):
+		var v0 := left_v[i]
+		var v1 := right_v[i]
+		var v2 := left_v[i + 1]
+		var v3 := right_v[i + 1]
+		var a0 := Color(1.0, 1.0, 1.0, alphas[i])
+		var a1 := Color(1.0, 1.0, 1.0, alphas[i + 1])
+		var u0 := dists[i]
+		var u1 := dists[i + 1]
+		# Треугольник 1
+		st.set_normal(Vector3.UP); st.set_color(a0); st.set_uv(Vector2(0.0, u0)); st.add_vertex(v0)
+		st.set_normal(Vector3.UP); st.set_color(a1); st.set_uv(Vector2(0.0, u1)); st.add_vertex(v2)
+		st.set_normal(Vector3.UP); st.set_color(a0); st.set_uv(Vector2(1.0, u0)); st.add_vertex(v1)
+		# Треугольник 2
+		st.set_normal(Vector3.UP); st.set_color(a0); st.set_uv(Vector2(1.0, u0)); st.add_vertex(v1)
+		st.set_normal(Vector3.UP); st.set_color(a1); st.set_uv(Vector2(0.0, u1)); st.add_vertex(v2)
+		st.set_normal(Vector3.UP); st.set_color(a1); st.set_uv(Vector2(1.0, u1)); st.add_vertex(v3)
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = _trail_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
 
 
 ## Цвет маршрута: на станциях леера метили флажками — красный к метео, синий к мачте и т. д.
@@ -3349,19 +3477,19 @@ func _build_forest() -> void:
 		else:
 			var g := groves.get_noise_2d(p.x, p.z)
 			dens = smoothstep(-0.25, 0.3, g)                 # куртины и промежутки между ними
-			if d_house < 24.0:
-				dens *= 0.4                                       # двор открытый: деревья группками
+			if d_house < 26.0:
+				dens = maxf(dens, 0.88)                      # плотное кольцо вековых елей вокруг кордона
 			if glades.get_noise_2d(p.x, p.z) > 0.42:
-				dens *= 0.12                                      # поляны
+				dens *= 0.12                                 # поляны
 			if d_house > 55.0:
-				dens = maxf(dens, 0.9)                            # дальняя стена
+				dens = maxf(dens, 0.9)                       # дальняя стена
 		if rng.randf() > dens:
 			continue
 		var cell := Vector2i(floori(p.x / 1.9), floori(p.z / 1.9))
 		if occupied.has(cell):
 			continue
 		occupied[cell] = true
-		var s := rng.randf_range(0.75, 1.6) if d_house < 55.0 else rng.randf_range(1.1, 1.9)
+		var s := rng.randf_range(1.15, 1.85) if d_house < 28.0 else (rng.randf_range(0.85, 1.65) if d_house < 55.0 else rng.randf_range(1.15, 1.95))
 		var alley_tilt := Basis()
 		if d_path < 7.0:
 			var to_path := _vec_to_path(_all_paths, p)
@@ -4184,48 +4312,28 @@ func _trigger_ambient_outdoor_audio() -> void:
 
 
 func _build_backyard_features() -> void:
-	# 1. Люк ледника в сугробе за северной стеной холодной кладовой (X=5.25, Z=-7.2)
-	var cellar := Props.cellar_hatch()
-	cellar.position = Vector3(5.25, 0.0, -7.2)
-	add_child(cellar)
+	# 1. Таёжный ледник-погреб с вытяжкой и замком (сдвинут от стены кладовой к новой тропе; пар включается только аномалией cellar_steam)
+	var cellar_pos := Vector3(4.8, Terrain.height(4.8, -9.0), -9.0)
+	cellar_prop = Props.ice_cellar()
+	cellar_prop.position = cellar_pos
+	cellar_prop.rotation.y = deg_to_rad(36.0)
+	add_child(cellar_prop)
 
-	var cellar_it := Geo.interactable(self, Vector3(1.6, 1.0, 1.8), Vector3(5.25, 0.5, -7.2), null, "", func(_p: Player) -> void:
+	var cellar_col := Geo.collider(self, Vector3(1.65, 0.75, 1.9), cellar_pos + Vector3(0, 0.38, 0))
+	cellar_col.rotation.y = deg_to_rad(36.0)
+
+	var cellar_it := Geo.interactable(self, Vector3(1.8, 1.1, 2.0), cellar_pos + Vector3(0, 0.55, 0), null, "", func(_p: Player) -> void:
 		if not SaveGame.flags.get("cellar_searched", false):
 			SaveGame.flags["cellar_searched"] = true
 			Game.add_spare_flares(1)
-			Game.audio.play_3d(CLANK_SOUND, Vector3(5.25, 0.4, -7.2), 0.0)
-			Game.hud.subtitle(Loc.t(&"sub.cellar_open"), 5.5)
+			Game.audio.play_3d(CLANK_SOUND, cellar_pos + Vector3(0, 0.4, 0), 0.0)
+			Game.hud.subtitle(Loc.t(&"sub.cellar_open"), 5.0)
 		else:
 			Game.hud.subtitle(Loc.t(&"sub.cellar_empty"), 2.5)
 	)
 	cellar_it.prompt_provider = func() -> String:
 		return Loc.t(&"sub.cellar_empty") if SaveGame.flags.get("cellar_searched", false) else Loc.t(&"it.cellar")
 	cellar_it.name = "CellarHatch"
-
-	if Game.is_night():
-		var steam := CPUParticles3D.new()
-		steam.name = "CellarHatchSteam"
-		steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-		steam.emission_box_extents = Vector3(0.4, 0.05, 0.4)
-		steam.position = Vector3(5.25, 0.15, -7.2)
-		steam.amount = 8
-		steam.lifetime = 2.8
-		steam.direction = Vector3(0.0, 1.0, 0.1)
-		steam.spread = 20.0
-		steam.initial_velocity_min = 0.1
-		steam.initial_velocity_max = 0.25
-		steam.gravity = Vector3(0.0, 0.04, 0.0)
-		var sq := QuadMesh.new()
-		sq.size = Vector2(0.22, 0.22)
-		var smat := StandardMaterial3D.new()
-		smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		smat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		smat.albedo_color = Color(0.9, 0.92, 0.95, 0.12)
-		smat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-		steam.mesh = sq
-		steam.material_override = smat
-		add_child(steam)
 
 	# 2. Следы босых ног и когтей под северным окном радиорубки (X=9.2, Z=-2.7)
 	var track_pts: Array[Vector3] = [
