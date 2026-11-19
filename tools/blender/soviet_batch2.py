@@ -34,9 +34,12 @@ def create_pbr(name, hex_col, metallic=0.0, roughness=0.5, alpha=1.0, transmissi
         return bpy.data.materials[name]
     mat = bpy.data.materials.new(name=name)
     mat.use_nodes = True
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
     if not bsdf:
         bsdf = mat.node_tree.nodes.new(type="ShaderNodeBsdfPrincipled")
+        out = next((n for n in mat.node_tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+        if out:
+            mat.node_tree.links.new(bsdf.outputs[0], out.inputs[0])
 
     h = hex_col.lstrip('#')
     rgb = tuple(int(h[i:i+2], 16) / 255.0 for i in (0, 2, 4))
@@ -408,12 +411,20 @@ def build_model_9_m37_visibility_shield(mats, col):
     def shield_post(bm):
         # Стальная стойка
         add_cyl(bm, 0.04, 0.04, 2.20, segments=12, center=(0, 0, 1.10))
-        # Щит кровельной стали 150 х 120 см
-        add_box(bm, (1.50, 0.02, 1.20), (0, 0.03, 1.50))
         # Консоль светильника
         add_cyl(bm, 0.015, 0.015, 0.35, segments=8, center=(0, 0.18, 2.15), rot_euler=(math.pi/2, 0, 0))
 
-    root = build_part("SM_M37_VisibilityShield", col, shield_post, mats["White_Paint"], bevel=0.002)
+    root = build_part("SM_M37_VisibilityShield", col, shield_post, mats["Cadmium_Steel"], bevel=0.002)
+
+    # Черный щит кровельной стали 150 х 120 см
+    def shield_board(bm):
+        add_box(bm, (1.50, 0.02, 1.20), (0, 0.03, 1.50))
+    build_part("Shield_Board", col, shield_board, mats["Black_Paint"], parent=root)
+
+    # Контрастная белая мишень по ГОСТ (для видимости на фоне темного леса)
+    def shield_target(bm):
+        add_box(bm, (0.45, 0.025, 0.75), (0, 0.035, 1.50))
+    build_part("Shield_Target", col, shield_target, mats["White_Paint"], parent=root)
 
     # Плафон ночного ориентира видимости
     def marker_lantern(bm):

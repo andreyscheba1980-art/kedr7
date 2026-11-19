@@ -140,7 +140,7 @@ static func _soviet_model(id: String, opts := {}) -> Node3D:
 	if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
 		return null
 	var root := Node3D.new()
-	var o := {"grime": 0.0, "bright": 1.0, "sat": 1.0, "scale": 1.0, "center": false, "keep": true}
+	var o := {"grime": 0.55, "bright": 0.85, "sat": 0.9, "scale": 1.0, "center": false, "keep": true}
 	o.merge(opts, true)
 	if Models.spawn(root, "soviet/" + id, Vector3.ZERO, 0.0, -1.0, o) == null:
 		root.free()

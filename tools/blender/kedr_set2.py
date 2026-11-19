@@ -127,8 +127,12 @@ elif PART == "shelf_jars":
     LIDM = mat("lid", (0.55, 0.52, 0.42), rough=0.4, wear=0.4)
     TIN = mat("tin", (0.5, 0.5, 0.48), rough=0.4, wear=0.5, wear_col=(0.45, 0.25, 0.15))
     LBL = mat("lbl", (0.68, 0.6, 0.42), rough=0.9, noise=0.2, noise_scale=40)
+    TIN_LBL_RED = mat("tin_lbl_red", (0.55, 0.16, 0.12), rough=0.85, noise=0.25, noise_scale=50, wear=0.4, wear_col=(0.6, 0.55, 0.4))
+    TIN_LBL_BLUE = mat("tin_lbl_blue", (0.18, 0.28, 0.46), rough=0.85, noise=0.25, noise_scale=50, wear=0.4, wear_col=(0.6, 0.55, 0.4))
     PAPER = mat("paper", (0.62, 0.56, 0.44), rough=1.0, noise=0.2, noise_scale=30)
-    BLUE = mat("enamel", (0.22, 0.32, 0.48), rough=0.4, wear=0.6, wear_col=(0.12, 0.1, 0.08))
+    BLUE = mat("enamel", (0.18, 0.28, 0.44), rough=0.4, wear=0.6, wear_col=(0.12, 0.1, 0.08))
+    ALU = mat("alumin", (0.56, 0.58, 0.60), rough=0.45, wear=0.5, wear_col=(0.25, 0.25, 0.25))
+    WOOD_HANDLE = mat("wood_h", (0.32, 0.22, 0.15), rough=0.8)
     for z in (0.0, 0.45):
         box(f"board{z}", (1.2, 0.24, 0.025), (0, 0, 0.6 + z), WOOD, 0.004)
         for sx in (-0.5, 0.5):
@@ -142,14 +146,22 @@ elif PART == "shelf_jars":
         if k % 2 == 0:
             box(f"jlbl{k}", (0.05, 0.004, 0.04), (x, -0.066, 0.613 + h * 0.45), LBL, 0.0)
         x += 0.105
-    # Тушёнка пирамидой и бидон
+    # Тушёнка пирамидой (жесть с советскими этикетками) и бидон
     for k in range(3):
         vcyl(f"tin{k}", 0.042, 0.08, (0.2 + k * 0.088, -0.03, 0.613), TIN, 12)
+        lm = TIN_LBL_RED if k != 1 else TIN_LBL_BLUE
+        vcyl(f"tinlbl{k}", 0.0426, 0.055, (0.2 + k * 0.088, -0.03, 0.625), lm, 12)
     vcyl("tin3", 0.042, 0.08, (0.244, -0.03, 0.693), TIN, 12)
+    vcyl("tinlbl3", 0.0426, 0.055, (0.244, -0.03, 0.705), TIN_LBL_RED, 12)
     vcyl("tin4", 0.042, 0.08, (0.332, -0.03, 0.693), TIN, 12)
+    vcyl("tinlbl4", 0.0426, 0.055, (0.332, -0.03, 0.705), TIN_LBL_BLUE, 12)
+    # Советский эмалированный бидон для молока
     vcyl("bidon", 0.07, 0.26, (0.5, -0.02, 1.063), BLUE, 14, r2=None)
-    vcyl("bidon_neck", 0.04, 0.06, (0.5, -0.02, 1.323), BLUE, 12)
-    torus("bidon_handle", 0.05, 0.006, (0.5, -0.02, 1.4), BLUE, rot=(math.pi / 2, 0, 0), maj=12, mino=4)
+    vcyl("bidon_rim", 0.072, 0.015, (0.5, -0.02, 1.063), ALU, 14)
+    vcyl("bidon_neck", 0.042, 0.06, (0.5, -0.02, 1.323), ALU, 12)
+    vcyl("bidon_lid", 0.045, 0.018, (0.5, -0.02, 1.383), ALU, 12)
+    torus("bidon_handle", 0.05, 0.006, (0.5, -0.02, 1.4), ALU, rot=(math.pi / 2, 0, 0), maj=12, mino=4)
+    box("bidon_grip", (0.045, 0.02, 0.02), (0.5, -0.02, 1.45), WOOD_HANDLE, 0.003)
     # Свёртки и коробки на верхней полке
     for k in range(3):
         b = sphere(f"bundle{k}", 1.0, (-0.45 + k * 0.17, -0.01, 1.11), PAPER, scale=(0.08, 0.09, 0.06), segs=10, rings=6)

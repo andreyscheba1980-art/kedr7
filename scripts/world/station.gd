@@ -3646,7 +3646,7 @@ func _build_generator_shack() -> void:
 
 	# Паяльная лампа ПЛ-64 на верстаке у стены
 	var torch := Props.pl64_blowtorch()
-	torch.position = shack_center + Vector3(0.85, 0.55, 0.4)
+	torch.position = shack_center + Vector3(1.20, 0.80, 0.40)
 	add_child(torch)
 
 	# Масляные пятна на дощатом полу под картером двигателя и у бочки

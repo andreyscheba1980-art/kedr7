@@ -243,7 +243,7 @@ func _ready() -> void:
 	else:
 		_build_lean_fuel_drums()
 	_build_signpost(JUNCTION + Vector3(0.8, 0.0, 1.2))
-	_build_notice_board(Vector3(17.8, 0.0, -0.4))
+	_build_notice_board(Vector3(19.3, 0.0, -0.4))
 	_build_doghouse(Vector3(21.4, 0.0, 9.4))
 	_build_frozen_clothesline(Vector3(-1.2, 0.0, 8.6))
 	_build_near_woodchop(Vector3(11.8, 0.0, 9.4))
@@ -1011,12 +1011,20 @@ func _build_wall_drifts() -> void:
 			var wid := rng.randf_range(0.8, 1.15)
 			# Сдвигаем сугробы строго наружу от стены с запасом на их ширину — исключает затекание геометрии внутрь избы
 			var p := a.lerp(b, float(i) / n) + nrm * (wid * 0.5 + rng.randf_range(0.12, 0.25))
+			var cur_h := h
+			# Не заваливаем окна станции снаружи огромными шапками сугробов:
+			# Западное окно жилой (z: 2.5..4.2): занижаем намёт под нижний срез рамы
+			if absf(nrm.x) > 0.5 and p.z >= 2.4 and p.z <= 4.2:
+				cur_h = 0.16
+			# Южные окна жилой и коридора (x: -0.2..1.2 и 6.8..8.2)
+			if absf(nrm.z) > 0.5 and ((p.x >= -0.2 and p.x <= 1.2) or (p.x >= 6.8 and p.x <= 8.2)):
+				cur_h = 0.14
 			var mi := MeshInstance3D.new()
 			mi.mesh = blob
 			mi.material_override = Palette.m(&"drift")
 			mi.layers = Station.LAYER_OUT
-			mi.position = p + Vector3(0, -h * 0.25, 0)
-			mi.scale = Vector3(len if along else wid, h * rng.randf_range(0.75, 1.0), wid if along else len)
+			mi.position = p + Vector3(0, -cur_h * 0.25, 0)
+			mi.scale = Vector3(len if along else wid, cur_h * rng.randf_range(0.75, 1.0), wid if along else len)
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(mi)
 
@@ -4833,7 +4841,7 @@ func _build_helipad() -> void:
 		var drift_mesh := MeshInstance3D.new()
 		drift_mesh.mesh = mound
 		drift_mesh.material_override = Palette.m(&"drift")
-		drift_mesh.position = HELIPAD + Vector3(0, -0.12, 0)
+		drift_mesh.position = HELIPAD + Vector3(0, 0.04, 0)
 		drift_mesh.scale = Vector3(3.6, 0.42, 3.4)
 		add_child(drift_mesh)
 		for e: Array in [[Vector3(0.35, 0.55, -0.2), Vector3(0.45, 0.6, 0.35)], [Vector3(-0.3, 0.5, 0.3), Vector3(0.4, 0.55, 0.3)], [Vector3(0.05, 0.62, 0.05), Vector3(0.3, 0.5, 0.45)]]:
@@ -4858,12 +4866,12 @@ func _build_helipad() -> void:
 			return "" if Game.helipad_cleared else Loc.t(&"task.helipad_prep")
 		_helipad_drift = drift_it
 
-	# 4. Посадочные жаровни (всегда строятся, даже если крест уже расчищен в прошлой смене!)
+	# 4. Посадочные жаровни (по углам периметра площадки, не загромождают тропу подхода)
 	var pot_offsets: Array[Vector3] = [
-		Vector3(0.0, 0.0, -5.5),
-		Vector3(-4.5, 0.0, 3.5),
-		Vector3(4.5, 0.0, 3.5),
-		Vector3(0.0, 0.0, 7.5)
+		Vector3(-6.2, 0.0, -6.2),
+		Vector3(6.2, 0.0, -6.2),
+		Vector3(-6.2, 0.0, 6.2),
+		Vector3(6.2, 0.0, 6.2)
 	]
 	var saved_pots_all := bool(SaveGame.flags.get("helipad_pots_all_lit", false))
 	var saved_pots_cnt := int(SaveGame.flags.get("helipad_firepots_lit_count", 0))
@@ -4943,9 +4951,10 @@ func _build_helipad() -> void:
 	it_ivo.name = "IVO1M_Meter"
 
 	var m37 := Props.m37_visibility_shield()
-	m37.position = PLOT + Vector3(-22.0, 0.0, 16.0)
+	var m37_pos := PLOT + Vector3(-6.0, 0.0, 34.0)
+	m37.position = m37_pos
 	add_child(m37)
-	var it_m37 := Geo.interactable(self, Vector3(1.5, 2.0, 0.8), PLOT + Vector3(-22.0, 1.0, 16.0), null, "", func(_p: Player) -> void:
+	var it_m37 := Geo.interactable(self, Vector3(1.8, 2.2, 1.2), m37_pos + Vector3(0.0, 1.1, 0.0), null, "", func(_p: Player) -> void:
 		AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", 0.0)
 		Game.hud.subtitle(Loc.t(&"it.m37_inspect", ["800 м"]), 4.5)
 	)
