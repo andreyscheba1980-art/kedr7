@@ -897,6 +897,9 @@ static func chimney_pipe() -> Node3D:
 ## Традиционная русская печь для избы: побелка, лежанка, арочное устье (шесток),
 ## чугунная заслонка и кирпичный свод.
 static func russian_stove() -> Node3D:
+	var glb := _kedr_model("russian_stove", {"center": false, "keep": true, "bright": 0.95, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"russian_stove", "tex_stove.png")
 	if cached != null:
 		return cached
@@ -1730,31 +1733,37 @@ static func bunker_blast_door() -> Node3D:
 	return _mi(k, &"bunker_blast_door", "tex_metal.png")
 
 
-## Медный русский самовар с краником и конфоркой.
+## Советский тульский латунный самовар с краником «ветка», ручками и венцом конфорки.
 static func samovar() -> Node3D:
+	var glb := _kedr_model("samovar", {"bright": 1.15, "sat": 1.0})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"samovar", "tex_metal.png")
 	if cached != null:
 		return cached
-	var k := _kit(81, 0.04)
-	var brass := Color(0.72, 0.58, 0.24)
-	var brass_dark := Color(0.48, 0.38, 0.16)
-	var wood_handle := Color(0.25, 0.15, 0.08)
+	var k := _kit(81, 0.03)
+	var brass := Color(0.76, 0.58, 0.22)
+	var brass_dark := Color(0.50, 0.37, 0.14)
+	var wood_handle := Color(0.20, 0.12, 0.06)
 
-	# Круглое ступенчатое основание (шейка и поддон)
-	k.tube([Vector3(0, 0.0, 0), Vector3(0, 0.06, 0)], [0.12, 0.08], brass_dark, 8)
-	k.tube([Vector3(0, 0.06, 0), Vector3(0, 0.10, 0)], [0.08, 0.11], brass, 8)
-	# Тулово («банка» / самоварное тело)
-	k.tube([Vector3(0, 0.10, 0), Vector3(0, 0.32, 0)], [0.14, 0.16], brass, 10)
-	# Крышка и конфорка под чайник
-	k.tube([Vector3(0, 0.32, 0), Vector3(0, 0.38, 0)], [0.15, 0.08], brass, 8)
-	k.tube([Vector3(0, 0.38, 0), Vector3(0, 0.44, 0)], [0.09, 0.09], brass_dark, 8)
-	# Краник с ключом
-	k.tube([Vector3(0, 0.16, 0.12), Vector3(0, 0.15, 0.22)], [0.015], brass_dark, 6)
-	k.box(Vector3(0, 0.18, 0.20), Vector3(0.04, 0.03, 0.015), wood_handle)
-	# Две боковые фигурные ручки
-	for sx: float in [-0.17, 0.17]:
-		k.tube([Vector3(sx * 0.9, 0.24, 0), Vector3(sx * 1.25, 0.25, 0)], [0.012], brass_dark, 4)
-		k.box(Vector3(sx * 1.25, 0.25, 0), Vector3(0.02, 0.05, 0.02), wood_handle)
+	# Ступенчатый квадратный поддон и шейка с поддувалом
+	k.box(Vector3(0, 0.02, 0), Vector3(0.17, 0.025, 0.17), brass_dark)
+	k.tube([Vector3(0, 0.03, 0), Vector3(0, 0.075, 0), Vector3(0, 0.11, 0)], [0.07, 0.048, 0.08], brass_dark, 14)
+	# Тулово («рюмка/банка») с плавным переходом и крышкой
+	k.tube([
+		Vector3(0, 0.11, 0), Vector3(0, 0.16, 0), Vector3(0, 0.25, 0),
+		Vector3(0, 0.31, 0), Vector3(0, 0.35, 0), Vector3(0, 0.375, 0),
+	], [0.09, 0.116, 0.118, 0.108, 0.088, 0.056], brass, 14)
+	# Венец конфорки под заварочный чайник
+	k.tube([Vector3(0, 0.375, 0), Vector3(0, 0.425, 0)], [0.058, 0.066], brass_dark, 14)
+	# Краник «ветка» спереди (+Z)
+	k.tube([Vector3(0, 0.168, 0.11), Vector3(0, 0.166, 0.165), Vector3(0, 0.142, 0.184)], [0.014, 0.011, 0.009], brass, 8)
+	k.tube([Vector3(0, 0.175, 0.162), Vector3(0.018, 0.215, 0.172), Vector3(0.008, 0.232, 0.174)], [0.005, 0.004, 0.004], brass_dark, 6)
+	# Две боковые дуговые ручки с точёными деревянными валиками
+	for sx: float in [-1.0, 1.0]:
+		k.tube([Vector3(sx * 0.112, 0.245, -0.032), Vector3(sx * 0.158, 0.256, -0.032)], [0.006], brass_dark, 6)
+		k.tube([Vector3(sx * 0.112, 0.245,  0.032), Vector3(sx * 0.158, 0.256,  0.032)], [0.006], brass_dark, 6)
+		k.tube([Vector3(sx * 0.158, 0.256, -0.036), Vector3(sx * 0.158, 0.256,  0.036)], [0.013], wood_handle, 8)
 	return _mi(k, &"samovar", "tex_metal.png")
 
 
@@ -4569,7 +4578,7 @@ static func gtt_transporter() -> Node3D:
 
 
 static func outhouse() -> Node3D:
-	var glb := _kedr_model("outhouse", {"scale": 1.0, "bright": 1.0})
+	var glb := _kedr_model("outhouse", {"scale": 1.0, "bright": 1.05, "sat": 0.95})
 	if glb != null:
 		return glb
 	var key := &"outhouse_proc"
@@ -5730,148 +5739,165 @@ static func spo200_pole(height := 5.4) -> Node3D:
 
 ## Новогодняя 3-литровая стеклянная банка с еловыми ветками, дождиком и советскими игрушками
 static func table_fir_jar() -> Node3D:
+	var glb := _kedr_model("table_fir_jar", {"center": false, "keep": true, "bright": 1.12, "sat": 1.0})
+	if glb != null:
+		glb.name = "TableFirJar"
+		return glb
 	var root := Node3D.new()
 	root.name = "TableFirJar"
 
-	# Стеклянная банка (3 литра)
+	# Стеклянная 3-литровая банка (fallback до запекания table_fir_jar.glb)
 	var jar_mat := StandardMaterial3D.new()
 	jar_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	jar_mat.albedo_color = Color(0.78, 0.92, 0.88, 0.45)
+	jar_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	jar_mat.albedo_color = Color(0.76, 0.90, 0.86, 0.36)
 	jar_mat.roughness = 0.15
 	jar_mat.metallic_specular = 0.85
 	jar_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	Geo.cylinder(root, 0.08, 0.22, Vector3(0, 0.11, 0), jar_mat, false)
+	Geo.cylinder(root, 0.08, 0.20, Vector3(0, 0.10, 0), jar_mat, false)
+	Geo.cylinder(root, 0.052, 0.04, Vector3(0, 0.22, 0), jar_mat, false)
 
-	# Горлышко банки
-	Geo.cylinder(root, 0.055, 0.04, Vector3(0, 0.23, 0), jar_mat, false)
-
-	# Вода на дне банки
 	var water_mat := StandardMaterial3D.new()
 	water_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	water_mat.albedo_color = Color(0.65, 0.82, 0.85, 0.6)
-	water_mat.roughness = 0.1
-	Geo.cylinder(root, 0.075, 0.09, Vector3(0, 0.045, 0), water_mat, false)
+	water_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	water_mat.albedo_color = Color(0.55, 0.72, 0.70, 0.55)
+	water_mat.roughness = 0.12
+	Geo.cylinder(root, 0.073, 0.095, Vector3(0, 0.05, 0), water_mat, false)
 
-	# Еловые ветки (3 лапы из банки)
-	var needle_mat := StandardMaterial3D.new()
-	needle_mat.albedo_color = Color(0.12, 0.26, 0.14)
-	needle_mat.roughness = 0.9
+	# Еловые ветки (конические лапы MeshKit вместо зелёных кубиков)
+	var k := _kit(261, 0.04)
+	var bark := Color(0.24, 0.16, 0.10)
+	var pine_a := Color(0.08, 0.20, 0.10)
+	var pine_b := Color(0.14, 0.28, 0.16)
+	var boughs := [
+		[Vector3(0.01, 0.03, 0.0), Vector3(0.01, 0.22, 0.0), Vector3(0.11, 0.46, 0.05)],
+		[Vector3(-0.01, 0.03, 0.0), Vector3(-0.01, 0.22, 0.0), Vector3(-0.12, 0.43, 0.03)],
+		[Vector3(0.0, 0.03, -0.01), Vector3(0.0, 0.22, -0.01), Vector3(-0.01, 0.49, -0.09)],
+	]
+	for b_pts: Array in boughs:
+		k.tube(b_pts, [0.006, 0.006, 0.004], bark, 5)
+		var p1: Vector3 = b_pts[1]
+		var p2: Vector3 = b_pts[2]
+		for tier in 4:
+			var t := 0.22 + float(tier) * 0.21
+			var base_p := p1.lerp(p2, t)
+			var r_cone := (0.075 - float(tier) * 0.014)
+			var tip_p := base_p + (p2 - p1).normalized() * 0.085
+			k.tube([base_p, tip_p], [r_cone, 0.006], pine_a if tier % 2 == 0 else pine_b, 6)
+	root.add_child(_mi(k, &"table_fir_boughs_fb", "tex_wood.png"))
 
-	var branch_angles := [-0.35, 0.15, 0.42]
-	var branch_yaws := [0.2, 2.1, -1.8]
-	for b in 3:
-		var branch := Node3D.new()
-		branch.position = Vector3(0.0, 0.22, 0.0)
-		branch.rotation = Vector3(branch_angles[b], branch_yaws[b], branch_angles[b] * 0.7)
-		root.add_child(branch)
-
-		var stem := Geo.box_mesh(Vector3(0.012, 0.26, 0.012), Palette.m(&"wood"))
-		stem.position.y = 0.12
-		branch.add_child(stem)
-
-		for tier in 3:
-			var w := 0.18 - tier * 0.04
-			var h := 0.07
-			var foliage := Geo.box_mesh(Vector3(w, h, w * 0.7), needle_mat)
-			foliage.position.y = 0.10 + tier * 0.06
-			foliage.rotation.y = float(tier) * 0.4
-			branch.add_child(foliage)
-
-			var snow_frost := Geo.box_mesh(Vector3(w * 0.9, 0.015, w * 0.65), Palette.m(&"snow"))
-			snow_frost.position.y = 0.10 + tier * 0.06 + h * 0.5 + 0.005
-			branch.add_child(snow_frost)
-
-	# Серебристый «дождик» (мишура) — сверкающие ленточки
+	# Серебристый дождик + рубиновая шишка + звёздочка
 	var tinsel_mat := StandardMaterial3D.new()
-	tinsel_mat.albedo_color = Color(0.92, 0.95, 1.0)
-	tinsel_mat.roughness = 0.1
-	tinsel_mat.metallic = 0.9
-	tinsel_mat.metallic_specular = 1.0
-	tinsel_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
-
+	tinsel_mat.albedo_color = Color(0.88, 0.92, 0.98)
+	tinsel_mat.roughness = 0.15
+	tinsel_mat.metallic = 0.85
 	for r in 5:
 		var ang := float(r) * TAU / 5.0 + 0.15
-		var tinsel := Geo.box_mesh(Vector3(0.004, 0.22, 0.008), tinsel_mat)
-		tinsel.position = Vector3(cos(ang) * 0.07, 0.18, sin(ang) * 0.07)
-		tinsel.rotation.z = 0.08 * sin(ang)
+		var tinsel := Geo.box_mesh(Vector3(0.003, 0.20, 0.005), tinsel_mat)
+		tinsel.position = Vector3(cos(ang) * 0.08, 0.24, sin(ang) * 0.08)
+		tinsel.rotation.z = 0.07 * sin(ang)
 		root.add_child(tinsel)
 
-	# 1. Советская стеклянная ёлочная игрушка — «Золотая шишка»
-	var cone_mat := StandardMaterial3D.new()
-	cone_mat.albedo_color = Color(0.95, 0.78, 0.22)
-	cone_mat.roughness = 0.2
-	cone_mat.metallic = 0.7
-	cone_mat.metallic_specular = 0.9
-	var cone_toy := Geo.box_mesh(Vector3(0.035, 0.06, 0.035), cone_mat)
-	cone_toy.position = Vector3(0.09, 0.26, 0.04)
-	cone_toy.rotation.z = deg_to_rad(12.0)
-	root.add_child(cone_toy)
+	var ruby_mat := StandardMaterial3D.new()
+	ruby_mat.albedo_color = Color(0.76, 0.09, 0.14)
+	ruby_mat.roughness = 0.2
+	ruby_mat.metallic = 0.55
+	var cone_mi := MeshInstance3D.new()
+	var cone_sm := SphereMesh.new()
+	cone_sm.radius = 0.019
+	cone_sm.height = 0.056
+	cone_sm.radial_segments = 8
+	cone_sm.rings = 4
+	cone_mi.mesh = cone_sm
+	cone_mi.material_override = ruby_mat
+	cone_mi.position = Vector3(0.10, 0.28, 0.06)
+	root.add_child(cone_mi)
 
-	# 2. Советская ёлочная игрушка — «Красный шар»
-	var red_mat := StandardMaterial3D.new()
-	red_mat.albedo_color = Color(0.85, 0.14, 0.18)
-	red_mat.roughness = 0.15
-	red_mat.metallic = 0.6
-	red_mat.metallic_specular = 0.95
-	var red_toy := Geo.box_mesh(Vector3(0.04, 0.045, 0.04), red_mat)
-	red_toy.position = Vector3(-0.08, 0.24, -0.05)
-	root.add_child(red_toy)
-
+	var gold_mat := StandardMaterial3D.new()
+	gold_mat.albedo_color = Color(0.92, 0.72, 0.22)
+	gold_mat.roughness = 0.2
+	gold_mat.metallic = 0.65
+	var star_mi := MeshInstance3D.new()
+	var star_sm := SphereMesh.new()
+	star_sm.radius = 0.022
+	star_sm.height = 0.044
+	star_sm.radial_segments = 5
+	star_sm.rings = 2
+	star_mi.mesh = star_sm
+	star_mi.material_override = gold_mat
+	star_mi.position = Vector3(-0.09, 0.29, 0.05)
+	root.add_child(star_mi)
 	return root
 
 
-## Праздничный натюрморт заброшенного праздника: сморщенный мандарин, бутылка шампанского и гранёный стакан
+## Праздничный натюрморт заброшенного праздника: «Советское Шампанское», сморщенный мандарин «Maroc» и 14-гранный стакан
 static func new_year_still_life() -> Node3D:
+	var glb := _kedr_model("ny_still_life", {"center": false, "keep": true, "bright": 1.15, "sat": 1.0})
+	if glb != null:
+		glb.name = "NewYearStillLife"
+		return glb
 	var root := Node3D.new()
 	root.name = "NewYearStillLife"
 
-	# Бутылка «Советского шампанского» (тёмно-зелёное стекло, фольга на горлышке)
-	var bottle_mat := StandardMaterial3D.new()
-	bottle_mat.albedo_color = Color(0.12, 0.24, 0.14)
-	bottle_mat.roughness = 0.2
-	bottle_mat.metallic_specular = 0.8
-	Geo.cylinder(root, 0.042, 0.22, Vector3(0, 0.11, 0), bottle_mat, false)
+	# Fallback до запекания ny_still_life.glb: плавный профиль бутылки, сферический мандарин, 14-гранный стакан
+	var k := _kit(262, 0.02)
+	var dark_glass := Color(0.05, 0.14, 0.07)
+	var gold_foil := Color(0.88, 0.70, 0.24)
+	var label_c := Color(0.10, 0.10, 0.09)
+	k.tube([
+		Vector3(0, 0.0, 0), Vector3(0, 0.145, 0), Vector3(0, 0.195, 0),
+		Vector3(0, 0.245, 0), Vector3(0, 0.295, 0), Vector3(0, 0.312, 0),
+	], [0.043, 0.044, 0.036, 0.020, 0.016, 0.015], dark_glass, 14)
+	k.tube([
+		Vector3(0, 0.224, 0), Vector3(0, 0.265, 0), Vector3(0, 0.305, 0), Vector3(0, 0.315, 0),
+	], [0.028, 0.019, 0.0175, 0.014], gold_foil, 14)
+	k.tube([Vector3(0, 0.07, 0), Vector3(0, 0.138, 0)], [0.045, 0.045], label_c, 14)
+	root.add_child(_mi(k, &"ny_champagne_fb", "tex_metal.png"))
 
-	Geo.cylinder(root, 0.016, 0.10, Vector3(0, 0.26, 0), bottle_mat, false)
-
-	var foil_mat := StandardMaterial3D.new()
-	foil_mat.albedo_color = Color(0.94, 0.82, 0.28)
-	foil_mat.metallic = 0.85
-	foil_mat.roughness = 0.25
-	Geo.cylinder(root, 0.018, 0.065, Vector3(0, 0.28, 0), foil_mat, false)
-
-	var label := Geo.box_mesh(Vector3(0.086, 0.07, 0.086), Palette.m(&"paper"))
-	label.position.y = 0.11
-	root.add_child(label)
-
-	# Засохший тёмно-оранжевый мандарин со сморщенной кожурой
+	# Сморщенный мандарин (сплюснутая low-poly сфера, не кубик!) + ромб-наклейка «Maroc»
 	var mandarin_mat := StandardMaterial3D.new()
-	mandarin_mat.albedo_color = Color(0.86, 0.44, 0.08)
-	mandarin_mat.roughness = 0.95
-	var mandarin := Geo.box_mesh(Vector3(0.062, 0.046, 0.062), mandarin_mat)
-	mandarin.position = Vector3(0.12, 0.023, 0.03)
-	mandarin.rotation.y = 0.35
-	root.add_child(mandarin)
+	mandarin_mat.albedo_color = Color(0.84, 0.36, 0.06)
+	mandarin_mat.roughness = 0.85
+	var m_mi := MeshInstance3D.new()
+	var m_sm := SphereMesh.new()
+	m_sm.radius = 0.030
+	m_sm.height = 0.044
+	m_sm.radial_segments = 10
+	m_sm.rings = 5
+	m_mi.mesh = m_sm
+	m_mi.material_override = mandarin_mat
+	m_mi.position = Vector3(0.115, 0.022, 0.035)
+	root.add_child(m_mi)
 
 	var sticker_mat := StandardMaterial3D.new()
-	sticker_mat.albedo_color = Color(0.1, 0.32, 0.16)
-	var sticker := Geo.box_mesh(Vector3(0.016, 0.002, 0.016), sticker_mat)
-	sticker.position = Vector3(0.12, 0.047, 0.03)
-	sticker.rotation.y = deg_to_rad(45.0)
+	sticker_mat.albedo_color = Color(0.10, 0.12, 0.09)
+	var sticker := Geo.box_mesh(Vector3(0.014, 0.002, 0.014), sticker_mat)
+	sticker.position = Vector3(0.112, 0.038, 0.052)
+	sticker.rotation = Vector3(deg_to_rad(45.0), deg_to_rad(45.0), 0.0)
 	root.add_child(sticker)
 
-	# Советский гранёный стакан (14 граней) с недопитым напитком
+	# 14-гранный стакан с чаем
 	var glass_mat := StandardMaterial3D.new()
 	glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass_mat.albedo_color = Color(0.85, 0.92, 0.95, 0.42)
-	glass_mat.roughness = 0.2
-	Geo.cylinder(root, 0.034, 0.09, Vector3(-0.09, 0.045, 0.06), glass_mat, false)
+	glass_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	glass_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	glass_mat.albedo_color = Color(0.82, 0.92, 0.94, 0.38)
+	glass_mat.roughness = 0.15
+	var g_mi := MeshInstance3D.new()
+	var g_cm := CylinderMesh.new()
+	g_cm.bottom_radius = 0.027
+	g_cm.top_radius = 0.036
+	g_cm.height = 0.102
+	g_cm.radial_segments = 14
+	g_mi.mesh = g_cm
+	g_mi.material_override = glass_mat
+	g_mi.position = Vector3(-0.095, 0.051, 0.055)
+	root.add_child(g_mi)
 
-	var drink_mat := StandardMaterial3D.new()
-	drink_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	drink_mat.albedo_color = Color(0.85, 0.65, 0.25, 0.7)
-	drink_mat.roughness = 0.1
-	Geo.cylinder(root, 0.031, 0.025, Vector3(-0.09, 0.015, 0.06), drink_mat, false)
+	var tea_mat := StandardMaterial3D.new()
+	tea_mat.albedo_color = Color(0.44, 0.18, 0.05)
+	tea_mat.roughness = 0.2
+	Geo.cylinder(root, 0.028, 0.054, Vector3(-0.095, 0.036, 0.055), tea_mat, false)
 
 	return root
 
@@ -6010,70 +6036,79 @@ static func ice_cellar() -> Node3D:
 	var root := Node3D.new()
 	root.name = "IceCellar"
 
-	var base := _instance_from_cache(&"ice_cellar_base", "tex_wood.png")
-	if base == null:
-		var k := _kit(211, 0.09)
-		var log_c := Color(0.27, 0.21, 0.16)
-		var dark_c := Color(0.03, 0.035, 0.04)
-		var plank_c := Color(0.32, 0.27, 0.22)
-		# Два венца сруба вокруг горловины погреба
-		for row in 2:
-			var y := 0.11 + row * 0.20
-			k.tube([Vector3(-0.85, y, -0.95), Vector3(0.85, y, -0.95)], [0.105, 0.10], log_c, 7)
-			k.tube([Vector3(-0.85, y,  0.95), Vector3(0.85, y,  0.95)], [0.10, 0.105], log_c, 7)
-			k.tube([Vector3(-0.78, y + 0.07, -1.02), Vector3(-0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
-			k.tube([Vector3( 0.78, y + 0.07, -1.02), Vector3( 0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
-		# Наклонная горловина и тёмный провал внутри (виден, когда крышка приоткрыта)
-		k.box(Vector3(0.0, 0.26, -0.45), Vector3(1.36, 0.52, 0.75), plank_c)
-		k.box(Vector3(0.0, 0.14,  0.42), Vector3(1.36, 0.28, 0.82), plank_c * 0.9)
-		k.box(Vector3(0.0, 0.18,  0.02), Vector3(1.16, 0.34, 1.42), dark_c)
-		# Деревянная вытяжная труба сзади с железным дефлектором
-		k.box(Vector3(-0.48, 0.95, -0.78), Vector3(0.22, 1.15, 0.22), plank_c * 0.85)
-		k.box(Vector3(-0.48, 1.56, -0.78), Vector3(0.38, 0.04, 0.38), Color(0.18, 0.19, 0.20))
-		for sx in [-0.11, 0.11]:
-			k.box(Vector3(-0.48 + sx, 1.49, -0.78), Vector3(0.025, 0.14, 0.025), Color(0.18, 0.19, 0.20))
-		base = _mi(k, &"ice_cellar_base", "tex_wood.png")
-	root.add_child(base)
+	var base_glb := _kedr_model("ice_cellar", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if base_glb != null:
+		root.add_child(base_glb)
+	else:
+		var base := _instance_from_cache(&"ice_cellar_base", "tex_wood.png")
+		if base == null:
+			var k := _kit(211, 0.09)
+			var log_c := Color(0.27, 0.21, 0.16)
+			var dark_c := Color(0.03, 0.035, 0.04)
+			var plank_c := Color(0.32, 0.27, 0.22)
+			for row in 2:
+				var y := 0.11 + row * 0.20
+				k.tube([Vector3(-0.85, y, -0.95), Vector3(0.85, y, -0.95)], [0.105, 0.10], log_c, 7)
+				k.tube([Vector3(-0.85, y,  0.95), Vector3(0.85, y,  0.95)], [0.10, 0.105], log_c, 7)
+				k.tube([Vector3(-0.78, y + 0.07, -1.02), Vector3(-0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
+				k.tube([Vector3( 0.78, y + 0.07, -1.02), Vector3( 0.78, y + 0.07, 1.02)], [0.10, 0.10], log_c * 0.92, 7)
+			k.box(Vector3(0.0, 0.26, -0.45), Vector3(1.36, 0.52, 0.75), plank_c)
+			k.box(Vector3(0.0, 0.14,  0.42), Vector3(1.36, 0.28, 0.82), plank_c * 0.9)
+			k.box(Vector3(0.0, 0.18,  0.02), Vector3(1.16, 0.34, 1.42), dark_c)
+			k.box(Vector3(-0.48, 0.95, -0.78), Vector3(0.22, 1.15, 0.22), plank_c * 0.85)
+			k.box(Vector3(-0.48, 1.56, -0.78), Vector3(0.38, 0.04, 0.38), Color(0.18, 0.19, 0.20))
+			for sx in [-0.11, 0.11]:
+				k.box(Vector3(-0.48 + sx, 1.49, -0.78), Vector3(0.025, 0.14, 0.025), Color(0.18, 0.19, 0.20))
+			base = _mi(k, &"ice_cellar_base", "tex_wood.png")
+		root.add_child(base)
 
-	var snow := _instance_from_cache(&"ice_cellar_snow", "tex_snow.png")
-	if snow == null:
-		var ks := _kit(212, 0.05)
-		var sc := Color(0.76, 0.82, 0.90)
-		ks.blob(Vector3(-0.92, 0.18, -0.10), Vector3(0.55, 0.34, 1.15), sc, 4, 7)
-		ks.blob(Vector3( 0.92, 0.16,  0.05), Vector3(0.52, 0.30, 1.10), sc, 4, 7)
-		ks.blob(Vector3( 0.0,  0.22, -1.12), Vector3(1.05, 0.38, 0.55), sc, 4, 7)
-		ks.blob(Vector3(-0.48, 1.60, -0.78), Vector3(0.20, 0.06, 0.20), sc, 3, 6)
-		snow = _mi(ks, &"ice_cellar_snow", "tex_snow.png")
-	root.add_child(snow)
+		var snow := _instance_from_cache(&"ice_cellar_snow", "tex_snow.png")
+		if snow == null:
+			var ks := _kit(212, 0.05)
+			var sc := Color(0.76, 0.82, 0.90)
+			ks.blob(Vector3(-0.92, 0.18, -0.10), Vector3(0.55, 0.34, 1.15), sc, 4, 7)
+			ks.blob(Vector3( 0.92, 0.16,  0.05), Vector3(0.52, 0.30, 1.10), sc, 4, 7)
+			ks.blob(Vector3( 0.0,  0.22, -1.12), Vector3(1.05, 0.38, 0.55), sc, 4, 7)
+			ks.blob(Vector3(-0.48, 1.60, -0.78), Vector3(0.20, 0.06, 0.20), sc, 3, 6)
+			snow = _mi(ks, &"ice_cellar_snow", "tex_snow.png")
+		root.add_child(snow)
 
-	# Подвижная наклонная крышка (шарнир по задней кромке)
+	# Подвижная наклонная крышка (шарнир по задней кромке — сохраняет аномалию cellar_steam!)
 	var lid := Node3D.new()
 	lid.name = "HatchLid"
 	lid.position = Vector3(0.0, 0.54, -0.78)
 	lid.rotation.x = deg_to_rad(14.0)
-	var lid_mesh := _instance_from_cache(&"ice_cellar_lid", "tex_planks.png")
-	if lid_mesh == null:
-		var kl := _kit(213, 0.09)
-		var pl := Color(0.35, 0.29, 0.23)
-		var iron := Color(0.15, 0.16, 0.17)
-		for i in 5:
-			var lx := -0.56 + float(i) * 0.28
-			kl.box(Vector3(lx, 0.03, 0.82), Vector3(0.26, 0.055, 1.66), pl)
-		kl.box(Vector3(0.0, 0.065, 0.28), Vector3(1.36, 0.04, 0.12), pl * 0.85)
-		kl.box(Vector3(0.0, 0.065, 1.38), Vector3(1.36, 0.04, 0.12), pl * 0.85)
-		for sx in [-0.46, 0.46]:
-			kl.box(Vector3(sx, 0.075, 0.18), Vector3(0.07, 0.018, 0.42), iron)
-		kl.tube([
-			Vector3(-0.07, 0.06, 1.54), Vector3(-0.07, 0.12, 1.54),
-			Vector3( 0.07, 0.12, 1.54), Vector3( 0.07, 0.06, 1.54),
-		], [0.012], iron, 5)
-		lid_mesh = _mi(kl, &"ice_cellar_lid", "tex_planks.png")
-	lid.add_child(lid_mesh)
+	var lid_glb := _kedr_model("ice_cellar_lid", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if lid_glb != null:
+		lid.add_child(lid_glb)
+		var lock_anchor := Node3D.new()
+		lock_anchor.name = "Padlock"
+		lock_anchor.position = Vector3(0.0, -0.09, 1.60)
+		lid.add_child(lock_anchor)
+	else:
+		var lid_mesh := _instance_from_cache(&"ice_cellar_lid", "tex_planks.png")
+		if lid_mesh == null:
+			var kl := _kit(213, 0.09)
+			var pl := Color(0.35, 0.29, 0.23)
+			var iron := Color(0.15, 0.16, 0.17)
+			for i in 5:
+				var lx := -0.56 + float(i) * 0.28
+				kl.box(Vector3(lx, 0.03, 0.82), Vector3(0.26, 0.055, 1.66), pl)
+			kl.box(Vector3(0.0, 0.065, 0.28), Vector3(1.36, 0.04, 0.12), pl * 0.85)
+			kl.box(Vector3(0.0, 0.065, 1.38), Vector3(1.36, 0.04, 0.12), pl * 0.85)
+			for sx in [-0.46, 0.46]:
+				kl.box(Vector3(sx, 0.075, 0.18), Vector3(0.07, 0.018, 0.42), iron)
+			kl.tube([
+				Vector3(-0.07, 0.06, 1.54), Vector3(-0.07, 0.12, 1.54),
+				Vector3( 0.07, 0.12, 1.54), Vector3( 0.07, 0.06, 1.54),
+			], [0.012], iron, 5)
+			lid_mesh = _mi(kl, &"ice_cellar_lid", "tex_planks.png")
+		lid.add_child(lid_mesh)
 
-	var lock := padlock_chz1(true)
-	lock.name = "Padlock"
-	lock.position = Vector3(0.0, 0.05, 1.64)
-	lid.add_child(lock)
+		var lock := padlock_chz1(true)
+		lock.name = "Padlock"
+		lock.position = Vector3(0.0, 0.05, 1.64)
+		lid.add_child(lock)
 	root.add_child(lid)
 
 	# Unshaded blend_add пар из щели крышки (включается только во время аномалии cellar_steam)
@@ -6173,44 +6208,45 @@ static func abandoned_doghouse() -> Node3D:
 	var root := Node3D.new()
 	root.name = "AbandonedDoghouse"
 
-	var body := _instance_from_cache(&"doghouse_body", "tex_planks.png")
-	if body == null:
-		var k := _kit(231, 0.10)
-		var wood := Color(0.30, 0.25, 0.20)
-		var dark_in := Color(0.025, 0.025, 0.03)
-		var tarp := Color(0.22, 0.24, 0.19)
-		var iron := Color(0.20, 0.21, 0.22)
-		k.box(Vector3(0.0, 0.04, 0.0), Vector3(0.92, 0.08, 1.12), wood * 0.78)
-		k.box(Vector3(-0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
-		k.box(Vector3( 0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
-		k.box(Vector3( 0.0,  0.42, -0.50), Vector3(0.86, 0.72, 0.06), wood * 0.82)
-		k.box(Vector3(-0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
-		k.box(Vector3( 0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
-		k.box(Vector3( 0.0,  0.66,  0.50), Vector3(0.40, 0.24, 0.06), wood * 0.90)
-		k.box(Vector3( 0.0,  0.38, -0.44), Vector3(0.76, 0.62, 0.04), dark_in)
-		# Рваный промёрзший брезентовый полог над лазом
-		k.box(Vector3(-0.04, 0.49, 0.545), Vector3(0.42, 0.18, 0.025), tarp, Basis(Vector3.RIGHT, deg_to_rad(-16.0)))
-		k.box(Vector3(-0.14, 0.34, 0.560), Vector3(0.18, 0.16, 0.022), tarp * 0.85, Basis(Vector3.FORWARD, deg_to_rad(14.0)))
-		# Двускатная крыша с выносом
-		k.box(Vector3(-0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
-		k.box(Vector3( 0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
-		k.box(Vector3( 0.0,  1.06, 0.04), Vector3(0.10, 0.06, 1.34), wood * 0.75)
-		# Колышек и проржавевшая эмалированная миска со льдом
-		k.tube([Vector3(0.56, 0.0, 0.62), Vector3(0.54, 0.28, 0.62)], [0.024, 0.020], iron, 6)
-		k.tube([Vector3(-0.34, 0.0, 0.78), Vector3(-0.34, 0.075, 0.78)], [0.11, 0.135], Color(0.28, 0.34, 0.32), 8)
-		k.tube([Vector3(-0.34, 0.05, 0.78), Vector3(-0.34, 0.062, 0.78)], [0.105, 0.105], Color(0.55, 0.65, 0.74), 8)
-		body = _mi(k, &"doghouse_body", "tex_planks.png")
-	root.add_child(body)
+	var dog_glb := _kedr_model("doghouse", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if dog_glb != null:
+		root.add_child(dog_glb)
+	else:
+		var body := _instance_from_cache(&"doghouse_body", "tex_planks.png")
+		if body == null:
+			var k := _kit(231, 0.10)
+			var wood := Color(0.30, 0.25, 0.20)
+			var dark_in := Color(0.025, 0.025, 0.03)
+			var tarp := Color(0.22, 0.24, 0.19)
+			var iron := Color(0.20, 0.21, 0.22)
+			k.box(Vector3(0.0, 0.04, 0.0), Vector3(0.92, 0.08, 1.12), wood * 0.78)
+			k.box(Vector3(-0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
+			k.box(Vector3( 0.43, 0.42, 0.0), Vector3(0.06, 0.72, 1.06), wood)
+			k.box(Vector3( 0.0,  0.42, -0.50), Vector3(0.86, 0.72, 0.06), wood * 0.82)
+			k.box(Vector3(-0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
+			k.box(Vector3( 0.31, 0.42,  0.50), Vector3(0.24, 0.72, 0.06), wood * 0.95)
+			k.box(Vector3( 0.0,  0.66,  0.50), Vector3(0.40, 0.24, 0.06), wood * 0.90)
+			k.box(Vector3( 0.0,  0.38, -0.44), Vector3(0.76, 0.62, 0.04), dark_in)
+			k.box(Vector3(-0.04, 0.49, 0.545), Vector3(0.42, 0.18, 0.025), tarp, Basis(Vector3.RIGHT, deg_to_rad(-16.0)))
+			k.box(Vector3(-0.14, 0.34, 0.560), Vector3(0.18, 0.16, 0.022), tarp * 0.85, Basis(Vector3.FORWARD, deg_to_rad(14.0)))
+			k.box(Vector3(-0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
+			k.box(Vector3( 0.27, 0.90, 0.04), Vector3(0.66, 0.05, 1.32), wood * 0.86, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
+			k.box(Vector3( 0.0,  1.06, 0.04), Vector3(0.10, 0.06, 1.34), wood * 0.75)
+			k.tube([Vector3(0.56, 0.0, 0.62), Vector3(0.54, 0.28, 0.62)], [0.024, 0.020], iron, 6)
+			k.tube([Vector3(-0.34, 0.0, 0.78), Vector3(-0.34, 0.075, 0.78)], [0.11, 0.135], Color(0.28, 0.34, 0.32), 8)
+			k.tube([Vector3(-0.34, 0.05, 0.78), Vector3(-0.34, 0.062, 0.78)], [0.105, 0.105], Color(0.55, 0.65, 0.74), 8)
+			body = _mi(k, &"doghouse_body", "tex_planks.png")
+		root.add_child(body)
 
-	var snow := _instance_from_cache(&"doghouse_snow", "tex_snow.png")
-	if snow == null:
-		var ks := _kit(232, 0.05)
-		var sc := Color(0.78, 0.84, 0.92)
-		ks.box(Vector3(-0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
-		ks.box(Vector3( 0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
-		ks.blob(Vector3(0.0, 0.22, -0.78), Vector3(0.68, 0.32, 0.45), sc, 4, 6)
-		snow = _mi(ks, &"doghouse_snow", "tex_snow.png")
-	root.add_child(snow)
+		var snow := _instance_from_cache(&"doghouse_snow", "tex_snow.png")
+		if snow == null:
+			var ks := _kit(232, 0.05)
+			var sc := Color(0.78, 0.84, 0.92)
+			ks.box(Vector3(-0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(32.0)))
+			ks.box(Vector3( 0.25, 0.96, 0.02), Vector3(0.60, 0.09, 1.24), sc, Basis(Vector3.FORWARD, deg_to_rad(-32.0)))
+			ks.blob(Vector3(0.0, 0.22, -0.78), Vector3(0.68, 0.32, 0.45), sc, 4, 6)
+			snow = _mi(ks, &"doghouse_snow", "tex_snow.png")
+		root.add_child(snow)
 
 	var chain_slack := _instance_from_cache(&"doghouse_chain_slack", "tex_metal.png")
 	if chain_slack == null:
@@ -6273,46 +6309,50 @@ static func outpost_stand() -> Node3D:
 	var root := Node3D.new()
 	root.name = "OutpostStand"
 
-	var frame := _instance_from_cache(&"outpost_stand_frame", "tex_wood.png")
-	if frame == null:
-		var k := _kit(241, 0.08)
-		var post_c := Color(0.25, 0.19, 0.14)
-		var board_c := Color(0.20, 0.26, 0.21)
-		var trim_c := Color(0.44, 0.15, 0.12)
-		for sx in [-0.74, 0.74]:
-			k.tube([Vector3(sx, 0.0, 0.0), Vector3(sx, 2.25, 0.0)], [0.075, 0.068], post_c, 7)
-			k.box(Vector3(sx * 0.82, 0.32, 0.0), Vector3(0.06, 0.50, 0.06), post_c * 0.9,
-					Basis(Vector3.FORWARD, deg_to_rad(32.0 * signf(sx))))
-			k.box(Vector3(sx * 0.84, 1.98, 0.0), Vector3(0.05, 0.34, 0.05), post_c * 0.9,
-					Basis(Vector3.FORWARD, deg_to_rad(-38.0 * signf(sx))))
-		k.box(Vector3(0.0, 1.38, 0.0), Vector3(1.44, 1.02, 0.06), board_c)
-		k.box(Vector3(0.0, 1.94, 0.01), Vector3(1.46, 0.14, 0.07), trim_c)
-		k.box(Vector3(0.0, 2.18, -0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
-		k.box(Vector3(0.0, 2.18,  0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
-		frame = _mi(k, &"outpost_stand_frame", "tex_wood.png")
-	root.add_child(frame)
+	var stand_glb := _kedr_model("outpost_stand", {"center": false, "keep": true, "bright": 1.10, "sat": 1.0})
+	if stand_glb != null:
+		root.add_child(stand_glb)
+	else:
+		var frame := _instance_from_cache(&"outpost_stand_frame", "tex_wood.png")
+		if frame == null:
+			var k := _kit(241, 0.08)
+			var post_c := Color(0.25, 0.19, 0.14)
+			var board_c := Color(0.20, 0.26, 0.21)
+			var trim_c := Color(0.44, 0.15, 0.12)
+			for sx in [-0.74, 0.74]:
+				k.tube([Vector3(sx, 0.0, 0.0), Vector3(sx, 2.25, 0.0)], [0.075, 0.068], post_c, 7)
+				k.box(Vector3(sx * 0.82, 0.32, 0.0), Vector3(0.06, 0.50, 0.06), post_c * 0.9,
+						Basis(Vector3.FORWARD, deg_to_rad(32.0 * signf(sx))))
+				k.box(Vector3(sx * 0.84, 1.98, 0.0), Vector3(0.05, 0.34, 0.05), post_c * 0.9,
+						Basis(Vector3.FORWARD, deg_to_rad(-38.0 * signf(sx))))
+			k.box(Vector3(0.0, 1.38, 0.0), Vector3(1.44, 1.02, 0.06), board_c)
+			k.box(Vector3(0.0, 1.94, 0.01), Vector3(1.46, 0.14, 0.07), trim_c)
+			k.box(Vector3(0.0, 2.18, -0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
+			k.box(Vector3(0.0, 2.18,  0.15), Vector3(1.74, 0.045, 0.42), post_c * 0.85, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
+			frame = _mi(k, &"outpost_stand_frame", "tex_wood.png")
+		root.add_child(frame)
 
-	var cap := _instance_from_cache(&"outpost_stand_snow", "tex_snow.png")
-	if cap == null:
-		var ks := _kit(242, 0.04)
-		var sc := Color(0.78, 0.84, 0.92)
-		ks.box(Vector3(0.0, 2.24, -0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
-		ks.box(Vector3(0.0, 2.24,  0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
-		cap = _mi(ks, &"outpost_stand_snow", "tex_snow.png")
-	root.add_child(cap)
+		var cap := _instance_from_cache(&"outpost_stand_snow", "tex_snow.png")
+		if cap == null:
+			var ks := _kit(242, 0.04)
+			var sc := Color(0.78, 0.84, 0.92)
+			ks.box(Vector3(0.0, 2.24, -0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(26.0)))
+			ks.box(Vector3(0.0, 2.24,  0.13), Vector3(1.70, 0.07, 0.36), sc, Basis(Vector3.RIGHT, deg_to_rad(-26.0)))
+			cap = _mi(ks, &"outpost_stand_snow", "tex_snow.png")
+		root.add_child(cap)
 
-	var canvas := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = Vector2(1.30, 0.88)
-	canvas.mesh = pm
-	canvas.position = Vector3(0.0, 1.38, 0.036)
-	canvas.rotation.x = deg_to_rad(90.0)
-	var cmat := StandardMaterial3D.new()
-	cmat.albedo_texture = _outpost_board_texture()
-	cmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	cmat.roughness = 0.92
-	canvas.material_override = cmat
-	root.add_child(canvas)
+		var canvas := MeshInstance3D.new()
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(1.30, 0.88)
+		canvas.mesh = pm
+		canvas.position = Vector3(0.0, 1.38, 0.036)
+		canvas.rotation.x = deg_to_rad(90.0)
+		var cmat := StandardMaterial3D.new()
+		cmat.albedo_texture = _outpost_board_texture()
+		cmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		cmat.roughness = 0.92
+		canvas.material_override = cmat
+		root.add_child(canvas)
 
 	var pin := MeshInstance3D.new()
 	pin.name = "RedPin"

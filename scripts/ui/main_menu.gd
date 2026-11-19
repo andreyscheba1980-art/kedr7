@@ -116,30 +116,36 @@ func _rebuild() -> void:
 	for c in _ui.get_children():
 		c.queue_free()
 
-	# 1. Паспортная табличка ГОСТ / Штамп Госкомгидромета СССР
-	var stamp := PanelContainer.new()
-	var stamp_sb := StyleBoxFlat.new()
-	stamp_sb.bg_color = Color(0.04, 0.055, 0.06, 0.78)
-	stamp_sb.border_color = Color("#2C3834")
-	stamp_sb.set_border_width_all(1)
-	stamp_sb.set_content_margin_all(12)
-	stamp.add_theme_stylebox_override("panel", stamp_sb)
-	UiKit.place(_ui, stamp, 0, 0, 0, 0, 72, 38, 545, 178)
+	# 1. Эмалевый паспортный шильдик ГОСТ с заклёпками и мигающим диодом дежурства
+	var stamp := _EnamelPlate.new()
+	UiKit.place(_ui, stamp, 0, 0, 0, 0, 72, 34, 558, 186)
 
 	var stamp_vbox := VBoxContainer.new()
 	stamp_vbox.add_theme_constant_override("separation", 2)
-	stamp.add_child(stamp_vbox)
+	UiKit.place(stamp, stamp_vbox, 0, 0, 1, 1, 18, 14, -18, -12)
+
+	var top_meta := HBoxContainer.new()
+	top_meta.add_theme_constant_override("separation", 8)
+	stamp_vbox.add_child(top_meta)
 
 	var agency := Label.new()
 	agency.text = Loc.t(&"menu.agency")
 	agency.add_theme_font_size_override("font_size", 11)
-	agency.add_theme_color_override("font_color", Color("#687873"))
-	stamp_vbox.add_child(agency)
+	agency.add_theme_color_override("font_color", Color("#7C8E88"))
+	top_meta.add_child(agency)
+
+	top_meta.add_spacer(false)
+
+	var duty_tag := Label.new()
+	duty_tag.text = Loc.p("ЭФИР 3820 кГц", "LINK 3820 kHz")
+	duty_tag.add_theme_font_size_override("font_size", 10)
+	duty_tag.add_theme_color_override("font_color", Color("#FFA62B"))
+	top_meta.add_child(duty_tag)
 
 	var station_desc := Label.new()
 	station_desc.text = Loc.t(&"menu.station_desc")
 	station_desc.add_theme_font_size_override("font_size", 10)
-	station_desc.add_theme_color_override("font_color", Color("#4A5854"))
+	station_desc.add_theme_color_override("font_color", Color("#566661"))
 	stamp_vbox.add_child(station_desc)
 
 	var title_row := HBoxContainer.new()
@@ -149,7 +155,7 @@ func _rebuild() -> void:
 	var title_label := Label.new()
 	title_label.text = "КЕДР"
 	title_label.add_theme_font_size_override("font_size", 40)
-	title_label.add_theme_color_override("font_color", Color("#C5CFCB"))
+	title_label.add_theme_color_override("font_color", Color("#D2DBD7"))
 	title_row.add_child(title_label)
 
 	var dash_label := Label.new()
@@ -167,7 +173,7 @@ func _rebuild() -> void:
 	var passport := Label.new()
 	passport.text = Loc.t(&"menu.passport")
 	passport.add_theme_font_size_override("font_size", 10)
-	passport.add_theme_color_override("font_color", Color("#687873"))
+	passport.add_theme_color_override("font_color", Color("#768782"))
 	stamp_vbox.add_child(passport)
 
 	# 2. Нижняя телеметрическая сводка (вместо предупреждения о скримерах)
@@ -501,3 +507,36 @@ func _desc(key: StringName) -> Label:
 	l.modulate = Color(1, 1, 1, 0.65)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l
+
+
+## Советский эмалевый шильдик станции с латунными заклёпками и мигающим диодом дежурства.
+class _EnamelPlate extends Control:
+	var _t := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0.036, 0.052, 0.056, 0.88), true)
+		draw_rect(r, Color(0.28, 0.36, 0.33, 0.95), false, 1.5)
+		draw_rect(r.grow(-4.0), Color(0.45, 0.37, 0.24, 0.32), false, 1.0)
+		# Четыре латунные заклёпки по углам
+		var riv := Color(0.50, 0.44, 0.32, 0.78)
+		var rim := Color(0.08, 0.09, 0.09, 0.9)
+		for p: Vector2 in [
+			Vector2(9.0, 9.0), Vector2(size.x - 9.0, 9.0),
+			Vector2(9.0, size.y - 9.0), Vector2(size.x - 9.0, size.y - 9.0)
+		]:
+			draw_circle(p, 3.2, rim)
+			draw_circle(p, 2.0, riv)
+		# Живой янтарный светодиод дежурства у правого верхнего края
+		var pulse := 0.55 + 0.45 * sin(_t * 2.4)
+		var dp := Vector2(size.x - 108.0, 21.0)
+		draw_circle(dp, 6.0, Color(1.0, 0.62, 0.16, 0.18 * pulse))
+		draw_circle(dp, 3.0, Color(1.0, 0.68, 0.22, 0.45 + 0.55 * pulse))
+

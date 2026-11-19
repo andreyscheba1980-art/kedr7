@@ -21,15 +21,15 @@ static func theme() -> Theme:
 	th.default_font = UiStyle.type_font()   # свой шрифт в игре: у игроков без Consolas всё выглядит так же
 	th.default_font_size = 18
 	th.set_color("font_color", "Label", TEXT)
-	th.set_color("font_outline_color", "Label", Color(0, 0, 0, 0.9))
-	th.set_constant("outline_size", "Label", 5)
-	th.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0.6))
-	th.set_constant("shadow_offset_x", "Label", 2)
-	th.set_constant("shadow_offset_y", "Label", 2)
+	th.set_color("font_outline_color", "Label", Color(0.0, 0.0, 0.0, 0.72))
+	th.set_constant("outline_size", "Label", 2)
+	th.set_color("font_shadow_color", "Label", Color(0.0, 0.0, 0.0, 0.42))
+	th.set_constant("shadow_offset_x", "Label", 1)
+	th.set_constant("shadow_offset_y", "Label", 1)
 
-	var normal := _box(Color(0.08, 0.09, 0.08, 0.85), Color(0.35, 0.33, 0.28))
-	var hover := _box(Color(0.16, 0.14, 0.1, 0.95), AMBER)
-	var pressed := _box(Color(0.25, 0.18, 0.08, 0.95), AMBER)
+	var normal := _box(Color(0.05, 0.07, 0.075, 0.90), Color(0.24, 0.30, 0.28))
+	var hover := _box(Color(0.14, 0.12, 0.09, 0.96), AMBER)
+	var pressed := _box(Color(0.22, 0.16, 0.08, 0.98), AMBER)
 	for state: String in ["normal", "focus"]:
 		th.set_stylebox(state, "Button", normal if state == "normal" else hover)
 	th.set_stylebox("hover", "Button", hover)
@@ -37,12 +37,12 @@ static func theme() -> Theme:
 	th.set_color("font_color", "Button", TEXT)
 	th.set_color("font_hover_color", "Button", AMBER)
 	th.set_color("font_focus_color", "Button", AMBER)
-	th.set_font_size("font_size", "Button", 20)
+	th.set_font_size("font_size", "Button", 18)
 	th.set_stylebox("normal", "LineEdit", _box(Color(0.95, 0.92, 0.82), INK))
 	th.set_stylebox("focus", "LineEdit", _box(Color(1.0, 0.97, 0.88), AMBER))
 	th.set_color("font_color", "LineEdit", INK)
 	th.set_font_size("font_size", "LineEdit", 22)
-	th.set_stylebox("panel", "ItemList", _box(Color(0.06, 0.07, 0.06, 0.9), Color(0.35, 0.33, 0.28)))
+	th.set_stylebox("panel", "ItemList", _box(Color(0.045, 0.06, 0.065, 0.94), Color(0.24, 0.30, 0.28)))
 	th.set_color("font_color", "ItemList", TEXT)
 	th.set_color("font_selected_color", "ItemList", AMBER)
 	_theme = th

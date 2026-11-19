@@ -151,12 +151,55 @@ static func _restyle(inst: Node3D, opts: Dictionary) -> void:
 	var sat: float = opts.get("sat", 1.0 if is_baked else 0.6)
 	var shadow: bool = opts.get("shadow", true)
 	for mi in _meshes(inst):
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		if mi.mesh == null:
-			continue
-		for si in mi.mesh.get_surface_count():
-			var src := mi.get_active_material(si)
-			mi.set_surface_override_material(si, _convert(src, tint, grime, bright, sat))
+		var all_alpha := mi.mesh != null and mi.mesh.get_surface_count() > 0
+		if mi.mesh != null:
+			for si in mi.mesh.get_surface_count():
+				var src := mi.get_active_material(si)
+				if _is_transparent(src):
+					mi.set_surface_override_material(si, _convert_transparent(src as BaseMaterial3D, tint, bright))
+				else:
+					all_alpha = false
+					mi.set_surface_override_material(si, _convert(src, tint, grime, bright, sat))
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (shadow and not all_alpha) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+static func _is_transparent(src: Material) -> bool:
+	if not (src is BaseMaterial3D):
+		return false
+	var bm := src as BaseMaterial3D
+	return (
+		bm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA
+		or bm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		or bm.albedo_color.a < 0.95
+	)
+
+
+static func _convert_transparent(bm: BaseMaterial3D, tint: Color, bright: float) -> StandardMaterial3D:
+	var key := "tr|%d|%s|%.2f" % [bm.get_instance_id(), tint.to_html(), bright]
+	if _mats.has(key):
+		return _mats[key] as StandardMaterial3D
+	var m := StandardMaterial3D.new()
+	var col := bm.albedo_color
+	m.albedo_color = Color(
+		clampf(col.r * tint.r * bright, 0.0, 1.0),
+		clampf(col.g * tint.g * bright, 0.0, 1.0),
+		clampf(col.b * tint.b * bright, 0.0, 1.0),
+		col.a
+	)
+	m.albedo_texture = bm.albedo_texture
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if bm.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		m.alpha_scissor_threshold = bm.alpha_scissor_threshold
+		m.roughness = 0.92
+	else:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		m.roughness = clampf(bm.roughness, 0.08, 0.35)
+		m.metallic_specular = 0.8
+	_mats[key] = m
+	return m
 
 
 static func _convert(src: Material, tint: Color, grime: float, bright := 0.5, sat := 0.6) -> ShaderMaterial:

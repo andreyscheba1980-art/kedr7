@@ -9,20 +9,64 @@ const PORT = Number(process.env.PORT || 3000);
 
 const MODIFIED_FILES = [
   {
-    path: "assets/shaders/trodden_path.gdshader",
-    role: "Шейдер бесшовных троп (blend_mul + depth_bias + fog_disabled)",
+    path: "scripts/ui/hud.gd",
+    role: "Аналоговый HUD 1983: живой прицел, гальванометр, панель «Волна-К» + 6Е1П и телетайпный отчёт",
   },
   {
-    path: "scripts/world/footprints.gd",
-    role: "Следы в снегу без «синих картонок» (BLEND_MODE_MUL + disable_fog)",
+    path: "scripts/ui/journal_tm1_ui.gd",
+    role: "Журнал ТМ-1: авто-зона по локации, счётчики, звук пера и рукописная лента аномалий",
+  },
+  {
+    path: "scripts/ui/main_menu.gd",
+    role: "Главное меню: эмалевый ГОСТ-шильдик с заклёпками и пульсирующим диодом дежурства",
+  },
+  {
+    path: "scripts/ui/pause_menu.gd",
+    role: "Меню паузы: унификация с Главным меню на TelemetryButton и шильдике смены",
+  },
+  {
+    path: "scripts/ui/ui_kit.gd",
+    role: "Чистая типографика UI (мягкая обводка 2px, эмалевые кнопки и поля)",
+  },
+  {
+    path: "tools/blender/bake_kedr_props.py",
+    role: "Автосборщик Blender (4.x/5.2): запекание всех новых low-poly .glb в assets/models/kedr/",
+  },
+  {
+    path: "tools/blender/new_year_table.py",
+    role: "Новогодний стол: ель в 3-л банке (дождик + игрушки), шампанское/мандарин/стакан, тульский самовар",
+  },
+  {
+    path: "tools/blender/yard_buildings.py",
+    role: "Двор + изба: инфо-щит с картой кордона и ТБ, конура, ледник + крышка люка, русская печь",
+  },
+  {
+    path: "tools/blender/outhouse.py",
+    role: "Станционная уборная: наборные доски со щелями, петли, скоба, щеколда, козырёк со снегом",
+  },
+  {
+    path: "tools/blender/stove.py",
+    role: "Кирпичная печь: чугунная варочная плита с 2 конфорками и рельефная топочная дверца ДТ-3",
+  },
+  {
+    path: "scripts/world/models.gd",
+    role: "Поддержка полупрозрачного стекла GLB (3-л банка, гранёный стакан) и alpha-scissor без артефактов",
   },
   {
     path: "scripts/world/props.gd",
-    role: "5 новых MeshKit-пропсов + апгрейд советской гирлянды",
+    role: "Подключение GLB-моделей Блока 1/2 и печей + сохранение узлов всех дворовых аномалий",
+  },
+  {
+    path: "assets/shaders/trodden_path.gdshader",
+    role: "Шейдер бесшовных троп (blend_mix из main + depth_bias + мягкий край)",
+  },
+  {
+    path: "scripts/world/footprints.gd",
+    role: "Следы в снегу (синхронизировано с актуальным main)",
   },
   {
     path: "scripts/world/yard.gd",
-    role: "Коридорная планировка двора, лента троп и реактивный саспенс",
+    role: "Коридорная планировка двора, сугробы вдоль стен и поляна у уборной (синхронизировано с main)",
   },
   {
     path: "scripts/world/anomalies.gd",

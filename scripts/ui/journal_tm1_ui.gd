@@ -803,22 +803,59 @@ func _build_notes_spread() -> void:
 		style_paper_label(hint, C_INK_MUTED, 12)
 		right.add_child(hint)
 
-	_select_zone(_notes_zone)
+	_notes_zone = _detect_current_zone()
+	_select_zone(_notes_zone, true)
 	_refresh_notes()
 
 
-func _select_zone(z: StringName) -> void:
+func _detect_current_zone() -> StringName:
+	if Game == null:
+		return &"house"
+	if Game.zone == &"radio_room":
+		return &"radio"
+	if Game.is_outside():
+		if Game.zone == &"meteo" or Game.zone == &"pavilion":
+			return &"instr"
+		return &"yard"
+	return &"house"
+
+
+func _update_zone_tab_labels() -> void:
+	var an := Game.anomalies
+	var cur_zone := _detect_current_zone()
+	for z: StringName in Anomalies.ZONES:
+		if not _zone_btns.has(z):
+			continue
+		var cnt := 0
+		if an != null:
+			for n: Dictionary in an.notes:
+				if StringName(n.get("zone", &"")) == z:
+					cnt += 1
+		var base := Loc.t(StringName("anom.zone." + String(z)))
+		var marker := "● " if z == cur_zone else ""
+		var suffix := " (%d)" % cnt if cnt > 0 else ""
+		(_zone_btns[z] as Button).text = "%s%s%s" % [marker, base, suffix]
+
+
+func _select_zone(z: StringName, silent := false) -> void:
 	_notes_zone = z
-	AudioDirector.play_raw(TICK_SFX, -6.0)
+	if not silent:
+		AudioDirector.play_raw(TICK_SFX, -8.0)
+	_update_zone_tab_labels()
 	for k: StringName in _zone_btns:
-		(_zone_btns[k] as Button).modulate = Color(1.2, 1.1, 0.8) if k == z else Color.WHITE
+		var zb := _zone_btns[k] as Button
+		zb.modulate = Color(1.22, 1.12, 0.82) if k == z else Color(0.95, 0.94, 0.90)
 	for c in _notes_items.get_children():
 		c.queue_free()
 	var an := Game.anomalies
+	if an == null:
+		return
 	for id: StringName in Anomalies.ids_for(z, Game.night):
 		var b := Button.new()
 		var done := an.noted(id)
-		b.text = ("✎ " if done else "○ ") + Loc.t(StringName("anom." + String(id)))
+		var reverted := done and an.active.has(id) and bool(an.active[id].get("reverted", false))
+		var prefix := "✓ " if reverted else ("✎ " if done else "○ ")
+		b.text = prefix + Loc.t(StringName("anom." + String(id)))
 		b.custom_minimum_size = Vector2(PAGE_W - 32, 30)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -832,9 +869,12 @@ func _select_zone(z: StringName) -> void:
 func _write_note(id: StringName, b: Button) -> void:
 	if Game.anomalies == null or not Game.anomalies.note(id):
 		return
-	AudioDirector.play_raw(STAMP_SFX, -6.0)
+	# Сухой росчерк пера по бумаге + тихий щелчок штампа вместо громкого металлического лязга
+	AudioDirector.play_raw(PAGE_SFX, -12.0)
+	AudioDirector.play_raw(TICK_SFX, -8.0)
 	b.text = "✎ " + Loc.t(StringName("anom." + String(id)))
 	b.disabled = true
+	_update_zone_tab_labels()
 	_refresh_notes()
 
 
@@ -842,7 +882,7 @@ func _refresh_notes() -> void:
 	for c in _notes_list.get_children():
 		c.queue_free()
 	var an := Game.anomalies
-	if an.notes.is_empty():
+	if an == null or an.notes.is_empty():
 		var empty := Label.new()
 		empty.text = Loc.t(&"anom.empty")
 		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -850,12 +890,30 @@ func _refresh_notes() -> void:
 		_notes_list.add_child(empty)
 		return
 	for n: Dictionary in an.notes:
-		var l := Label.new()
-		l.text = "%s — %s: %s" % [Game.minutes_to_clock(int(n["min"])), Loc.t(StringName("anom.zone." + String(n["zone"]))),
-			Loc.t(StringName("anom." + String(n["id"])))]
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		style_paper_label(l, C_INK_MAIN, 13)
-		_notes_list.add_child(l)
+		var nid := StringName(n.get("id", &""))
+		var reverted := an.active.has(nid) and bool(an.active[nid].get("reverted", false))
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 1)
+
+		var hdr := Label.new()
+		var stamp_str := Loc.p("[ВОЗВРАЩЕНО В НОРМУ]", "[REVERTED]") if reverted else Loc.p("[ЗАФИКСИРОВАНО]", "[LOGGED]")
+		hdr.text = "%s · %s   %s" % [
+			Game.minutes_to_clock(int(n["min"])),
+			Loc.t(StringName("anom.zone." + String(n["zone"]))).to_upper(),
+			stamp_str
+		]
+		style_paper_label(hdr, C_STAMP if not reverted else C_INK_MUTED, 10)
+		row.add_child(hdr)
+
+		var body := Label.new()
+		body.text = Loc.t(StringName("anom." + String(nid)))
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		style_paper_label(body, C_INK_MUTED if reverted else C_INK_MAIN, 18)
+		body.add_theme_font_override(&"font", UiStyle.hand_font())
+		row.add_child(body)
+
+		row.add_child(_make_line(Color(0.20, 0.22, 0.35, 0.14)))
+		_notes_list.add_child(row)
 
 
 # --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ И СТИЛИ ---------------------------------------
@@ -1148,9 +1206,13 @@ func _switch_tab(tab_idx: int) -> void:
 	if tab_idx == 1 and not _archive_built:
 		_archive_built = true
 		_build_archive_spread()
-	if tab_idx == 2 and not _notes_built and _notes_on():
-		_notes_built = true
-		_build_notes_spread()
+	if tab_idx == 2 and _notes_on():
+		if not _notes_built:
+			_notes_built = true
+			_build_notes_spread()
+		else:
+			_select_zone(_detect_current_zone(), true)
+			_refresh_notes()
 	_tab = tab_idx
 	_flipping = true
 	AudioDirector.play_raw(PAGE_SFX, -2.0)
