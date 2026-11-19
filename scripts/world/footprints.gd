@@ -68,16 +68,14 @@ static func material(kind: StringName) -> StandardMaterial3D:
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.render_priority = 2
 	if _is_snow_kind(kind):
-		# BLEND_MODE_MUL: белый фон текстуры невидим, тень вмятины умножается на реальный
-		# освещённый снег (синий под луной, жёлтый под фонарём) — никаких «синих наклеек»!
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		m.blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
 		m.disable_fog = true
-		m.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
+		m.albedo_color = Color(0.38, 0.44, 0.54, 0.68)
 	else:
-		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.albedo_color = Color(0.07, 0.06, 0.05, 0.8)
 		m.roughness = 0.15
 		m.metallic_specular = 0.8
@@ -94,17 +92,16 @@ static func _plane(kind: StringName) -> PlaneMesh:
 	return pm
 
 
-## Рисунок следа: для снежных (MUL) белый фон и затемнение во вмятине; для мокрых — альфа-маска.
+## Рисунок следа: альфа-маска углубления со сглаженным краем
 static func _texture(kind: StringName) -> ImageTexture:
-	var snow_mul := _is_snow_kind(kind)
 	var shape := kind if kind == &"bare" or kind == &"paw" else &"boot"
-	var key := StringName("%s_%s" % [shape, "mul" if snow_mul else "alpha"])
+	var key := StringName("%s_alpha" % shape)
 	if _tex.has(key):
 		return _tex[key]
 	var w := 24
 	var h := 50
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(1, 1, 1, 1) if snow_mul else Color(1, 1, 1, 0))
+	img.fill(Color(1, 1, 1, 0))
 	var blobs: Array
 	if shape == &"paw":     # лисий след: подушка и четыре пальца
 		blobs = [[12.0, 33.0, 7.0, 8.0], [7.0, 17.0, 3.2, 4.2], [17.0, 17.0, 3.2, 4.2], [9.5, 8.0, 3.0, 4.0], [14.5, 8.0, 3.0, 4.0]]
@@ -115,7 +112,6 @@ static func _texture(kind: StringName) -> ImageTexture:
 		blobs = [[12.0, 14.0, 9.0, 12.0], [12.0, 30.0, 6.5, 6.0], [12.0, 41.0, 8.0, 7.5]]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var depth_col := Color(0.46, 0.49, 0.54, 1.0) if shape == &"bare" else Color(0.54, 0.57, 0.62, 1.0)
 	for py in h:
 		for px in w:
 			var a := 0.0
@@ -124,13 +120,8 @@ static func _texture(kind: StringName) -> ImageTexture:
 				var dy := (float(py) - float(bl[1])) / float(bl[3])
 				a = maxf(a, clampf(1.35 - (dx * dx + dy * dy) * 1.45, 0.0, 1.0))
 			if a > 0.0:
-				var grain := rng.randf_range(0.82, 1.0)
-				if snow_mul:
-					# Мягкий градиент тени внутри следа (в MUL белый = 100% прозрачно)
-					var k := clampf(a * grain, 0.0, 1.0)
-					img.set_pixel(px, py, Color(1, 1, 1, 1).lerp(depth_col, k))
-				else:
-					img.set_pixel(px, py, Color(1, 1, 1, minf(a, 1.0) * grain))
+				var grain := rng.randf_range(0.85, 1.0)
+				img.set_pixel(px, py, Color(1, 1, 1, clampf(a * grain * 0.9, 0.0, 1.0)))
 	var tex := ImageTexture.create_from_image(img)
 	_tex[key] = tex
 	return tex

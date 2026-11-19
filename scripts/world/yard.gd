@@ -1006,15 +1006,16 @@ func _build_wall_drifts() -> void:
 		var h: float = r[3]
 		var n := maxi(3, int(a.distance_to(b) / 0.75))   # часто и внахлёст — сплошной намёт, а не ряд «камней»
 		for i in range(n + 1):
-			var p := a.lerp(b, float(i) / n) + nrm * rng.randf_range(0.0, 0.2)
+			var along := absf(nrm.x) < 0.5
+			var len := rng.randf_range(1.4, 2.2)
+			var wid := rng.randf_range(0.8, 1.15)
+			# Сдвигаем сугробы строго наружу от стены с запасом на их ширину — исключает затекание геометрии внутрь избы
+			var p := a.lerp(b, float(i) / n) + nrm * (wid * 0.5 + rng.randf_range(0.12, 0.25))
 			var mi := MeshInstance3D.new()
 			mi.mesh = blob
 			mi.material_override = Palette.m(&"drift")
 			mi.layers = Station.LAYER_OUT
 			mi.position = p + Vector3(0, -h * 0.25, 0)
-			var along := absf(nrm.x) < 0.5
-			var len := rng.randf_range(1.4, 2.2)
-			var wid := rng.randf_range(0.8, 1.15)
 			mi.scale = Vector3(len if along else wid, h * rng.randf_range(0.75, 1.0), wid if along else len)
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			add_child(mi)
@@ -3468,7 +3469,7 @@ func _build_forest() -> void:
 			continue
 		if _flat_dist(p, Vector3(14.5, 0.0, -13.5)) < 7.5 or (p.x > 11.0 and p.x < 18.0 and p.z > -16.0 and p.z < 4.0):
 			continue
-		if _flat_dist(p, LAKE) < LAKE_R + 4.0 or _flat_dist(p, LAKE_SHACK) < 6.0 or _flat_dist(p, REPEATER) < 9.0 or _flat_dist(p, BUNKER) < 6.0 or _flat_dist(p, HELIPAD) < 9.5:
+		if _flat_dist(p, LAKE) < LAKE_R + 4.0 or _flat_dist(p, LAKE_SHACK) < 6.0 or _flat_dist(p, REPEATER) < 9.0 or _flat_dist(p, BUNKER) < 6.0 or _flat_dist(p, HELIPAD) < 9.5 or _flat_dist(p, Vector3(17.2, 0.0, 19.5)) < 4.5:
 			continue
 
 		var dens: float
@@ -5326,8 +5327,8 @@ func _build_station_road_dressing() -> void:
 # --- Дополнительное обустройство двора станции (Yard Clutter) ----------------
 
 func _build_yard_clutter() -> void:
-	# 1. Станционная уборная (Outhouse) на пути к дровянику
-	var outhouse_pos := Vector3(14.2, Terrain.height(14.2, 19.5), 19.5)
+	# 1. Станционная уборная (Outhouse) в стороне от тропы к дровянику
+	var outhouse_pos := Vector3(17.0, Terrain.height(17.0, 19.5), 19.5)
 	var outhouse_prop := Props.outhouse()
 	outhouse_prop.position = outhouse_pos
 	outhouse_prop.rotation.y = deg_to_rad(-85.0)
@@ -5335,7 +5336,7 @@ func _build_yard_clutter() -> void:
 	var o_col := Geo.collider(self, Vector3(1.3, 2.4, 1.3), outhouse_pos + Vector3(0, 1.2, 0))
 	o_col.rotation.y = deg_to_rad(-85.0)
 
-	# Мостки от тропы к двери уборной
+	# Мостки от тропы к двери уборной (от x=14.0 у тропы до порога x=16.4)
 	var outhouse_walk := Props.plank_walkway(2.4)
 	outhouse_walk.position = Vector3(15.2, Terrain.height(15.2, 19.5) + 0.02, 19.5)
 	outhouse_walk.rotation.y = deg_to_rad(90.0)
