@@ -8,11 +8,17 @@ const ROOT = path.resolve(__dirname, "..");
 const required = [
   "preview/index.html",
   "preview/server.mjs",
+  "scripts/autoload/audio_mix.gd",
+  "scripts/director/director.gd",
+  "scripts/player/player.gd",
+  "scripts/ui/barograph_ui.gd",
+  "scripts/ui/darkroom_ui.gd",
   "scripts/ui/hud.gd",
   "scripts/ui/journal_tm1_ui.gd",
   "scripts/ui/main_menu.gd",
   "scripts/ui/pause_menu.gd",
   "scripts/ui/ui_kit.gd",
+  "assets/shaders/frost.gdshader",
   "assets/shaders/trodden_path.gdshader",
   "scripts/data/phases.gd",
   "scripts/loc/strings.gd",
@@ -25,9 +31,11 @@ const required = [
   "scripts/world/footprints.gd",
   "scripts/world/models.gd",
   "scripts/world/props.gd",
+  "scripts/world/radio_orders.gd",
   "scripts/world/station.gd",
   "scripts/world/yard.gd",
   "scripts/world/yrka.gd",
+  "scripts/world/zenit.gd",
 ];
 
 const missing = required.filter((rel) => !fs.existsSync(path.join(ROOT, rel)));

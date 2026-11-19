@@ -165,7 +165,7 @@ func snap() -> void:
 		to.y = 0.0
 		ghost_pos = cam.global_position + to.normalized() * minf(to.length(), 5.0)
 		ghost_pos.y = Game.player.global_position.y - 0.05
-	elif force_ghost or (Game.is_night() and Game.night >= 3 and Game.rng.randf() < (0.12 if Game.night < 5 else 0.22)):
+	elif force_ghost or (Game.is_night() and Game.night >= 2 and Game.rng.randf() < (0.18 if Game.night == 2 else (0.28 if Game.night < 5 else 0.36))):
 		ghost_pos = _ghost_spot(cam)
 	if ghost_pos != Vector3.INF:
 		_place_ghost(ghost_pos, voice)

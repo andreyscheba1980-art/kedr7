@@ -133,6 +133,23 @@ func request_ambient(amount: float, reason: String) -> bool:
 	return true
 
 
+## Находимся ли в «окне мнимого покоя» (после сильного испуга/скримера), когда не надо добивать игрока вторым событием подряд.
+func in_calm_window() -> bool:
+	return hold or phase == Phase.PLAYING or (phase == Phase.RELAX and cooldown_left > 0.0)
+
+
+## Принудительная фаза «мнимого покоя» (45–65 с) после жёсткого скримера или погони — чтобы качели страха работали.
+func force_relax(sec := 52.0, release := 38.0, reason := "") -> void:
+	tension = maxf(tension - release, 8.0)
+	cooldown_left = maxf(cooldown_left, sec)
+	_peak_time = 0.0
+	_ambient_wait = maxf(_ambient_wait, sec * 0.75)
+	if phase != Phase.PLAYING:
+		phase = Phase.RELAX
+	if reason != "":
+		_log("■ %s — окно покоя %.0f с" % [reason, cooldown_left])
+
+
 ## Крупное событие другой системы (осада, диверсия) вместо испуга из пула: только на пике,
 ## после него — передышка, как у обычного испуга.
 func take_peak(reason: String, release := 40.0, rest := 60.0) -> bool:
@@ -142,10 +159,11 @@ func take_peak(reason: String, release := 40.0, rest := 60.0) -> bool:
 		return false
 	scares_played += 1
 	tension = maxf(tension - release, 0.0)
-	cooldown_left = rest
+	cooldown_left = maxf(rest, 48.0)
 	_peak_time = 0.0
+	_ambient_wait = maxf(_ambient_wait, 35.0)
 	phase = Phase.RELAX
-	_log("▶ %s (событие охотника), передышка %.0f с" % [reason, rest])
+	_log("▶ %s (событие охотника), передышка %.0f с" % [reason, cooldown_left])
 	return true
 
 
@@ -176,12 +194,13 @@ func _process(delta: float) -> void:
 				# Если во дворе/на улице нет кандидатов для испуга или ложной тревоги,
 				# даём естественную передышку, чтобы напряжение и музыка не висели вечно на 100%.
 				tension = maxf(tension - 45.0, 15.0)
-				cooldown_left = 35.0
+				cooldown_left = 45.0
 				_peak_time = 0.0
 				phase = Phase.RELAX
 				_log("пик без кандидатов: естественная разрядка")
 		Phase.RELAX:
-			tension = minf(tension + rate * 0.25 * delta, 100.0)
+			# В окне мнимого покоя напряжение слегка выдыхается, чтобы игрок успел расслабиться перед новым ударом
+			tension = maxf(tension - rate * 0.22 * delta, 10.0)
 			cooldown_left -= delta
 			if cooldown_left <= 0.0:
 				phase = Phase.BUILD

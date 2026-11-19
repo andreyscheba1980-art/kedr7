@@ -151,6 +151,9 @@ var _dog_eyes_fled := false
 var _cellar_knocked := false
 var _closed_trail_stare_t := 0.0
 var _closed_trail_triggered := false
+var _cellar_window_tracks_done := false
+var _cellar_window_tracks_root: Node3D = null
+var _booth_ambush_done := false
 static var _trail_mat: ShaderMaterial = null
 
 
@@ -688,7 +691,8 @@ func _process(delta: float) -> void:
 			_diesel_zone_noticed = true
 			Game.hud.subtitle(Loc.t(&"sub.diesel_zone"), 4.5)
 
-	# Аномалия Ночи 6: цепочка босых следов от будки в метель
+	# Живые босые следы от ледника к окну аппаратной (Ночи 2–5) + Ночь 6 от будки, заметаемые метелью на глазах
+	_process_cellar_window_tracks(delta)
 	_process_night6_bare_tracks(delta)
 
 	# Уличные кошмары: появление сущностей и пугающая атмосфера в тайге
@@ -2229,6 +2233,12 @@ func _interact_meteo_booth(booth_prop: MeteoBoothScreen, booth_pos: Vector3) -> 
 		Game.audio.play_3d("res://assets/sfx/door_handle.ogg", booth_pos, -2.0)
 		Game.audio.play_3d("res://assets/sfx/house_creak.ogg", booth_pos, -6.0)
 
+		# ЖЁСТКИЙ СКРИМЕР #3: на Ночи 3+ один раз за смену внутри психрометрической будки +36.6°C и взгляд в упор!
+		if Game.is_night() and Game.night >= 3 and not _booth_ambush_done and not Director.in_calm_window() and Director.tension >= 45.0:
+			_booth_ambush_done = true
+			_execute_meteo_booth_ambush(booth_pos)
+			return
+
 		if Game.synoptic != null and Game.synoptic.wind_speed > 11.0:
 			get_tree().create_timer(0.35, false).timeout.connect(func() -> void:
 				if is_instance_valid(self):
@@ -2239,6 +2249,66 @@ func _interact_meteo_booth(booth_prop: MeteoBoothScreen, booth_pos: Vector3) -> 
 			EventBus.ui_requested.emit(&"thermometer"))
 	else:
 		EventBus.ui_requested.emit(&"thermometer")
+
+
+func _execute_meteo_booth_ambush(booth_pos: Vector3) -> void:
+	var p := Game.player
+	if p == null:
+		return
+	if Game.anomalies != null:
+		Game.anomalies.occur(&"therm_366")
+	# Тёплое облако пара из открытой будки при -40°C
+	if OS.get_name() != "headless":
+		var fx := CPUParticles3D.new()
+		fx.amount = 18
+		fx.lifetime = 1.8
+		fx.one_shot = true
+		fx.explosiveness = 0.85
+		fx.direction = (p.global_position - booth_pos).normalized()
+		fx.spread = 32.0
+		fx.initial_velocity_min = 0.8
+		fx.initial_velocity_max = 1.9
+		fx.scale_amount_min = 0.35
+		fx.scale_amount_max = 0.95
+		fx.color_ramp = Player.puff_ramp()
+		var qm := QuadMesh.new()
+		qm.size = Vector2(0.55, 0.55)
+		qm.material = Player.puff_material(0.42)
+		fx.mesh = qm
+		fx.position = booth_pos + Vector3(0, 1.45, 0)
+		add_child(fx)
+		fx.emitting = true
+		Geo.free_after(fx, 2.4)
+	# Лицо/глаза прямо в проёме будки в 12 FPS + выбивает фонарь «Жучок»!
+	var rig: Node3D = Creatures.make_yrka()
+	add_child(rig)
+	var base_p := booth_pos + Vector3(0, 0.15, 0)
+	rig.global_position = base_p
+	rig.look_at(Vector3(p.global_position.x, base_p.y, p.global_position.z), Vector3.UP)
+	if rig.has_method(&"set_eye_glow"):
+		rig.call(&"set_eye_glow", 3.6)
+	Game.audio.play_2d("res://assets/audio/growl.ogg", 3.0)
+	Game.audio.play_2d("res://assets/audio/shriek.ogg", 2.0)
+	if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):
+		Game.hud.trigger_jumpscare_flash(0.92, 0.34)
+	var dir_p := (p.global_position - base_p)
+	dir_p.y = 0.0
+	dir_p = dir_p.normalized() if dir_p.length_squared() > 0.01 else Vector3.FORWARD
+	for i in range(4):
+		if not is_instance_valid(rig):
+			break
+		rig.global_position = base_p + dir_p * (0.22 * float(i + 1))
+		rig.rotation.z = deg_to_rad(15.0 if i % 2 == 0 else -15.0)
+		await get_tree().create_timer(0.083, false).timeout
+	if is_instance_valid(rig):
+		rig.queue_free()
+	# От ужаса и удара гаснет «Жучок» — заставляет в панике крутить динамо на метеоплощадке!
+	if p.flashlight_on():
+		p.toggle_flashlight()
+	Game.flash_charge = maxf(Game.flash_charge - 14.0, 6.0)
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.booth_ambush"), 5.0, 2)
+	Director.force_relax(55.0, 34.0, "засада +36.6 в психрометрической будке")
 
 
 func _on_mast_panel(_p: Player) -> void:
@@ -3742,18 +3812,69 @@ func _process_night6_bare_tracks(delta: float) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.night6_bare_tracks"), 5.5)
 			Director.add_tension(15.0, "босые следы с шагом 1.5 метра")
 
-	# Заметание следов ветром за ~90 секунд
+	# Заметание следов ветром и метелью прямо на глазах
+	var wind_rate: float = 1.0 + (weather.intensity * 1.8 if weather != null else 0.0)
 	if _bare_tracks_root != null and is_instance_valid(_bare_tracks_root):
 		for ch in _bare_tracks_root.get_children():
 			for fp in ch.get_children():
 				if not (fp is Node3D):
 					continue
-				var life: float = fp.get_meta("life", 120.0) - delta
+				var life: float = fp.get_meta("life", 95.0) - delta * wind_rate
 				fp.set_meta("life", life)
-				if life < 20.0:
-					(fp as Node3D).scale *= 0.99
+				if life < 28.0:
+					(fp as Node3D).scale *= clampf(1.0 - delta * 0.45 * wind_rate, 0.85, 0.995)
 				if life <= 0.0:
 					fp.queue_free()
+
+
+## Живые босые следы от ледника прямо к окну радиорубки (Ночи 2–5): пока игрок идёт вдоль них с «Жучком», метель стирает их на глазах.
+func _process_cellar_window_tracks(delta: float) -> void:
+	if not Game.is_night() or Game.night < 2 or Game.night > 5:
+		return
+	var win_pos := Vector3(9.2, 0.0, -2.0)
+	var cellar_pos := cellar_prop.global_position if (cellar_prop != null and is_instance_valid(cellar_prop)) else Vector3(4.8, 0.0, -9.0)
+	if not _cellar_window_tracks_done and not Game.is_indoors() and Game.player != null and (Game.after_hour(2) or Director.tension >= 38.0):
+		_cellar_window_tracks_done = true
+		_cellar_window_tracks_root = Node3D.new()
+		_cellar_window_tracks_root.name = "CellarWindowBareTracks"
+		add_child(_cellar_window_tracks_root)
+		var route := PackedVector3Array([
+			Vector3(cellar_pos.x, 0.0, cellar_pos.z + 1.1),
+			Vector3(6.2, 0.0, -6.5),
+			Vector3(7.9, 0.0, -4.1),
+			Vector3(win_pos.x, 0.0, win_pos.z - 0.35),
+		])
+		Footprints.trail(_cellar_window_tracks_root, &"bare", route, 0.0, 0.48)
+		# Помечаем время жизни по порядку следов: ранние у ледника заметает быстрее, свежие у окна держатся чуть дольше
+		var idx := 0
+		for ch in _cellar_window_tracks_root.get_children():
+			for fp in ch.get_children():
+				if fp is Node3D:
+					fp.set_meta("life", 42.0 + float(idx) * 2.2)
+					idx += 1
+		if Game.player.global_position.distance_to(win_pos) < 26.0 or Game.player.global_position.distance_to(cellar_pos) < 24.0:
+			Game.audio.play_3d("res://assets/audio/ice_hit.ogg", Vector3(9.2, 1.45, -2.0), -3.0, 12.0)
+			if Game.hud != null:
+				Game.hud.subtitle(Loc.t(&"sub.cellar_window_tracks"), 5.5, 1)
+			Director.add_tension(12.0, "босые следы от ледника к окну")
+
+	if _cellar_window_tracks_root != null and is_instance_valid(_cellar_window_tracks_root):
+		var wind_rate: float = 1.0 + (weather.intensity * 2.1 if weather != null else 0.3)
+		var any_left := false
+		for ch in _cellar_window_tracks_root.get_children():
+			for fp in ch.get_children():
+				if not (fp is Node3D):
+					continue
+				any_left = true
+				var life: float = fp.get_meta("life", 55.0) - delta * wind_rate
+				fp.set_meta("life", life)
+				if life < 22.0:
+					(fp as Node3D).scale *= clampf(1.0 - delta * 0.55 * wind_rate, 0.82, 0.995)
+				if life <= 0.0:
+					fp.queue_free()
+		if not any_left:
+			_cellar_window_tracks_root.queue_free()
+			_cellar_window_tracks_root = null
 
 
 # --- Уличные кошмары и сущности ----------------------------------------------
@@ -4216,8 +4337,25 @@ func _try_spawn_outdoor_entity() -> void:
 		return
 	if Game.yrka != null and Game.yrka.stage == YrkaThreat.Stage.CHASE:
 		return
+	if Director.in_calm_window():
+		return
 
 	var p_pos := p.global_position
+	var cam_fwd := -p.camera.global_basis.z if p.camera != null else -p.global_basis.z
+	cam_fwd.y = 0.0
+	cam_fwd = cam_fwd.normalized() if cam_fwd.length_squared() > 0.01 else Vector3.FORWARD
+
+	# Периферийный Жердяй: сначала пробуем поставить точно на краю поля зрения (28–48° между верхушками елей)
+	if Game.rng.randf() < 0.65:
+		var side := -1.0 if Game.rng.randf() < 0.5 else 1.0
+		var ang := deg_to_rad(side * Game.rng.randf_range(28.0, 48.0))
+		var periph_dir := cam_fwd.rotated(Vector3.UP, ang)
+		var periph_pt := p_pos + periph_dir * Game.rng.randf_range(24.0, 38.0)
+		periph_pt.y = Terrain.height(periph_pt.x, periph_pt.z)
+		if Game.level != null and not Game.level.is_pos_inside_house(periph_pt):
+			_spawn_outdoor_entity(&"zherdyai", periph_pt)
+			return
+
 	var spawn_candidates: Array[Dictionary] = [
 		{"type": &"zherdyai", "pos": Vector3(45.0, 0.0, -28.0), "min_night": 1}, # опушка за метео
 		{"type": &"zherdyai", "pos": Vector3(26.0, 0.0, -38.0), "min_night": 1}, # деревья у мачты
@@ -4233,7 +4371,7 @@ func _try_spawn_outdoor_entity() -> void:
 		var pt: Vector3 = cand["pos"]
 		var dist := p_pos.distance_to(pt)
 		# Жердяй не подходит: его видно только издалека, между стволами
-		var near := 25.0 if cand["type"] == &"zherdyai" else 10.0
+		var near := 22.0 if cand["type"] == &"zherdyai" else 10.0
 		var far := 70.0 if cand["type"] == &"zherdyai" else 35.0
 		if dist >= near and dist <= far:
 			_spawn_outdoor_entity(cand["type"], pt)
@@ -4263,15 +4401,30 @@ func _spawn_outdoor_entity(type: StringName, pt: Vector3) -> void:
 		_outdoor_entity_type = type
 
 
+var _zherdyai_dismissing := false
+
+
+## Периферийный Жердяй в 12 FPS: при повороте взгляда не скользит плавно, а делает рваные step-motion шаги за ствол ели.
 func _dismiss_zherdyai() -> void:
-	if _outdoor_entity == null or not is_instance_valid(_outdoor_entity):
+	if _zherdyai_dismissing or _outdoor_entity == null or not is_instance_valid(_outdoor_entity):
 		return
-	var pos := _outdoor_entity.global_position
-	Game.audio.play_3d("res://assets/audio/tree_creak.ogg", pos, 1.5)
-	var tw := create_tween()
-	var back := _outdoor_entity.global_basis.z * 6.0
-	tw.tween_property(_outdoor_entity, "global_position", pos + back, 0.7).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	await tw.finished
+	_zherdyai_dismissing = true
+	var ent := _outdoor_entity
+	var start_pos := ent.global_position
+	Game.audio.play_3d("res://assets/audio/tree_creak.ogg", start_pos, 2.0, 18.0)
+	var side_dir := ent.global_basis.x * (1.0 if Game.rng.randf() < 0.5 else -1.0)
+	var retreat_vec := side_dir * 3.8 + ent.global_basis.z * 5.2
+	# 9 рваных кадров по 0.083 с (= 12 FPS uncanny valley)
+	for step_i in range(9):
+		if not is_instance_valid(ent):
+			break
+		var k := float(step_i + 1) / 9.0
+		var next_p := start_pos + retreat_vec * (k * k)
+		next_p.y = Terrain.height(next_p.x, next_p.z)
+		ent.global_position = next_p
+		ent.rotation.z = deg_to_rad(14.0 if step_i % 2 == 0 else -11.0)
+		await get_tree().create_timer(0.083, false).timeout
+	_zherdyai_dismissing = false
 	_clear_outdoor_entity()
 
 

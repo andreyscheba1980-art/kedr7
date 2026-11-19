@@ -1,9 +1,22 @@
 # res://scripts/autoload/audio_mix.gd
 extends Node
 
-## Звуковые шины и эффект приглушения улицы изнутри избы (LowPass filter).
+## 3 акустические зоны (Изба / Сени / Двор): динамический LowPass + лёгкий Reverb.
+## За закрытой дверью буран глухо давит низами (~360 Гц), в сенях — промежуточный тамбур (~1150 Гц),
+## а в момент открытия двери ветер мгновенно бьёт полным спектром (18000 Гц).
 var _bus_idx := -1
+var _sfx_idx := -1
 var _lp: AudioEffectLowPassFilter = null
+var _reverb: AudioEffectReverb = null
+var _target_cutoff := 18000.0
+var _target_wet := 0.0
+var _target_room := 0.25
+
+## Совместимость со ссылками вида `AudioMix.filter` в station.gd
+var filter: AudioEffectLowPassFilter:
+	get:
+		return _lp
+
 
 func _ready() -> void:
 	_bus_idx = AudioServer.get_bus_index(&"Outdoor")
@@ -12,7 +25,7 @@ func _ready() -> void:
 		_bus_idx = AudioServer.bus_count - 1
 		AudioServer.set_bus_name(_bus_idx, &"Outdoor")
 		AudioServer.set_bus_send(_bus_idx, &"Master")
-	
+
 	for i in range(AudioServer.get_bus_effect_count(_bus_idx)):
 		var eff := AudioServer.get_bus_effect(_bus_idx, i)
 		if eff is AudioEffectLowPassFilter:
@@ -21,8 +34,62 @@ func _ready() -> void:
 	if _lp == null:
 		_lp = AudioEffectLowPassFilter.new()
 		_lp.cutoff_hz = 18000.0
+		_lp.resonance = 0.55
 		AudioServer.add_bus_effect(_bus_idx, _lp)
 
-func set_indoor(amount: float) -> void:  # 1 = внутри, дверь закрыта
+	_sfx_idx = AudioServer.get_bus_index(&"SFX")
+	var rev_bus := _sfx_idx if _sfx_idx != -1 else _bus_idx
+	for i in range(AudioServer.get_bus_effect_count(rev_bus)):
+		var eff := AudioServer.get_bus_effect(rev_bus, i)
+		if eff is AudioEffectReverb:
+			_reverb = eff
+			break
+	if _reverb == null:
+		_reverb = AudioEffectReverb.new()
+		_reverb.room_size = 0.28
+		_reverb.damping = 0.72
+		_reverb.wet = 0.0
+		_reverb.dry = 1.0
+		AudioServer.add_bus_effect(rev_bus, _reverb)
+
+
+func _process(delta: float) -> void:
 	if _lp != null:
-		_lp.cutoff_hz = lerpf(18000.0, 700.0, clampf(amount, 0.0, 1.0))
+		# При открытии двери (рост частоты) — почти мгновенный удар ветра; при закрытии — быстрое приглушение.
+		var spd := 22.0 if _target_cutoff > _lp.cutoff_hz else 9.0
+		_lp.cutoff_hz = lerpf(_lp.cutoff_hz, _target_cutoff, minf(delta * spd, 1.0))
+	if _reverb != null:
+		_reverb.wet = lerpf(_reverb.wet, _target_wet, minf(delta * 5.0, 1.0))
+		_reverb.room_size = lerpf(_reverb.room_size, _target_room, minf(delta * 4.0, 1.0))
+
+
+func set_indoor(amount: float) -> void:  # 1 = внутри избы, 0 = двор / открытая дверь
+	var k := clampf(amount, 0.0, 1.0)
+	_target_cutoff = lerpf(18000.0, 360.0, k)
+	_target_wet = lerpf(0.02, 0.14, k)
+	_target_room = lerpf(0.15, 0.30, k)
+	if _lp != null and k <= 0.01:
+		_lp.cutoff_hz = 18000.0
+
+
+## Явная установка одной из 3 акустических зон: Изба / Сени / Двор.
+func set_zone_acoustics(zone: StringName, door_open: bool) -> void:
+	if door_open or zone in [&"yard", &"meteo", &"mast", &"shed", &"woodpile", &"forest", &"lake", &"zimnik"]:
+		_target_cutoff = 18000.0
+		_target_wet = 0.02
+		_target_room = 0.15
+		if door_open and _lp != null:
+			_lp.cutoff_hz = maxf(_lp.cutoff_hz, 12000.0)   # мгновенный «удар» ветра при распахивании двери
+	elif zone == &"vestibule":
+		_target_cutoff = 1150.0
+		_target_wet = 0.22
+		_target_room = 0.44   # гулкий холодный тамбур
+	elif zone == &"bunker" or zone == &"gen_shack":
+		_target_cutoff = 520.0
+		_target_wet = 0.30
+		_target_room = 0.56
+	else:
+		# Изба / радиорубка / коридор / кладовая / чердак: глухие 360 Гц + тёплый деревянный отклик
+		_target_cutoff = 360.0
+		_target_wet = 0.13
+		_target_room = 0.28

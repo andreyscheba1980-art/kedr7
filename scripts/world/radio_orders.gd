@@ -19,7 +19,10 @@ const KINDS := {
 	&"fake_report_wrong": [&"mlf_report", &"ordf.report", Radio.Pass.FAKE_WRONG, 40, &"report", true],
 	&"fake_report_clean": [&"mlf_report", &"ordf.report", Radio.Pass.FAKE_CLEAN, 40, &"report", true],
 	&"fake_door_wrong": [&"mlf_door", &"ordf.door", Radio.Pass.FAKE_WRONG, 30, &"door", true],
+	&"fake_vane_trap": [&"mlf_report", &"ordf.vane_trap", Radio.Pass.FAKE_WRONG, 50, &"vane_trap", true],
 }
+
+const CLOSED_TRAIL_TRAP := Vector3(-4.5, 0.0, 10.2)   ## тупиковая закрытая просека в тайгу за двором
 
 var _queue: Array = []          ## [[минута, вид], ...]
 var _kind: StringName = &""     ## активный приказ
@@ -55,7 +58,42 @@ func objective() -> String:
 			return Loc.t(&"ord.obj.check", [Game.minutes_to_clock(_until)])
 		&"door":
 			return Loc.t(&"ord.obj.door")
+		&"vane_trap":
+			return Loc.t(&"ord.obj.vane_trap", [Game.minutes_to_clock(_until)])
 	return ""
+
+
+func _process(_delta: float) -> void:
+	if not active() or _busy or Game.dead or Game.shift_over or Game.player == null:
+		return
+	if StringName(KINDS[_kind][4]) != &"vane_trap":
+		return
+	if not Game.is_outside():
+		return
+	var p_xz := Vector2(Game.player.global_position.x, Game.player.global_position.z)
+	var vane_pos := Yard.METEO + Yard.M_VANE
+	var near_closed_trail := p_xz.distance_to(Vector2(CLOSED_TRAIL_TRAP.x, CLOSED_TRAIL_TRAP.z)) < 7.5
+	var near_far_vane := p_xz.distance_to(Vector2(vane_pos.x, vane_pos.z)) < 10.5
+	if near_closed_trail or near_far_vane:
+		_trigger_vane_ambush()
+
+
+func _trigger_vane_ambush() -> void:
+	_kind = &""
+	_busy = true
+	NightMemory.mark(&"obeyed_fake")
+	if Game.audio != null:
+		Game.audio.trigger_vacuum(2.6)
+		Game.audio.play_2d("res://assets/audio/radio_anomaly.ogg", 1.5)
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"ordf.vane_ambush"), 4.5, 2)
+	await get_tree().create_timer(1.1, false).timeout
+	_busy = false
+	if Game.dead or Game.shift_over or not Game.is_outside():
+		return
+	_gave_away()
+	if Game.yrka != null and Game.yrka.enabled:
+		Game.yrka.lure_strike()
 
 
 func _on_minute(m: int) -> void:

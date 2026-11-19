@@ -9,8 +9,64 @@ const PORT = Number(process.env.PORT || 3000);
 
 const MODIFIED_FILES = [
   {
+    path: "scripts/autoload/audio_mix.gd",
+    role: "3 акустические зоны (изба 360 Гц + тёплый реверб / сени 1150 Гц / двор 18 кГц) + фикс AudioMix.filter",
+  },
+  {
+    path: "scripts/director/director.gd",
+    role: "Окно мнимого покоя (45–65 с), in_calm_window(), force_relax() и выдох tension в RELAX",
+  },
+  {
+    path: "scripts/player/player.gd",
+    role: "Хруст снега по температуре (-15..-42°C), отдача динамо «Жучок» и микро-дрожь прицела в мороз",
+  },
+  {
+    path: "scripts/ui/barograph_ui.gd",
+    role: "Живой самописец М-22: кардиограмма пера при Ырке, тремор рычага и чернильная надпись на сетке",
+  },
+  {
+    path: "scripts/ui/darkroom_ui.gd",
+    role: "Скример #4 «Красный кадр» под 8× лупой (задержка 1.15 с, зум, визг, «ОН УЖЕ В ДОМЕ»)",
+  },
+  {
     path: "scripts/ui/hud.gd",
-    role: "Аналоговый HUD 1983: живой прицел, гальванометр, панель «Волна-К» + 6Е1П и телетайпный отчёт",
+    role: "Аналоговый HUD 1983, 6Е1П с просадкой от ДЭС-8 и вспышка жёсткого скримера trigger_jumpscare_flash()",
+  },
+  {
+    path: "scripts/world/radio_orders.gd",
+    role: "Фальшивый приказ «Свердловск-44» (fake_vane_trap) с засадой Ырки у флюгера / закрытой тропы",
+  },
+  {
+    path: "scripts/world/zenit.gd",
+    role: "Проявка невидимого глазом силуэта на плёнке Зенит-Е с Ночи 2+ (18%/28%/36%)",
+  },
+  {
+    path: "assets/shaders/frost.gdshader",
+    role: "Процедурный отпечаток ладони и 5 пальцев снаружи (hand_reveal), подтаивающий в инее окна",
+  },
+  {
+    path: "scripts/world/station.gd",
+    role: "Самовар/ледяной чай, пар в сенях, 22-с просадка ДЭС-8, ладонь на стекле, 3 зоны звука и Скримеры #1/#2",
+  },
+  {
+    path: "scripts/world/yard.gd",
+    role: "Следы от ледника к окну в метель, периферийный Жердяй в 12 FPS и Скример #3 в будке +36.6°C",
+  },
+  {
+    path: "scripts/world/anomalies.gd",
+    role: "Аномалия frozen_tea (ледяной чай и почерневший мандарин) + 5 дворовых/домовых микро-аномалий",
+  },
+  {
+    path: "scripts/world/yrka.gd",
+    role: "Акустический вакуум в CALLING и просадка динамо-фонаря в PRESSURE",
+  },
+  {
+    path: "scripts/data/phases.gd",
+    role: "Расписание fake_vane_trap на Ночах 3–4, темп смен и активная Ырка",
+  },
+  {
+    path: "scripts/loc/strings.gd",
+    role: "Все новые ключи субтитров, приказов, самовара, самописца и 4 скримеров (RU/EN)",
   },
   {
     path: "scripts/ui/journal_tm1_ui.gd",
@@ -63,30 +119,6 @@ const MODIFIED_FILES = [
   {
     path: "scripts/world/footprints.gd",
     role: "Следы в снегу (синхронизировано с актуальным main)",
-  },
-  {
-    path: "scripts/world/yard.gd",
-    role: "Коридорная планировка двора, сугробы вдоль стен и поляна у уборной (синхронизировано с main)",
-  },
-  {
-    path: "scripts/world/anomalies.gd",
-    role: "5 новых микро-аномалий (DEFS, _apply/_revert, журнал ТМ-1)",
-  },
-  {
-    path: "scripts/world/station.gd",
-    role: "Мерцание гирлянды 1983 года, реакция на блэкаут и garland_red",
-  },
-  {
-    path: "scripts/world/yrka.gd",
-    role: "Акустический вакуум в CALLING и просадка динамо-фонаря в PRESSURE",
-  },
-  {
-    path: "scripts/data/phases.gd",
-    role: "Темп ночей (~11 мин), зубы Ночи 1 и активная Ырка с Ночи 2",
-  },
-  {
-    path: "scripts/loc/strings.gd",
-    role: "Сухой слог вахтенного журнала 1983 г. + ключи 5 аномалий (RU/EN)",
   },
 ];
 

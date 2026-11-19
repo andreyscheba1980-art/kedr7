@@ -406,8 +406,7 @@ static var log_subs := false   ## автотест: печатать кажды�
 func subtitle(text: String, duration := 3.0, priority := 1, custom_color := Color.TRANSPARENT) -> void:
 	var now := Time.get_ticks_msec()
 	if log_subs:
-		print("[sub] ", text.replace("
-", " ").left(90))
+		print("[sub] ", text.replace("\n", " ").left(90))
 	if priority < _sub_priority and now < _sub_until:
 		return
 	_sub_priority = priority
@@ -720,6 +719,44 @@ func flash_face(duration: float, tex: Texture2D = null) -> void:
 		await get_tree().create_timer(0.04, false).timeout
 		t += 0.04
 	_face.visible = false
+
+
+## Жёсткий PS1-удар скримера: рваная вспышка лица (12 FPS), дрожь экрана, резкий зум FOV и красный/белый строб.
+func trigger_jumpscare_flash(intensity := 1.0, duration := 0.36) -> void:
+	if OS.get_name() == "headless":
+		return
+	if Game.player != null and Game.player.camera != null:
+		var cam := Game.player.camera
+		var base_fov := cam.fov
+		cam.fov = maxf(base_fov - 12.0 * intensity, 34.0)
+		var tw := create_tween()
+		tw.tween_property(cam, "fov", base_fov, maxf(duration + 0.25, 0.45)).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		Game.player.shake(0.10 * intensity, duration + 0.18)
+	Game.vibrate(0.85 * intensity, 0.95 * intensity, duration)
+	# Выбор жуткого лица из пула текстур и быстрая рваная отрисовка
+	var n := 9
+	var k := randi() % n
+	if k == _last_face:
+		k = (k + 1) % n
+	_last_face = k
+	var path := FACE_TEX if k == 0 else "res://assets/textures/face_flash_%d.png" % (k + 1)
+	if ResourceLoader.exists(path):
+		_face.texture = load(path)
+	var step := 0.045
+	var t := 0.0
+	var base_scale := _face.scale
+	while t < duration and is_inside_tree():
+		_face.visible = randf() > 0.12
+		_face.position = Vector2(randf_range(-42.0, 12.0) * intensity, randf_range(-34.0, 10.0) * intensity)
+		_face.scale = base_scale * randf_range(1.02, 1.14)
+		var strobe := randf() < 0.35
+		_face.modulate = Color(1.0, 0.25, 0.20, 0.95) if strobe else Color(0.95, 0.95, 1.0, 0.90)
+		await get_tree().create_timer(step, false).timeout
+		t += step
+	if is_instance_valid(_face):
+		_face.visible = false
+		_face.scale = base_scale
+		_face.position = Vector2.ZERO
 
 
 func _format_screen_meta() -> String:
@@ -1228,7 +1265,12 @@ class _RadioFaceplate extends Control:
 		var eye_r := 30.0
 		draw_circle(eye_c, eye_r + 5.0, Color(0.18, 0.16, 0.12, 0.95))
 		draw_circle(eye_c, eye_r + 2.0, Color(0.02, 0.04, 0.03, 1.0))
-		var phos_col := Color(0.75, 0.42, 1.0, 0.95) if _overload else Color(0.10, 0.98, 0.40, 0.88)
+		var sag := 0.0
+		if Game.level != null and "power_sag" in Game.level:
+			sag = clampf(float(Game.level.get("power_sag")), 0.0, 1.0)
+		var sag_k := 1.0 - sag * (0.58 + 0.22 * sin(_t * 28.0))
+		var phos_col := Color(0.75, 0.42, 1.0, 0.95) if _overload else Color(0.10, 0.98, 0.40, 0.88).lerp(Color(0.85, 0.48, 0.12, 0.72), sag * 0.65)
+		phos_col = Color(phos_col.r * sag_k, phos_col.g * sag_k, phos_col.b * sag_k, phos_col.a)
 		draw_circle(eye_c, eye_r, phos_col * Color(1, 1, 1, 0.25))
 		draw_arc(eye_c, eye_r * 0.72, 0.0, TAU, 36, phos_col, 9.0, true)
 		# Два смыкающихся теневых сектора: при _eye_smooth = 0 щель широкая, при 1.0 — лепестки сомкнуты

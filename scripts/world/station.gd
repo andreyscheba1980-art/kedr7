@@ -152,6 +152,26 @@ var _susedko_hearth_timer := 25.0
 var _treat_bread: Node3D = null          ## хлеб на блюдце у подпечья: ночью его съедают
 var _treat_set_min := -1.0               ## когда поставили угощение (минуты смены)
 var _treat_eaten_seen := true            ## игрок уже заметил пустое блюдце
+## Единая электросеть от ДЭС-8: 0..1 — фаза пред-блэкаутной просадки напряжения (~22 с до остановки дизеля)
+var power_sag := 0.0
+var _power_sag_t := 0.0
+var _power_sag_active := false
+var _power_sag_hum: AudioStreamPlayer = null
+var _door_draft_t := 0.0
+var _door_steam_fx: CPUParticles3D = null
+var _frozen_tea_active := false
+var _frozen_tea_ice: Node3D = null
+var _ny_still_node: Node3D = null
+var _frost_hand_reveal := 0.0
+var _frost_hand_live_warned := false
+var _last_acoustic_zone := &""
+## Жёсткие скримеры внутри избы (уважают окно покоя Director.in_calm_window())
+var _door_ambush_armed := false
+var _door_ambush_done := false
+var _door_ambush_timer := 135.0
+var _ui_dwell_t := 0.0
+var _ui_was_open := false
+var _ui_ambush_done := false
 
 var _clock_pendulum: Node3D
 var _kettle_steam: CPUParticles3D
@@ -232,7 +252,8 @@ func _ready() -> void:
 	EventBus.chimney_iced_changed.connect(_on_chimney_iced)
 	EventBus.clock_minute.connect(_on_clock_minute)
 	_on_chimney_iced(Game.chimney_iced)
-	AudioMix.set_indoor(1.0 if not door_open else 0.0)
+	AudioMix.set_zone_acoustics(Game.zone, door_open)
+	_last_acoustic_zone = Game.zone
 
 
 var _last_pips_hour := -1
@@ -312,6 +333,12 @@ func _process(delta: float) -> void:
 	_tick_creak(delta)
 	_tick_indoor_shadows(delta)
 	_tick_garland()
+	_tick_power_sag(delta)
+	_tick_acoustics()
+	if not is_backdrop:
+		_tick_brutal_indoor_scares(delta)
+	if _door_draft_t > 0.0:
+		_door_draft_t = maxf(_door_draft_t - delta, 0.0)
 	var burning := Game.stove_wood > 0.0
 	if _fire != null:
 		_fire.visible = burning
@@ -566,6 +593,23 @@ func _process(delta: float) -> void:
 			_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
 			if _north_frost_mat != null:
 				_north_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
+		# При сильном остывании дома (Ночь 2+) на стёклах снаружи проступают отпечатки ладоней прямо внутри инея
+		if Game.is_night() and Game.night >= 2:
+			var want_hand := clampf((Game.house_cold - 0.50) / 0.36, 0.0, 1.0)
+			if absf(want_hand - _frost_hand_reveal) > 0.004:
+				_frost_hand_reveal = move_toward(_frost_hand_reveal, want_hand, delta * 0.06)
+				if _north_frost_mat != null:
+					_north_frost_mat.set_shader_parameter(&"hand_reveal", _frost_hand_reveal)
+				if _frost_mat != null:
+					_frost_mat.set_shader_parameter(&"hand_reveal", _frost_hand_reveal * 0.75)
+			if not _frost_hand_live_warned and _frost_hand_reveal >= 0.45 and Game.player != null and Game.is_home():
+				if Game.player.global_position.distance_to(Vector3(9.2, 1.45, -2.0)) < 5.5:
+					_frost_hand_live_warned = true
+					var cr := Game.audio.play_3d("res://assets/audio/ice_hit.ogg", Vector3(9.2, 1.45, -2.0), -6.0, 7.0)
+					if cr != null:
+						cr.pitch_scale = 1.65
+					Game.hud.subtitle(Loc.t(&"sub.frost_hand_live"), 4.5, 1)
+					Director.add_tension(10.0, "ладони проступили в инее окна")
 
 		# Управление таянием и повторным замерзанием протёртого окна
 		if _north_frost_mat != null and _window_wiped_radius > 0.0:
@@ -775,9 +819,10 @@ func _process(delta: float) -> void:
 			if is_instance_valid(panel):
 				panel.rotation.x = sway
 
-	# Мерцание керосиновой лампы
+	# Мерцание керосиновой лампы (+ сбивание пламени порывом мороза при открытии двери)
 	if _kerosene_lit and _kerosene_light != null:
-		_kerosene_light.light_energy = 1.1 + sin(_t * 8.5) * 0.08 + randf() * 0.05
+		var draft_dip := 1.0 - (_door_draft_t / 2.2) * (0.55 + 0.32 * sin(_t * 28.0))
+		_kerosene_light.light_energy = maxf((1.1 + sin(_t * 8.5) * 0.08 + randf() * 0.05) * draft_dip, 0.14)
 
 	# Выстуживание дома при открытой наружной двери
 	if door_open and Game.is_night():
@@ -1037,7 +1082,12 @@ func _tick_garland() -> void:
 			bm.albedo_color = anom_col * (0.72 + 0.08 * sin(_t * 1.4))
 		else:
 			var wave := 0.72 + 0.28 * sin(_t * 1.9 + float(i) * 0.85)
-			bm.albedo_color = (base_colors[i] as Color) * wave
+			var base_c: Color = base_colors[i] as Color
+			if power_sag > 0.02:
+				var sag_k := clampf(1.0 - power_sag * (0.62 + 0.25 * sin(_t * 26.0)), 0.12, 1.0)
+				bm.albedo_color = base_c.lerp(Color(0.95, 0.45, 0.10), power_sag * 0.7) * (wave * sag_k)
+			else:
+				bm.albedo_color = base_c * wave
 		if i < halo_mats.size():
 			var hm := halo_mats[i] as ShaderMaterial
 			if hm != null:
@@ -1047,7 +1097,7 @@ func _tick_garland() -> void:
 					hm.set_shader_parameter(&"tint", anom_col)
 					hm.set_shader_parameter(&"intensity", 0.42)
 				else:
-					var hw := 0.38 + 0.22 * sin(_t * 1.9 + float(i) * 0.85)
+					var hw := (0.38 + 0.22 * sin(_t * 1.9 + float(i) * 0.85)) * clampf(1.0 - power_sag * 0.7, 0.15, 1.0)
 					hm.set_shader_parameter(&"tint", base_colors[i] as Color)
 					hm.set_shader_parameter(&"intensity", hw)
 	if _garland_glow != null and is_instance_valid(_garland_glow):
@@ -1073,7 +1123,7 @@ var _sag_t := 60.0
 var _sagging := false
 
 func _process_lamp_sag(delta: float) -> void:
-	if _sagging or not lights_lit():
+	if _sagging or _power_sag_active or not lights_lit():
 		return
 	_sag_t -= delta
 	if _sag_t > 0.0:
@@ -1108,6 +1158,7 @@ func _brownout() -> void:
 
 
 func _on_power_changed(on: bool) -> void:
+	_cancel_power_sag()
 	_apply_lamps()
 	if on:
 		_gen_stall_timer = Game.rng.randf_range(300.0, 460.0)   # только что завели/залили/починили — не глохнет сразу
@@ -2304,6 +2355,7 @@ func _build_living_quarters() -> void:
 	var samovar := Props.samovar()
 	samovar.position = Vector3(1.2, 0.75, 4.0)
 	add_child(samovar)
+	Geo.interactable(samovar, Vector3(0.36, 0.52, 0.36), Vector3(0.0, 0.26, 0.0), null, Loc.t(&"it.samovar"), _on_samovar_used)
 
 	var teapot_living := Props.kettle()
 	teapot_living.position = Vector3(1.5, 0.75, 4.15)
@@ -2322,8 +2374,34 @@ func _build_living_quarters() -> void:
 	var ny_still := Props.new_year_still_life()
 	ny_still.position = Vector3(1.42, 0.75, 3.7)
 	add_child(ny_still)
+	_ny_still_node = ny_still
+	# Скрытая корка льда на стакане и почерневший мандарин (аномалия frozen_tea)
+	_frozen_tea_ice = Node3D.new()
+	_frozen_tea_ice.visible = false
+	var ice_mat := StandardMaterial3D.new()
+	ice_mat.albedo_color = Color(0.72, 0.88, 0.98, 0.82)
+	ice_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ice_mat.roughness = 0.2
+	Geo.cylinder(_frozen_tea_ice, 0.036, 0.025, Vector3(0.11, 0.095, -0.02), ice_mat, false)
+	var rot_mat := StandardMaterial3D.new()
+	rot_mat.albedo_color = Color(0.08, 0.07, 0.06)
+	rot_mat.roughness = 0.95
+	var rot_mandarin := MeshInstance3D.new()
+	var sp := SphereMesh.new()
+	sp.radius = 0.038
+	sp.height = 0.058
+	sp.radial_segments = 10
+	sp.rings = 5
+	rot_mandarin.mesh = sp
+	rot_mandarin.material_override = rot_mat
+	rot_mandarin.position = Vector3(0.02, 0.029, 0.09)
+	_frozen_tea_ice.add_child(rot_mandarin)
+	ny_still.add_child(_frozen_tea_ice)
 	Geo.interactable(ny_still, Vector3(0.35, 0.35, 0.35), Vector3(0.0, 0.15, 0.0), null, Loc.t(&"it.ny_table"), func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.t(&"sub.ny_table"), 4.5)
+		if _frozen_tea_active:
+			Game.hud.subtitle(Loc.t(&"sub.samovar_frozen"), 5.0, 2)
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.ny_table"), 4.5)
 	)
 
 	# Бумажная резная снежинка на южном окне жилой комнаты
@@ -3974,14 +4052,19 @@ func set_door_open(open: bool) -> void:
 			Game.hud.subtitle(Loc.t(&"sub.phobia_door_hesitate"), 3.0)
 		await get_tree().create_timer(0.32, false).timeout
 	door_open = open
-	AudioMix.set_indoor(0.0 if open else 1.0)
+	AudioMix.set_zone_acoustics(Game.zone, open)
 	if not open and Game.radio != null and Game.radio.tube_synth != null:
 		Game.radio.tube_synth.trigger_tube_microphonics(1.0)
 	if open:
 		EventBus.door_opened.emit()
 		Game.audio.play_3d(CLANK_SOUND, _door_hinge.global_position + Vector3(0, 1, 0.5), -6.0, 1.45)
-		if Game.is_outside() and Game.weather != null and (Game.weather.intensity > 0.25 or Game.weather.blizzard):
-			Game.audio.play_3d("res://assets/audio/gust.ogg", _door_hinge.global_position, -8.0, 4.0)
+		# Морозный пар по полу сеней + сбивание пламени керосинки и печи при открытии двери в -45°C
+		_spawn_door_frost_rush()
+		_door_draft_t = 2.2
+		if Game.weather != null and (Game.weather.intensity > 0.15 or Game.weather.blizzard or Game.is_night()):
+			Game.audio.play_3d("res://assets/audio/gust.ogg", _door_hinge.global_position, -4.0, 6.0)
+		if _door_ambush_armed:
+			_execute_door_false_relief_ambush()
 		if Game.night == 7 and Game.final_call:
 			_door_busy = false
 			var is_mimic: bool = bool(SaveGame.flags.get("night7_crawler_is_mimic", true))
@@ -4591,7 +4674,65 @@ func trigger_beacon_blackout(duration := 6.0) -> void:
 
 
 func _trigger_generator_stall() -> void:
-	if not Game.power_on or Game.gen_broken or Game.generator_fuel <= 0.0 or Game.is_prologue():
+	if not Game.power_on or Game.gen_broken or Game.generator_fuel <= 0.0 or Game.is_prologue() or _power_sag_active:
+		return
+	# Единая электросеть от ДЭС-8: сперва 22 секунды просадки напряжения в тусклый янтарь с гулом 50 Гц
+	_power_sag_active = true
+	_power_sag_t = 22.0
+	power_sag = 0.22
+	var gen_pos := _generator.global_position if _generator != null else Vector3(14.2, 0.45, -13.65)
+	var stall := Voice.sfx(&"gen_stall")
+	if stall != "":
+		Game.audio.play_3d(stall, gen_pos, 1.0, 9.0)
+	elif _gen_sputter_player != null:
+		_gen_sputter_player.play()
+	if _power_sag_hum == null:
+		_power_sag_hum = AudioStreamPlayer.new()
+		_power_sag_hum.stream = AudioDirector.cached_stream("res://assets/audio/hum_loop.ogg")
+		_power_sag_hum.bus = &"SFX"
+		add_child(_power_sag_hum)
+	_power_sag_hum.pitch_scale = 0.72
+	_power_sag_hum.volume_db = -14.0
+	if not _power_sag_hum.playing:
+		_power_sag_hum.play()
+	if Game.is_home() and Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.power_sag_warn"), 4.5, 1)
+
+
+func _tick_power_sag(delta: float) -> void:
+	if not _power_sag_active:
+		if power_sag > 0.0:
+			power_sag = maxf(power_sag - delta * 2.5, 0.0)
+			_restore_lamp_colors()
+		return
+	if not Game.power_on or Game.gen_broken or Game.generator_fuel <= 0.0:
+		_cancel_power_sag()
+		return
+	_power_sag_t -= delta
+	var prog := clampf(1.0 - _power_sag_t / 22.0, 0.0, 1.0)
+	power_sag = clampf(0.20 + prog * 0.80, 0.0, 1.0)
+	var pulse := 0.5 + 0.5 * sin(_t * (18.0 + prog * 24.0))
+	var dim_k := clampf(1.0 - power_sag * (0.48 + 0.28 * pulse), 0.16, 1.0)
+	var amber := Color(1.0, 0.48, 0.12)
+	for l in _lamps:
+		if not is_instance_valid(l) or not l.visible:
+			continue
+		if not l.has_meta(&"base_e"):
+			l.set_meta(&"base_e", l.light_energy)
+		if not l.has_meta(&"base_c"):
+			l.set_meta(&"base_c", l.light_color)
+		l.light_energy = float(l.get_meta(&"base_e")) * dim_k
+		l.light_color = (l.get_meta(&"base_c") as Color).lerp(amber, power_sag * 0.68)
+	if _power_sag_hum != null and _power_sag_hum.playing:
+		_power_sag_hum.pitch_scale = lerpf(0.76, 0.54, prog)
+		_power_sag_hum.volume_db = lerpf(-15.0, -7.0, prog)
+	if _power_sag_t <= 0.0:
+		_complete_generator_stall()
+
+
+func _complete_generator_stall() -> void:
+	_cancel_power_sag()
+	if not Game.power_on:
 		return
 	_gen_stalled = true
 	var gen_pos := _generator.global_position if _generator != null else Vector3(14.2, 0.45, -13.65)
@@ -4600,14 +4741,273 @@ func _trigger_generator_stall() -> void:
 		Game.audio.play_3d(stall, gen_pos, 2.0, 7.0)
 	elif _gen_sputter_player != null:
 		_gen_sputter_player.play()
-	flicker(1.4)
-	await get_tree().create_timer(1.2, false).timeout
+	flicker(1.1)
+	await get_tree().create_timer(1.0, false).timeout
 	if _gen_stalled and Game.power_on:
 		Game.dga_ap50_engaged = false
 		Game.dga_engine_running = false
 		Game.set_power(false)
 		Director.add_tension(12.0, "генератор заглох")
 		Game.hud.subtitle(Loc.t(&"sub.gen_stalled"), 4.5, 2)
+
+
+func _cancel_power_sag() -> void:
+	_power_sag_active = false
+	_power_sag_t = 0.0
+	power_sag = 0.0
+	if _power_sag_hum != null and _power_sag_hum.playing:
+		_power_sag_hum.stop()
+	_restore_lamp_colors()
+
+
+func _restore_lamp_colors() -> void:
+	for l in _lamps:
+		if not is_instance_valid(l):
+			continue
+		if l.has_meta(&"base_e"):
+			l.light_energy = float(l.get_meta(&"base_e"))
+		if l.has_meta(&"base_c"):
+			l.light_color = l.get_meta(&"base_c") as Color
+
+
+func _tick_acoustics() -> void:
+	if Game.zone != _last_acoustic_zone:
+		_last_acoustic_zone = Game.zone
+		AudioMix.set_zone_acoustics(Game.zone, door_open)
+
+
+## Интерактивный тульский самовар: ритуал согревания и слом уюта при аномалии frozen_tea.
+func set_frozen_tea_anomaly(active: bool) -> void:
+	_frozen_tea_active = active
+	if _frozen_tea_ice != null and is_instance_valid(_frozen_tea_ice):
+		_frozen_tea_ice.visible = active
+
+
+func _on_samovar_used(p: Player) -> void:
+	if _frozen_tea_active:
+		# Слом новогоднего уюта: чай схвачен льдом прямо при горящей печи + чужой ледяной выдох в затылок
+		var cr := Game.audio.play_2d("res://assets/audio/ice_hit.ogg", -2.0)
+		if cr != null:
+			cr.pitch_scale = 1.45
+		Game.audio.play_3d("res://assets/audio/breath_loop.ogg", p.global_position + p.global_basis.z * 0.45 + Vector3(0, 1.5, 0), 2.5, 4.0)
+		p.shake(0.06, 0.45)
+		Game.warmth = maxf(Game.warmth - 8.0, 10.0)
+		Game.hud.subtitle(Loc.t(&"sub.samovar_frozen"), 5.5, 2)
+		Director.add_tension(16.0, "ледяной чай при горящей печи")
+		return
+	if Game.stove_wood <= 0.0:
+		Game.hud.subtitle(Loc.t(&"sub.samovar_cold"), 3.0)
+		return
+	if Game.tea_cd > 0.0:
+		Game.hud.subtitle(Loc.t(&"sub.kettle_recent"), 2.5)
+		return
+	Game.tea_cd = 75.0
+	Game.tea_warmth_timer = 55.0
+	Game.warmth = minf(Game.warmth + 24.0, 100.0)
+	Game.add_fatigue(-6.0)
+	Game.audio.play_3d(Voice.sfx_or(&"kettle_whistle", STOVE_SOUND), Vector3(1.2, 1.05, 4.0), -4.0)
+	Game.hud.subtitle(Loc.t(&"sub.samovar_drink"), 4.0)
+	Director.add_tension(-5.0, "горячий чай из самовара")
+
+
+## Клуб тяжёлого морозного пара по полу сеней при открытии входной двери в -45°C (gl_compatibility billboard).
+func _spawn_door_frost_rush() -> void:
+	if _door_hinge == null or OS.get_name() == "headless":
+		return
+	if _door_steam_fx == null or not is_instance_valid(_door_steam_fx):
+		var fx := CPUParticles3D.new()
+		fx.amount = 22
+		fx.lifetime = 2.4
+		fx.one_shot = true
+		fx.explosiveness = 0.72
+		fx.local_coords = false
+		fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		fx.emission_box_extents = Vector3(0.18, 0.35, 0.45)
+		fx.direction = Vector3(-1.0, -0.18, 0.0)
+		fx.spread = 28.0
+		fx.initial_velocity_min = 1.4
+		fx.initial_velocity_max = 2.9
+		fx.gravity = Vector3(0.0, -0.35, 0.0)
+		fx.scale_amount_min = 0.55
+		fx.scale_amount_max = 1.45
+		fx.color_ramp = Player.puff_ramp()
+		var pm := QuadMesh.new()
+		pm.size = Vector2(0.75, 0.75)
+		pm.material = Player.puff_material(0.32)
+		fx.mesh = pm
+		fx.position = Vector3(14.0, 0.55, 3.1)
+		add_child(fx)
+		_door_steam_fx = fx
+	_door_steam_fx.restart()
+	_door_steam_fx.emitting = true
+
+
+## Жёсткие ночные скримеры внутри избы:
+## 1) Двойной обман у двери (ритмичный стук Михалыча -> пустое крыльцо -> рывок из-за косяка в 12 FPS)
+## 2) Засада за спиной после закрытия UI приборов (барограф / журнал ТМ-1 / рация)
+func _tick_brutal_indoor_scares(delta: float) -> void:
+	if not Game.is_night() or Game.night < 2 or Game.dead or Game.shift_over or Game.player == null:
+		return
+	if Director.in_calm_window():
+		return
+
+	# 1. Подготовка «Двойного обмана у двери» (после 01:30, раз за ночь, когда игрок в доме и дверь закрыта)
+	if not _door_ambush_done and not _door_ambush_armed and Game.after_hour(1) and Game.is_home() and not door_open:
+		_door_ambush_timer -= delta
+		if _door_ambush_timer <= 0.0 and Director.tension >= 42.0:
+			_door_ambush_armed = true
+			_door_ambush_done = true
+			_play_mikhalych_door_knock()
+
+	# 2. Засада за спиной при долгой работе с интерфейсом (Ночь 3+, tension >= 60)
+	var ui_open := Game.hud != null and Game.hud.modal() != null
+	if ui_open and Game.is_home() and Game.night >= 3:
+		_ui_dwell_t += delta
+		_ui_was_open = true
+	elif _ui_was_open and not ui_open:
+		_ui_was_open = false
+		if not _ui_ambush_done and _ui_dwell_t >= 6.0 and Director.tension >= 58.0 and Game.is_home():
+			_ui_ambush_done = true
+			_execute_post_ui_shoulder_ambush()
+		_ui_dwell_t = 0.0
+	elif not ui_open:
+		_ui_dwell_t = 0.0
+
+
+func _play_mikhalych_door_knock() -> void:
+	var dp := Vector3(14.4, 1.35, 3.1)
+	# Фирменный ритм «тук-тук... тук»
+	Game.audio.play_3d("res://assets/audio/door_knock.ogg", dp, 2.0, 14.0)
+	await get_tree().create_timer(0.28, false).timeout
+	if not is_inside_tree() or door_open:
+		return
+	Game.audio.play_3d("res://assets/audio/door_knock.ogg", dp, 2.5, 14.0)
+	await get_tree().create_timer(0.55, false).timeout
+	if not is_inside_tree() or door_open:
+		return
+	Game.audio.play_3d("res://assets/audio/door_knock.ogg", dp, 3.0, 14.0)
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.door_ambush_knock"), 5.0, 1)
+	# Если игрок так и не открыл за 32 с — засада тихо снимается
+	await get_tree().create_timer(32.0, false).timeout
+	if is_inside_tree():
+		_door_ambush_armed = false
+
+
+func _execute_door_false_relief_ambush() -> void:
+	_door_ambush_armed = false
+	if Game.player == null or Game.dead:
+		return
+	# 0.55 с ложного облегчения — крыльцо пустое, буран шумит...
+	await get_tree().create_timer(0.55, false).timeout
+	if not is_inside_tree() or Game.player == null or not door_open:
+		return
+	var p := Game.player
+	var fwd := -p.camera.global_basis.z
+	fwd.y = 0.0
+	fwd = fwd.normalized() if fwd.length_squared() > 0.01 else Vector3.RIGHT
+	var right := p.camera.global_basis.x
+	right.y = 0.0
+	right = right.normalized()
+	var rig: Node3D = Creatures.make_yrka()
+	add_child(rig)
+	var start_pos := p.global_position + fwd * 1.45 + right * 0.95
+	start_pos.y = p.global_position.y
+	var end_pos := p.global_position + fwd * 0.82
+	end_pos.y = p.global_position.y
+	rig.global_position = start_pos
+	rig.look_at(Vector3(p.global_position.x, start_pos.y, p.global_position.z), Vector3.UP)
+	if rig.has_method(&"set_eye_glow"):
+		rig.call(&"set_eye_glow", 3.4)
+	Game.audio.play_2d("res://assets/audio/shriek.ogg", 3.5)
+	Game.audio.play_2d("res://assets/audio/sub_drop.ogg", 2.0)
+	if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):
+		Game.hud.trigger_jumpscare_flash(1.0, 0.38)
+	# Рывок в 12 FPS (5 ступеней по 0.083 с) — пугающий uncannny-рывок прямо из-за косяка
+	for i in range(5):
+		if not is_instance_valid(rig):
+			break
+		var k := float(i + 1) / 5.0
+		rig.global_position = start_pos.lerp(end_pos, k)
+		rig.rotation.z = deg_to_rad(-16.0 if i % 2 == 0 else 14.0)
+		await get_tree().create_timer(0.083, false).timeout
+	if is_instance_valid(rig):
+		rig.queue_free()
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.door_ambush_hit"), 4.0, 2)
+	# Дверь с грохотом захлопывается сама + обязательное окно покоя 55 с
+	if door_open and not _door_busy:
+		set_door_open(false)
+	Director.force_relax(55.0, 35.0, "двойной обман у двери")
+
+
+func _execute_post_ui_shoulder_ambush() -> void:
+	if Game.player == null or Game.dead:
+		return
+	var p := Game.player
+	if Game.audio != null:
+		Game.audio.trigger_vacuum(3.0)
+	var back := p.global_basis.z
+	back.y = 0.0
+	back = back.normalized() if back.length_squared() > 0.01 else Vector3.BACK
+	var behind_pos := p.global_position + back * 1.15
+	behind_pos.y = p.global_position.y
+	Game.audio.play_3d("res://assets/audio/breath_loop.ogg", behind_pos + Vector3(0, 1.5, 0), 3.0, 5.0)
+	if Game.hud != null:
+		Game.hud.subtitle(Loc.t(&"sub.ui_ambush_breath"), 3.2, 2)
+
+	var rig: Node3D = Creatures.make_silhouette()
+	add_child(rig)
+	rig.global_position = behind_pos
+	rig.look_at(Vector3(p.global_position.x, behind_pos.y, p.global_position.z), Vector3.UP)
+	if rig.has_method(&"set_eye_glow"):
+		rig.call(&"set_eye_glow", 3.2)
+
+	# Ждём, пока игрок обернётся (до 4.0 с)
+	var wait_t := 0.0
+	var turned := false
+	while wait_t < 4.0 and is_inside_tree() and Game.player != null:
+		var look_head := rig.global_position + Vector3(0, 1.5, 0)
+		if Game.player.is_looking_at(look_head, 32.0):
+			turned = true
+			break
+		await get_tree().process_frame
+		wait_t += get_process_delta_time()
+
+	if not is_inside_tree() or Game.player == null:
+		if is_instance_valid(rig):
+			rig.queue_free()
+		return
+
+	if turned:
+		Game.audio.play_2d("res://assets/audio/scream.ogg", 2.5)
+		Game.audio.play_2d("res://assets/audio/sub_drop.ogg", 2.5)
+		if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):
+			Game.hud.trigger_jumpscare_flash(0.95, 0.34)
+		var base_p := rig.global_position
+		var toward := (Game.player.global_position - base_p)
+		toward.y = 0.0
+		var lunge_to := base_p + toward.normalized() * 0.48
+		for i in range(4):
+			if not is_instance_valid(rig):
+				break
+			rig.global_position = base_p.lerp(lunge_to, float(i + 1) / 4.0)
+			rig.rotation.z = deg_to_rad(18.0 if i % 2 == 0 else -18.0)
+			await get_tree().create_timer(0.083, false).timeout
+		if Game.hud != null:
+			Game.hud.set_black(true)
+		if is_instance_valid(rig):
+			rig.queue_free()
+		# Мокрые босые следы остаются прямо перед сапогами игрока
+		var wet := Footprints.trail(self, &"wet", PackedVector3Array([behind_pos, p.global_position - back * 0.25]), 0.05, 0.36)
+		Geo.free_after(wet, 75.0)
+		await get_tree().create_timer(0.24, false).timeout
+		if is_inside_tree() and Game.hud != null:
+			Game.hud.set_black(false)
+		Director.force_relax(60.0, 38.0, "засада за спиной после UI")
+	else:
+		if is_instance_valid(rig):
+			rig.queue_free()
 
 
 func _generator_prompt() -> String:

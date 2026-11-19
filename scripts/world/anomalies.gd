@@ -15,7 +15,7 @@ const DEFS := {
 	&"chair": [&"house", 2], &"cup": [&"house", 2], &"teapot": [&"house", 2], &"bucket": [&"house", 2],
 	&"glass2": [&"house", 2], &"photo": [&"house", 3], &"tools": [&"house", 3], &"clock": [&"house", 3],
 	&"pennant": [&"house", 3], &"boots": [&"house", 3], &"calendar": [&"house", 4], &"bed": [&"house", 4], &"journal": [&"house", 4],
-	&"garland_red": [&"house", 2], &"wet_steps": [&"house", 5],
+	&"garland_red": [&"house", 2], &"frozen_tea": [&"house", 3], &"wet_steps": [&"house", 5],
 	&"flag": [&"yard", 2], &"cellar_steam": [&"yard", 2], &"axe_turned": [&"yard", 2],
 	&"tracks": [&"yard", 3], &"dog_chain": [&"yard", 3], &"stand_pin": [&"yard", 3],
 	&"izba_light": [&"yard", 3], &"mast_figure": [&"yard", 5],
@@ -270,6 +270,17 @@ func _build() -> void:
 				st.set_garland_anomaly(false)
 		_pos[&"garland_red"] = func() -> Vector3:
 			return st.garland_prop.global_position if is_instance_valid(st) and is_instance_valid(st.garland_prop) else Vector3.INF
+
+	# Новогодний стол: чай в стакане схвачен льдом при горящей печи, мандарин почернел
+	if st != null and st.has_method(&"set_frozen_tea_anomaly"):
+		_apply[&"frozen_tea"] = func() -> void:
+			if is_instance_valid(st):
+				st.set_frozen_tea_anomaly(true)
+		_revert[&"frozen_tea"] = func() -> void:
+			if is_instance_valid(st):
+				st.set_frozen_tea_anomaly(false)
+		_pos[&"frozen_tea"] = func() -> Vector3:
+			return Vector3(1.35, 0.9, 3.85)
 
 	# Приборы и эфир — флаги: их читают барограф, анемометр, термометр и рация.
 	# Календарь в рубке: поверх дат кто-то нацарапал бурым.

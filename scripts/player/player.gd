@@ -729,9 +729,16 @@ func _update_steps(delta: float) -> void:
 	var base_vol := -12.0 if not _sprinting else -8.0
 	if in_deep:
 		base_vol -= 1.0
+	var frost_pitch := 1.0
+	if is_out and not Game.skis_equipped:
+		# Хруст снега по реальной температуре: при -15°C мягкий, при -42°C резкий «стеклянный»
+		var temp_c: float = Game.air_temp().x
+		var frost_k := clampf((-15.0 - temp_c) / 27.0, 0.0, 1.0)
+		frost_pitch = lerpf(0.92, 1.24, frost_k)
+		base_vol += lerpf(-1.2, 2.2, frost_k)
 	var p := Game.audio.play_2d(path, base_vol + vol_offset)
 	if p != null:
-		p.pitch_scale = randf_range(0.82, 0.96) if in_deep else randf_range(0.95, 1.10)
+		p.pitch_scale = (randf_range(0.82, 0.96) if in_deep else randf_range(0.95, 1.10)) * frost_pitch
 	if is_out and Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled:
 		Game.yrka.on_player_footstep(global_position, global_basis.z)
 	if is_out and _sprinting and Game.audio != null and Game.audio.has_method(&"record_player_noise"):
@@ -1000,10 +1007,16 @@ func _trigger_phantom_breath() -> void:
 func _update_shiver(delta: float) -> void:
 	if (Game.warmth < 38.0 or Game.fatigue > 65.0) and Game.tea_warmth_timer <= 0.0:
 		var factor := clampf((38.0 - Game.warmth) / 38.0 + (Game.fatigue - 65.0) / 35.0, 0.0, 1.0)
-		var shake := (randf() - 0.5) * 0.0055 * factor
+		var shake := (randf() - 0.5) * 0.0065 * factor
 		camera.rotation.z = lerpf(camera.rotation.z, shake, minf(delta * 14.0, 1.0))
-		camera.position.x = lerpf(camera.position.x, (randf() - 0.5) * 0.004 * factor, minf(delta * 14.0, 1.0))
-		camera.position.y = lerpf(camera.position.y, (randf() - 0.5) * 0.004 * factor, minf(delta * 14.0, 1.0))
+		camera.position.x = lerpf(camera.position.x, (randf() - 0.5) * 0.0045 * factor, minf(delta * 14.0, 1.0))
+		camera.position.y = lerpf(camera.position.y, (randf() - 0.5) * 0.0045 * factor, minf(delta * 14.0, 1.0))
+		# Окоченевшая микро-дрожь прицела при наведении на приборы в сильный мороз
+		if Game.warmth < 32.0 and mode == Mode.WALK:
+			var t_s := float(Time.get_ticks_msec()) * 0.009
+			var aim_drift := clampf((32.0 - Game.warmth) / 32.0, 0.0, 1.0) * 0.00055
+			head.rotation.x = clampf(head.rotation.x + sin(t_s * 1.7) * aim_drift, deg_to_rad(-82.0), deg_to_rad(82.0))
+			rotation.y += cos(t_s * 1.3) * aim_drift
 
 		# Звук стука зубов от лютого мороза
 		_teeth_timer -= delta
@@ -1058,8 +1071,15 @@ func _update_flashlight(delta: float) -> void:
 	if Input.is_action_just_pressed(&"crank") and hands_busy:
 		Game.hud.subtitle(Loc.t(&"sub.hands_busy_crank"), 2.5)
 	cranking = (mode == Mode.WALK or mode == Mode.RADIO) and Input.is_action_pressed(&"crank") and not hands_busy
+	var crank_surge := 1.0
 	if cranking:
 		Game.flash_charge = minf(Game.flash_charge + CRANK_RATE * Consequences.hands_k() * delta, 100.0)
+		# Физическая отдача «Жучка»: ритмичный толчок камеры + пульсирующий скачок яркости динамо на каждый жим
+		var t_crank := float(Time.get_ticks_msec()) * 0.034
+		var pulse := pow(0.5 + 0.5 * sin(t_crank), 2.0)
+		crank_surge = lerpf(0.76, 1.26, pulse)
+		camera.rotation.z = lerpf(camera.rotation.z, sin(t_crank) * 0.009, minf(delta * 18.0, 1.0))
+		camera.position.y = lerpf(camera.position.y, -pulse * 0.008, minf(delta * 18.0, 1.0))
 		if Game != null and randf() < delta * 10.0:
 			Game.vibrate(0.22, 0.08, 0.09)
 	if _crank_player != null:
@@ -1122,7 +1142,7 @@ func _update_flashlight(delta: float) -> void:
 
 	# Фонарь из снабжения (галогенный, «Свердловск-2»): ярче и бьёт дальше
 	var upg := Game.has_flag("upg_flashlight")
-	var energy := 4.0 if upg else 3.0
+	var energy := (4.0 if upg else 3.0) * crank_surge
 	var want_range := 46.0 if upg else 32.0
 	if flashlight.spot_range != want_range:
 		flashlight.spot_range = want_range

@@ -50,6 +50,9 @@ var _tape_mat: StandardMaterial3D
 var _light := 1.0
 var _mouse := Vector2(-1, -1)
 var _tape_tex: ImageTexture            ## лента: вьюпорт перепекается в обычную текстуру (вьюпорт напрямую на дуге — белый)
+var _live_glitch_t := 0.0
+var _live_glitch_k := 0.0              ## 0..1: аномальное биение пера («кардиограмма» при Ырке / высоком tension)
+var _glitch_tick_cd := 0.0
 
 
 func _ready() -> void:
@@ -111,7 +114,36 @@ func _process(delta: float) -> void:
 	if absf(dx) > 0.01:
 		_cu.scroll(dx * 0.08 * delta)
 	_ruler_y = _ruler_at(_mouse)
+	# Живая реакция самописца М-22: при приближении Ырки, зубе baro_tooth или высокой тревоге перо бьётся как кардиограмма
+	var yrka_near: bool = Game.yrka != null and is_instance_valid(Game.yrka) and Game.yrka.enabled and (
+		Game.yrka.threat >= 35.0 or Game.yrka.stage in [
+			YrkaThreat.Stage.STALKING, YrkaThreat.Stage.CALLING, YrkaThreat.Stage.PRESSURE,
+			YrkaThreat.Stage.CONTACT, YrkaThreat.Stage.CHASE,
+		]
+	)
+	var baro_anom: bool = Game.anomalies != null and Game.anomalies.is_active(&"baro_tooth")
+	var want_glitch := 0.0
+	if Game.is_night() and Game.barograph_live():
+		if baro_anom:
+			want_glitch = 1.0
+		elif yrka_near:
+			want_glitch = clampf((Game.yrka.threat - 25.0) / 55.0, 0.45, 1.0)
+		elif Director.tension >= 62.0:
+			want_glitch = clampf((Director.tension - 62.0) / 32.0, 0.25, 0.95)
+	_live_glitch_k = lerpf(_live_glitch_k, want_glitch, minf(delta * 3.0, 1.0))
+	if _live_glitch_k > 0.12:
+		_live_glitch_t += delta * (4.2 + _live_glitch_k * 3.8)
+		_glitch_tick_cd -= delta
+		if _glitch_tick_cd <= 0.0 and _listening <= 0.0:
+			_glitch_tick_cd = lerpf(0.65, 0.22, _live_glitch_k)
+			if _scratch_player != null:
+				_scratch_player.pitch_scale = randf_range(1.45, 1.95)
+				_scratch_player.volume_db = lerpf(-20.0, -9.0, _live_glitch_k)
+				_scratch_player.play()
 	_place_arm()
+	if _arm != null and _live_glitch_k > 0.15:
+		var ecg_kick := sin(_live_glitch_t * 3.1) * pow(maxf(sin(_live_glitch_t * 0.7), 0.0), 3.0)
+		_arm.rotation.x += ecg_kick * 0.06 * _live_glitch_k
 
 	# Свет на ленте считаем сами: освещённая лента пересвечивалась до белого (как шкала термометра)
 	var see := _cu.can_see() or _room_lit()
@@ -471,6 +503,13 @@ func _pen(h: float) -> float:
 		var th := _now_h - 0.7                                  # зуб: −9 мм за четверть часа, и назад
 		if h > th and h < th + 0.5:
 			p -= 9.0 * sin(PI * (h - th) / 0.5)
+	if _live_glitch_k > 0.15 and h > _now_h - 0.95:
+		# Живая «кардиограмма» на последнем отрезке ленты перед пером
+		var tail_k := clampf((h - (_now_h - 0.95)) / 0.95, 0.0, 1.0)
+		var ph := (h - _now_h) * 34.0 + _live_glitch_t * 1.4
+		var spike := sin(ph * 2.5) * pow(maxf(cos(ph * 0.65), 0.0), 4.0)
+		var dip := -0.45 * pow(maxf(sin(ph * 0.65 + 0.4), 0.0), 6.0)
+		p += (spike * 5.8 + dip * 4.2) * tail_k * _live_glitch_k
 	return p
 
 
@@ -520,6 +559,13 @@ func _draw_chart() -> void:
 	var tip := pts[pts.size() - 1]
 	if Game.barograph_live():
 		_chart.draw_circle(tip, 5.0, Color(0.28, 0.08, 0.38))   # капля чернил под пером (само перо — на рычаге)
+	# На Ночи 3+ при сильном биении пера прямо на ГОСТ-сетке проступает рваная чернильная надпись
+	if Game.is_night() and Game.night >= 3 and _live_glitch_k > 0.48:
+		var msg := Loc.t(&"barograph.ink_scrawl_1") if (Game.night % 2 == 1) else Loc.t(&"barograph.ink_scrawl_2")
+		var alpha := clampf((_live_glitch_k - 0.45) * 1.35, 0.0, 0.82)
+		var sx := clampf(tip.x - 240.0, 62.0, w.x - 320.0)
+		var sy := clampf(tip.y - 26.0, 56.0, w.y - 60.0)
+		_chart.draw_string(font, Vector2(sx, sy), msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.34, 0.06, 0.42, alpha))
 	# Линейка у мыши
 	if _ruler_y >= 0.0:
 		_chart.draw_line(Vector2(50, _ruler_y), Vector2(w.x - 10, _ruler_y), Color(0.15, 0.35, 0.75, 0.8), 3.0)

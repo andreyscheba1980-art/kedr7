@@ -39,6 +39,9 @@ var _loupe_overlay: Control
 var _loupe_img: TextureRect
 var _loupe_title: Label
 var _loupe_desc: Label
+var _loupe_scare_done := false
+var _loupe_scare_token := 0
+var _loupe_scratch: Label
 
 
 func _ready() -> void:
@@ -410,20 +413,37 @@ func _build_loupe_overlay() -> void:
 	_loupe_img.material = mat
 	frame.add_child(_loupe_img)
 
+	_loupe_scratch = UiKit.label("", 28, HORIZONTAL_ALIGNMENT_CENTER)
+	_loupe_scratch.add_theme_color_override(&"font_color", Color(1.0, 0.14, 0.10, 0.96))
+	_loupe_scratch.visible = false
+	_loupe_scratch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UiKit.place(_loupe_img, _loupe_scratch, 0.0, 0.35, 1.0, 0.65, 0, 0, 0, 0)
+
 	_loupe_desc = UiKit.label("", 12)
 	_loupe_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_loupe_desc.add_theme_color_override(&"font_color", Color(1.0, 0.88, 0.82))
 	center.add_child(_loupe_desc)
 
-	var close_loupe_btn := UiKit.button(Loc.p("✕ ЗАКРЫТЬ ЛУПУ [Esc]", "✕ CLOSE LOUPE [Esc]"), func() -> void: _loupe_overlay.visible = false)
+	var close_loupe_btn := UiKit.button(Loc.p("✕ ЗАКРЫТЬ ЛУПУ [Esc]", "✕ CLOSE LOUPE [Esc]"), func() -> void:
+		_loupe_scare_token += 1
+		_loupe_overlay.visible = false
+	)
 	center.add_child(close_loupe_btn)
 
 
 func _inspect_photo_loupe(ph: Dictionary) -> void:
 	AudioDirector.play_raw("res://assets/audio/ui_tick.ogg", -4.0)
+	_loupe_scare_token += 1
+	var my_token := _loupe_scare_token
+	if _loupe_scratch != null:
+		_loupe_scratch.visible = false
+	_loupe_img.scale = Vector2.ONE
+	_loupe_img.pivot_offset = _loupe_img.custom_minimum_size * 0.5
 	var img: Image = ph.get("img")
 	if img != null and not img.is_empty():
 		_loupe_img.texture = ImageTexture.create_from_image(img)
+	var haunted: bool = ph.get("paradox", false) or ph.get("ghost", false) or ph.get("has_eyes", false) \
+		or ph.get("has_shadow", false) or ph.get("has_face", false) or ph.get("has_window_face", false)
 	if ph.get("paradox", false):
 		_loupe_title.text = Loc.t(&"darkroom.paradox_title")
 		_loupe_desc.text = ph.get("detail", Loc.t(&"darkroom.paradox_desc"))
@@ -431,6 +451,7 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 		AudioDirector.play_raw("res://assets/audio/whisper.ogg", -4.0)
 		Game.paradox_photo_seen = true
 		_loupe_overlay.visible = true
+		_trigger_loupe_red_scare(my_token)
 		return
 	var poi_tag: StringName = &""
 	for t in ph.get("tags", []):
@@ -444,10 +465,41 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 	else:
 		_loupe_title.text = Loc.t(&"darkroom.loupe_active")
 		_loupe_desc.text = ph.get("detail", _caption(ph))
-		if ph.get("ghost", false) or ph.get("has_eyes", false) or ph.get("has_shadow", false) or ph.get("has_tracks", false) or ph.get("has_face", false) or ph.get("has_fingers", false) or ph.get("has_mast_creature", false) or ph.get("has_window_face", false):
+		if haunted or ph.get("has_tracks", false) or ph.get("has_fingers", false) or ph.get("has_mast_creature", false):
 			Director.add_tension(7.0, "аномалия на фотоплёнке")
 			AudioDirector.play_raw("res://assets/audio/whisper.ogg", -8.0)
 	_loupe_overlay.visible = true
+	if haunted:
+		_trigger_loupe_red_scare(my_token)
+
+
+## Жёсткий «Красный кадр»: через 1.15 с разглядывания заражённого кадра — резкий зум, хлопок красного фонаря и царапина эмульсии.
+func _trigger_loupe_red_scare(token: int) -> void:
+	if _loupe_scare_done or Game.night < 2:
+		return
+	_loupe_scare_done = true
+	await get_tree().create_timer(1.15, false).timeout
+	if not is_inside_tree() or not _loupe_overlay.visible or token != _loupe_scare_token:
+		return
+	AudioDirector.play_raw("res://assets/audio/shriek.ogg", 2.0)
+	AudioDirector.play_raw("res://assets/audio/clank.ogg", 1.0)
+	if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):
+		Game.hud.trigger_jumpscare_flash(0.85, 0.30)
+	_loupe_img.scale = Vector2(1.72, 1.72)
+	_loupe_img.modulate = Color(1.4, 0.45, 0.38)
+	if _loupe_scratch != null:
+		_loupe_scratch.text = Loc.t(&"darkroom.scare_scratch")
+		_loupe_scratch.visible = true
+	if Game.player != null:
+		Game.player.shake(0.08, 0.35)
+	await get_tree().create_timer(0.32, false).timeout
+	if not is_inside_tree():
+		return
+	_loupe_img.scale = Vector2.ONE
+	_loupe_img.modulate = Color.WHITE
+	if Game.audio != null:
+		Game.audio.trigger_vacuum(2.5)
+	Director.force_relax(50.0, 28.0, "красный кадр в тёмной комнате")
 
 
 func _create_paradox_shot() -> Dictionary:
