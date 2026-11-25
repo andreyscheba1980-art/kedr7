@@ -790,7 +790,7 @@ func play_ending(id: StringName) -> void:
 		&"directive_zaboy":
 			# Высоковольтная дуга ДГА-24 на мачту: ослепительный разряд сжигает эфирный резонатор
 			Game.audio.play_2d("res://assets/audio/flare.ogg", 4.0)
-			Game.audio.play_2d("res://assets/audio/elec_buzz_loop.ogg", 2.0)
+			Game.audio.play_2d("res://assets/sfx/cc0/elec_buzz_loop.ogg", 2.0)
 			for i in range(5):
 				Game.hud.flash_red(1.0, 0.4)
 				_player.shake(0.12, 0.5)

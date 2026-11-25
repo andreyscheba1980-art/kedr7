@@ -168,7 +168,7 @@ var _last_acoustic_zone := &""
 ## Жёсткие скримеры внутри избы (уважают окно покоя Director.in_calm_window())
 var _door_ambush_armed := false
 var _door_ambush_done := false
-var _door_ambush_timer := 135.0
+var _door_ambush_timer := 75.0
 var _ui_dwell_t := 0.0
 var _ui_was_open := false
 var _ui_ambush_done := false
@@ -593,9 +593,11 @@ func _process(delta: float) -> void:
 			_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
 			if _north_frost_mat != null:
 				_north_frost_mat.set_shader_parameter(&"coverage", _frost_cov)
-		# При сильном остывании дома (Ночь 2+) на стёклах снаружи проступают отпечатки ладоней прямо внутри инея
+		# При сильном остывании дома ИЛИ высокой тревоге (Ночь 2+) на стёклах снаружи проступают отпечатки ладоней в инее
 		if Game.is_night() and Game.night >= 2:
-			var want_hand := clampf((Game.house_cold - 0.50) / 0.36, 0.0, 1.0)
+			var cold_hand := clampf((Game.house_cold - 0.50) / 0.36, 0.0, 1.0)
+			var fear_hand := clampf((Director.tension - 56.0) / 36.0, 0.0, 0.90)
+			var want_hand := maxf(cold_hand, fear_hand)
 			if absf(want_hand - _frost_hand_reveal) > 0.004:
 				_frost_hand_reveal = move_toward(_frost_hand_reveal, want_hand, delta * 0.06)
 				if _north_frost_mat != null:
@@ -4387,7 +4389,7 @@ func _build_zaboy_switch() -> void:
 			if _zaboy_lever != null:
 				_zaboy_lever.rotation_degrees.x = -65.0
 			Game.audio.play_3d(CLANK_SOUND, at, 2.0)
-			AudioDirector.play_raw("res://assets/audio/elec_buzz_loop.ogg", 1.0)
+			AudioDirector.play_raw("res://assets/sfx/cc0/elec_buzz_loop.ogg", 1.0)
 			if Game.night == 7 and Game.final_call:
 				EventBus.ending_chosen.emit(&"directive_zaboy")
 			else:
@@ -4950,8 +4952,21 @@ func _execute_post_ui_shoulder_ambush() -> void:
 	var back := p.global_basis.z
 	back.y = 0.0
 	back = back.normalized() if back.length_squared() > 0.01 else Vector3.BACK
-	var behind_pos := p.global_position + back * 1.15
-	behind_pos.y = p.global_position.y
+	var chest := p.global_position + Vector3(0, 1.0, 0)
+	var space := get_world_3d().direct_space_state
+	var best_pt := p.global_position + back * 1.15
+	var best_d := -1.0
+	for ang_deg: float in [0.0, 35.0, -35.0, 68.0, -68.0]:
+		var dir := back.rotated(Vector3.UP, deg_to_rad(ang_deg))
+		var q := PhysicsRayQueryParameters3D.create(chest, chest + dir * 1.35, Geo.LAYER_WORLD, [p.get_rid()])
+		var hit := space.intersect_ray(q)
+		var clear_d := 1.15 if hit.is_empty() else maxf(chest.distance_to(hit["position"] as Vector3) - 0.38, 0.42)
+		if clear_d > best_d:
+			best_d = clear_d
+			best_pt = p.global_position + dir * clear_d
+		if clear_d >= 1.10:
+			break
+	var behind_pos := Vector3(best_pt.x, p.global_position.y, best_pt.z)
 	Game.audio.play_3d("res://assets/audio/breath_loop.ogg", behind_pos + Vector3(0, 1.5, 0), 3.0, 5.0)
 	if Game.hud != null:
 		Game.hud.subtitle(Loc.t(&"sub.ui_ambush_breath"), 3.2, 2)

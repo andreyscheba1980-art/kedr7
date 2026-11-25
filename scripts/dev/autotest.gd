@@ -2268,8 +2268,23 @@ func _run() -> void:
 	Game.level.set_door_open(true)
 	await _wait(6.0)
 	await _shot("finale_end")
+	_verify_patch_systems()
 	print("[autotest] done, shots: ", _n)
 	get_tree().quit()
+
+
+func _verify_patch_systems() -> void:
+	for req_flag: StringName in [&"photolab", &"codebook", &"seismograph", &"interferometer", &"theodolite", &"meteor_fax", &"board_repair"]:
+		assert(Flags.on(req_flag), "Flag %s must be enabled!" % req_flag)
+	assert(AudioServer.get_bus_index(&"Weather") >= 0, "Weather audio bus missing!")
+	assert(AudioMix.filter != null, "AudioMix.filter must bind to Weather LowPass!")
+	var trap_xz := Vector2(RadioOrders.CLOSED_TRAIL_TRAP.x, RadioOrders.CLOSED_TRAIL_TRAP.z)
+	var meteo_xz := Vector2(Yard.METEO.x + Yard.M_VANE.x, Yard.METEO.z + Yard.M_VANE.z)
+	assert(trap_xz.distance_to(meteo_xz) > 50.0, "fake_vane_trap must not collide with MeteoCorpus!")
+	var baro_node := Props.barograph()
+	assert(baro_node != null, "Props.barograph() must instantiate cleanly!")
+	baro_node.free()
+	print("[autotest] patch verification OK")
 
 
 ## Проверка эфирной сетки, фирменных сцен и озвучки (без оценки на глаз — только ошибки и лог).

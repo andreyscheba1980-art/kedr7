@@ -367,7 +367,7 @@ func _process(delta: float) -> void:
 			_rustle_t -= delta
 			if _rustle_t <= 0.0:
 				_rustle_t = randf_range(1.8, 3.5)
-				Game.audio.play_3d("res://assets/sfx/cc0/coat_rustle.ogg", pp + Vector3(0, 0.3, 0), -4.0, 6.0)
+				Game.audio.play_3d("res://assets/sfx/breath_close.ogg", pp + Vector3(0, 0.3, 0), -4.0, 6.0)
 	else:
 		if not (local.z < -35.2 and local.z > -39.2):
 			Game.player.target_head_y = 1.58

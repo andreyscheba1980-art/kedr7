@@ -22,7 +22,7 @@ const KINDS := {
 	&"fake_vane_trap": [&"mlf_report", &"ordf.vane_trap", Radio.Pass.FAKE_WRONG, 50, &"vane_trap", true],
 }
 
-const CLOSED_TRAIL_TRAP := Vector3(-4.5, 0.0, 10.2)   ## тупиковая закрытая просека в тайгу за двором
+const CLOSED_TRAIL_TRAP := Vector3(-6.8, 0.0, 8.2)   ## калитка закрытой просеки в тайгу (западнее избы)
 
 var _queue: Array = []          ## [[минута, вид], ...]
 var _kind: StringName = &""     ## активный приказ
@@ -71,14 +71,14 @@ func _process(_delta: float) -> void:
 	if not Game.is_outside():
 		return
 	var p_xz := Vector2(Game.player.global_position.x, Game.player.global_position.z)
-	var vane_pos := Yard.METEO + Yard.M_VANE
-	var near_closed_trail := p_xz.distance_to(Vector2(CLOSED_TRAIL_TRAP.x, CLOSED_TRAIL_TRAP.z)) < 7.5
-	var near_far_vane := p_xz.distance_to(Vector2(vane_pos.x, vane_pos.z)) < 10.5
-	if near_closed_trail or near_far_vane:
-		_trigger_vane_ambush()
+	# Срабатывает только у самой закрытой тропы в тайгу — чтобы не наказывать игрока за визит на основной метеокорпус
+	if p_xz.distance_to(Vector2(CLOSED_TRAIL_TRAP.x, CLOSED_TRAIL_TRAP.z)) < 4.2:
+		trigger_vane_ambush()
 
 
-func _trigger_vane_ambush() -> void:
+func trigger_vane_ambush() -> void:
+	if _busy or not active() or StringName(KINDS[_kind][4]) != &"vane_trap":
+		return
 	_kind = &""
 	_busy = true
 	NightMemory.mark(&"obeyed_fake")

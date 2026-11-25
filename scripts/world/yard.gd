@@ -549,7 +549,10 @@ func _build_closed_trail(pos: Vector3) -> void:
 	gate.add_child(sb)
 
 	var it := Geo.interactable(gate, Vector3(2.6, 1.5, 0.8), Vector3(0.0, 0.9, 0.2), null, Loc.t(&"it.closed_trail"), func(_p: Player) -> void:
-		Game.hud.subtitle(Loc.t(&"sub.closed_trail"), 4.5)
+		if Game.radio_orders != null and Game.radio_orders.active() and Game.radio_orders.is_fake():
+			Game.radio_orders.trigger_vane_ambush()
+		else:
+			Game.hud.subtitle(Loc.t(&"sub.closed_trail"), 4.5)
 	)
 	it.name = "ClosedTrailGateIt"
 
@@ -1637,7 +1640,7 @@ func _climb_unzha_mast() -> void:
 	get_tree().create_timer(1.8, false).timeout.connect(func() -> void:
 		if p != null:
 			p.shake(0.08, 0.5)
-			Game.audio.play_3d("res://assets/audio/wind_gust_01.ogg", MAST + Vector3(0, 12.0, 0), 2.0)
+			Game.audio.play_3d("res://assets/sfx/wind_gust.ogg", MAST + Vector3(0, 12.0, 0), 2.0)
 			Game.hud.subtitle(Loc.p("Высота 16 м: порыв ветра 28 м/с! Мачта гудит и вибрирует с амплитудой 35 см...", "Height 16m: 28 m/s wind gust! The mast hums and sways with 35cm amplitude..."), 3.5)
 	)
 

@@ -7,17 +7,8 @@ extends Node
 ## (б) меняет то, что он слышит.
 ## Всё остальное отключается флагом.
 
-const OFF := [
-	&"interferometer",
-	&"theodolite",
-	&"seismograph",
-	&"photolab",
-	&"board_repair",
-	&"cipher",
-	&"telemetry",
-	&"codebook",
-	&"meteor_fax",
-]
+## Все приборы, фотолаборатория, шифроблокнот и ремонт щитка включены.
+const OFF: Array[StringName] = []
 
 func on(id: StringName) -> bool:
 	return id not in OFF

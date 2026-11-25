@@ -1867,7 +1867,7 @@ func thaw_padlock_with_match() -> bool:
 	if not padlock_shack_frozen:
 		return false
 	padlock_thaw_t = 6.0
-	audio.play_2d("res://assets/audio/flare_shot.ogg", -6.0)
+	audio.play_2d("res://assets/audio/flare.ogg", -6.0)
 	if hud != null:
 		hud.subtitle(Loc.t(&"sub.padlock_thawed_match"), 3.5)
 	return true

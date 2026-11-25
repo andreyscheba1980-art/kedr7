@@ -130,6 +130,10 @@ var _was_on_floor: bool = true
 var _last_fall_vel: float = 0.0
 var _landing_dip: float = 0.0
 var _turn_roll: float = 0.0
+var _shiver_roll: float = 0.0
+var _shiver_off := Vector2.ZERO
+var _crank_roll: float = 0.0
+var _crank_dip: float = 0.0
 var _slope_roll: float = 0.0
 var _lantern_lag: Vector2 = Vector2.ZERO
 var _filament_flicker_t: float = 0.0
@@ -1005,16 +1009,16 @@ func _trigger_phantom_breath() -> void:
 
 
 func _update_shiver(delta: float) -> void:
+	var shake_k: float = Settings.camera_shake if Settings != null else 1.0
 	if (Game.warmth < 38.0 or Game.fatigue > 65.0) and Game.tea_warmth_timer <= 0.0:
-		var factor := clampf((38.0 - Game.warmth) / 38.0 + (Game.fatigue - 65.0) / 35.0, 0.0, 1.0)
+		var factor := clampf((38.0 - Game.warmth) / 38.0 + (Game.fatigue - 65.0) / 35.0, 0.0, 1.0) * shake_k
 		var shake := (randf() - 0.5) * 0.0065 * factor
-		camera.rotation.z = lerpf(camera.rotation.z, shake, minf(delta * 14.0, 1.0))
-		camera.position.x = lerpf(camera.position.x, (randf() - 0.5) * 0.0045 * factor, minf(delta * 14.0, 1.0))
-		camera.position.y = lerpf(camera.position.y, (randf() - 0.5) * 0.0045 * factor, minf(delta * 14.0, 1.0))
+		_shiver_roll = lerpf(_shiver_roll, shake, minf(delta * 14.0, 1.0))
+		_shiver_off = _shiver_off.lerp(Vector2((randf() - 0.5), (randf() - 0.5)) * 0.0045 * factor, minf(delta * 14.0, 1.0))
 		# Окоченевшая микро-дрожь прицела при наведении на приборы в сильный мороз
-		if Game.warmth < 32.0 and mode == Mode.WALK:
+		if Game.warmth < 32.0 and mode == Mode.WALK and shake_k > 0.05:
 			var t_s := float(Time.get_ticks_msec()) * 0.009
-			var aim_drift := clampf((32.0 - Game.warmth) / 32.0, 0.0, 1.0) * 0.00055
+			var aim_drift := clampf((32.0 - Game.warmth) / 32.0, 0.0, 1.0) * 0.00045 * shake_k
 			head.rotation.x = clampf(head.rotation.x + sin(t_s * 1.7) * aim_drift, deg_to_rad(-82.0), deg_to_rad(82.0))
 			rotation.y += cos(t_s * 1.3) * aim_drift
 
@@ -1023,10 +1027,9 @@ func _update_shiver(delta: float) -> void:
 		if _teeth_timer <= 0.0 and Game.warmth < 32.0:
 			_teeth_timer = randf_range(8.0, 15.0)
 			Game.audio.play_2d("res://assets/audio/teeth_chatter.ogg", -2.0)
-	elif Game.tea_warmth_timer > 0.0:
-		camera.rotation.z = lerpf(camera.rotation.z, 0.0, minf(delta * 10.0, 1.0))
-		camera.position.x = lerpf(camera.position.x, 0.0, minf(delta * 10.0, 1.0))
-		camera.position.y = lerpf(camera.position.y, 0.0, minf(delta * 10.0, 1.0))
+	else:
+		_shiver_roll = lerpf(_shiver_roll, 0.0, minf(delta * 10.0, 1.0))
+		_shiver_off = _shiver_off.lerp(Vector2.ZERO, minf(delta * 10.0, 1.0))
 
 
 func _update_extra_step(delta: float) -> void:
@@ -1078,10 +1081,14 @@ func _update_flashlight(delta: float) -> void:
 		var t_crank := float(Time.get_ticks_msec()) * 0.034
 		var pulse := pow(0.5 + 0.5 * sin(t_crank), 2.0)
 		crank_surge = lerpf(0.76, 1.26, pulse)
-		camera.rotation.z = lerpf(camera.rotation.z, sin(t_crank) * 0.009, minf(delta * 18.0, 1.0))
-		camera.position.y = lerpf(camera.position.y, -pulse * 0.008, minf(delta * 18.0, 1.0))
+		var shake_k: float = Settings.camera_shake if Settings != null else 1.0
+		_crank_roll = lerpf(_crank_roll, sin(t_crank) * 0.011 * shake_k, minf(delta * 18.0, 1.0))
+		_crank_dip = lerpf(_crank_dip, -pulse * 0.008 * shake_k, minf(delta * 18.0, 1.0))
 		if Game != null and randf() < delta * 10.0:
 			Game.vibrate(0.22, 0.08, 0.09)
+	else:
+		_crank_roll = lerpf(_crank_roll, 0.0, minf(delta * 14.0, 1.0))
+		_crank_dip = lerpf(_crank_dip, 0.0, minf(delta * 14.0, 1.0))
 	if _crank_player != null:
 		_crank_player.volume_db = lerpf(_crank_player.volume_db, -6.0 if cranking else -80.0, minf(delta * 12.0, 1.0))
 
@@ -1217,7 +1224,7 @@ func _update_camera_fx(delta: float) -> void:
 		_gust_timer = minf(_gust_timer, 5.0)
 
 	_turn_roll = lerpf(_turn_roll, 0.0, minf(delta * 8.0, 1.0))
-	var base_roll := _turn_roll + _slope_roll
+	var base_roll := _turn_roll + _slope_roll + _shiver_roll + _crank_roll
 	if _gust_flinch_t > 0.0:
 		_gust_flinch_t -= delta
 		var gust_k := clampf(_gust_flinch_t / 0.16, 0.0, 1.0)
@@ -1227,8 +1234,8 @@ func _update_camera_fx(delta: float) -> void:
 
 	camera.rotation.z = lerpf(camera.rotation.z, base_roll, minf(delta * 12.0, 1.0))
 	_landing_dip = lerpf(_landing_dip, 0.0, minf(delta * 8.0, 1.0))
-	camera.h_offset = sx + bob_h
-	camera.v_offset = bob + sy + _landing_dip
+	camera.h_offset = sx + bob_h + _shiver_off.x
+	camera.v_offset = bob + sy + _landing_dip + _shiver_off.y + _crank_dip
 
 	# Покачивание переносимого предмета в руках при ходьбе с учётом массы (тяжёлый рундук)
 	if _held_root != null and _held_root.visible:

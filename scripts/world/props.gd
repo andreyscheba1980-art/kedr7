@@ -3664,6 +3664,10 @@ static func retro_transistor_radio() -> Node3D:
 ## Советский недельный барограф М-22 (ГОСТ 7193-79) под стеклянным колпаком.
 ## Литое чугунное основание, стопка анероидных коробок, часовой барабан с лентой и пером.
 static func barograph() -> Node3D:
+	var glb := _kedr_model("barograph_m22", {"bright": 1.15, "sat": 1.0})
+	if glb != null:
+		glb.add_child(_barograph_glass(Vector3(0.315, 0.152, 0.155), 0.108))
+		return glb
 	var root := Node3D.new()
 	var k := _kit(88, 0.03)
 

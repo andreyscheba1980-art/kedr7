@@ -15,7 +15,11 @@ func reset() -> void:
 	tier_changed.emit(0)
 
 func add(a: float) -> void:
+	var prev := value
 	value = clampf(value + a, 0.0, 100.0)
+	var delta_v := value - prev
+	if delta_v > 0.5 and Director != null and not Director.in_calm_window():
+		Director.add_tension(delta_v * 0.35, "внимание тайги")
 
 func _process(dt: float) -> void:
 	value = maxf(0.0, value - 1.5 * dt)  # тайга «забывает» со временем
@@ -24,5 +28,8 @@ func _process(dt: float) -> void:
 		if value >= th:
 			t += 1
 	if t != tier:
+		var old_tier := tier
 		tier = t
 		tier_changed.emit(t)
+		if t > old_tier and t >= 2 and Director != null and not Director.in_calm_window():
+			Director.add_tension(float(t) * 3.0, "тревога тайги")

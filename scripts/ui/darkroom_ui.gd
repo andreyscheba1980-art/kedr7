@@ -477,16 +477,16 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 func _trigger_loupe_red_scare(token: int) -> void:
 	if _loupe_scare_done or Game.night < 2:
 		return
-	_loupe_scare_done = true
 	await get_tree().create_timer(1.15, false).timeout
-	if not is_inside_tree() or not _loupe_overlay.visible or token != _loupe_scare_token:
+	if _loupe_scare_done or not is_inside_tree() or not _loupe_overlay.visible or token != _loupe_scare_token:
 		return
+	_loupe_scare_done = true
 	AudioDirector.play_raw("res://assets/audio/shriek.ogg", 2.0)
 	AudioDirector.play_raw("res://assets/audio/clank.ogg", 1.0)
 	if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):
 		Game.hud.trigger_jumpscare_flash(0.85, 0.30)
-	_loupe_img.scale = Vector2(1.72, 1.72)
-	_loupe_img.modulate = Color(1.4, 0.45, 0.38)
+	_loupe_img.scale = Vector2(1.42, 1.42) if Settings.reduce_flashes else Vector2(1.72, 1.72)
+	_loupe_img.modulate = Color(1.0, 0.72, 0.68) if Settings.reduce_flashes else Color(1.4, 0.45, 0.38)
 	if _loupe_scratch != null:
 		_loupe_scratch.text = Loc.t(&"darkroom.scare_scratch")
 		_loupe_scratch.visible = true

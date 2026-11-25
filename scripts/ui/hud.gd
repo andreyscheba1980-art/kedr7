@@ -725,12 +725,11 @@ func flash_face(duration: float, tex: Texture2D = null) -> void:
 func trigger_jumpscare_flash(intensity := 1.0, duration := 0.36) -> void:
 	if OS.get_name() == "headless":
 		return
-	if Game.player != null and Game.player.camera != null:
-		var cam := Game.player.camera
-		var base_fov := cam.fov
-		cam.fov = maxf(base_fov - 12.0 * intensity, 34.0)
+	var reduce := Settings.reduce_flashes
+	if Game.player != null:
+		Game.player.fov_offset = -6.0 * intensity if reduce else -12.0 * intensity
 		var tw := create_tween()
-		tw.tween_property(cam, "fov", base_fov, maxf(duration + 0.25, 0.45)).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		tw.tween_property(Game.player, "fov_offset", 0.0, maxf(duration + 0.25, 0.45)).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 		Game.player.shake(0.10 * intensity, duration + 0.18)
 	Game.vibrate(0.85 * intensity, 0.95 * intensity, duration)
 	# Выбор жуткого лица из пула текстур и быстрая рваная отрисовка
@@ -742,21 +741,30 @@ func trigger_jumpscare_flash(intensity := 1.0, duration := 0.36) -> void:
 	var path := FACE_TEX if k == 0 else "res://assets/textures/face_flash_%d.png" % (k + 1)
 	if ResourceLoader.exists(path):
 		_face.texture = load(path)
-	var step := 0.045
-	var t := 0.0
 	var base_scale := _face.scale
-	while t < duration and is_inside_tree():
-		_face.visible = randf() > 0.12
-		_face.position = Vector2(randf_range(-42.0, 12.0) * intensity, randf_range(-34.0, 10.0) * intensity)
-		_face.scale = base_scale * randf_range(1.02, 1.14)
-		var strobe := randf() < 0.35
-		_face.modulate = Color(1.0, 0.25, 0.20, 0.95) if strobe else Color(0.95, 0.95, 1.0, 0.90)
-		await get_tree().create_timer(step, false).timeout
-		t += step
+	if reduce:
+		# При включённой настройке снижения вспышек: без стробоскопа, ровный тёмный силуэт
+		_face.visible = true
+		_face.position = Vector2(-12.0 * intensity, -8.0 * intensity)
+		_face.scale = base_scale * 1.04
+		_face.modulate = Color(0.75, 0.25, 0.25, 0.48)
+		await get_tree().create_timer(duration, false).timeout
+	else:
+		var step := 0.045
+		var t := 0.0
+		while t < duration and is_inside_tree():
+			_face.visible = randf() > 0.12
+			_face.position = Vector2(randf_range(-42.0, 12.0) * intensity, randf_range(-34.0, 10.0) * intensity)
+			_face.scale = base_scale * randf_range(1.02, 1.14)
+			var strobe := randf() < 0.35
+			_face.modulate = Color(1.0, 0.25, 0.20, 0.95) if strobe else Color(0.95, 0.95, 1.0, 0.90)
+			await get_tree().create_timer(step, false).timeout
+			t += step
 	if is_instance_valid(_face):
 		_face.visible = false
 		_face.scale = base_scale
 		_face.position = Vector2.ZERO
+		_face.modulate = Color.WHITE
 
 
 func _format_screen_meta() -> String:

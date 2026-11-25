@@ -19,7 +19,7 @@ const RUN_TRIGGER_Z := -9.0                        ## ближе к стволу
 const STEP := "res://assets/audio/yrka_steps.ogg"
 const SHRIEK := "res://assets/audio/shriek.ogg"
 const GROWL := "res://assets/audio/growl.ogg"
-const HEART := "res://assets/audio/heartbeat.ogg"
+const HEART := "res://assets/audio/heart_loop.ogg"
 
 static var instance: MineStory
 

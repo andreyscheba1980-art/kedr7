@@ -210,18 +210,7 @@ func _process(delta: float) -> void:
 	_hum.volume_db = lerpf(_hum.volume_db, hum_target, minf(delta * 4.0, 1.0))
 	_hum.pitch_scale = lerpf(_hum.pitch_scale, 1.0 - t * 0.07, minf(delta, 1.0))
 
-	# Звуковая окклюзия метели (Low-Pass Filter на шине Weather):
-	# На улице — звонкий, ледяной свист бурана (20 кГц).
-	# В доме при закрытой двери — глухой, низкий гул в стенах и трубе (360 Гц).
-	var w_bus := AudioServer.get_bus_index(&"Weather")
-	if w_bus >= 0 and AudioServer.get_bus_effect_count(w_bus) > 0:
-		var lp := AudioServer.get_bus_effect(w_bus, 0) as AudioEffectLowPassFilter
-		if lp != null:
-			var target_cutoff := 20000.0
-			if inside:
-				var door_open: bool = Game.level != null and Game.level.has_method(&"is_door_open") and bool(Game.level.call(&"is_door_open"))
-				target_cutoff = 2200.0 if door_open else 360.0
-			lp.cutoff_hz = lerpf(lp.cutoff_hz, target_cutoff, minf(delta * 5.0, 1.0))
+	# Звуковая окклюзия метели на шине Weather (3 зоны: Изба 360 Гц / Сени 1150 Гц / Двор 18 кГц) управляется через AudioMix.
 
 	var door_open_now: bool = inside and Game.level != null and Game.level.has_method(&"is_door_open") and bool(Game.level.call(&"is_door_open"))
 	# Мастеринг громкости бурана:
