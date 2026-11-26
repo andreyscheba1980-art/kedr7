@@ -156,9 +156,9 @@ func _build_pult() -> void:
 		var face := MeshInstance3D.new()
 		face.mesh = q
 		face.material_override = _tex_mat(speed_tex if i == 0 else rumb_tex)
-		face.position = Vector3(cx, FL + 1.02, face_z)
+		face.position = Vector3(cx, FL + 1.02, face_z + 0.008)
 		add_child(face)
-		_cyl(0.19, 0.01, Vector3(cx, FL + 1.02, face_z - 0.007), bez, Vector3(PI * 0.5, 0, 0))   # ободок за шкалой
+		_cyl(0.19, 0.01, Vector3(cx, FL + 1.02, face_z - 0.010), bez, Vector3(PI * 0.5, 0, 0))   # ободок за шкалой
 		var pivot := Node3D.new()
 		pivot.position = Vector3(cx, FL + 1.02, face_z + 0.006)
 		add_child(pivot)
@@ -193,7 +193,7 @@ func _build_pult() -> void:
 	_box(Vector3(0.2, 0.002, 0.3), rec + Vector3(0, 0.125, 0.12), _mat(Color(0.86, 0.84, 0.78)))
 	# Стопка книжек КМ-1, карандаш, термос
 	for k in 3:
-		_box(Vector3(0.15, 0.012, 0.21), Vector3(PX + 0.45, FL + 0.862 + k * 0.012, PZ + 0.18), _mat(Color(0.25, 0.3, 0.42).darkened(k * 0.1)), Vector3(0, k * 0.08, 0))
+		_box(Vector3(0.15, 0.012, 0.21), Vector3(PX + 0.45, FL + 0.862 + k * 0.015, PZ + 0.18), _mat(Color(0.25, 0.3, 0.42).darkened(k * 0.1)), Vector3(0, k * 0.08, 0))
 	_box(Vector3(0.15, 0.006, 0.006), Vector3(PX + 0.2, FL + 0.86, PZ + 0.25), _mat(Color(0.75, 0.6, 0.2)), Vector3(0, 0.6, 0))
 	_cyl(0.04, 0.26, Vector3(PX + 0.72, FL + 0.99, PZ + 0.22), _mat(Color(0.3, 0.12, 0.1), 0.4))
 
@@ -273,8 +273,8 @@ func _build_recorders() -> void:
 			holder.add_to_group(&"barograph_model")
 			holder.set_meta(&"rig_base", o)
 			holder.set_meta(&"rig_yaw", -PI * 0.5)   # стол у перегородки: смотрят на прибор с запада
-		_box(Vector3(0.24, 0.05, 0.38), o + Vector3(0, 0.025, 0), wood, Vector3.ZERO, holder)
-		_box(Vector3(0.2, 0.008, 0.34), o + Vector3(0, 0.054, 0), _mat(Color(0.3, 0.3, 0.3), 0.4), Vector3.ZERO, holder)
+		_box(Vector3(0.24, 0.04, 0.38), o + Vector3(0, 0.020, 0), wood, Vector3.ZERO, holder)
+		_box(Vector3(0.2, 0.008, 0.34), o + Vector3(0, 0.056, 0), _mat(Color(0.3, 0.3, 0.3), 0.4), Vector3.ZERO, holder)
 		# барабан с лентой
 		_cyl(0.05, 0.09, o + Vector3(-0.03, 0.105, 0.08), drum_mat, Vector3.ZERO, holder)
 		_cyl(0.052, 0.006, o + Vector3(-0.03, 0.153, 0.08), brass, Vector3.ZERO, holder)
@@ -324,7 +324,7 @@ func _build_posters() -> void:
 	for b: Array in [[Vector3(0, 0.15, 0.3), Vector3(0.006, 0.12, 0.2)], [Vector3(0, 0.15, -0.3), Vector3(0.006, 0.12, 0.2)],
 			[Vector3(0, -0.15, 0.0), Vector3(0.006, 0.16, 0.34)], [Vector3(0, 0.0, 0.3), Vector3(0.006, 0.18, 0.006)],
 			[Vector3(0, 0.0, -0.3), Vector3(0.006, 0.18, 0.006)], [Vector3(0, -0.08, 0.0), Vector3(0.006, 0.006, 0.6)]]:
-		_box(b[1], ps + Vector3(-0.009, 0, 0) + b[0], ink)   # над листом, а не в нём (мерцало)
+		_box(b[1], ps + Vector3(-0.020, 0, 0) + b[0], ink)
 	# Кабинет наблюдателя: календарь (над столом, на западной стене) и карта района (на перегородке)
 	# календарь — на простенке между перегородкой тамбура и окном (окно z −24.75…−23.65)
 	var cal_z := -25.35

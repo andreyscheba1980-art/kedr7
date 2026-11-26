@@ -9,7 +9,7 @@ const BUSES: Array[String] = ["SFX", "Ambient", "Music", "Radio", "Tape", "Weath
 const STYLE_VERSION := 3
 const PS1_SNAP := 320.0   ## было 140 — крупный снап «ломал» текстуры на больших гранях
 const KEYS: Array[String] = [
-	"master_volume", "sfx_volume", "music_volume", "ambient_volume", "radio_volume",
+	"master_volume", "sfx_volume", "music_volume", "ambient_volume", "weather_volume", "radio_volume",
 	"mouse_sens", "gamepad_sens", "invert_y", "head_bob", "fov", "brightness", "subtitle_size", "ps1_filter", "language",
 	"fullscreen", "resolution", "pixelation", "show_fps", "quality", "render_scale", "auto_tuned",
 	"rumble", "mic_enabled", "mic_sensitivity", "mic_threshold", "mic_device", "mic_consent", "mic_mimic",
@@ -24,6 +24,7 @@ var master_volume := 0.85
 var sfx_volume := 1.0
 var music_volume := 0.8
 var ambient_volume := 1.0
+var weather_volume := 1.0
 var radio_volume := 1.0
 var mouse_sens := 1.0
 var gamepad_sens := 1.0       ## отдельный множитель для правого аналогового стика
@@ -84,7 +85,7 @@ func apply() -> void:
 	_set_bus("SFX", sfx_volume)
 	_set_bus("Music", music_volume)
 	_set_bus("Ambient", ambient_volume)
-	_set_bus("Weather", ambient_volume)
+	_set_bus("Weather", weather_volume)
 	_set_bus("Radio", radio_volume)
 	_set_bus("Tape", radio_volume)
 	if mic_device != "" and mic_device != "Default":
@@ -154,6 +155,8 @@ func _load() -> void:
 	for k in KEYS:
 		if cfg.has_section_key("settings", k):
 			set(k, cfg.get_value("settings", k))
+	if not cfg.has_section_key("settings", "weather_volume") and cfg.has_section_key("settings", "ambient_volume"):
+		weather_volume = ambient_volume
 	# v1.8: игра сменила вид на чёткий стилизованный — старые сохранённые PS1-настройки сбрасываем один раз.
 	if int(cfg.get_value("settings", "style", 1)) < STYLE_VERSION:
 		pixelation = 0

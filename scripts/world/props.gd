@@ -3028,15 +3028,17 @@ static func carpet(width := 1.05, length := 3.4) -> Node3D:
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	m.uv1_scale = Vector3(1.0, length / 3.2, 1.0)
 	mi.material_override = m
-	mi.position.y = 0.012   # 6 мм над кромкой: при 1 мм узор и кромка «рябили» вдали
+	mi.position.y = 0.008
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
-	# Толщина половика — тёмная кромка снизу, чтобы край не «лип» к полу
-	var under := Geo.box_mesh(Vector3(width - 0.01, 0.006, length - 0.01), _rug_edge_mat())
-	under.position.y = 0.003
-	root.add_child(under)
+	# Боковые кромки половика без сплошной дублирующей плоскости снизу (иначе z-fighting)
+	var edge_mat := _rug_edge_mat()
+	for side_x: float in [-width * 0.5, width * 0.5]:
+		var side_bar := Geo.box_mesh(Vector3(0.014, 0.006, length), edge_mat)
+		side_bar.position = Vector3(side_x, 0.005, 0.0)
+		root.add_child(side_bar)
 	# Бахрома по торцам: короткие кисти из той же основы
-	var fr := _rug_edge_mat()
+	var fr := edge_mat
 	for end_side: float in [-1.0, 1.0]:
 		var n := int(width / 0.035)
 		for k in n:

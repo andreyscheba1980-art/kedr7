@@ -128,7 +128,7 @@ func _eligible(mi: MeshInstance3D, root: Node, containers: Dictionary, pinned: D
 			return "parent pinned"
 		if p.get_script() != null:
 			var sname: String = (p.get_script() as Script).resource_path.get_file()
-			if sname in ["station_lore.gd", "corpus_dressing.gd", "site_dressing.gd", "life_dressing.gd", "day_pois.gd"]:
+			if sname in ["station_lore.gd", "corpus_dressing.gd", "meteo_corpus.gd", "site_dressing.gd", "life_dressing.gd", "day_pois.gd"]:
 				p = p.get_parent()
 				continue
 			return "parent script:" + sname

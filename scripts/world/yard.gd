@@ -1099,9 +1099,10 @@ func _build_trail(line: PackedVector3Array) -> void:
 	if _trail_mat == null:
 		_trail_mat = ShaderMaterial.new()
 		_trail_mat.shader = load("res://assets/shaders/trodden_path.gdshader") as Shader
-		_trail_mat.set_shader_parameter(&"rut_tint", Color(0.66, 0.70, 0.76))
-		_trail_mat.set_shader_parameter(&"strength", 0.78)
 		_trail_mat.render_priority = 1
+	var day_trail := Game.is_daylight()
+	_trail_mat.set_shader_parameter(&"rut_tint", Color(0.56, 0.62, 0.70) if day_trail else Color(0.16, 0.22, 0.30))
+	_trail_mat.set_shader_parameter(&"strength", 0.56 if day_trail else 0.42)
 
 	# Сэмплируем полилинию с шагом ~1.8 м, чтобы лента точно повторяла рельеф без провалов и стыков
 	var pts: Array[Vector3] = []

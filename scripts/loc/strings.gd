@@ -37,6 +37,7 @@ const S := {
 	&"set.sfx": ["Звуки", "Sound effects"],
 	&"set.music": ["Музыка", "Music"],
 	&"set.ambient": ["Окружение", "Ambience"],
+	&"set.weather": ["Погода и ветер", "Weather and wind"],
 	&"set.radio": ["Рация и плёнка", "Radio and tapes"],
 	&"set.sens": ["Чувствительность мыши", "Mouse sensitivity"],
 	&"set.fov": ["Поле зрения", "Field of view"],

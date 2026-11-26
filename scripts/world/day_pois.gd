@@ -34,6 +34,8 @@ var _borehole_drone_player: AudioStreamPlayer3D
 var _tower_wind_player: AudioStreamPlayer3D
 var _shrine_whisper_player: AudioStreamPlayer3D
 var _mi4_wind_player: AudioStreamPlayer3D
+var _poi_emitters: Array[AudioStreamPlayer3D] = []
+var _emitters_t := 0.0
 var _solar_halo: Node3D = null
 var _tower_model: Node3D = null
 var _tower_pos := Vector3.ZERO
@@ -719,7 +721,6 @@ func _setup_audio_emitters() -> void:
 	_shaft_hum_player.volume_db = -10.0
 	_shaft_hum_player.bus = &"SFX"
 	add_child(_shaft_hum_player)
-	_shaft_hum_player.play()
 
 	# Магнитный/вибрационный призвук возле Чёртова Пальца
 	_finger_hum_player = AudioStreamPlayer3D.new()
@@ -741,7 +742,6 @@ func _setup_audio_emitters() -> void:
 	_mine_hum_player.volume_db = -9.0
 	_mine_hum_player.bus = &"SFX"
 	add_child(_mine_hum_player)
-	_mine_hum_player.play()
 
 	# Тихое радио в кабине вмерзшего трелёвочника
 	_tractor_radio_player = AudioStreamPlayer3D.new()
@@ -753,7 +753,6 @@ func _setup_audio_emitters() -> void:
 	_tractor_radio_player.volume_db = -13.0
 	_tractor_radio_player.bus = &"SFX"
 	add_child(_tractor_radio_player)
-	_tractor_radio_player.play()
 
 	# Акустический шепот внутри купола РЛС
 	_radar_whisper_player = AudioStreamPlayer3D.new()
@@ -764,7 +763,6 @@ func _setup_audio_emitters() -> void:
 	_radar_whisper_player.volume_db = -16.0
 	_radar_whisper_player.bus = &"SFX"
 	add_child(_radar_whisper_player)
-	_radar_whisper_player.play()
 
 	# Глубокий 7-километровый гул из устья скважины СГ-4
 	_borehole_drone_player = AudioStreamPlayer3D.new()
@@ -776,7 +774,6 @@ func _setup_audio_emitters() -> void:
 	_borehole_drone_player.volume_db = -8.0
 	_borehole_drone_player.bus = &"SFX"
 	add_child(_borehole_drone_player)
-	_borehole_drone_player.play()
 
 	# Ветер в металлических вантах триангуляционной вышки 24м
 	_tower_wind_player = AudioStreamPlayer3D.new()
@@ -787,7 +784,6 @@ func _setup_audio_emitters() -> void:
 	_tower_wind_player.volume_db = -8.0
 	_tower_wind_player.bus = &"SFX"
 	add_child(_tower_wind_player)
-	_tower_wind_player.play()
 
 	# Шёпот и потрескивание у мансийского радио-тотема
 	_shrine_whisper_player = AudioStreamPlayer3D.new()
@@ -798,7 +794,6 @@ func _setup_audio_emitters() -> void:
 	_shrine_whisper_player.volume_db = -14.0
 	_shrine_whisper_player.bus = &"SFX"
 	add_child(_shrine_whisper_player)
-	_shrine_whisper_player.play()
 
 	# Свист ветра в разломанном фюзеляже вертолёта Ми-4
 	_mi4_wind_player = AudioStreamPlayer3D.new()
@@ -810,7 +805,13 @@ func _setup_audio_emitters() -> void:
 	_mi4_wind_player.volume_db = -10.0
 	_mi4_wind_player.bus = &"SFX"
 	add_child(_mi4_wind_player)
-	_mi4_wind_player.play()
+
+	# Не держим 8 далёких 3D-петель активными 24/7: включаем только при приближении игрока (< 42 м)
+	_poi_emitters = [
+		_shaft_hum_player, _mine_hum_player, _tractor_radio_player,
+		_radar_whisper_player, _borehole_drone_player, _tower_wind_player,
+		_shrine_whisper_player, _mi4_wind_player,
+	]
 
 
 # --- 3. Аномалии POI: сбой компаса, временная деформация и акустика ---
@@ -833,6 +834,17 @@ func _tick_anomalous_pois(delta: float) -> void:
 	if Game.player == null:
 		return
 	var pl_pos := Game.player.global_position
+	_emitters_t -= delta
+	if _emitters_t <= 0.0:
+		_emitters_t = 0.5
+		for em: AudioStreamPlayer3D in _poi_emitters:
+			if em == null or not is_instance_valid(em):
+				continue
+			var d_em := pl_pos.distance_to(em.global_position)
+			if d_em <= 42.0 and not em.playing:
+				em.play()
+			elif d_em > 46.0 and em.playing:
+				em.stop()
 
 	# Ледяная штольня («Шурф Времени»): временное мерцание компаса и сжатие звука
 	var mine_pos: Vector3 = POI_TARGETS[&"poi_ice_mine"]["pos"]

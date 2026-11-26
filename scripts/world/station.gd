@@ -2012,8 +2012,8 @@ func _window(glass_pos: Vector3, size: Vector3, inward: Vector3, wname: String) 
 	body.add_child(Geo.box_shape(size))
 
 	var along_x := size.x > size.z
-	Geo.block(self, Vector3(maxf(size.x, 0.05), 0.04, maxf(size.z, 0.05)), glass_pos, Palette.m(&"dark"), false)
-	Geo.block(self, Vector3(0.05, size.y, 0.05), glass_pos, Palette.m(&"dark"), false)
+	Geo.block(self, Vector3(maxf(size.x, 0.036), 0.036, maxf(size.z, 0.036)), glass_pos, Palette.m(&"dark"), false)
+	Geo.block(self, Vector3(0.036, size.y, 0.036), glass_pos + inward * 0.004, Palette.m(&"dark"), false)
 	var sill := Vector3(size.x + 0.1, 0.05, 0.3) if along_x else Vector3(0.3, 0.05, size.z + 0.1)
 	Geo.block(self, sill, glass_pos + Vector3(0, -size.y / 2.0, 0), Palette.m(&"wood"), false)
 
@@ -2107,7 +2107,7 @@ func _window_frost(glass_pos: Vector3, size: Vector3, inward: Vector3, along_x: 
 		mi.material_override = _frost_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var thick := minf(size.x, size.z)
-	mi.position = glass_pos + inward * (thick * 0.5 + 0.006)
+	mi.position = glass_pos + inward * (thick * 0.5 + 0.018)
 	if not along_x:
 		mi.rotation.y = PI * 0.5
 	add_child(mi)
@@ -2165,7 +2165,7 @@ func _window_glow(glass_pos: Vector3, size: Vector3, outward: Vector3) -> void:
 	glow.material_override = mat
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	light.add_child(glow)
-	glow.position = glass_pos + outward * 0.03 - light.position
+	glow.position = glass_pos + outward * 0.048 - light.position
 	glow.rotation.y = atan2(outward.x, outward.z)
 	# Сцены «кто-то стоит в окне» гасят свечение: аддитивное стекло иначе засвечивает фигуру за ним
 	if not window_spots.is_empty() and window_spots[-1]["glass"] == glass_pos:
@@ -2203,8 +2203,8 @@ func _build_living_quarters() -> void:
 	stove_mesh.position.y = -0.65
 	stove.add_child(stove_mesh)
 	if ResourceLoader.exists("res://assets/models/kedr/stove_brick.glb"):
-		# Печь из Блендера: свечение — прямо в проёме топки (центр 0.5 м, грань z = 1.45)
-		_fire_glow = Geo.block(self, Vector3(0.36, 0.22, 0.01), Vector3(-1.5, 0.5, 1.452), Palette.glow(&"amber"), false)
+		# Печь из Блендера: свечение — чуть перед топкой, не пересекает чугун дверцы
+		_fire_glow = Geo.block(self, Vector3(0.32, 0.18, 0.008), Vector3(-1.5, 0.5, 1.462), Palette.glow(&"amber"), false)
 	else:
 		_fire_glow = Geo.block(self, Vector3(0.4, 0.25, 0.02), Vector3(-1.5, 0.35, 1.58), Palette.glow(&"amber"), false)
 	_fire = Geo.omni(self, Vector3(-1.5, 0.4, 1.2), 3.4, 0.65, Color(1.0, 0.5, 0.15))
@@ -2507,7 +2507,7 @@ func _build_living_quarters() -> void:
 	else:
 		cmat.albedo_color = Color(0.7, 0.68, 0.65)
 	crew_photo_plane.material_override = cmat
-	crew_photo_plane.position = Vector3(2.1, 1.80, 0.14)
+	crew_photo_plane.position = Vector3(2.1, 1.80, 0.16)
 	add_child(crew_photo_plane)
 
 	Geo.interactable(self, Vector3(0.45, 0.45, 0.2), Vector3(2.1, 1.80, 0.12), null, Loc.t(&"it.crew_photo"), func(_p: Player) -> void:
@@ -3463,15 +3463,16 @@ func _build_living_door() -> void:
 	l_door.prompt_provider = func() -> String: return Loc.t(&"it.door_close") if living_door_open else Loc.t(&"it.door_open")
 	l_door.add_child(Geo.box_shape(Vector3(0.08, 2.0, 1.0)))
 
-	# Дверное полотно из сосновых досок с филёнками и латунной ручкой
-	var door_mesh := Geo.box_mesh(Vector3(0.045, 1.96, 0.96), Palette.m(&"wood"))
+	# Дверное полотно из сосновых досок с филёнками (накладки с обеих сторон без пересечения полотна)
+	var door_mesh := Geo.box_mesh(Vector3(0.042, 1.96, 0.96), Palette.m(&"wood"))
 	l_door.add_child(door_mesh)
-	var p_top := Geo.box_mesh(Vector3(0.052, 0.72, 0.38), Palette.m(&"wood"))
-	p_top.position = Vector3(0.0, 0.42, 0.0)
-	l_door.add_child(p_top)
-	var p_bot := Geo.box_mesh(Vector3(0.052, 0.62, 0.38), Palette.m(&"wood"))
-	p_bot.position = Vector3(0.0, -0.42, 0.0)
-	l_door.add_child(p_bot)
+	for side_x: float in [-0.025, 0.025]:
+		var p_top := Geo.box_mesh(Vector3(0.008, 0.72, 0.38), Palette.m(&"wood"))
+		p_top.position = Vector3(side_x, 0.42, 0.0)
+		l_door.add_child(p_top)
+		var p_bot := Geo.box_mesh(Vector3(0.008, 0.62, 0.38), Palette.m(&"wood"))
+		p_bot.position = Vector3(side_x, -0.42, 0.0)
+		l_door.add_child(p_bot)
 	var handle := Geo.box_mesh(Vector3(0.12, 0.035, 0.12), Palette.m(&"metal"))
 	handle.position = Vector3(0.0, 0.0, 0.38)
 	l_door.add_child(handle)
