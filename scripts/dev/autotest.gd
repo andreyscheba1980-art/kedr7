@@ -2268,7 +2268,7 @@ func _run() -> void:
 	Game.level.set_door_open(true)
 	await _wait(6.0)
 	await _shot("finale_end")
-	_verify_patch_systems()
+	await _verify_patch_systems()
 	print("[autotest] done, shots: ", _n)
 	get_tree().quit()
 
@@ -2278,13 +2278,35 @@ func _verify_patch_systems() -> void:
 		assert(Flags.on(req_flag), "Flag %s must be enabled!" % req_flag)
 	assert(AudioServer.get_bus_index(&"Weather") >= 0, "Weather audio bus missing!")
 	assert(AudioMix.filter != null, "AudioMix.filter must bind to Weather LowPass!")
+	AudioMix.set_zone_acoustics(&"vestibule", false)
+	AudioMix.set_zone_acoustics(&"room", false)
+	AudioMix.set_zone_acoustics(&"yard", true)
 	var trap_xz := Vector2(RadioOrders.CLOSED_TRAIL_TRAP.x, RadioOrders.CLOSED_TRAIL_TRAP.z)
 	var meteo_xz := Vector2(Yard.METEO.x + Yard.M_VANE.x, Yard.METEO.z + Yard.M_VANE.z)
 	assert(trap_xz.distance_to(meteo_xz) > 50.0, "fake_vane_trap must not collide with MeteoCorpus!")
-	var baro_node := Props.barograph()
-	assert(baro_node != null, "Props.barograph() must instantiate cleanly!")
-	baro_node.free()
-	print("[autotest] patch verification OK")
+	for prop_n: Node3D in [
+		Props.barograph(), Props.desk(), Props.chair(), Props.bed(),
+		Props.oil_can(), Props.snow_shovel(), Props.axe_stump(), Props.soviet_garland()
+	]:
+		assert(prop_n != null, "Blender/prop model must instantiate cleanly!")
+		prop_n.free()
+	if Game.level != null and Game.level.has_method(&"get_coop_fx"):
+		var fx: Dictionary = Game.level.call(&"get_coop_fx")
+		assert(fx.has("sag") and fx.has("frozen_tea") and fx.has("hand"), "Coop FX dict incomplete!")
+		Game.level.call(&"apply_coop_fx", 0.0, false, 0.0)
+	var ev_before := int(SaveGame.flags.get("evidence", 0))
+	var dr := DarkroomUI.new()
+	Game.hud.open_modal(dr)
+	await _wait(0.2)
+	var pshot: Dictionary = dr._create_paradox_shot()
+	dr._inspect_photo_loupe(pshot)
+	assert(int(SaveGame.flags.get("evidence", 0)) == ev_before + 1, "DarkroomUI must record evidence on paradox/ghost inspection!")
+	Game.hud.close_modal()
+	var baro_ui := BarographUI.new()
+	Game.hud.open_modal(baro_ui)
+	await _wait(0.2)
+	Game.hud.close_modal()
+	print("[autotest] patch verification OK (Blender props, AudioMix, Darkroom evidence, Barograph, Coop FX)")
 
 
 ## Проверка эфирной сетки, фирменных сцен и озвучки (без оценки на глаз — только ошибки и лог).

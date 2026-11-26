@@ -124,7 +124,7 @@ func _ready() -> void:
 		closed.emit()
 	)
 	row.add_child(btn)
-	btn.grab_focus.call_deferred()
+	UiKit.safe_focus(btn)
 
 	_build_loupe_overlay()
 	if not tank_loaded_this_session:
@@ -140,7 +140,6 @@ func _build_blind_tank_phase() -> void:
 	var center_box := VBoxContainer.new()
 	center_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	center_box.add_theme_constant_override("separation", 14)
-	_black_overlay.add_child(center_box)
 	UiKit.place(_black_overlay, center_box, 0.5, 0.5, 0.5, 0.5, -380, -140, 380, 140)
 
 	var h1 := UiKit.label(Loc.p("ФАЗА 1: ЗАРЯДКА В ЭБОНИТОВЫЙ БАЧОК (100% ТЕМНОТА)", "PHASE 1: EBONITE SPIRAL TANK LOADING (TOTAL DARKNESS)"), 16, HORIZONTAL_ALIGNMENT_CENTER)
@@ -450,6 +449,9 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 		Director.add_tension(15.0, "осознание хронологического парадокса")
 		AudioDirector.play_raw("res://assets/audio/whisper.ogg", -4.0)
 		Game.paradox_photo_seen = true
+		if not ph.get("evidence_logged", false):
+			ph["evidence_logged"] = true
+			SaveGame.flags["evidence"] = int(SaveGame.flags.get("evidence", 0)) + 1
 		_loupe_overlay.visible = true
 		_trigger_loupe_red_scare(my_token)
 		return
@@ -458,6 +460,12 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 		if String(t).begins_with("poi_"):
 			poi_tag = t
 			break
+	var any_anomaly: bool = haunted or ph.get("has_tracks", false) or ph.get("has_fingers", false) or ph.get("has_mast_creature", false)
+	if (any_anomaly or poi_tag != &"") and not ph.get("evidence_logged", false):
+		ph["evidence_logged"] = true
+		SaveGame.flags["evidence"] = int(SaveGame.flags.get("evidence", 0)) + 1
+		if Game.hud != null:
+			Game.hud.subtitle(Loc.t(&"darkroom.evidence_logged"), 3.5)
 	if poi_tag != &"":
 		_loupe_title.text = Loc.t(&"darkroom.loupe_poi_revealed")
 		_loupe_desc.text = ph.get("detail", Loc.t(StringName("poi." + String(poi_tag) + ".loupe")))
@@ -465,7 +473,7 @@ func _inspect_photo_loupe(ph: Dictionary) -> void:
 	else:
 		_loupe_title.text = Loc.t(&"darkroom.loupe_active")
 		_loupe_desc.text = ph.get("detail", _caption(ph))
-		if haunted or ph.get("has_tracks", false) or ph.get("has_fingers", false) or ph.get("has_mast_creature", false):
+		if any_anomaly:
 			Director.add_tension(7.0, "аномалия на фотоплёнке")
 			AudioDirector.play_raw("res://assets/audio/whisper.ogg", -8.0)
 	_loupe_overlay.visible = true

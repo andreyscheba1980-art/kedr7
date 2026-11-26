@@ -2077,6 +2077,7 @@ The operator is not to be informed about the object.
 	&"barograph.ink_scrawl_1": ["НЕ ОГЛЯДЫВАЙСЯ", "DON'T LOOK BACK"],
 	&"barograph.ink_scrawl_2": ["ОН ЗА ДВЕРЬЮ", "IT IS AT THE DOOR"],
 	&"darkroom.scare_scratch": ["ОН УЖЕ В ДОМЕ", "IT IS ALREADY INSIDE"],
+	&"darkroom.evidence_logged": ["Улика зафиксирована в деле №83-М.", "Evidence logged to Case File #83-M."],
 
 	# --- Утро: Большая Земля помнит ночь ---
 	&"morn.ok": ["Кедр-7, ночь приняли, сводки на месте. Хорошая работа.", "Kedr-7, night logged, all reports in. Good work."],

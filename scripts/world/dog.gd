@@ -152,8 +152,8 @@ static func make_model() -> Array:
 	var a := inst.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	var shader := load("res://assets/shaders/ps1_skinned.gdshader") as Shader
 	var tex: Texture2D = null
-	if ResourceLoader.exists("res://assets/models/kedr/dog_dog.png"):
-		tex = load("res://assets/models/kedr/dog_dog.png") as Texture2D
+	if ResourceLoader.exists("res://assets/textures/dog_dog.png"):
+		tex = load("res://assets/textures/dog_dog.png") as Texture2D
 	for mi: MeshInstance3D in inst.find_children("*", "MeshInstance3D", true, false):
 		var src := mi.get_active_material(0) as BaseMaterial3D
 		var m := ShaderMaterial.new()

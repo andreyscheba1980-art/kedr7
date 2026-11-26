@@ -2427,7 +2427,7 @@ func _build_living_quarters() -> void:
 	add_child(table_lamp)
 	var l_table := Geo.omni(self, Vector3(0.85, 1.15, 4.2), 2.4, 0.95, Color(1.0, 0.82, 0.52))
 	l_table.omni_attenuation = 2.0
-	l_table.shadow_enabled = true
+	l_table.shadow_enabled = false
 	register_lamp(l_table)
 
 	var table_dust := CPUParticles3D.new()
@@ -3119,7 +3119,7 @@ func _build_darkroom_safelight() -> void:
 	red_light.light_energy = 1.75
 	red_light.omni_range = 3.6
 	red_light.omni_attenuation = 1.35
-	red_light.shadow_enabled = true
+	red_light.shadow_enabled = false
 	add_child(red_light)
 
 	# 2. Натянутая бельевая верёвка с деревянными прищепками и сохнущими отпечатками Семёнова
@@ -4451,7 +4451,7 @@ func _build_pzs35_searchlight() -> void:
 	_pzs35_light.spot_angle = 24.0
 	_pzs35_light.light_energy = 4.5
 	_pzs35_light.light_color = Color(1.0, 0.94, 0.82)
-	_pzs35_light.shadow_enabled = true
+	_pzs35_light.shadow_enabled = Settings.quality >= 1
 	_pzs35_light.light_cull_mask = LAYER_OUT
 	_pzs35_light.shadow_caster_mask = LAYER_OUT
 	_pzs35_light.visible = Game.pzs35_on and not Game.has_flag("ap50_tripped") and Game.power_on
@@ -4783,6 +4783,23 @@ func set_frozen_tea_anomaly(active: bool) -> void:
 	_frozen_tea_active = active
 	if _frozen_tea_ice != null and is_instance_valid(_frozen_tea_ice):
 		_frozen_tea_ice.visible = active
+
+
+## Кооперативная синхронизация атмосферных эффектов (просадка ДЭС-8, ледяной чай, отпечаток ладони в инее).
+func get_coop_fx() -> Dictionary:
+	return {"sag": power_sag, "frozen_tea": _frozen_tea_active, "hand": _frost_hand_reveal}
+
+
+func apply_coop_fx(sag: float, frozen_tea: bool, hand: float) -> void:
+	set_frozen_tea_anomaly(frozen_tea)
+	if sag > 0.02:
+		power_sag = clampf(sag, 0.0, 1.0)
+	if absf(hand - _frost_hand_reveal) > 0.01:
+		_frost_hand_reveal = clampf(hand, 0.0, 1.0)
+		if _north_frost_mat != null:
+			_north_frost_mat.set_shader_parameter(&"hand_reveal", _frost_hand_reveal)
+		if _frost_mat != null:
+			_frost_mat.set_shader_parameter(&"hand_reveal", _frost_hand_reveal * 0.75)
 
 
 func _on_samovar_used(p: Player) -> void:

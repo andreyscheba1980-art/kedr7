@@ -679,6 +679,9 @@ func _test_tick(delta: float) -> void:
 func _slow_sync() -> void:
 	if role == "host":
 		_clock.rpc(Game.shift_minutes, Game.weather != null and Game.weather.blizzard)
+		if Game.level != null and Game.level.has_method(&"get_coop_fx"):
+			var fx: Dictionary = Game.level.call(&"get_coop_fx")
+			_station_fx.rpc(float(fx.get("sag", 0.0)), bool(fx.get("frozen_tea", false)), float(fx.get("hand", 0.0)))
 	elif Game.yrka != null and Game.yrka.enabled:
 		_yrka_state.rpc(Game.yrka.virtual_pos, Game.yrka.threat, int(Game.yrka.stage))
 	if Game.tasks != null:
@@ -750,6 +753,14 @@ func _clock(minutes: float, blizzard: bool) -> void:
 		Game.shift_minutes = minutes
 	if Game.weather != null and Game.weather.blizzard != blizzard:
 		Game.weather.force_blizzard(blizzard, 30.0)
+
+
+@rpc("authority", "call_remote", "unreliable_ordered")
+func _station_fx(sag: float, frozen_tea: bool, hand: float) -> void:
+	if not in_session:
+		return
+	if Game.level != null and Game.level.has_method(&"apply_coop_fx"):
+		Game.level.call(&"apply_coop_fx", sag, frozen_tea, hand)
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")

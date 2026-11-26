@@ -644,7 +644,7 @@ func toggle_tasks() -> void:
 		if Game.player != null:
 			Game.player.mode = Player.Mode.UI
 		if _tab_btn_tasks != null:
-			_tab_btn_tasks.grab_focus.call_deferred()
+			UiKit.safe_focus(_tab_btn_tasks)
 	else:
 		if Game.player != null and not Game.dead:
 			Game.player.mode = Player.Mode.WALK

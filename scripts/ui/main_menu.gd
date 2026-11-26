@@ -226,14 +226,14 @@ func _show_main() -> void:
 			stop_music()
 			continue_pressed.emit())
 		_box.add_child(cont_btn)
-		cont_btn.grab_focus.call_deferred()
+		UiKit.safe_focus(cont_btn)
 
 		var new_btn := _make_telem_btn(Loc.p("СМН-02", "SFT-02"), Loc.t(&"menu.btn_new"), Loc.p("ПЕРЕЗАПИСЬ", "OVERWRITE"), _show_difficulty)
 		_box.add_child(new_btn)
 	else:
 		var new_btn := _make_telem_btn(Loc.p("КН-01", "BTN-01"), Loc.t(&"menu.btn_new"), save_hint, _show_difficulty)
 		_box.add_child(new_btn)
-		new_btn.grab_focus.call_deferred()
+		UiKit.safe_focus(new_btn)
 
 	# Пункт 2: ДВЕ ВАХТЫ (Связь)
 	var coop_btn := _make_telem_btn(Loc.p("ЗАС-02", "SEC-02"), Loc.t(&"menu.btn_coop"), Loc.p("3820 кГц // ЭФИР", "3820 kHz // RADIO"), _show_coop)
@@ -296,7 +296,7 @@ func _show_dossier_hub() -> void:
 
 	var b1 := _make_telem_btn(Loc.p("ДОК-01", "DOC-01"), Loc.t(&"menu.dossier_tab1"), Loc.p("УПРАВЛЕНИЕ", "CONTROLS"), _show_controls)
 	_box.add_child(b1)
-	b1.grab_focus.call_deferred()
+	UiKit.safe_focus(b1)
 
 	var b2 := _make_telem_btn(Loc.p("ДОК-02", "DOC-02"), Loc.t(&"menu.dossier_tab2"), Loc.p("СЕМЁНОВ", "SEMENOV"), _show_archive)
 	_box.add_child(b2)
@@ -324,7 +324,7 @@ func _show_difficulty() -> void:
 		stop_music()
 		new_game.emit("story"))
 	_box.add_child(story_btn)
-	story_btn.grab_focus.call_deferred()
+	UiKit.safe_focus(story_btn)
 	_box.add_child(_desc(&"diff.story_desc"))
 
 	var hard_btn := _make_telem_btn(Loc.p("РЕЖ-02", "MOD-02"), Loc.t(&"diff.hard"), Loc.p("БУРАН-ХАРДКОР", "BLIZZARD HARDCORE"), func() -> void:
@@ -499,7 +499,7 @@ func _show_coop() -> void:
 			Net.status.disconnect(on_status)
 		if Net.room_code.is_connected(on_code):
 			Net.room_code.disconnect(on_code))
-	first.grab_focus.call_deferred()
+	UiKit.safe_focus(first)
 
 
 func _desc(key: StringName) -> Label:

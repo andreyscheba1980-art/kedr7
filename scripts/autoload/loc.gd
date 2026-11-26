@@ -19,6 +19,10 @@ func set_language(l: String) -> void:
 	language_changed.emit()
 
 
+func is_ru() -> bool:
+	return lang == "ru"
+
+
 ## Строка по ключу. args — подстановка через % (как у String).
 func t(key: StringName, args: Array = []) -> String:
 	var entry: Variant = StringsClass.S.get(key)

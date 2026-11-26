@@ -61,6 +61,9 @@ static func _kit(seed_value: int, mottle := 0.08) -> MeshKit:
 
 ## Стол 2.1 × 0.85, высота 0.75: широкая столешница, ножки слева, тумба с ящиками справа.
 static func desk() -> Node3D:
+	var glb := _kedr_model("soviet_desk", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var k := _kit(11)
 	k.box(Vector3(0, 0.725, 0), Vector3(2.1, 0.05, 0.85), WOOD)
 	for sx: float in [-0.96, -0.38]:
@@ -77,6 +80,12 @@ static func desk() -> Node3D:
 
 ## Табурет со спинкой. Начало — центр сиденья по высоте 0.225 (как у старой коробки).
 static func chair() -> Node3D:
+	var glb := _kedr_model("soviet_chair", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		glb.position.y = -0.225
+		var croot := Node3D.new()
+		croot.add_child(glb)
+		return croot
 	var k := _kit(12)
 	k.box(Vector3(0, 0.2, 0), Vector3(0.44, 0.04, 0.42), WOOD)
 	for sx: float in [-0.19, 0.19]:
@@ -426,6 +435,9 @@ static func desk_lamp() -> Node3D:
 
 ## Железная кровать: спинки из труб, матрас, подушка, шерстяное одеяло. Изголовье — +Z.
 static func bed() -> Node3D:
+	var glb := _kedr_model("soviet_bed", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var k := _kit(15)
 	for sz: float in [-0.98, 0.98]:
 		var h := 0.95 if sz > 0.0 else 0.7
@@ -710,6 +722,9 @@ static func firewood_bundle(held := false) -> Node3D:
 
 ## Советская прямоугольная жестяная банка моторного масла МС-20 с ручкой и носиком.
 static func oil_can(held := false) -> Node3D:
+	var glb := _kedr_model("oil_can_ms20", {"bright": 1.1, "sat": 0.95, "scale": 0.8 if held else 1.0})
+	if glb != null:
+		return glb
 	var key := &"oil_held" if held else &"oil_world"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:
@@ -1448,6 +1463,9 @@ static func tracked_vehicle() -> Node3D:
 
 ## Колода с топором-колуном у поленницы.
 static func axe_stump() -> Node3D:
+	var glb := _kedr_model("axe_stump", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"axe_stump", "tex_wood.png")
 	if cached != null:
 		return cached
@@ -1828,6 +1846,9 @@ static func snow_shovel(is_held := false) -> Node3D:
 		m.scale = Vector3(0.72, 0.72, 0.72)
 		root.add_child(m)
 		return root
+	var glb := _kedr_model("snow_shovel_wood", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"snow_shovel", "tex_wood.png")
 	if cached != null:
 		return cached
@@ -5946,19 +5967,23 @@ static func soviet_garland() -> Node3D:
 	var width := 1.9
 	var drop := 0.22
 
-	# Провисший чёрный провод-катенария между гвоздями
-	var wire := _instance_from_cache(&"soviet_garland_wire", "")
-	if wire == null:
-		var kw := _kit(251, 0.03)
-		var pts: Array = []
-		var rads: Array = []
-		for i in 15:
-			var t := float(i) / 14.0
-			pts.append(Vector3((t - 0.5) * (width + 0.12), -4.0 * drop * t * (1.0 - t) + 0.015, 0.0))
-			rads.append(0.0045)
-		kw.tube(pts, rads, Color(0.05, 0.05, 0.06), 4, true, true)
-		wire = _mi(kw, &"soviet_garland_wire", "")
-	root.add_child(wire)
+	# Провисший чёрный провод-катенария с фарфоровыми изоляторами и карболитовыми цоколями (Blender GLB)
+	var wire_glb := _kedr_model("soviet_garland_wire", {"center": false, "keep": true, "bright": 1.05, "sat": 0.95})
+	if wire_glb != null:
+		root.add_child(wire_glb)
+	else:
+		var wire := _instance_from_cache(&"soviet_garland_wire", "")
+		if wire == null:
+			var kw := _kit(251, 0.03)
+			var pts: Array = []
+			var rads: Array = []
+			for i in 15:
+				var t := float(i) / 14.0
+				pts.append(Vector3((t - 0.5) * (width + 0.12), -4.0 * drop * t * (1.0 - t) + 0.015, 0.0))
+				rads.append(0.0045)
+			kw.tube(pts, rads, Color(0.05, 0.05, 0.06), 4, true, true)
+			wire = _mi(kw, &"soviet_garland_wire", "")
+		root.add_child(wire)
 
 	var glow_shader := load("res://assets/shaders/soft_glow.gdshader") as Shader
 	var halo_quad := QuadMesh.new()
@@ -5993,9 +6018,10 @@ static func soviet_garland() -> Node3D:
 		bulb.rotation.z = (t - 0.5) * 0.35
 		root.add_child(bulb)
 
-		var cap := Geo.box_mesh(Vector3(0.018, 0.016, 0.018), Palette.m(&"metal"))
-		cap.position = Vector3(x, y, 0.0)
-		root.add_child(cap)
+		if wire_glb == null:
+			var cap := Geo.box_mesh(Vector3(0.018, 0.016, 0.018), Palette.m(&"metal"))
+			cap.position = Vector3(x, y, 0.0)
+			root.add_child(cap)
 
 		# Мягкий unshaded blend_add ореол вокруг каждой лампочки (без дополнительных Light3D!)
 		if glow_shader != null:

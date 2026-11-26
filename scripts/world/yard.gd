@@ -128,6 +128,7 @@ var _whisper_timer := 120.0
 var _crow_timer := 110.0
 var _outdoor_cd := 0.0
 var _pilot_balloon_node: Node3D = null
+var _pilot_balloon_light: OmniLight3D = null
 const HUNTER_SPRUCE_POS := Vector3(22.0, 0.0, -28.0)
 var _frozen_hunter_node: Node3D = null
 var _hunter_aura_noticed := false
@@ -708,13 +709,13 @@ func _process(delta: float) -> void:
 	if _pilot_balloon_node != null and is_instance_valid(_pilot_balloon_node):
 		_pilot_balloon_node.position += Vector3(0.32 * delta, 0.72 * delta, -0.22 * delta)
 		# Свет фонарика гаснет с высотой: над двором он только первые ~40 с
-		var bl := _pilot_balloon_node.find_children("*", "OmniLight3D", true, false)
-		if not bl.is_empty():
-			(bl[0] as OmniLight3D).light_energy = 1.6 * clampf(1.0 - (_pilot_balloon_node.position.y - 12.0) / 22.0, 0.0, 1.0)
+		if _pilot_balloon_light != null and is_instance_valid(_pilot_balloon_light):
+			_pilot_balloon_light.light_energy = 1.6 * clampf(1.0 - (_pilot_balloon_node.position.y - 12.0) / 22.0, 0.0, 1.0)
 		if _pilot_balloon_node.position.y > 65.0:
 			Game.balloon_launched = false
 			_pilot_balloon_node.queue_free()
 			_pilot_balloon_node = null
+			_pilot_balloon_light = null
 
 
 ## Реактивный ночной саспенс двора без скримеров: вакуум ветра, звон цепи, гаснущие от фонаря глаза и стук из ледника.
@@ -1377,6 +1378,8 @@ func _launch_pilot_balloon(pos: Vector3) -> void:
 	_pilot_balloon_node = Props.pilot_balloon()
 	_pilot_balloon_node.position = pos + Vector3(0, 0.8, 0)
 	add_child(_pilot_balloon_node)
+	var bl := _pilot_balloon_node.find_children("*", "OmniLight3D", true, false)
+	_pilot_balloon_light = bl[0] as OmniLight3D if not bl.is_empty() else null
 	AudioDirector.play_raw("res://assets/audio/flare.ogg", -4.0)
 	Game.hud.subtitle(Loc.t(&"sub.balloon_launched_n", [Game.balloons_left]), 4.0)
 	Director.add_tension(5.0, "запуск шара-пилота в метель")
@@ -5077,7 +5080,7 @@ func _build_helipad() -> void:
 	psnd_light.light_color = Color(1.0, 0.12, 0.12)
 	psnd_light.light_energy = 16.0 if psnd_lit_saved else 0.0
 	psnd_light.omni_range = 28.0
-	psnd_light.shadow_enabled = true
+	psnd_light.shadow_enabled = false
 	add_child(psnd_light)
 
 	var it_psnd := Geo.interactable(self, Vector3(0.8, 0.8, 0.8), psnd_pos, null, "", func(_p: Player) -> void:

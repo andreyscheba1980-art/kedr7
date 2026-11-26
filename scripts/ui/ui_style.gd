@@ -105,14 +105,17 @@ static func paper(parent: Control, seed := 1.0, base := PAPER, stains := 1.0) ->
 static func stamp_button(text: String, on_press: Callable, ink := INK_STAMP) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(on_press)
+	b.focus_mode = Control.FOCUS_ALL
+	b.pressed.connect(func() -> void:
+		UiKit.play_tick(-6.0, 1.0)
+		on_press.call()
+	)
 	b.add_theme_font_override("font", plate_font())
 	b.add_theme_font_size_override("font_size", 24)
-	for st: Array in [["normal", 0.0], ["hover", 0.10], ["pressed", 0.2], ["focus", 0.0]]:
+	for st: Array in [["normal", 0.0], ["hover", 0.10], ["pressed", 0.2], ["focus", 0.08]]:
 		var sb := StyleBoxFlat.new()
 		sb.bg_color = PAPER.lerp(ink, float(st[1]) * 2.0)   # бумажный ярлычок: штамп читается и на снегу
-		sb.border_color = Color(ink, 0.85)
+		sb.border_color = UiKit.AMBER if st[0] == "focus" else Color(ink, 0.85)
 		sb.set_border_width_all(3)
 		sb.set_corner_radius_all(5)
 		sb.set_content_margin_all(6)
@@ -130,12 +133,16 @@ static func text_button(text: String, on_press: Callable, color := Color(0.82, 0
 	var b := Button.new()
 	b.text = text
 	b.flat = true
-	b.focus_mode = Control.FOCUS_NONE
-	b.pressed.connect(on_press)
+	b.focus_mode = Control.FOCUS_ALL
+	b.pressed.connect(func() -> void:
+		UiKit.play_tick(-6.0, 1.05)
+		on_press.call()
+	)
 	b.add_theme_font_override("font", type_font())
 	b.add_theme_font_size_override("font_size", 16)
 	b.add_theme_color_override("font_color", Color(color, 0.75))
 	b.add_theme_color_override("font_hover_color", color)
+	b.add_theme_color_override("font_focus_color", UiKit.AMBER)
 	b.add_theme_color_override("font_pressed_color", color)
 	b.add_theme_constant_override("outline_size", 0)
 	return b

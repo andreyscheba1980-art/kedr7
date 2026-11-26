@@ -229,6 +229,16 @@ static func button(text: String, on_press: Callable) -> Button:
 	return b
 
 
+## Безопасный отложенный фокус: никогда не кидает ошибку `!is_inside_tree()`, если окно уже закрылось.
+static func safe_focus(c: Control) -> void:
+	if c == null:
+		return
+	(func() -> void:
+		if is_instance_valid(c) and c.is_inside_tree() and c.is_visible_in_tree():
+			c.grab_focus()
+	).call_deferred()
+
+
 ## Ставит контрол в родителя с якорями (доли) и отступами (пиксели).
 static func place(parent: Control, c: Control, al: float, at: float, ar: float, ab: float, ol: float, ot: float, o_r: float, ob: float) -> void:
 	parent.add_child(c)
