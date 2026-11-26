@@ -48,12 +48,12 @@ static func _corridor(st: Node3D) -> void:
 
 
 static func _storage(st: Node3D) -> void:
-	# Бочки с керосином и ящики в холодной кладовой
-	_m(st, "survival/barrel", Vector3(6.45, F, -5.1), 0.0, 0.85, {"collide": true, "tint": Color(0.62, 0.34, 0.26)})
-	_m(st, "survival/barrel", Vector3(5.85, F, -5.15), 40.0, 0.85, {"collide": true, "tint": Color(0.5, 0.42, 0.36)})
-	_m(st, "survival/box", Vector3(5.2, F, -5.15), 10.0, 0.45, {"collide": true})
+	# Бочки с керосином и ящики в холодной кладовой (в стороне от стола фотолаборатории DarkroomTable)
+	_m(st, "survival/barrel", Vector3(3.95, F, -2.55), 0.0, 0.85, {"collide": true, "tint": Color(0.62, 0.34, 0.26)})
+	_m(st, "survival/barrel", Vector3(4.55, F, -2.55), 40.0, 0.85, {"collide": true, "tint": Color(0.5, 0.42, 0.36)})
+	_m(st, "survival/box", Vector3(4.25, F, -4.35), 10.0, 0.45, {"collide": true})
 	_m(st, "survival/bucket", Vector3(6.75, F, -2.4), 0.0, 0.3)
-	_m(st, "survival/resource-planks", Vector3(6.6, F, -2.55), 90.0, 0.16)
+	_m(st, "survival/resource-planks", Vector3(6.2, F, -2.55), 90.0, 0.16)
 
 
 static func _vestibule(st: Node3D) -> void:

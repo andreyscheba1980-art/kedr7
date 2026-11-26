@@ -78,6 +78,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not is_inside_tree() or Game.level == null:
 		return
+	var inside := Game.is_indoors()
+	if not inside:
+		# Снаружи и в лесу не крутим потолочный/дверной гул и не шлём звуки сруба в уши
+		if _attic_audio != null and _attic_audio.playing:
+			_attic_audio.stop()
+		if _keyhole_audio != null and _keyhole_audio.playing:
+			_keyhole_audio.stop()
+		if _window_audio != null and _window_audio.playing:
+			_window_audio.stop()
+		return
 	var yrka_near: bool = Game.yrka != null and is_instance_valid(Game.yrka) and \
 		Game.yrka.stage in [YrkaThreat.Stage.STALKING, YrkaThreat.Stage.CALLING, YrkaThreat.Stage.PRESSURE, YrkaThreat.Stage.CHASE]
 
@@ -99,8 +109,10 @@ func _tick_stove_cooling(delta: float, yrka_near: bool) -> void:
 		_stove_click_timer -= delta
 		if _stove_click_timer <= 0.0:
 			var delta_abs := maxf(absf(d_heat), 0.02)
-			_stove_click_timer = clampf(12.0 / (delta_abs * 100.0), 3.0, 15.0)
-			AudioDirector.play_raw("res://assets/audio/clank.ogg", -14.0, randf_range(1.6, 2.3))
+			_stove_click_timer = clampf(12.0 / (delta_abs * 100.0), 4.5, 18.0)
+			var cp := Game.audio.play_3d("res://assets/audio/clank.ogg", STOVE_POS, -16.0, 2.0)
+			if cp != null:
+				cp.pitch_scale = randf_range(1.6, 2.2)
 
 	# За 20 секунд до атаки Ырки опрокидывание тяги: булькающий вой и дребезг конфорки
 	if yrka_near:
@@ -108,80 +120,95 @@ func _tick_stove_cooling(delta: float, yrka_near: bool) -> void:
 		if _draft_howl_timer <= 0.0:
 			_draft_howl_timer = randf_range(16.0, 28.0)
 			_stove_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/chimney_howl.ogg")
-			_stove_audio.volume_db = -4.0
+			_stove_audio.volume_db = -6.0
 			_stove_audio.pitch_scale = randf_range(0.75, 0.95)
 			_stove_audio.play()
 			# Мелкий звон чугунной конфорки
 			get_tree().create_timer(1.2, false).timeout.connect(func() -> void:
-				if is_instance_valid(self):
-					AudioDirector.play_raw("res://assets/audio/clank_v2.ogg", -12.0, 2.4)
+				if is_instance_valid(self) and Game.is_indoors():
+					var cp2 := Game.audio.play_3d("res://assets/audio/clank_v2.ogg", STOVE_POS, -14.0, 2.0)
+					if cp2 != null:
+						cp2.pitch_scale = 2.2
 			)
 
 
 ## 2. Оконные переплёты: предвестие порыва ветра и когти Ырки
 func _tick_window_rattle(delta: float, yrka_near: bool) -> void:
 	var wind_int: float = Game.weather.intensity if Game.weather != null else 0.4
+	if wind_int < 0.35 and not yrka_near:
+		return
 	_gust_incoming_timer -= delta
 	if _gust_incoming_timer <= 0.0:
-		_gust_incoming_timer = randf_range(18.0, 35.0) / maxf(wind_int, 0.3)
-		# За 1.5 секунды до удара порыва ветра: тонкое резонансное дребезжание 2-мм стекла
+		_gust_incoming_timer = randf_range(24.0, 42.0) / maxf(wind_int, 0.35)
+		# За 1.5 секунды до удара порыва ветра: тихое дребезжание переплёта только при сильном ветре
 		if not yrka_near:
 			_window_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/flag_flap_loop.ogg")
-			_window_audio.volume_db = -10.0
-			_window_audio.pitch_scale = 1.8
+			_window_audio.volume_db = -18.0
+			_window_audio.pitch_scale = 1.05
 			_window_audio.play()
-			get_tree().create_timer(1.5, false).timeout.connect(func() -> void:
+			get_tree().create_timer(1.3, false).timeout.connect(func() -> void:
 				if is_instance_valid(self):
 					_window_audio.stop()
-					AudioDirector.play_raw("res://assets/audio/gust.ogg", -2.0, randf_range(0.9, 1.1))
+					if Game.is_indoors():
+						var gp := Game.audio.play_3d("res://assets/audio/gust.ogg", LIVING_WINDOW_POS, -10.0, 4.0)
+						if gp != null:
+							gp.pitch_scale = randf_range(0.9, 1.1)
 			)
 		else:
 			# Если за окном Ырка — поток перекрыт телом, стекло не дрожит, раздаётся сухой писк нажима ногтя
 			_window_audio.stop()
 			_window_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/claw_scrape_1.wav")
-			_window_audio.volume_db = -5.0
+			_window_audio.volume_db = -6.0
 			_window_audio.pitch_scale = randf_range(1.2, 1.45)
 			_window_audio.play()
 
 
 ## 3. Потолочные балки и чердак: талрепы АШ-4 на стропилах
 func _tick_attic_talreps(delta: float, yrka_near: bool) -> void:
-	var wind_speed: float = (Game.weather.intensity * 25.0 + 5.0) if Game.weather != null else 12.0
+	var wind_int: float = Game.weather.intensity if Game.weather != null else 0.0
+	# В слабый ветер и тихую погоду чердак не гудит навязчивым низкочастотным лупом
+	if wind_int < 0.30 and not yrka_near:
+		if _attic_audio.playing:
+			_attic_audio.stop()
+		return
+	var wind_speed: float = wind_int * 25.0 + 5.0
 	var v_sq := pow(clampf(wind_speed / 20.0, 0.2, 2.5), 2.0)
 
-	# Низкочастотный инфразвуковой гул растяжек, прикрученных к стропилам
+	# Низкочастотный инфразвуковой гул растяжек, прикрученных к стропилам (только в пургу)
+	var target_db := linear_to_db(clampf(v_sq * 0.10, 0.01, 0.6)) - 14.0
 	if not _attic_audio.playing:
 		_attic_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/pole_hum_loop.ogg")
-		_attic_audio.volume_db = linear_to_db(clampf(v_sq * 0.15, 0.01, 0.8)) - 10.0
-		_attic_audio.pitch_scale = randf_range(0.7, 0.85)
+		_attic_audio.volume_db = target_db
+		_attic_audio.pitch_scale = randf_range(0.75, 0.85)
 		_attic_audio.play()
 	else:
-		_attic_audio.volume_db = lerpf(_attic_audio.volume_db, linear_to_db(clampf(v_sq * 0.15, 0.01, 0.8)) - 10.0, delta * 2.0)
+		_attic_audio.volume_db = lerpf(_attic_audio.volume_db, target_db, delta * 2.0)
 
-	# Если Ырка наверху — резкий металлический звон дернутого кабеля
+	# Если Ырка наверху — резкий металлический звон дернутого кабеля (3D у стропил)
 	if yrka_near and randf() < delta * 0.03:
-		AudioDirector.play_raw("res://assets/audio/clank_v4.ogg", 2.0, 1.8)
+		var cp := Game.audio.play_3d("res://assets/audio/clank_v4.ogg", ATTIC_BEAMS_POS, -4.0, 4.0)
+		if cp != null:
+			cp.pitch_scale = 1.6
 
 
 ## 4. Замочная скважина сеней: резонатор Гельмгольца и зловещий обрыв
 func _tick_keyhole_whistle(delta: float, yrka_near: bool) -> void:
-	var player_near_door: bool = Game.player != null and Game.player.global_position.distance_to(DOOR_KEYHOLE_POS) < 6.0
+	var wind_int: float = Game.weather.intensity if Game.weather != null else 0.0
+	var player_near_door: bool = Game.player != null and Game.player.global_position.distance_to(DOOR_KEYHOLE_POS) < 4.5
 	var yrka_at_door: bool = yrka_near and Game.yrka != null and is_instance_valid(Game.yrka) and \
 		Game.yrka.creature_pos.distance_to(DOOR_KEYHOLE_POS) < 3.5
 
-	if yrka_at_door:
-		# Тело подошло к двери снаружи — щель перекрыта, свист сквозняка обрывается в мёртвую тишину!
+	# В тихую погоду и когда Ырка у двери — никаких постоянных свистов (и не крутим монстр-свист whistle.ogg в сенях)
+	if yrka_at_door or wind_int < 0.35 or not player_near_door:
 		if _keyhole_audio.playing:
 			_keyhole_audio.stop()
 		return
 
-	if player_near_door and not _keyhole_audio.playing:
-		_keyhole_audio.stream = AudioDirector.cached_stream("res://assets/audio/whistle.ogg")
-		_keyhole_audio.volume_db = -16.0
-		_keyhole_audio.pitch_scale = randf_range(0.85, 1.35)
+	if not _keyhole_audio.playing:
+		_keyhole_audio.stream = AudioDirector.cached_stream("res://assets/sfx/cc0/wind_whistle_loop.ogg")
+		_keyhole_audio.volume_db = -24.0
+		_keyhole_audio.pitch_scale = randf_range(0.92, 1.12)
 		_keyhole_audio.play()
-	elif not player_near_door and _keyhole_audio.playing:
-		_keyhole_audio.stop()
 
 
 ## 5. Венцы сруба: криогенный треск волокон древесины

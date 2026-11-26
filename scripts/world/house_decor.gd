@@ -53,10 +53,10 @@ static func _paper(st: Station, px: Vector2i, size_m: Vector2, pos: Vector3, nor
 	mi.material_override = m
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	st.add_child(mi)
-	mi.position = pos + normal * 0.012
+	mi.position = pos + normal * 0.022
 	mi.rotation.y = atan2(normal.x, normal.z)
 	if frame:
-		var fr := Geo.block(st, Vector3(size_m.x + 0.05, size_m.y + 0.05, 0.02), pos, Palette.m(&"dark"), false)
+		var fr := Geo.block(st, Vector3(size_m.x + 0.05, size_m.y + 0.05, 0.02), pos + normal * 0.01, Palette.m(&"dark"), false)
 		fr.rotation.y = atan2(normal.x, normal.z)
 	return mi
 
@@ -74,7 +74,8 @@ static func _today() -> int:
 ## Топокарта над столом: те же леера и постройки, что на схеме [M], карандашом; красный кружок — где пропал
 ## Семёнов. По [E] открывается схема — карта становится вещью в доме, а не меню.
 static func _wall_map(st: Station) -> void:
-	var pos := Vector3(6.55, 1.62, -1.89)
+	# Низ карты (1.78 - 0.475 = 1.305) строго выше деревянного молдинга стены (y ≈ 1.25)
+	var pos := Vector3(6.55, 1.78, -1.89)
 	var mi := _paper(st, Vector2i(520, 380), Vector2(1.3, 0.95), pos, Vector3(0, 0, 1), func(c: Control) -> void:
 		var r := Rect2(Vector2.ZERO, c.size)
 		c.draw_rect(r, Color(0.84, 0.8, 0.66))
@@ -250,7 +251,8 @@ static func _pennant(st: Station) -> void:
 # --- Коридор: плакат по технике безопасности ----------------------------------------------
 
 static func _safety_poster(st: Station) -> void:
-	_paper(st, Vector2i(300, 420), Vector2(0.5, 0.7), Vector3(8.9, 1.55, 6.49), Vector3(0, 0, -1), func(c: Control) -> void:
+	# Низ плаката (1.66 - 0.35 = 1.31) строго выше горизонтального молдинга стены (y ≈ 1.25)
+	_paper(st, Vector2i(300, 420), Vector2(0.5, 0.7), Vector3(8.9, 1.66, 6.49), Vector3(0, 0, -1), func(c: Control) -> void:
 		c.draw_rect(Rect2(Vector2.ZERO, c.size), Color(0.9, 0.86, 0.74))
 		c.draw_rect(Rect2(0, 0, c.size.x, 90), Color(0.72, 0.1, 0.07))
 		c.draw_string(_font(), Vector2(0, 40), Loc.t(&"decor.poster_1"), HORIZONTAL_ALIGNMENT_CENTER, c.size.x, 24, Color(0.97, 0.93, 0.85))

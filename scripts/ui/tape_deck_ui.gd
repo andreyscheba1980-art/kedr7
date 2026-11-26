@@ -52,16 +52,19 @@ func _ready() -> void:
 	UiKit.place(self, dim, 0, 0, 1, 1, 0, 0, 0, 0)
 
 	var panel := UiKit.panel()
-	UiKit.place(self, panel, 0.5, 0.5, 0.5, 0.5, -570, -340, 570, 340)
+	UiKit.place(self, panel, 0.5, 0.5, 0.5, 0.5, -590, -340, 590, 340)
 	var cols := HBoxContainer.new()
 	cols.add_theme_constant_override("separation", 18)
+	cols.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(cols)
 
 	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 380
+	left.custom_minimum_size.x = 460
+	left.size_flags_horizontal = Control.SIZE_FILL
 	cols.add_child(left)
-	var title := UiStyle.brass_plate(Loc.p("МАГНИТОФОН «МАЯК-205» · КАТУШКИ СЕМЁНОВА", "TAPE DECK 'MAYAK-205' · SEMENOV REELS"), 17)
-	title.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	var title := UiStyle.brass_plate(Loc.p("МАГНИТОФОН «МАЯК-205» · КАТУШКИ СЕМЁНОВА", "TAPE DECK 'MAYAK-205' · SEMENOV REELS"), 16)
+	title.size_flags_horizontal = Control.SIZE_FILL
 	left.add_child(title)
 
 	_list = ItemList.new()
@@ -107,7 +110,8 @@ func _ready() -> void:
 	left.add_child(UiKit.button(Loc.t(&"ui.close"), _close))
 
 	_spectro_box = VBoxContainer.new()
-	_spectro_box.custom_minimum_size = Vector2(640, 0)
+	_spectro_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_spectro_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	cols.add_child(_spectro_box)
 	_build_spectro()
 
@@ -412,11 +416,13 @@ func _set_filters(lo: float, hi: float) -> void:
 
 
 func _build_spectro() -> void:
-	var cap := UiKit.label(Loc.t(&"tape.spectro"), 14)
+	var cap := UiKit.label(Loc.t(&"tape.spectro"), 13)
+	cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cap.modulate = Color(1, 1, 1, 0.7)
 	_spectro_box.add_child(cap)
 	var frame := Control.new()
-	frame.custom_minimum_size = Vector2(640, 360)
+	frame.custom_minimum_size = Vector2(480, 340)
+	frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	frame.clip_contents = true
 	_spectro_box.add_child(frame)
 	_spectro = ColorRect.new()

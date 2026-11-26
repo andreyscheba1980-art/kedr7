@@ -12,7 +12,7 @@ extends Control
 signal closed
 
 const CLANK_SFX := "res://assets/audio/clank.ogg"
-const SCRATCH_SFX := "res://assets/audio/clock_tick.ogg"
+const SCRATCH_SFX := "res://assets/audio/ui_tick.ogg"   # одиночный щелчок без зацикливания clock_tick.ogg
 const PEN_SFX := "res://assets/audio/clank.ogg"
 const HOURS_BACK := 12.0
 const HOURS_AHEAD := 2.0

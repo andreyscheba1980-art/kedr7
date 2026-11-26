@@ -5317,11 +5317,15 @@ func _build_station_road_dressing() -> void:
 		drum_it.name = "ArktikaBarrelsRoute"
 
 		var drum_wind := AudioStreamPlayer3D.new()
-		drum_wind.stream = AudioDirector.cached_stream("res://assets/audio/echo_loop.ogg")
-		drum_wind.volume_db = -22.0
-		drum_wind.unit_size = 5.0
-		drum_wind.max_distance = 16.0
-		drum_wind.bus = &"SFX"
+		var dw_stream := load("res://assets/sfx/cc0/wire_gust_loop.ogg") as AudioStream
+		if dw_stream is AudioStreamOggVorbis:
+			dw_stream = dw_stream.duplicate()
+			(dw_stream as AudioStreamOggVorbis).loop = true
+		drum_wind.stream = dw_stream
+		drum_wind.volume_db = -30.0
+		drum_wind.unit_size = 4.0
+		drum_wind.max_distance = 14.0
+		drum_wind.bus = &"Weather"
 		drum_wind.position = ds_pos + Vector3(1.3, 0.8, 0)
 		add_child(drum_wind)
 		drum_wind.play()
@@ -5335,11 +5339,15 @@ func _build_station_road_dressing() -> void:
 
 	# Поющий провод ЛЭП на ветру
 	var wire_sing := AudioStreamPlayer3D.new()
-	wire_sing.stream = AudioDirector.cached_stream("res://assets/audio/echo_loop.ogg")
-	wire_sing.volume_db = -20.0
-	wire_sing.unit_size = 6.0
-	wire_sing.max_distance = 28.0
-	wire_sing.bus = &"SFX"
+	var ws_stream := load("res://assets/sfx/cc0/wire_gust_loop.ogg") as AudioStream
+	if ws_stream is AudioStreamOggVorbis:
+		ws_stream = ws_stream.duplicate()
+		(ws_stream as AudioStreamOggVorbis).loop = true
+	wire_sing.stream = ws_stream
+	wire_sing.volume_db = -28.0
+	wire_sing.unit_size = 4.5
+	wire_sing.max_distance = 18.0
+	wire_sing.bus = &"Weather"
 	wire_sing.position = Vector3(56.0, 4.5, -18.0)
 	add_child(wire_sing)
 	wire_sing.play()

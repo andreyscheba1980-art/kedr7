@@ -76,8 +76,10 @@ void fragment() {
 		col = mix(col, vec3(lm) * vec3(1.14, 0.98, 0.76) * 1.08, memory * 0.86);
 		col *= 1.0 - memory * 0.5 * smoothstep(0.12, 0.7, d2 * 2.2);
 		col *= 1.0 + memory * 0.05 * sin(TIME * 21.0) * sin(TIME * 3.7);
-		float scr = step(0.9965, hash12(vec2(floor(UV.x * 260.0), floor(TIME * 11.0))));
-		col += vec3(scr * memory * 0.1);
+		// Прерывистые микро-царапины киноплёнки вместо сплошной вертикальной полосы во весь кадр
+		float band = step(0.996, hash12(vec2(floor(UV.x * 420.0), floor(TIME * 9.0))));
+		float seg = smoothstep(0.65, 0.95, hash12(vec2(floor(UV.y * 14.0), floor(TIME * 9.0))));
+		col += vec3(band * seg * memory * 0.045);
 	}
 
 	if (whiteout > 0.001) {

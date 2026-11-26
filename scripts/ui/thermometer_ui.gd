@@ -84,7 +84,7 @@ func _ready() -> void:
 	elif ResourceLoader.exists("res://assets/audio/wind_loop.ogg"):
 		_nail_audio.stream = load("res://assets/audio/wind_loop.ogg")
 	_nail_audio.volume_db = -80.0
-	_nail_audio.bus = &"Master"
+	_nail_audio.bus = &"SFX"
 	add_child(_nail_audio)
 	_nail_audio.play()
 

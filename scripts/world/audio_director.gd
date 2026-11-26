@@ -627,7 +627,8 @@ func play_2d(path: String, volume_db := 0.0, max_duration := 0.0) -> AudioStream
 	_track(p, path)
 	# Петля, запущенная как разовый звук, сама не кончается: помехи с мачты, треск фонаря и сердце
 	# после отказа фонаря играли до конца ночи (помехи — с резким громким всплеском раз в 20 с).
-	if max_duration > 0.0 or path.contains("_loop."):
+	var is_looping := path.contains("_loop.") or (p.stream is AudioStreamOggVorbis and (p.stream as AudioStreamOggVorbis).loop)
+	if max_duration > 0.0 or is_looping:
 		var t := Timer.new()
 		t.one_shot = true
 		t.wait_time = max_duration if max_duration > 0.0 else 4.0
@@ -669,7 +670,8 @@ func play_3d(path: String, pos: Vector3, volume_db := 0.0, unit_size := 2.0, max
 	_track(p, path)
 	# Защита от бесконечного зацикливания луп-файлов (например, breath_loop.ogg, lullaby_loop.ogg),
 	# если они вызваны как одноразовый 3D-звук без ручного управления
-	if max_duration > 0.0 or path.contains("_loop."):
+	var is_looping := path.contains("_loop.") or (p.stream is AudioStreamOggVorbis and (p.stream as AudioStreamOggVorbis).loop)
+	if max_duration > 0.0 or is_looping:
 		var dur := max_duration if max_duration > 0.0 else 4.0
 		var t := Timer.new()
 		t.one_shot = true

@@ -1260,7 +1260,9 @@ func toggle_flashlight() -> void:
 		Game.hud.subtitle(Loc.t(&"sub.flash_dead"), 3.0)
 		return
 	flashlight.visible = not flashlight.visible
-	var click := Game.audio.play_2d("res://assets/audio/clank.ogg", -10.0, randf_range(1.75, 1.95))
+	var click := Game.audio.play_2d("res://assets/audio/clank.ogg", -10.0)
+	if click != null:
+		click.pitch_scale = randf_range(1.75, 1.95)
 	if flashlight.visible:
 		_filament_flicker_t = 0.07
 	if flashlight.visible and Game.is_night():
@@ -1458,7 +1460,9 @@ func tap_compass() -> void:
 		_hands.tap_compass()
 	compass_stuck = move_toward(compass_stuck, 0.0, 0.7)
 	compass_glitch = move_toward(compass_glitch, 0.0, 0.9)
-	Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0, randf_range(1.15, 1.35))
+	var tap := Game.audio.play_2d("res://assets/audio/clank.ogg", -4.0)
+	if tap != null:
+		tap.pitch_scale = randf_range(1.15, 1.35)
 	if Game.hud != null:
 		Game.hud.subtitle(Loc.t(&"sub.compass_tapped"), 2.2)
 

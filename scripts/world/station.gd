@@ -845,20 +845,36 @@ func _process(delta: float) -> void:
 	_process_susedko(delta)
 
 	# Управление фоновым звуковым эмбиентом дома
+	var inside_now := Game.is_indoors()
+	var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.2
 	if _chimney_wind_player != null:
-		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.2
-		var target_chim_db: float = lerpf(-32.0, -14.0, w_intensity)
-		if Game.stove_flue or Game.chimney_iced:
-			target_chim_db -= 8.0
-		_chimney_wind_player.volume_db = lerpf(_chimney_wind_player.volume_db, target_chim_db, minf(delta * 2.0, 1.0))
+		# Вой в дымоходе — только в доме и при ощутимом ветре (>= 0.22), в тишину останавливаем плеер
+		var want_chim := inside_now and w_intensity >= 0.22
+		var target_chim_db := -80.0
+		if want_chim:
+			target_chim_db = lerpf(-34.0, -16.0, w_intensity)
+			if Game.stove_flue or Game.chimney_iced:
+				target_chim_db -= 8.0
+		_chimney_wind_player.volume_db = lerpf(_chimney_wind_player.volume_db, target_chim_db, minf(delta * 2.5, 1.0))
 		_chimney_wind_player.pitch_scale = lerpf(0.85, 1.25, w_intensity)
+		if _chimney_wind_player.volume_db < -72.0 and _chimney_wind_player.playing:
+			_chimney_wind_player.stop()
+		elif want_chim and _chimney_wind_player.volume_db >= -72.0 and not _chimney_wind_player.playing:
+			_chimney_wind_player.play()
 
 	if _indoor_wind_player != null:
-		var w_intensity: float = Game.weather.intensity if Game.weather != null else 0.2
-		var target_indoor_db: float = lerpf(-26.0, -18.0, w_intensity)
-		if door_open:
-			target_indoor_db += 8.0
+		# Обычный фон стен уже ведёт Ambience._indoor; 3D-сквозняк включаем только при открытой двери или буране
+		var want_indoor := inside_now and (door_open or w_intensity >= 0.45)
+		var target_indoor_db := -80.0
+		if want_indoor:
+			target_indoor_db = lerpf(-28.0, -20.0, w_intensity)
+			if door_open:
+				target_indoor_db += 7.0
 		_indoor_wind_player.volume_db = lerpf(_indoor_wind_player.volume_db, target_indoor_db, minf(delta * 3.0, 1.0))
+		if _indoor_wind_player.volume_db < -72.0 and _indoor_wind_player.playing:
+			_indoor_wind_player.stop()
+		elif want_indoor and _indoor_wind_player.volume_db >= -72.0 and not _indoor_wind_player.playing:
+			_indoor_wind_player.play()
 
 	# Периодические потрескивания стропил от мороза и дребезжание рам на ветру
 	if not is_backdrop and Game.is_night():
@@ -2465,9 +2481,9 @@ func _build_living_quarters() -> void:
 	_clock_pendulum = clock.find_child("Pendulum", true, false)
 	_clock_player = AudioStreamPlayer3D.new()
 	_clock_player.stream = AudioDirector.cached_stream("res://assets/audio/clock_tick.ogg")
-	_clock_player.unit_size = 3.2
-	_clock_player.max_distance = 10.0
-	_clock_player.volume_db = -3.0
+	_clock_player.unit_size = 1.5
+	_clock_player.max_distance = 5.5
+	_clock_player.volume_db = -15.0
 	_clock_player.bus = &"SFX"
 	_clock_player.autoplay = true
 	clock.add_child(_clock_player)
@@ -2779,7 +2795,7 @@ func _build_radio_room() -> void:
 	# 8. Уют и детализация радиорубки:
 	# Тканая дорожка-половик от проёма к операторскому столу
 	var carpet := Props.carpet(1.1, 3.2)
-	carpet.position = Vector3(8.2, 0.055, 0.2)
+	carpet.position = Vector3(8.2, 0.062, 0.2)
 	add_child(carpet)
 
 	# Советский настенный радиорепродуктор «Рекорд» (черная тарелка) на перегородке с коридором
@@ -2964,10 +2980,7 @@ func _build_corridor() -> void:
 	Geo.bulb(bulb_omni, &"bulb", 0.065)
 	register_lamp(bulb_omni)
 
-	# 3. Вешалка с тёплыми ватниками на южной стене коридора
-	Geo.block(self, Vector3(0.9, 0.1, 0.05), Vector3(10.2, 1.6, 6.45), Palette.m(&"wood"), false)
-	Geo.block(self, Vector3(0.35, 0.85, 0.15), Vector3(10.0, 1.25, 6.4), Palette.m(&"cloth"), false)
-	Geo.block(self, Vector3(0.35, 0.90, 0.15), Vector3(10.4, 1.22, 6.4), Palette.m(&"dark"), false)
+	# Вешалка на южной стене коридора: 3D-модель с тулупами ставит LifeDressing (x = 10.2)
 
 
 func _build_storage() -> void:
@@ -3216,7 +3229,7 @@ func _build_vestibule() -> void:
 	valenki.position = Vector3(13.0, 0.05, 1.8)
 	add_child(valenki)
 
-	var shovel_it := Geo.interactable(self, Vector3(0.5, 1.5, 0.4), Vector3(14.36, 0.75, 1.8), null, Loc.t(&"it.pick_shovel"), _on_vestibule_shovel_used)
+	var shovel_it := Geo.interactable(self, Vector3(0.5, 1.5, 0.4), Vector3(14.36, 0.75, 1.72), null, Loc.t(&"it.pick_shovel"), _on_vestibule_shovel_used)
 	var shovel1 := Props.snow_shovel()
 	shovel1.position = Vector3(0.0, -0.7, 0.0)
 	shovel1.rotation = Vector3(deg_to_rad(-6.0), deg_to_rad(90.0), 0.0)
@@ -3224,7 +3237,7 @@ func _build_vestibule() -> void:
 	_vestibule_shovel = shovel_it
 
 	var shovel2 := Props.snow_shovel()
-	shovel2.position = Vector3(14.36, 0.05, 2.15)
+	shovel2.position = Vector3(14.36, 0.05, 2.30)
 	shovel2.rotation = Vector3(deg_to_rad(-4.0), deg_to_rad(90.0), 0.0)
 	add_child(shovel2)
 
@@ -3251,12 +3264,13 @@ func _build_vestibule() -> void:
 	add_child(shoe_bench)
 	Geo.block(self, Vector3(1.6, 0.05, 0.35), Vector3(12.6, 1.4, 5.85), Palette.m(&"weathered"), false)
 
-	# Весовой снегомер ВС-43 на стене сеней над лавкой
-	var vs43_it := Geo.interactable(self, Vector3(0.4, 1.3, 0.3), Vector3(12.6, 1.35, 5.75), null, "", _on_vs43_interact)
+	# Весовой снегомер ВС-43 на стене сеней горизонтально над лавкой (не протыкает лавку)
+	var vs43_it := Geo.interactable(self, Vector3(1.35, 0.35, 0.3), Vector3(12.6, 1.68, 6.42), null, "", _on_vs43_interact)
 	vs43_it.prompt_provider = func() -> String:
 		return Loc.t(&"it.vs43_take") if not Game.has_item(&"vs43") else Loc.t(&"it.vs43")
 	var vs43_model := Props.snow_tube_vs43()
-	vs43_model.position = Vector3(0.0, -0.65, 0.0)
+	vs43_model.rotation.z = deg_to_rad(90.0)
+	vs43_model.position = Vector3(0.62, 0.0, 0.0)
 	vs43_it.add_child(vs43_model)
 
 	_build_house_switch()
@@ -3355,9 +3369,9 @@ func _build_front_door() -> void:
 	# Боковые откосы (косяки двери), закрывающие пустоту между внутренней и наружной стеной:
 	Geo.block(self, Vector3(0.48, 2.20, 0.12), Vector3(14.63, 1.10, 2.54), Palette.m(&"wood"), false)
 	Geo.block(self, Vector3(0.48, 2.20, 0.12), Vector3(14.63, 1.10, 3.66), Palette.m(&"wood"), false)
-	# Притолока и глухое перекрытие над проёмом до свеса крыши (от 2.05 до 2.80 м):
-	Geo.block(self, Vector3(0.24, 0.75, 1.16), Vector3(14.44, 2.425, 3.1), Palette.m(&"plank"), false)
-	Geo.block(self, Vector3(0.26, 0.75, 1.16), Vector3(14.68, 2.425, 3.1), Palette.m(&"wood"), false)
+	# Притолока и глухое перекрытие над проёмом до свеса крыши (в толще стены, не торчит в сени):
+	Geo.block(self, Vector3(0.18, 0.68, 1.16), Vector3(14.54, 2.46, 3.1), Palette.m(&"plank"), false)
+	Geo.block(self, Vector3(0.24, 0.72, 1.16), Vector3(14.70, 2.44, 3.1), Palette.m(&"wood"), false)
 	_door_hinge = Node3D.new()
 	_door_hinge.position = Vector3(14.5, 0.0, 2.6)
 	add_child(_door_hinge)
