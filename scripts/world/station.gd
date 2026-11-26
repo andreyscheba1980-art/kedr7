@@ -612,6 +612,7 @@ func _process(delta: float) -> void:
 						cr.pitch_scale = 1.65
 					Game.hud.subtitle(Loc.t(&"sub.frost_hand_live"), 4.5, 1)
 					Director.add_tension(10.0, "ладони проступили в инее окна")
+					Achievements.unlock(&"frost_palm")
 
 		# Управление таянием и повторным замерзанием протёртого окна
 		if _north_frost_mat != null and _window_wiped_radius > 0.0:
@@ -4813,6 +4814,7 @@ func _on_samovar_used(p: Player) -> void:
 		Game.warmth = maxf(Game.warmth - 8.0, 10.0)
 		Game.hud.subtitle(Loc.t(&"sub.samovar_frozen"), 5.5, 2)
 		Director.add_tension(16.0, "ледяной чай при горящей печи")
+		Achievements.unlock(&"frozen_tea")
 		return
 	if Game.stove_wood <= 0.0:
 		Game.hud.subtitle(Loc.t(&"sub.samovar_cold"), 3.0)
@@ -4827,6 +4829,7 @@ func _on_samovar_used(p: Player) -> void:
 	Game.audio.play_3d(Voice.sfx_or(&"kettle_whistle", STOVE_SOUND), Vector3(1.2, 1.05, 4.0), -4.0)
 	Game.hud.subtitle(Loc.t(&"sub.samovar_drink"), 4.0)
 	Director.add_tension(-5.0, "горячий чай из самовара")
+	Achievements.unlock(&"samovar_tea")
 
 
 ## Клуб тяжёлого морозного пара по полу сеней при открытии входной двери в -45°C (gl_compatibility billboard).

@@ -43,7 +43,7 @@ func _ready() -> void:
 		row.add_child(d)
 	var back := UiKit.button(Loc.t(&"ui.back"), func() -> void: closed.emit())
 	v.add_child(back)
-	back.grab_focus.call_deferred()
+	UiKit.safe_focus(back)
 
 
 func _unhandled_input(event: InputEvent) -> void:

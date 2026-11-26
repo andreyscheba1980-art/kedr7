@@ -19,6 +19,7 @@ const LIST := [
 	&"hitchhiker", &"first_night", &"no_flash", &"reader", &"handy", &"tape",
 	&"lair", &"lair_clean", &"satellite", &"turned", &"seven", &"case_closed",
 	&"semenov", &"pirat", &"liar_book",
+	&"samovar_tea", &"frozen_tea", &"red_frame", &"frost_palm", &"vane_survivor",
 ]
 
 static var _cfg: ConfigFile

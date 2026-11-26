@@ -122,9 +122,11 @@ func _ready() -> void:
 	lang.add_child(UiKit.button("Русский", func() -> void: _set_lang("ru")))
 	lang.add_child(UiKit.button("English", func() -> void: _set_lang("en")))
 
-	var back_btn := UiKit.button(Loc.t(&"ui.back"), _close)
+	var back_btn := TelemetryButton.new()
+	back_btn.set_data(Loc.p("ВЫХ-00", "RET-00"), Loc.t(&"ui.back").to_upper(), Loc.p("СОХРАНИТЬ", "APPLY"))
+	back_btn.pressed.connect(_close)
 	outer.add_child(back_btn)
-	back_btn.grab_focus.call_deferred()
+	UiKit.safe_focus(back_btn)
 
 
 

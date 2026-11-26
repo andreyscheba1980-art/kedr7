@@ -659,6 +659,12 @@ static func canister(held := false) -> Node3D:
 
 ## Охапка колотых и круглых берёзово-сосновых поленьев со спилами и верёвкой.
 static func firewood_bundle(held := false) -> Node3D:
+	var glb := _kedr_model("firewood_bundle", {"bright": 1.05, "sat": 0.95, "scale": 0.85 if held else 1.0})
+	if glb != null:
+		if held:
+			for mi in glb.find_children("*", "MeshInstance3D", true, false):
+				(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return glb
 	var key := &"firewood_held" if held else &"firewood_world"
 	var cached := _instance_from_cache(key, "tex_wood.png")
 	if cached != null:
@@ -1198,6 +1204,9 @@ static func battery_rack() -> Node3D:
 
 ## Полки холодной кладовой: коробки с радиолампами, керосинка, банки.
 static func storage_shelves() -> Node3D:
+	var glb := _kedr_model("storage_shelves", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"storage_shelves", "tex_wood.png")
 	if cached != null:
 		return cached
@@ -1814,6 +1823,9 @@ static func safe() -> Node3D:
 
 ## Войлочные валенки с резиновыми галошами
 static func valenki() -> Node3D:
+	var glb := _kedr_model("valenki", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"valenki", "tex_cloth.png")
 	if cached != null:
 		return cached
@@ -1897,6 +1909,9 @@ static func wall_ladder(height := 3.2) -> Node3D:
 
 ## Ржавый таёжный капкан на зверя.
 static func bear_trap() -> Node3D:
+	var glb := _kedr_model("bear_trap", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var cached := _instance_from_cache(&"bear_trap", "tex_metal.png")
 	if cached != null:
 		return cached
@@ -2002,12 +2017,16 @@ static func woodbox(count := 3) -> Node3D:
 	var birch := Color(0.76, 0.74, 0.68)
 	var log_end := LOG_END
 
-	# Дощатый открытый короб 0.70 × 0.40 × 0.45
-	k.box(Vector3(0, 0.02, 0), Vector3(0.70, 0.04, 0.45), wood) # дно
-	k.box(Vector3(-0.33, 0.22, 0), Vector3(0.04, 0.40, 0.45), wood) # левая стенка
-	k.box(Vector3(0.33, 0.22, 0), Vector3(0.04, 0.40, 0.45), wood)  # правая стенка
-	k.box(Vector3(0, 0.22, -0.21), Vector3(0.66, 0.40, 0.03), wood) # задняя стенка
-	k.box(Vector3(0, 0.10, 0.21), Vector3(0.66, 0.16, 0.03), wood)  # низкий передний бортик
+	# Дощатый открытый короб 0.70 × 0.40 × 0.45 (Blender GLB) или процедурный запас
+	var frame_glb := _kedr_model("woodbox_frame", {"bright": 1.05, "sat": 0.95})
+	if frame_glb != null:
+		root.add_child(frame_glb)
+	else:
+		k.box(Vector3(0, 0.02, 0), Vector3(0.70, 0.04, 0.45), wood) # дно
+		k.box(Vector3(-0.33, 0.22, 0), Vector3(0.04, 0.40, 0.45), wood) # левая стенка
+		k.box(Vector3(0.33, 0.22, 0), Vector3(0.04, 0.40, 0.45), wood)  # правая стенка
+		k.box(Vector3(0, 0.22, -0.21), Vector3(0.66, 0.40, 0.03), wood) # задняя стенка
+		k.box(Vector3(0, 0.10, 0.21), Vector3(0.66, 0.16, 0.03), wood)  # низкий передний бортик
 
 	# Поленья внутри ящика
 	if count >= 1:
@@ -2017,10 +2036,11 @@ static func woodbox(count := 3) -> Node3D:
 	if count >= 3:
 		k.tube([Vector3(0.0, 0.22, -0.02), Vector3(0.0, 0.22, 0.16)], [0.072], birch, 7, true, true, [log_end, birch, log_end])
 
-	var mi := MeshInstance3D.new()
-	mi.mesh = k.commit()
-	mi.material_override = _gained(Creatures._mat(StringName("woodbox_%d" % count), Color.WHITE, "tex_wood.png", 0.0))
-	root.add_child(mi)
+	if frame_glb == null or count >= 1:
+		var mi := MeshInstance3D.new()
+		mi.mesh = k.commit()
+		mi.material_override = _gained(Creatures._mat(StringName("woodbox_%d" % count), Color.WHITE, "tex_wood.png", 0.0))
+		root.add_child(mi)
 	return root
 
 
@@ -3558,6 +3578,9 @@ static func gtt_cab_props() -> Node3D:
 
 
 static func crate() -> Node3D:
+	var glb := _kedr_model("kedr_supply_crate", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var key := &"crate"
 	var cached := _instance_from_cache(key, "tex_wood.png")
 	if cached != null:
@@ -4023,6 +4046,9 @@ static func snow_fence(length := 2.6, height := 1.7) -> Node3D:
 
 ## Экспедиционные деревянные сани-волокуши геодезистов (1965 г.) с обледенелым брезентом и ящиками.
 static func surveyor_sledge() -> Node3D:
+	var glb := _kedr_model("surveyor_sledge", {"bright": 1.05, "sat": 0.95})
+	if glb != null:
+		return glb
 	var key := &"surveyor_sledge_v1"
 	var cached := _instance_from_cache(key, "tex_wood.png")
 	if cached != null:
@@ -4290,6 +4316,9 @@ static func hunter_dugout() -> Node3D:
 
 ## Советский грунтовый геофон и сейсмоприемник СВ-20 («Слухач»)
 static func seismograph_sv20() -> Node3D:
+	var glb := _kedr_model("seismograph_sv20", {"bright": 1.1, "sat": 0.95})
+	if glb != null:
+		return glb
 	var key := &"seismograph_sv20"
 	var cached := _instance_from_cache(key, "tex_metal.png")
 	if cached != null:

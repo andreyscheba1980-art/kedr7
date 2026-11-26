@@ -21,7 +21,7 @@ var _tween: Tween
 func _ready() -> void:
 	flat = true
 	focus_mode = Control.FOCUS_ALL
-	custom_minimum_size = Vector2(450.0, 42.0)
+	custom_minimum_size = Vector2(580.0, 44.0)
 	text = "" # Отрисовка текста выполняется кастомно в _draw
 	
 	# Убираем все дефолтные прямоугольные рамки Godot
@@ -98,18 +98,22 @@ func _draw() -> void:
 	# 2. Технический индекс слева (например: [КН-01])
 	var idx_col := COLOR_IDLE.lerp(COLOR_FOCUS, _hover_weight)
 	var idx_text := "[" + index_code + "]"
-	draw_string(font, Vector2(14.0, h * 0.65), idx_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size - 2, idx_col)
-	
-	# 3. Основной текст пункта со смещением _shift_x
+	var idx_fs := maxi(font_size - 2, 12)
+	draw_string(font, Vector2(14.0, h * 0.65), idx_text, HORIZONTAL_ALIGNMENT_LEFT, -1, idx_fs, idx_col)
+	var idx_w := font.get_string_size(idx_text, HORIZONTAL_ALIGNMENT_LEFT, -1, idx_fs).x
+
+	# 3. Основной текст пункта со смещением _shift_x и гарантированным зазором до правого статуса
 	var main_col := COLOR_NORMAL_TEXT.lerp(COLOR_FOCUS, _hover_weight)
 	if _hover_weight > 0.8 and Engine.get_process_frames() % 6 == 0:
 		main_col = main_col.lightened(0.08)
 
-	var hint_w := clampf(w * 0.40, 130.0, 220.0) if not status_hint.is_empty() else 0.0
-	var title_max_w := (w - hint_w - 110.0) if not status_hint.is_empty() else (w - 110.0)
-	draw_string(font, Vector2(96.0 + _shift_x, h * 0.66), label_title, HORIZONTAL_ALIGNMENT_LEFT, title_max_w, font_size + 2, main_col)
-	
-	# 4. Дополнительный статус справа (например: "СУТКИ 03 // -41°C")
+	var hint_fs := maxi(font_size - 3, 12)
+	var hint_w := (font.get_string_size(status_hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_fs).x + 8.0) if not status_hint.is_empty() else 0.0
+	var title_x := maxf(96.0, 14.0 + idx_w + 14.0) + _shift_x
+	var title_max_w := maxf(w - title_x - hint_w - 28.0, 140.0)
+	draw_string(font, Vector2(title_x, h * 0.66), label_title, HORIZONTAL_ALIGNMENT_LEFT, title_max_w, font_size + 1, main_col)
+
+	# 4. Дополнительный статус справа (без обрезания температуры и смены)
 	if not status_hint.is_empty():
-		var hint_pos_x := w - hint_w - 16.0
-		draw_string(font, Vector2(hint_pos_x, h * 0.65), status_hint, HORIZONTAL_ALIGNMENT_RIGHT, hint_w, font_size - 3, idx_col)
+		var hint_pos_x := w - hint_w - 12.0
+		draw_string(font, Vector2(hint_pos_x, h * 0.65), status_hint, HORIZONTAL_ALIGNMENT_RIGHT, hint_w, hint_fs, idx_col)

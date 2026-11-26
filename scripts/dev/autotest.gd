@@ -2286,10 +2286,15 @@ func _verify_patch_systems() -> void:
 	assert(trap_xz.distance_to(meteo_xz) > 50.0, "fake_vane_trap must not collide with MeteoCorpus!")
 	for prop_n: Node3D in [
 		Props.barograph(), Props.desk(), Props.chair(), Props.bed(),
-		Props.oil_can(), Props.snow_shovel(), Props.axe_stump(), Props.soviet_garland()
+		Props.oil_can(), Props.snow_shovel(), Props.axe_stump(), Props.soviet_garland(),
+		Props.storage_shelves(), Props.woodbox(3), Props.firewood_bundle(), Props.valenki(),
+		Props.seismograph_sv20(), Props.bear_trap(), Props.surveyor_sledge(), Props.crate()
 	]:
 		assert(prop_n != null, "Blender/prop model must instantiate cleanly!")
 		prop_n.free()
+	for req_ach: StringName in [&"samovar_tea", &"frozen_tea", &"red_frame", &"frost_palm", &"vane_survivor"]:
+		assert(Achievements.LIST.has(req_ach), "Missing achievement %s" % req_ach)
+		assert(Loc.t(StringName("ach.%s" % req_ach)) != String("ach.%s" % req_ach), "Missing ach loc %s" % req_ach)
 	if Game.level != null and Game.level.has_method(&"get_coop_fx"):
 		var fx: Dictionary = Game.level.call(&"get_coop_fx")
 		assert(fx.has("sag") and fx.has("frozen_tea") and fx.has("hand"), "Coop FX dict incomplete!")

@@ -489,6 +489,7 @@ func _trigger_loupe_red_scare(token: int) -> void:
 	if _loupe_scare_done or not is_inside_tree() or not _loupe_overlay.visible or token != _loupe_scare_token:
 		return
 	_loupe_scare_done = true
+	Achievements.unlock(&"red_frame")
 	AudioDirector.play_raw("res://assets/audio/shriek.ogg", 2.0)
 	AudioDirector.play_raw("res://assets/audio/clank.ogg", 1.0)
 	if Game.hud != null and Game.hud.has_method(&"trigger_jumpscare_flash"):

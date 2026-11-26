@@ -64,7 +64,7 @@ func _ready() -> void:
 	# 3. Секция: Заветы дежурных
 	_build_covenants_section(content)
 
-	_close_btn.grab_focus.call_deferred()
+	UiKit.safe_focus(_close_btn)
 
 
 func _build_endings_section(parent: VBoxContainer) -> void:

@@ -206,9 +206,12 @@ func _gave_away() -> void:
 
 
 func _expire() -> void:
+	var old_kind := _kind
 	var fake := is_fake()
 	_kind = &""
 	if fake:
+		if old_kind == &"fake_vane_trap":
+			Achievements.unlock(&"vane_survivor")
 		# Не поддался — эфир шепчет вслед. Наказания нет: это и есть правильный ответ.
 		if Game.is_home() and Game.radio != null and not Game.radio.is_voice_busy():
 			Game.radio.play_transmission(VOICE, -4.0, Radio.Pass.FAKE)
