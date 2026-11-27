@@ -42,8 +42,8 @@ func _build() -> void:
 		"\"Drop the gear… trucks are idling! Hey—who's untying the pup?!\"")
 
 	_add_artifact(&"izba", Yard.IZBA + Vector3(2.8, 0.0, 2.2), 1.2, &"notches",
-		WHISPER, "«Занавесь зеркало, Витя… пока не стемнело — оно смотрит через стекло.»",
-		"\"Cover the mirror, Vitya… before dark—it watches through the glass.\"")
+		WHISPER, "На притолоке восемь зарубок. Под седьмой ногтем выцарапано: «Не выходи на свой голос — он знает семью по имени».",
+		"Eight notches on the lintel. Beneath the seventh, scratched by a fingernail: 'Don't step out to your own voice — it knows your family's names.'")
 
 	_add_artifact(&"lake", Yard.HOLE + Vector3(-1.5, 0.0, 1.2), 2.1, &"reel",
 		ICE_HIT, "Подо льдом глухо стукнуло — на краю проруби лежат оборванная плёнка и очки.",

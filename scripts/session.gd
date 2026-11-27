@@ -235,8 +235,18 @@ func _begin() -> void:
 			Game.hud.subtitle(Loc.t(&"pro.start"), 5.0)
 	elif Game.is_day():
 		Game.hud.subtitle(Loc.t(StringName("day%d.start" % Game.phase_index)), 6.0)
+		var th_day := StringName("day%d.thought" % Game.phase_index)
+		if Loc.has_key(th_day):
+			get_tree().create_timer(7.0, false).timeout.connect(func() -> void:
+				if is_inside_tree() and not Game.shift_over and not Game.dead:
+					Game.hud.subtitle(Loc.t(th_day), 6.5, 2))
 	elif Loc.has_key(StringName("n%d.start" % Game.night)):
 		Game.hud.subtitle(Loc.t(StringName("n%d.start" % Game.night)), 7.0)
+		var th_night := StringName("n%d.thought" % Game.night)
+		if Loc.has_key(th_night):
+			get_tree().create_timer(7.8, false).timeout.connect(func() -> void:
+				if is_inside_tree() and not Game.shift_over and not Game.dead:
+					Game.hud.subtitle(Loc.t(th_night), 6.5, 2))
 	if Game.is_night() and Net.role == "":
 		# Тетрадь дежурных переписывается: через полминуты — «новая запись, вчера её не было»
 		get_tree().create_timer(28.0, false).timeout.connect(func() -> void:
