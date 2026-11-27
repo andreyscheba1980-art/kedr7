@@ -19,6 +19,8 @@ uniform float sat_alarm = 0.0;          // 1 — встал и мигает     
 uniform float aurora = 0.0;             // северное сияние: 0 — нет, 1 — во всё небо (ясные ночи)
 uniform vec3 aurora_tint : source_color = vec3(0.2, 0.95, 0.55);
 uniform vec3 aurora_top : source_color = vec3(0.45, 0.25, 0.6);   // верх шторы — лиловый
+uniform float surge_0310 = 0.0;         // аномальный всполох окна 03:10 (багрово-бирюзовый)
+uniform float dusk_warmth = 0.0;        // тёплый полярный отблеск заката/рассвета по горизонту
 
 float hash(vec3 p) {
 	p = fract(p * 0.3183099 + 0.1);
@@ -62,6 +64,11 @@ void sky() {
 	float az = atan(d.x, d.z) / 6.2831853 * 6.0;
 	float horiz_glow = exp(-max(el, 0.0) * 8.5) * 0.28;
 	vec3 col = mix(horizon_color + horizon_color * horiz_glow, top_color, pow(smoothstep(-0.02, 0.50, el), 0.75));
+	if (dusk_warmth > 0.005) {
+		float band = exp(-abs(el - 0.03) * 14.0);
+		vec3 sun_glow = mix(vec3(0.95, 0.44, 0.24), vec3(0.68, 0.34, 0.52), smoothstep(0.0, 0.14, max(el, 0.0)));
+		col += sun_glow * band * dusk_warmth * (1.0 - cloud_amount * 0.65) * 0.55;
+	}
 
 	// Звёзды: редкие, тусклее у горизонта и в метель.
 	vec3 sp = d * 220.0;
@@ -110,28 +117,32 @@ void sky() {
 
 	// Северное сияние: не кольцо вокруг горизонта, а одна-две «шторы» на севере. Нижний край —
 	// резкий и волнистый (шум), вверх свет тает и уходит из зелёного в лиловый; лучи — шумом, не синусом.
-	if (aurora > 0.001 && el > 0.02) {
+	if ((aurora > 0.001 || surge_0310 > 0.001) && el > 0.02) {
 		float ang = atan(d.x, -d.z);                      // 0 — север, ±π — юг (там сияния нет)
-		float sector = smoothstep(-0.15, 0.75, cos(ang));
+		float sector = mix(smoothstep(-0.15, 0.75, cos(ang)), 1.0, surge_0310 * 0.45);
 		vec3 acc = vec3(0.0);
+		float spd = 1.0 + surge_0310 * 2.4;
 		for (int i = 0; i < 2; i++) {
 			float fi = float(i);
 			float u = ang * 1.5 + fi * 2.7;
-			float wig = (vnoise(vec2(u * 1.2 + TIME * 0.025, fi * 7.0)) - 0.5) * 0.16
-				+ (vnoise(vec2(u * 4.5 - TIME * 0.04, fi * 3.0 + 11.0)) - 0.5) * 0.05;
+			float wig = (vnoise(vec2(u * 1.2 + TIME * 0.025 * spd, fi * 7.0)) - 0.5) * 0.16
+				+ (vnoise(vec2(u * 4.5 - TIME * 0.04 * spd, fi * 3.0 + 11.0)) - 0.5) * 0.05;
 			float base = 0.2 + fi * 0.09 + wig;
 			float hgt = el - base;
 			float bottom = smoothstep(-0.012, 0.018, hgt);
 			float top = exp(-max(hgt, 0.0) * (3.6 + fi * 2.5));
-			float r = vnoise(vec2(u * 26.0, TIME * 0.12 + fi * 9.0));
+			float r = vnoise(vec2(u * 26.0, TIME * 0.12 * spd + fi * 9.0));
 			float rays = 0.35 + 0.65 * r * r;
-			float fold = smoothstep(0.25, 0.85, vnoise(vec2(u * 1.7 - TIME * 0.015, 5.0 + fi * 4.0)));
+			float fold = smoothstep(0.25, 0.85, vnoise(vec2(u * 1.7 - TIME * 0.015 * spd, 5.0 + fi * 4.0)));
 			float a = bottom * top * rays * fold;
-			vec3 c = mix(aurora_tint, aurora_top, smoothstep(0.03, 0.22, hgt));
+			vec3 c_norm = mix(aurora_tint, aurora_top, smoothstep(0.03, 0.22, hgt));
+			vec3 c_surge = mix(vec3(0.95, 0.20, 0.22), vec3(0.18, 0.85, 0.75), smoothstep(0.02, 0.25, hgt));
+			vec3 c = mix(c_norm, c_surge, surge_0310);
 			acc += c * a * (1.0 - fi * 0.35);
 		}
-		float pulse = 1.0 + sin(TIME * 0.35 + ang * 1.8) * 0.18;
-		col += acc * aurora * 0.62 * pulse * sector * (1.0 - cloud_amount) * smoothstep(0.02, 0.12, el);
+		float pulse = 1.0 + sin(TIME * (0.35 + surge_0310 * 2.2) + ang * 1.8) * (0.18 + surge_0310 * 0.25);
+		float strength = max(aurora * 0.62, surge_0310 * 0.85);
+		col += acc * strength * pulse * sector * (1.0 - cloud_amount * 0.65) * smoothstep(0.02, 0.12, el);
 	}
 
 	// Хребты: естественные пологие сопки тайги с мягкой воздушной перспективой

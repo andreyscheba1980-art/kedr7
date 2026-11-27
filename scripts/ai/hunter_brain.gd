@@ -37,6 +37,7 @@ var _check_t := 2.0
 var _route_cells: Array[String] = []    ## клетки привычных троп этой ночи — там тварь ждёт
 var _route_used: Dictionary = {}
 var _step_t := 2.0
+var _reposition_t := 0.0
 
 
 func _ready() -> void:
@@ -58,6 +59,13 @@ func _process(delta: float) -> void:
 		return
 	if _warn_t >= 0.0:
 		_tick_sabotage_warning(delta)
+	if _reposition_t > 0.0:
+		_reposition_t -= delta
+		if _reposition_t <= 0.0 and Game.yrka != null:
+			# После отпугивания у ДЭС тварь занимает засаду у метеоплощадки или на обратном пути
+			Game.yrka.virtual_pos = Vector2(Yard.PLOT.x + Game.rng.randf_range(-10.0, 10.0), Yard.PLOT.z + Game.rng.randf_range(-10.0, 10.0))
+			Game.yrka.threat = maxf(Game.yrka.threat, YrkaThreat.STALK_AT)
+			_route_used.clear()
 	_track_routes(delta)
 	_check_t -= delta
 	if _check_t > 0.0:
@@ -153,16 +161,22 @@ func offer_peak() -> bool:
 		Rituals.worked(&"salt")
 	Game.audio.play_3d(SNOW_CRUNCH, GEN_POS + Vector3(-1.5, 0, 1.2), 2.0, 16.0)
 	Game.audio.play_3d(CLANK_SOUND, GEN_POS, -2.0, 16.0)
+	# Отвлекающий стук в противоположное окно (пока крадётся к ДЭС)
+	if Game.level != null and not Game.level.window_spots.is_empty():
+		var w_spot: Dictionary = Game.level.window_spots[0]
+		var w_pos: Vector3 = w_spot.get("glass", Vector3(-2.5, 1.4, 3.0))
+		Game.audio.play_3d(KNOCK_SOUND, w_pos, 1.0, 10.0)
 	Game.hud.subtitle(Loc.t(&"sub.gen_shack_steps"), 4.5, 2)
 	return true
 
 
 func _tick_sabotage_warning(delta: float) -> void:
 	_warn_t -= delta
-	# Вышел во двор, пока возятся у ДЭС, — спугнул: шаги уходят в лес, ремень цел
+	# Вышел во двор, пока возятся у ДЭС, — спугнул: шаги уходят к площадке, позже готовит засаду
 	if Game.is_outside():
 		_warn_t = -1.0
 		generator_sabotaged = true
+		_reposition_t = 75.0
 		Game.audio.play_3d(SNOW_CRUNCH, GEN_POS + Vector3(-6.0, 0, -4.0), 0.0, 20.0)
 		Game.hud.subtitle(Loc.t(&"sub.gen_shack_fled"), 4.0)
 		Director.add_tension(-15.0, "спугнул у ДЭС")

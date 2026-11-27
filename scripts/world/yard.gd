@@ -84,6 +84,7 @@ var _izba_door_busy := false
 var open_sites: Dictionary = {}       ## repeater / lake / bunker / zimnik → открыто на схеме
 var _site_paths: Dictionary = {}
 var _all_paths: Array[PackedVector3Array] = []
+var _drive_corridors: Array[PackedVector3Array] = []
 var _ice_nodes: Array[Node3D] = []
 var _vane_ice_node: Node3D
 var _vane_it: Interactable
@@ -177,6 +178,13 @@ func _ready() -> void:
 	paths.append(closed_taiga_path)
 	_all_paths = paths.duplicate()
 	_all_paths.append(izba_path)
+	# Свободные от леса проезды для «Бурана» от стоянки у гаража (40, 25) ко всем выездам на зимники
+	_drive_corridors = [
+		PackedVector3Array([Vector3(40, 0, 25), Vector3(28, 0, 25), Vector3(14, 0, 24), Vector3(-6, 0, 18), Vector3(-24, 0, 10)]),
+		PackedVector3Array([Vector3(40, 0, 25), Vector3(32, 0, 34), Vector3(18, 0, 40), Vector3(4, 0, 44)]),
+		PackedVector3Array([Vector3(40, 0, 25), Vector3(50, 0, 12), Vector3(60, 0, -14), Vector3(68, 0, -42), Vector3(72, 0, -62)]),
+		PackedVector3Array([Vector3(24, 0, -18), Vector3(4, 0, -28), Vector3(-22, 0, -48), Vector3(-44, 0, -70), Vector3(-62, 0, -88)]),
+	]
 	if izba_open:
 		paths.append(izba_path)
 	_site_paths = {
@@ -3392,6 +3400,8 @@ func _build_footprints() -> void:
 # --- Лес ---------------------------------------------------------------------
 
 func _forest_mask(p: Vector3) -> float:   # -1 = дефолт (шум), 0 = пусто, 1 = стена
+	if not Terrain.is_clear(p.x, p.z) or Terrain.road_dist(p.x, p.z) < 6.5 or _dist_to(_drive_corridors, p) < 4.8:
+		return 0.0
 	var d_path := _dist_to(_all_paths, p)
 	if d_path < ALLEY_HALF:
 		return 0.0
@@ -3548,7 +3558,7 @@ func _build_forest() -> void:
 		if m == 0.0:
 			continue
 		var d_path := _dist_to(_all_paths, p)
-		if d_house < 13.0 or d_path < ALLEY_HALF:
+		if d_house < 13.0 or d_path < ALLEY_HALF or not Terrain.is_clear(p.x, p.z) or Terrain.road_dist(p.x, p.z) < 6.5 or _dist_to(_drive_corridors, p) < 4.8:
 			continue
 		if _near_corpus(p, 7.0) or _in_shed_box(p) or _flat_dist(p, MAST) < 11.5 or _flat_dist(p, IZBA) < 8.5 or (p.x >= -22.0 and p.x <= -10.0 and p.z >= -36.0 and p.z <= -24.0) or _flat_dist(p, WOODPILE) < 7.5:
 			continue
@@ -3661,7 +3671,7 @@ func _build_windfall(points: Array[Vector3], rng: RandomNumberGenerator) -> void
 	for p in points:
 		if n >= int(34 * Settings.detail()) + 6:
 			break
-		if _dist_to(_all_paths, p) < 3.5 or _flat_dist(p, HOUSE_CENTER) < 16.0:
+		if _dist_to(_all_paths, p) < 3.5 or _flat_dist(p, HOUSE_CENTER) < 16.0 or Terrain.road_dist(p.x, p.z) < 6.5 or _dist_to(_drive_corridors, p) < 4.8:
 			continue
 		if _flat_dist(p, Vector3(14.5, 0.0, -13.5)) < 7.5 or (p.x > 11.0 and p.x < 18.0 and p.z > -16.0 and p.z < 4.0):
 			continue

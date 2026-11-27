@@ -1,13 +1,15 @@
 class_name Crows
 extends Node3D
-## Вороны днём: сидят на коньке дома и на крыше дизельной, вертят головами, переступают.
-## Подойдёшь ближе — с карканьем срываются и улетают в лес. Ночью их нет.
+## Вороны днём и в сумерках:
+##   • сидят на коньке дома и крыше дизельной, вертят головами — при приближении (или угрозе) с карканьем улетают;
+##   • стаи высоко кружат над дальними ориентирами (лесосека, вышка, буровая) — живой указатель в небе.
 
 const SPOTS := [Vector3(1.6, 5.62, 3.3), Vector3(6.8, 5.62, 3.3), Vector3(7.5, 5.62, 3.32), Vector3(12.2, 5.62, 3.3),
 	Vector3(14.2, 2.72, -12.5)]
 const SCARE_DIST := 9.0
 
-var _birds: Array = []      ## [root, head, wing_l, wing_r, state(0 сидит/1 летит), velocity, t]
+var _birds: Array = []      ## [root, head, wing_l, wing_r, state(0 сидит/1 летит/2 кружит), velocity, t, meta]
+var _flock_centers: Array[Vector3] = []
 
 
 func _ready() -> void:
@@ -23,23 +25,36 @@ func _ready() -> void:
 		b.position = spots[i]
 		b.rotation.y = rng.randf() * TAU
 		add_child(b)
-		_birds.append([b, b.get_node("Head"), b.get_node("WingL"), b.get_node("WingR"), 0, Vector3.ZERO, rng.randf() * 5.0])
+		_birds.append([b, b.get_node("Head"), b.get_node("WingL"), b.get_node("WingR"), 0, Vector3.ZERO, rng.randf() * 5.0, {}])
+	# Кружащие ориентиры над дальними точками (в прологе и днём)
+	for site: StringName in [&"camp", &"tower", &"drill"]:
+		var c := Terrain.pad_pos(site)
+		var base_h := c.y + 22.0
+		var n_flock := 3 if site == &"camp" else 2
+		for j in n_flock:
+			var b := _make_crow()
+			var ang := rng.randf() * TAU
+			var rad := rng.randf_range(12.0, 24.0)
+			b.position = Vector3(c.x + cos(ang) * rad, base_h + rng.randf_range(0.0, 6.0), c.z + sin(ang) * rad)
+			add_child(b)
+			_birds.append([b, b.get_node("Head"), b.get_node("WingL"), b.get_node("WingR"), 2, Vector3.ZERO, rng.randf() * 6.0, {"c": c, "r": rad, "a": ang, "spd": rng.randf_range(0.28, 0.45) * (1.0 if j % 2 == 0 else -1.0), "y": b.position.y}])
 
 
 func _process(delta: float) -> void:
 	if _birds.is_empty() or Game.player == null:
 		return
 	var pp := Game.player.global_position
-	var scare := false
+	var scare := Game.yrka != null and Game.yrka.enabled and Game.yrka.stage >= YrkaThreat.Stage.CALLING
 	_birds = _birds.filter(func(b: Array) -> bool: return is_instance_valid(b[0]))
 	for b: Array in _birds:
-		if b[4] == 0 and Game.is_outside() and Game.player.mode == Player.Mode.WALK and (b[0] as Node3D).global_position.distance_to(pp) < SCARE_DIST:
+		if int(b[4]) == 0 and Game.is_outside() and Game.player.mode == Player.Mode.WALK and (b[0] as Node3D).global_position.distance_to(pp) < SCARE_DIST:
 			scare = true
 	for b: Array in _birds:
 		var root: Node3D = b[0]
 		b[6] = float(b[6]) + delta
 		var t: float = b[6]
-		if b[4] == 0:
+		var st := int(b[4])
+		if st == 0:
 			if scare:
 				_take_off(b, pp)
 				continue
@@ -47,6 +62,23 @@ func _process(delta: float) -> void:
 			(b[1] as Node3D).rotation.y = sin(t * 1.7) * 0.6 if fmod(t, 3.0) < 1.6 else -0.4
 			if fmod(t, 7.0) < delta:
 				root.rotation.y += randf_range(-0.8, 0.8)
+		elif st == 2:
+			var meta: Dictionary = b[7]
+			var center: Vector3 = meta["c"]
+			var a := float(meta["a"]) + float(meta["spd"]) * delta
+			meta["a"] = a
+			var r := float(meta["r"])
+			var nx := center.x + cos(a) * r
+			var nz := center.z + sin(a) * r
+			var ny := float(meta["y"]) + sin(t * 1.2) * 0.8
+			var next_p := Vector3(nx, ny, nz)
+			var dir := next_p - root.position
+			if dir.length_squared() > 0.0001:
+				root.rotation.y = atan2(-dir.x, -dir.z)
+			root.position = next_p
+			var flap := sin(t * 9.0) * 0.65 if fmod(t, 4.5) < 2.2 else 0.12
+			(b[2] as Node3D).rotation.z = flap
+			(b[3] as Node3D).rotation.z = -flap
 		else:
 			var v: Vector3 = b[5]
 			v.y = minf(v.y + delta * 0.6, 2.6)

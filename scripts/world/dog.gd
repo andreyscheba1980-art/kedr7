@@ -49,6 +49,8 @@ var _uncanny := false
 var _uncanny_t := 0.0
 var _uncanny_cooldown := 90.0
 var _uncanny_eyes: Node3D = null
+var _home_bed: Node3D = null
+var _breath: CPUParticles3D = null
 
 
 static func health() -> float:
@@ -106,11 +108,11 @@ static func ensure(yard: Node3D) -> void:
 		d.where = Where.CAMP
 		SaveGame.flags["dog_state"] = "" if not SaveGame.flags.get("dog_found", false) else "ground"
 		yard.add_child(d)
-		# У торцевой двери второго КУНГа, на открытом месте: прежняя точка (11.5, -5) была внутри корпуса
-		var c := Terrain.pad_pos(&"camp") + Vector3(6.2, 0.0, -4.2)
-		c.y = Terrain.height(c.x, c.z)
+		# У торцевой двери жилого КУНГа k0 (на подстилке у порога, рядом с тёплой лампой и костровой бочкой)
+		var c := Terrain.pad_pos(&"camp") + Vector3(1.8, 0.0, -7.2)
+		c.y = Terrain.height(c.x, c.z) + 0.045
 		d.position = c
-		d.rotation.y = 0.6
+		d.rotation.y = 0.75
 
 
 func _ready() -> void:
@@ -125,10 +127,12 @@ func _ready() -> void:
 	add_child(_it)
 	if where == Where.HOME:
 		_make_bowl()
+		_make_home_bed()
 		if SaveGame.flags.get("dog_came_back", false):
 			SaveGame.flags["dog_came_back"] = false
 			if Game.hud != null:
 				Game.hud.subtitle.call_deferred(Loc.t(&"dog.came_back"), 6.0)
+	_build_breath()
 	_update_hunger()
 
 
@@ -158,9 +162,9 @@ static func make_model() -> Array:
 		var src := mi.get_active_material(0) as BaseMaterial3D
 		var m := ShaderMaterial.new()
 		m.shader = shader
-		m.set_shader_parameter(&"tex", src.albedo_texture if src != null and src.albedo_texture != null else tex)
+		m.set_shader_parameter(&"tex", tex if tex != null else (src.albedo_texture if src != null else null))
 		m.set_shader_parameter(&"albedo", Color(1.0, 1.0, 1.0))
-		m.set_shader_parameter(&"emission", 0.06)
+		m.set_shader_parameter(&"emission", 0.015)
 		mi.material_override = m
 	if a != null:
 		for n: StringName in a.get_animation_list():
@@ -267,9 +271,10 @@ func put_down(at: Vector3) -> void:
 		SaveGame.flags["dog_state"] = "home"
 		if get_parent() != Game.level:
 			reparent(Game.level, false)
-		position = STOVE_SPOT
+		position = STOVE_SPOT + Vector3(0.0, 0.025, 0.0)
 		rotation.y = 0.4
 		_make_bowl()
+		_make_home_bed()
 		Game.hud.subtitle(Loc.t(&"dog.home") if not SaveGame.flags.get("dog_home_once", false) else Loc.t(&"dog.put_down"), 6.0)
 		SaveGame.flags["dog_home_once"] = true
 	else:
@@ -313,6 +318,69 @@ func _pet() -> void:
 
 
 # --- Миска -------------------------------------------------------------------------
+
+func _make_home_bed() -> void:
+	if _home_bed != null and is_instance_valid(_home_bed) or Game.level == null:
+		return
+	var root := Node3D.new()
+	root.name = "DogBedMat"
+	root.position = STOVE_SPOT
+	root.rotation.y = 0.3
+	var pad := MeshInstance3D.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(0.76, 0.028, 0.62)
+	pad.mesh = pm
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.56, 0.22, 0.16)
+	m.roughness = 0.95
+	pad.material_override = m
+	pad.position.y = 0.024
+	root.add_child(pad)
+	var rim := MeshInstance3D.new()
+	var rm := BoxMesh.new()
+	rm.size = Vector3(0.64, 0.018, 0.50)
+	rim.mesh = rm
+	var m2 := StandardMaterial3D.new()
+	m2.albedo_color = Color(0.74, 0.64, 0.48)
+	m2.roughness = 0.96
+	rim.material_override = m2
+	rim.position.y = 0.036
+	root.add_child(rim)
+	Game.level.add_child(root)
+	_home_bed = root
+
+
+func _build_breath() -> void:
+	if _breath != null and is_instance_valid(_breath):
+		return
+	var cp := CPUParticles3D.new()
+	cp.name = "DogBreath"
+	cp.position = Vector3(0.0, 0.34, -0.44)
+	cp.amount = 4
+	cp.lifetime = 0.9
+	cp.speed_scale = 0.8
+	cp.direction = Vector3(0.0, 0.35, -1.0)
+	cp.spread = 18.0
+	cp.gravity = Vector3(0.0, 0.15, 0.0)
+	cp.initial_velocity_min = 0.08
+	cp.initial_velocity_max = 0.18
+	cp.scale_amount_min = 0.5
+	cp.scale_amount_max = 1.0
+	var sm := SphereMesh.new()
+	sm.radius = 0.026
+	sm.height = 0.045
+	sm.radial_segments = 6
+	sm.rings = 4
+	cp.mesh = sm
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.86, 0.9, 0.96, 0.16)
+	cp.material_override = mat
+	cp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(cp)
+	_breath = cp
+
 
 func _make_bowl() -> void:
 	if _bowl != null and is_instance_valid(_bowl):
@@ -405,6 +473,10 @@ func _update_hunger() -> void:
 func _process(delta: float) -> void:
 	_pet_cd = maxf(_pet_cd - delta, 0.0)
 	_uncanny_cooldown = maxf(_uncanny_cooldown - delta, 0.0)
+	if _breath != null and is_instance_valid(_breath):
+		var cold_spot := where == Where.CAMP or where == Where.GROUND or where == Where.LOST or Game.is_outside() or (where == Where.HOME and Game.house_cold > 0.35)
+		_breath.emitting = cold_spot and where != Where.HELD
+		_breath.position = Vector3(0.0, 0.18, -0.34) if _clip in [&"lie_shiver", &"sleep"] else Vector3(0.0, 0.36, -0.44)
 	_read_whistle(delta)
 	if where == Where.HELD:
 		return
@@ -448,12 +520,13 @@ func _home(delta: float) -> void:
 		return
 
 	if h < 40.0:
-		if _target == Vector3.INF:
+		if _busy_t <= 0.0 and _target == Vector3.INF:
 			_play(&"lie_shiver")
 			if _whine_t <= 0.0 and Game.is_home():
 				_whine_t = randf_range(14.0, 26.0)
 				Game.audio.play_3d(Voice.sfx_or(&"dog_whine", "res://assets/audio/whisper.ogg"), global_position + Vector3(0, 0.3, 0), -8.0, 2.0)
-		_walk(delta, WALK * 0.6)
+		if _busy_t <= 0.0:
+			_walk(delta, WALK * 0.6)
 		return
 	_alert(delta)
 	if _fleeing:
@@ -886,6 +959,11 @@ func _follow_alert(delta: float) -> void:
 		_play(&"growl", 0.2)
 		_busy_t = 2.5
 		Game.audio.play_3d(Voice.sfx_or(&"dog_growl", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.4, 0), -2.0, 5.0)
+	elif Wildlife.instance != null and Wildlife.instance.state == &"circling" and _growl_t <= 0.0:
+		_growl_t = randf_range(8.0, 14.0)
+		_play(&"growl", 0.2)
+		_busy_t = 2.0
+		Game.audio.play_3d(Voice.sfx_or(&"dog_growl", "res://assets/audio/growl.ogg"), global_position + Vector3(0, 0.4, 0), -4.0, 4.0)
 
 
 ## Сорвалась в погоне: убегает в сторону, лежит там и скулит. Свистни — отзовётся лаем; по следам — найти.

@@ -100,8 +100,8 @@ func _issue() -> void:
 		var tmp: Variant = pool[i]
 		pool[i] = pool[j]
 		pool[j] = tmp
-	# Одно дело за ночь (раньше — два): ночь не должна превращаться в чек-лист, страх живёт в паузах.
-	var count := 1
+	# На 1-й ночи — 1 задание для знакомства, дальше — по 2 разноплановых дела на смену.
+	var count := 1 if Game.night <= 1 else 2
 	for i in range(mini(count, pool.size())):
 		active.append(pool[i] as StringName)
 	beacon_range.x = rng.randi_range(36, 82) * 100

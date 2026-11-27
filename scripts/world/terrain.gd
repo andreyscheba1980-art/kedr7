@@ -25,7 +25,7 @@ const ROADS := {
 	&"tower": [Vector2(72, -62), Vector2(96, -92), Vector2(128, -132), Vector2(168, -176), Vector2(214, -228), Vector2(258, -276), Vector2(292, -312)],
 	## Старая заросшая просека от зимника к лесосеке — к капищу (на схеме — только когда пеленги сошлись)
 	&"old_cut": [Vector2(-100, 4), Vector2(-106, 26), Vector2(-99, 48), Vector2(-95, 60)],
-	&"camp": [Vector2(-36, 20), Vector2(-62, 14), Vector2(-100, 4), Vector2(-146, -2), Vector2(-198, 4), Vector2(-256, 14), Vector2(-312, 12), Vector2(-350, 10)],
+	&"camp": [Vector2(-24, 10), Vector2(-42, 3), Vector2(-68, 2), Vector2(-100, 4), Vector2(-146, -2), Vector2(-198, 4), Vector2(-256, 14), Vector2(-312, 12), Vector2(-350, 10)],
 	&"drill": [Vector2(4, 44), Vector2(8, 84), Vector2(18, 130), Vector2(34, 180), Vector2(52, 230), Vector2(70, 282), Vector2(78, 312)],
 }
 ## Овраги и распадки: ломаная по дну, глубина, полуширина, есть ли ручей подо льдом.
@@ -37,7 +37,7 @@ const RAVINES := [
 ## Площадки: центр, радиус. Высота — отметка рельефа в центре.
 const PADS := {
 	&"tower": [Vector2(300, -322), 22.0],
-	&"camp": [Vector2(-362, 10), 30.0],
+	&"camp": [Vector2(-362, 10), 34.0],
 	&"drill": [Vector2(80, 324), 24.0],
 	&"drop": [Vector2(-90, -121), 9.0],   # где ГТ-Т садится в перемёт (пролог): ~210 м до крыльца
 	# Автоматические метеостанции у зимников (наряды на выезд, FieldJobs)
@@ -181,6 +181,22 @@ static func normal(x: float, z: float) -> Vector3:
 static func is_clear(x: float, z: float) -> bool:
 	var g := _grid_xy(x, z)
 	return _clear[_idx(roundi(g.x), roundi(g.y))] == 0
+
+
+## Расстояние по плоскости до ближайшего полотна зимника.
+static func road_dist(x: float, z: float) -> float:
+	var p := Vector2(x, z)
+	var best_sq := INF
+	for road: StringName in ROADS:
+		var pts: Array = ROADS[road]
+		for k in range(pts.size() - 1):
+			var a: Vector2 = pts[k]
+			var b: Vector2 = pts[k + 1]
+			var ab := b - a
+			var len_sq := ab.length_squared()
+			var t := 0.0 if len_sq <= 0.0001 else clampf((p - a).dot(ab) / len_sq, 0.0, 1.0)
+			best_sq = minf(best_sq, p.distance_squared_to(a + ab * t))
+	return sqrt(best_sq)
 
 
 ## Постройки за квадратом лесного двора (корпус с ангаром): дальний лес сюда не сажаем —

@@ -103,38 +103,80 @@ static func _tower(yard: Node3D, c: Vector3) -> void:
 
 
 static func _camp(yard: Node3D, c: Vector3) -> void:
-	_model(yard, "gtt_transporter", c + Vector3(-8.0, 0.0, -6.0), 140.0)
-	# Первый вагончик-КУНГ: открываемый и с тулупом геолога внутри
-	var k_pos0 := c + Vector3(6.0, 0.0, -8.0)
+	_model(yard, "gtt_transporter", c + Vector3(-11.0, 0.0, -9.0), 135.0)
+	# Первый вагончик-КУНГ: жилой, открываемый, с тулупом геолога внутри и тёплой лампой у порога
+	var k_pos0 := c + Vector3(3.8, 0.0, -10.5)
 	k_pos0.y = Terrain.height(k_pos0.x, k_pos0.z)
 	var k0 := Props.kung_trailer()
 	k0.position = k_pos0
-	k0.rotation.y = deg_to_rad(15.0)
+	k0.rotation.y = deg_to_rad(10.0)
 	yard.add_child(k0)
 	_enterable_kung(yard, k_pos0, k0.rotation.y)
 
-	# Второй КУНГ: запертый фоновый
-	var k_pos1 := c + Vector3(10.0, 0.0, -6.0)
+	# Второй КУНГ: сдвинут в сторону и чуть под углом — не перекрывает двери, не мешает въезду со стороны зимника
+	var k_pos1 := c + Vector3(12.2, 0.0, -8.2)
 	k_pos1.y = Terrain.height(k_pos1.x, k_pos1.z)
 	var k1 := Props.kung_trailer()
 	k1.position = k_pos1
-	k1.rotation.y = deg_to_rad(23.0)
+	k1.rotation.y = deg_to_rad(32.0)
 	yard.add_child(k1)
 	_solid(yard, k_pos1 + Vector3(0, 1.3, 0), Vector3(5.4, 2.6, 2.7), k1.rotation.y)
 
-	# Штабеля брёвен
+	# Уголок Найды прямо у крыльца жилого КУНГа: деревянный настил, телогрейка-подстилка, пустая жестянка, кость и следы
+	_build_dog_shelter(yard, c + Vector3(1.8, 0.0, -7.2), k_pos0)
+
+	# Штабеля брёвен вынесены западнее и севернее — центральная площадка и въезд с востока (x +10..+28) полностью свободны для «Бурана»
 	for j in 3:
 		var w := Props.woodpile(6.0, 1.6)
-		w.position = c + Vector3(-10.0 + j * 2.6, 0.0, 8.0)
+		w.position = c + Vector3(-13.5 + j * 2.6, 0.0, 9.5)
 		w.position.y = Terrain.height(w.position.x, w.position.z)
 		w.rotation.y = deg_to_rad(90.0)
 		yard.add_child(w)
 	var saw := Props.sawhorse()
-	saw.position = c + Vector3(2.0, Terrain.height(c.x + 2.0, c.z + 3.0) - c.y, 3.0)
+	saw.position = c + Vector3(-6.0, Terrain.height(c.x - 6.0, c.z + 5.5) - c.y, 5.5)
 	yard.add_child(saw)
-	_note(yard, &"camp", c + Vector3(3.5, Terrain.height(c.x + 3.5, c.z - 4.0) - c.y, -4.0))
-	_light(yard, c + Vector3(6.0, 3.0, -5.5), Color(1.0, 0.75, 0.45))
+	_note(yard, &"camp", c + Vector3(0.4, Terrain.height(c.x + 0.4, c.z - 5.2) - c.y, -5.2))
+	_light(yard, c + Vector3(2.2, 3.0, -7.8), Color(1.0, 0.75, 0.45))
 	SiteDressing.camp(yard, c)
+
+
+static func _build_dog_shelter(yard: Node3D, bed_pos: Vector3, kung_pos: Vector3) -> void:
+	var by := Terrain.height(bed_pos.x, bed_pos.z)
+	var root := Node3D.new()
+	root.name = "CampDogShelter"
+	root.position = Vector3(bed_pos.x, by, bed_pos.z)
+	root.rotation.y = 0.4
+	yard.add_child(root)
+	# Дощатый поддон + старая скрученная телогрейка-подстилка
+	var wood_mat := Palette.m(&"wood")
+	var pad := Geo.block(root, Vector3(1.05, 0.032, 0.88), Vector3(0, 0.016, 0), wood_mat, false)
+	pad.name = "ShelterPallet"
+	var rag_mat := StandardMaterial3D.new()
+	rag_mat.albedo_color = Color(0.22, 0.26, 0.20)
+	rag_mat.roughness = 0.96
+	Geo.block(root, Vector3(0.84, 0.025, 0.68), Vector3(0.02, 0.038, 0.02), rag_mat, false)
+	# Перевёрнутая пустая жестяная банка (миска) и обгрызенная кость рядом
+	var tin_mat := StandardMaterial3D.new()
+	tin_mat.albedo_color = Color(0.56, 0.56, 0.58)
+	tin_mat.metallic = 0.55
+	tin_mat.roughness = 0.45
+	Geo.cylinder(root, 0.09, 0.055, Vector3(-0.42, 0.028, 0.34), tin_mat, false)
+	var bone_mat := StandardMaterial3D.new()
+	bone_mat.albedo_color = Color(0.72, 0.68, 0.58)
+	bone_mat.roughness = 0.85
+	var bone := Geo.cylinder(root, 0.018, 0.16, Vector3(0.38, 0.022, 0.35), bone_mat, false)
+	bone.rotation = Vector3(deg_to_rad(90.0), 0.55, 0.0)
+	# Обрывок верёвки от полоза КУНГа к лежанке
+	var rope_pts := PackedVector3Array([Vector3(bed_pos.x + 0.5, by + 0.03, bed_pos.z - 0.5), Vector3(kung_pos.x - 1.2, by + 0.08, kung_pos.z + 1.0)])
+	Footprints.trail(yard, &"paw", rope_pts, by, 0.35, 0.04)
+	# Тёплый оранжевый ореол у порога КУНГа + следы щенка к костровой бочке
+	var prints := PackedVector3Array([
+		bed_pos + Vector3(0.1, 0, 0.5),
+		bed_pos + Vector3(0.8, 0, 1.3),
+		bed_pos + Vector3(1.6, 0, 1.7),
+		bed_pos + Vector3(2.4, 0, 1.2),
+	])
+	Footprints.trail(yard, &"paw", prints, by, 0.32, 0.04)
 
 
 static func _enterable_kung(yard: Node3D, pos: Vector3, yaw: float) -> void:

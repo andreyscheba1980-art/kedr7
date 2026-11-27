@@ -1288,6 +1288,9 @@ func _update_sky_life(delta: float) -> void:
 	if _sky_mat != null:
 		var night := not Game.is_daylight()
 		_sky_mat.set_shader_parameter(&"sat_on", 1.0 if night else 0.0)
+		_sky_mat.set_shader_parameter(&"surge_0310", Signal0310.surge_level if night else 0.0)
+		var dusk_w := clampf((Game.shift_minutes - 80.0) / 130.0, 0.0, 1.0) if (Game.is_daylight() and not Game.is_prologue()) else (0.55 if Game.is_prologue() and Game.has_flag("prologue_arrived") else 0.0)
+		_sky_mat.set_shader_parameter(&"dusk_warmth", dusk_w)
 		if night:
 			if _sat_stop_at < 0.0:
 				_sat_stop_at = randf_range(90.0, 400.0) if Game.night >= 5 and not Game.has_flag("sat_stopped_%d" % Game.night) else 1e9
@@ -1360,7 +1363,8 @@ func _update_rays() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null or _sky_light == null or Game.is_indoors() or Game.is_prologue_trail() or dbg_no_rays:
 		_post.set_shader_parameter(&"ray_amount", 0.0)
-		_post.set_shader_parameter(&"warm", 0.0)
+		var stove_warm := clampf(Game.stove_wood / 85.0, 0.0, 0.32) if Game.is_home() and Game.stove_wood > 0.0 else 0.0
+		_post.set_shader_parameter(&"warm", stove_warm)
 		return
 	var dir := _sky_light.global_basis.z
 	var face := (-cam.global_basis.z).dot(dir)
@@ -5137,7 +5141,17 @@ func _bed_prompt() -> String:
 
 
 func _can_sleep() -> bool:
-	return Game.after_hour(5) and Game.cfg.get("finale", &"") == &""
+	if Game.cfg.get("finale", &"") != &"":
+		return false
+	if Game.after_hour(5):
+		return true
+	# После 03:30 (450 мин), если все сводки переданы и ночные наряды закрыты — можно лечь отдыхать, не высиживая пустой рассвет
+	if Game.shift_minutes >= 450.0:
+		var reps_need := (Game.cfg.get("reports", []) as Array).size()
+		var tasks_clear := Game.tasks == null or Game.tasks.active.is_empty()
+		if Game.reports_sent >= reps_need and tasks_clear:
+			return true
+	return false
 
 
 var _bed_sleeping := false
@@ -5199,6 +5213,12 @@ func _on_bed_used(_p: Player) -> void:
 		else:
 			Game.hud.subtitle(Loc.t(&"sub.not_yet"), 3.0)
 	elif _can_sleep():
+		if not Game.after_hour(5) and door_open:
+			Game.hud.subtitle(Loc.t(&"sub.bed_door_open"), 3.5)
+			return
+		if not Game.after_hour(5) and Game.stove_wood <= 0.0:
+			Game.hud.subtitle(Loc.t(&"sub.stove_cold_bed"), 3.5)
+			return
 		Game.end_shift()
 	else:
 		Game.hud.subtitle(Loc.t(&"sub.too_early"), 3.0)

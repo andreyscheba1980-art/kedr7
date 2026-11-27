@@ -14,14 +14,21 @@ const SCRATCH := "res://assets/sfx/scratch_wall.ogg"
 const STATIC := "res://assets/audio/static_loop.ogg"
 const RADIO_POS := Vector3(9.2, 1.0, -1.4)
 
+static var surge_level := 0.0
+
 var _fired := false
 
 
 func _ready() -> void:
 	name = "Signal0310"
+	surge_level = 0.0
 	if Game.resumed and Game.shift_minutes > STRIKE_MIN:
 		_fired = true
 	EventBus.clock_minute.connect(_on_minute)
+
+
+func _exit_tree() -> void:
+	surge_level = 0.0
 
 
 static func _night_ok() -> bool:
@@ -49,6 +56,16 @@ func _on_minute(m: int) -> void:
 
 
 func _process(_delta: float) -> void:
+	if _night_ok() and not Game.dead and not Game.shift_over:
+		# Плавный аномальный всполох окна 03:10 (427..435 мин смены)
+		var m: float = Game.shift_minutes
+		if m >= 427.0 and m <= 436.0:
+			var peak_dist := absf(m - float(STRIKE_MIN)) / 4.5
+			surge_level = clampf(1.0 - peak_dist, 0.0, 1.0)
+		else:
+			surge_level = move_toward(surge_level, 0.0, _delta * 0.4)
+	else:
+		surge_level = 0.0
 	# Пеленг: наушники надеты, пока удар ещё звенит в мерзлоте
 	if _fired and Game.sv20_active and ringing() and not FieldJobs.has_bearing("station"):
 		FieldJobs.record_bearing("station")

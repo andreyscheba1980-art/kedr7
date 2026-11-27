@@ -8,8 +8,8 @@ const NIGHTS := {
 		"start_min": 120,              ## 22:00
 		"reports": [240, 360],         ## 00:00, 02:00 (после трёх Большой Земле не отвечают)
 		"min_per_sec": 0.72,           ## 22:00 → 06:00 ≈ 11 минут (плотный темп без провисаний)
-		"base_rate": 0.46, "peak": 58.0, "max_hard": 1,
-		"yrka_max": 2,                 ## 0 — нет, 1 — свист, 2 — шаги, 3 — глаза, 4 — погоня
+		"base_rate": 0.56, "peak": 52.0, "max_hard": 2,
+		"yrka_max": 3,                 ## ночь 1: 0..3 — шаги, зов, глаза в темноте без мгновенной смерти
 		"antenna_ice": false,
 		"signals": [&"mainland", &"buzzer", &"numbers"],
 		"gen_start": 76.0, "stove_start": 66.0, "canisters": 3,

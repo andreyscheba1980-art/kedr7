@@ -76,6 +76,8 @@ func _ready() -> void:
 		add_child(Signal0310.new())
 	add_child(ForestVoice.new())
 	add_child(Zenit.new())
+	add_child(Wildlife.new())     # живая тайга: днём зайцы и лиса, ночью — сова и волки
+	add_child(LoreEchoes.new())   # эхо-сцены прошлого и визуальные следы лора в 3D
 	if Game.is_night():
 		add_child(Anomalies.new())
 	add_child(Hints.new())
@@ -84,7 +86,6 @@ func _ready() -> void:
 	if Game.is_night():
 		add_child(NightTasks.new())
 		add_child(NightGuest.new())   # стук в дверь: человек или оно
-		add_child(Wildlife.new())     # волки: не всё, что ходит ночью, — тварь
 		add_child(MineStory.new())    # ночь 4: «Логово» — провал в штольню, стелс, погоня
 		if not Game.is_prologue():
 			Consequences.apply_night()   # что не починил днём — ночью платишь

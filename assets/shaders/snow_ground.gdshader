@@ -55,29 +55,32 @@ void fragment() {
 	float slope = cos(ph) * amp;
 	vec3 n_world = normalize(wnrm + vec3(wd.x * slope, 0.0, wd.y * slope) + vec3(cross_d.x, 0.0, cross_d.y) * slope * 0.2);
 	NORMAL = normalize((VIEW_MATRIX * vec4(n_world, 0.0)).xyz);
-	float crest = smoothstep(0.6, 1.0, sin(ph)) * amp;
+	float crest = smoothstep(0.45, 1.0, sin(ph)) * amp;
+	float trough = smoothstep(0.35, -0.8, sin(ph)) * amp;
 	// На крутых склонах сопок снег сдувается ветром, обнажая каменные курумники
 	float slope_rock = smoothstep(0.78, 0.50, wnrm.y);
 	vec3 rock_col = vec3(0.24, 0.25, 0.28) * (0.85 + 0.3 * big);
-	vec3 snow_col = albedo.rgb * t * (1.0 + crest * 0.25);
+	vec3 snow_col = albedo.rgb * t * (1.0 + crest * 0.28);
+	snow_col = mix(snow_col, snow_col * vec3(0.84, 0.90, 1.08), clamp(trough * 1.15, 0.0, 0.45));
 	ALBEDO = mix(snow_col, rock_col, slope_rock);
 	ROUGHNESS = 1.0;
 
-	// Кристаллы наста: ~0.7 % клеток 3×3 см, у каждой своя наклонённая микронормаль
+	// Кристаллы наста: ~0.9 % клеток 3×3 см, у каждой своя наклонённая микронормаль
 	vec2 cell = floor(uv * 32.0);
 	float h = hash2(cell);
 	float cd = length(wpos - CAMERA_POSITION_WORLD);
-	v_is_spark = step(mix(0.99, 0.997, smoothstep(4.0, 20.0, cd)), h) * glitter
-		* (1.0 - smoothstep(14.0, 28.0, cd));   // у ног гуще, дальше — реже; совсем вдали — не «конфетти»
+	v_is_spark = step(mix(0.987, 0.996, smoothstep(4.0, 22.0, cd)), h) * glitter
+		* (1.0 - smoothstep(14.0, 30.0, cd));   // у ног гуще, дальше — реже; совсем вдали — не «конфетти»
 	vec3 rnd = vec3(hash2(cell + 17.0), 1.6, hash2(cell + 41.0)) - vec3(0.5, 0.0, 0.5);
 	v_spark = normalize((VIEW_MATRIX * vec4(normalize(rnd), 0.0)).xyz);
 }
 
 void light() {
 	float NdotL = clamp((dot(NORMAL, LIGHT) + 0.25) / 1.25, 0.0, 1.0);
-	DIFFUSE_LIGHT += NdotL * ATTENUATION * LIGHT_COLOR / PI;
+	float rim = pow(1.0 - max(dot(NORMAL, VIEW), 0.0), 3.0) * 0.14;
+	DIFFUSE_LIGHT += (NdotL + rim) * ATTENUATION * LIGHT_COLOR / PI;
 	if (v_is_spark > 0.5) {
-		float s = pow(max(dot(reflect(-LIGHT, v_spark), VIEW), 0.0), 140.0);
-		SPECULAR_LIGHT += s * 5.0 * ATTENUATION * LIGHT_COLOR;
+		float s = pow(max(dot(reflect(-LIGHT, v_spark), VIEW), 0.0), 120.0);
+		SPECULAR_LIGHT += s * 6.0 * ATTENUATION * LIGHT_COLOR;
 	}
 }

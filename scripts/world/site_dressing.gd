@@ -121,56 +121,95 @@ static func _fire_barrel(yard: Node3D, pos: Vector3) -> void:
 	yard.add_child(l)
 	var glow := Geo.block(yard, Vector3(0.5, 0.05, 0.5), pos + Vector3(0, 0.92, 0), Palette.m(&"rust"), false)
 	glow.name = "FireBarrelGlow"
+	if Settings.quality >= 1:
+		var smoke := CPUParticles3D.new()
+		smoke.name = "BarrelSmoke"
+		smoke.position = pos + Vector3(0, 1.05, 0)
+		smoke.amount = 6
+		smoke.lifetime = 2.4
+		smoke.speed_scale = 0.7
+		smoke.direction = Vector3(0.25, 1.0, 0.1)
+		smoke.spread = 16.0
+		smoke.gravity = Vector3(0.08, 0.12, 0.0)
+		smoke.initial_velocity_min = 0.25
+		smoke.initial_velocity_max = 0.55
+		smoke.scale_amount_min = 0.5
+		smoke.scale_amount_max = 1.4
+		var sm := SphereMesh.new()
+		sm.radius = 0.14
+		sm.height = 0.22
+		sm.radial_segments = 6
+		sm.rings = 4
+		smoke.mesh = sm
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(0.58, 0.60, 0.64, 0.16)
+		smoke.material_override = mat
+		smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		yard.add_child(smoke)
 
 
-## Пни по кольцу вокруг площадки: просека уходит в лес, а не обрывается стеной.
+## Пни по кольцу вокруг площадки: просека уходит в лес, а не обрывается стеной (без захламления полотна дороги).
 static func _clearing_ring(yard: Node3D, c: Vector3, r0: float, r1: float, stumps: int, seed_value: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	for i in stumps:
 		var a := rng.randf() * TAU
 		var r := rng.randf_range(r0, r1)
+		var px := c.x + cos(a) * r
+		var pz := c.z + sin(a) * r
+		if Terrain.road_dist(px, pz) < 6.5:
+			continue
 		var s := Props.stump(snappedf(rng.randf_range(0.26, 0.42), 0.04))
 		_put(yard, s, c, cos(a) * r, sin(a) * r, rng.randf() * 360.0)
-	# Пологие снежные бугры: площадка не должна быть идеальным столом
+	# Пологие снежные бугры: площадка не должна быть идеальным столом (но не на въезде с зимника)
 	for i in stumps:
 		var a2 := rng.randf() * TAU
-		var r2 := rng.randf_range(r0 - 4.0, r1 + 4.0)
-		drift(yard, _ground(c, cos(a2) * r2, sin(a2) * r2), rng.randf_range(3.0, 6.0), rng.randf_range(0.4, 0.9), rng.randf_range(1.5, 3.0), rng.randf() * 180.0)
+		var r2 := rng.randf_range(r0 - 2.0, r1 + 4.0)
+		var px2 := c.x + cos(a2) * r2
+		var pz2 := c.z + sin(a2) * r2
+		if Terrain.road_dist(px2, pz2) < 6.5:
+			continue
+		drift(yard, _ground(c, cos(a2) * r2, sin(a2) * r2), rng.randf_range(3.0, 6.0), rng.randf_range(0.4, 0.8), rng.randf_range(1.5, 3.0), rng.randf() * 180.0)
 
 
-## Лесосека: лесопильня с пилой, штабели хлыстов, пни, костровая бочка, колеи волока, намёты.
+## Лесосека: лесопильня с пилой, штабели хлыстов по краю, пни, костровая бочка у КУНГа, открытый въезд со стороны зимника.
 static func camp(yard: Node3D, c: Vector3) -> void:
 	# Лесопильня к западу от вагончиков: стан, опилки, рядом колода с топором
-	var saw := _put(yard, Props.sawmill(), c, -3.5, 4.0, 12.0)
+	var saw := _put(yard, Props.sawmill(), c, -7.0, 4.0, 12.0)
 	_solid(yard, saw.position, Vector3(6.4, 1.2, 1.6), saw.rotation.y)
-	patch(yard, _ground(c, -3.0, 5.6), 2.2, &"dust")
-	patch(yard, _ground(c, -5.2, 3.2), 1.4, &"dust")
-	_put(yard, Props.axe_stump(), c, -7.0, 5.6, 40.0)
-	# Хлысты: два штабеля у стана и один у дороги
-	for lp: Array in [[-13.5, 0.0, 80.0], [-13.0, -3.0, 95.0], [16.0, -6.0, 10.0]]:
+	patch(yard, _ground(c, -6.5, 5.6), 2.2, &"dust")
+	patch(yard, _ground(c, -8.5, 3.2), 1.4, &"dust")
+	_put(yard, Props.axe_stump(), c, -10.5, 5.6, 40.0)
+	# Хлысты: два штабеля у лесопильни и один на северной кромке (восточный въезд свободен!)
+	for lp: Array in [[-15.5, 0.0, 80.0], [-14.5, -3.6, 95.0], [-4.0, -13.0, 12.0]]:
 		var p := _put(yard, Props.log_pile(5.4), c, lp[0], lp[1], lp[2])
 		_solid(yard, p.position, Vector3(5.2, 1.2, 1.7), p.rotation.y)
-	# Работа окончена внезапно: ящики, санки, бочка с огнём
-	_put(yard, Props.stacked_crates(), c, -1.0, -3.5, 25.0)
-	_put(yard, Props.surveyor_sledge(), c, 12.0, -3.0, -20.0)
-	_fire_barrel(yard, _ground(c, 4.8, -1.8))
-	patch(yard, _ground(c, 4.8, -1.8), 1.2, &"soot")
-	# Колея волока от дороги, обрывается у штабеля
-	tracks(yard, c + Vector3(34.0, 0, 3.0), c + Vector3(6.0, 0, 1.0))
+	# Работа окончена внезапно: ящики, санки в стороне, бочка с огнём у порога КУНГа и Найды
+	_put(yard, Props.stacked_crates(), c, -1.5, -6.5, 25.0)
+	_put(yard, Props.surveyor_sledge(), c, 12.5, 4.5, -20.0)
+	_fire_barrel(yard, _ground(c, 4.2, -5.6))
+	patch(yard, _ground(c, 4.2, -5.6), 1.2, &"soot")
+	# Колея волока с зимника и мимо площадки
+	tracks(yard, c + Vector3(32.0, 0, 0.5), c + Vector3(4.0, 0, -2.5))
 	tracks(yard, c + Vector3(-16.0, 0, 3.0), c + Vector3(-34.0, 0, 6.0))
-	# Намёты у вагончиков, поленниц и ГТ-Т
-	drift(yard, _ground(c, 6.0, -10.0), 3.4, 1.0, 1.1, 15.0)
-	drift(yard, _ground(c, 10.5, -8.0), 3.2, 0.9, 1.0, 23.0)
-	drift(yard, _ground(c, -10.0, -7.5), 3.0, 0.9, 1.2, 50.0)
+	# Намёты только с тыльной стороны вагончиков и поленниц
+	drift(yard, _ground(c, 4.0, -13.0), 3.4, 0.9, 1.1, 10.0)
+	drift(yard, _ground(c, 12.5, -10.8), 3.2, 0.8, 1.0, 32.0)
+	drift(yard, _ground(c, -12.5, -10.5), 3.0, 0.8, 1.2, 50.0)
 	for j in 3:
-		drift(yard, _ground(c, -10.0 + j * 2.6, 9.4), 1.6, 0.6, 1.0, 90.0)
-	drift(yard, _ground(c, -14.0, 0.0), 3.0, 0.8, 1.2, 80.0)
-	_clearing_ring(yard, c, 13.0, 28.0, 14, 5101)
-	# Вешки по краю площадки
+		drift(yard, _ground(c, -13.5 + j * 2.6, 11.0), 1.6, 0.6, 1.0, 90.0)
+	drift(yard, _ground(c, -16.0, 0.0), 3.0, 0.8, 1.2, 80.0)
+	_clearing_ring(yard, c, 15.0, 29.0, 12, 5101)
+	# Вешки по краю площадки, кроме восточного коридора въезда (x > c.x + 12, |dz| < 9)
 	for i in 6:
 		var a := TAU * float(i) / 6.0 + 0.3
-		_put(yard, Props.rope_post(true, Color(0.82, 0.5, 0.1)), c, cos(a) * 22.0, sin(a) * 22.0)
+		var dx := cos(a) * 23.0
+		var dz := sin(a) * 23.0
+		if dx > 10.0 and absf(dz) < 9.5:
+			continue
+		_put(yard, Props.rope_post(true, Color(0.82, 0.5, 0.1)), c, dx, dz)
 
 
 ## Буровая: стеллаж труб, цистерна ГСМ, мазутные пятна, бочки россыпью, щиты от ветра, намёты.

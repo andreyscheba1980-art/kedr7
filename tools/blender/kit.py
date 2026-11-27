@@ -175,7 +175,7 @@ def _boost_islands(body, pred, factor):
     print("UV_BOOST islands:", n)
 
 
-def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pack=0.0, ao_blur=0, uv_boost=None):
+def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pack=0.0, ao_blur=0, uv_boost=None, bake_margin=3):
     """uv_boost=(pred(Vector)->bool, factor): острова головы крупнее — лицу больше пикселей текстуры."""
     """Сборка в один меш, UV, запекание цвет×AO в одну текстуру, GLB + .blend (текстура упакована).
     origin: "bottom" — центр по XY, низ на 0 (как ждёт Models.spawn); "keep" — мировые координаты как есть."""
@@ -231,7 +231,7 @@ def finish(name, out_dir, res=1024, origin="bottom", samples=48, ao_min=0.35, pa
     for m in body.data.materials:
         n = m.node_tree.nodes.new("ShaderNodeTexImage"); n.image = img_col; m.node_tree.nodes.active = n
     bk = sc.render.bake
-    bk.use_pass_direct = False; bk.use_pass_indirect = False; bk.use_pass_color = True; bk.margin = 3
+    bk.use_pass_direct = False; bk.use_pass_indirect = False; bk.use_pass_color = True; bk.margin = bake_margin
     bpy.ops.object.bake(type="DIFFUSE")
     for m in body.data.materials:
         for n in m.node_tree.nodes:

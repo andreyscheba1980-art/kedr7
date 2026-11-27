@@ -63,6 +63,16 @@ func is_active(id: StringName) -> bool:
 	return active.has(id) and not bool(active[id].get("reverted", false))
 
 
+static func active_count() -> int:
+	if Game.anomalies == null:
+		return 0
+	var n := 0
+	for id: StringName in Game.anomalies.active:
+		if not bool(Game.anomalies.active[id].get("noted", false)) and not bool(Game.anomalies.active[id].get("reverted", false)):
+			n += 1
+	return n
+
+
 func pos_of(id: StringName) -> Vector3:
 	return (_pos[id] as Callable).call() if _pos.has(id) else Vector3.INF
 

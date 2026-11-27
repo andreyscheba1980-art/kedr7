@@ -6,13 +6,13 @@ extends Node3D
 
 const PARK := Vector3(40.0, 0.0, 25.0)
 const PARK_YAW := PI * 0.5
-const MAX_SPEED := 8.5           ## ≈ 30 км/ч по укатанному зимнику
-const DEEP_SPEED := 3.6          ## ≈ 13 км/ч в целине
-const REVERSE_SPEED := 2.2
-const ACCEL := 2.6               ## тяжёлый, разгоняется неохотно
-const BRAKE := 7.0
+const MAX_SPEED := 8.8           ## ≈ 32 км/ч по укатанному зимнику
+const DEEP_SPEED := 4.4          ## ≈ 16 км/ч в целине (тяговитый буксир)
+const REVERSE_SPEED := 3.2
+const ACCEL := 3.0
+const BRAKE := 7.5
 const DRAG := 2.4
-const TURN := 1.15
+const TURN := 1.45
 const FUEL_IDLE := 0.12          ## % в секунду на холостых
 const FUEL_RUN := 0.05           ## % за метр: полного бака — на два километра зимника
 const STALL_CHANCE := 0.07       ## ночью, раз в 20 с под нагрузкой
@@ -414,43 +414,45 @@ func _physics_process(delta: float) -> void:
 		throttle = 0.0
 	# Целина: всё, что не зимник, не площадка и не двор, — глубокий снег.
 	var pos := global_position
-	var packed := Terrain.is_clear(pos.x, pos.z) or Vector2(pos.x, pos.z).distance_to(Vector2(Yard.HOUSE_CENTER.x, Yard.HOUSE_CENTER.z)) < 55.0
+	var packed := Terrain.is_clear(pos.x, pos.z) or Terrain.road_dist(pos.x, pos.z) < 7.0 or Vector2(pos.x, pos.z).distance_to(Vector2(Yard.HOUSE_CENTER.x, Yard.HOUSE_CENTER.z)) < 58.0
 	_deep = move_toward(_deep, 0.0 if packed else 1.0, delta * 1.5)
 	if _deep > 0.6 and not _deep_told and absf(speed) > 1.5:
 		_deep_told = true
 		Game.hud.subtitle(Loc.t(&"sub.buran_deep"), 3.0)
-	# В гору «Буран» тянет хуже, в целине — ещё и проваливается.
+	# В гору «Буран» тянет хуже, в целине — чуть тяжелее, но не мёртвый клин.
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
 	var slope := -Terrain.normal(pos.x, pos.z).dot(fwd)   # > 0 — в гору
 	var deep_cap: float = DEEP_SPEED * (1.35 if (Game.has_item(&"belt_variator") or Game.has_flag("buran_belt")) else 1.0)
-	var cap := lerpf(MAX_SPEED, deep_cap, _deep) * clampf(1.0 - maxf(slope, 0.0) * (1.6 + _deep * 2.0), 0.25, 1.0)
+	var cap := maxf(lerpf(MAX_SPEED, deep_cap, _deep) * clampf(1.0 - maxf(slope, 0.0) * (1.25 + _deep * 1.3), 0.35, 1.0), 1.8)
 	# Ярус 3 (гольцы и курумники > 72 м): крутизна и каменные россыпи не пускают тяжелый снегоход
 	if pos.y > 72.0:
 		var kurumnik := clampf((pos.y - 72.0) / 18.0, 0.0, 1.0)
 		cap *= (1.0 - kurumnik * 0.85)
 		if kurumnik > 0.4 and absf(speed) > 0.4 and randf() < delta * 0.35:
 			Game.hud.subtitle(Loc.t(&"sub.buran_kurumnik_slip"), 3.0)
-	var acc := ACCEL * lerpf(1.0, 0.55, _deep)
+	var acc := ACCEL * lerpf(1.0, 0.65, _deep)
 	if throttle > 0.0:
 		speed = move_toward(speed, cap * throttle, acc * delta)
 		if speed > cap:
 			speed = move_toward(speed, cap, BRAKE * 0.5 * delta)
-		# Зарылся: газ в целине в гору, а скорости нет
-		if _deep > 0.8 and slope > 0.12 and speed < 0.8:
+		# Зарылся только на очень крутом целиновом склоне
+		if _deep > 0.85 and slope > 0.28 and speed < 0.5:
 			_stuck_t += delta
-			if _stuck_t > 1.5:
+			if _stuck_t > 2.2:
 				speed = 0.0
-				if _stuck_t < 1.5 + delta * 1.5:
+				if _stuck_t < 2.2 + delta * 1.5:
 					Game.hud.subtitle(Loc.t(&"sub.buran_stuck"), 3.5)
 		else:
 			_stuck_t = maxf(_stuck_t - delta * 2.0, 0.0)
 	elif throttle < 0.0:
-		speed = move_toward(speed, -REVERSE_SPEED, (BRAKE if speed > 0.0 else ACCEL * 0.6) * delta)
+		speed = move_toward(speed, -REVERSE_SPEED, (BRAKE if speed > 0.0 else ACCEL * 0.75) * delta)
 	else:
 		speed = move_toward(speed, 0.0, DRAG * delta)
-	steer_amount = move_toward(steer_amount, steer, get_physics_process_delta_time() * 4.0)
-	var grip := clampf(absf(speed) / 4.0, 0.0, 1.0) * (1.0 - clampf((absf(speed) - 10.0) / 12.0, 0.0, 0.35))
-	var dyaw := steer * TURN * grip * signf(speed if absf(speed) > 0.01 else 1.0) * delta
+	steer_amount = move_toward(steer_amount, steer, get_physics_process_delta_time() * 4.5)
+	var min_grip := 0.52 if engine_on else 0.0
+	var grip := maxf(min_grip, clampf(absf(speed) / 3.0, 0.0, 1.0) * (1.0 - clampf((absf(speed) - 10.0) / 12.0, 0.0, 0.3)))
+	var rev_sign := -1.0 if speed < -0.15 else 1.0
+	var dyaw := steer * TURN * grip * rev_sign * delta
 	_yaw += dyaw
 	p.rotation.y += dyaw
 	_move(delta)
@@ -524,24 +526,47 @@ func _physics_process(delta: float) -> void:
 
 func _move(delta: float) -> void:
 	var fwd := Vector3(-sin(_yaw), 0.0, -cos(_yaw))
+	var right := Vector3(cos(_yaw), 0.0, -sin(_yaw))
 	var step := fwd * speed * delta
 	if step.length() > 0.0001:
 		var space := get_world_3d().direct_space_state
-		var from := global_position + Vector3(0, 0.55, 0)
-		var reach := (1.8 if speed > 0.0 else 1.7) + step.length()
-		var q := PhysicsRayQueryParameters3D.create(from, from + fwd * signf(speed) * reach, Geo.LAYER_WORLD)
+		var dir := fwd * signf(speed)
+		var reach := (1.65 if speed > 0.0 else 1.55) + step.length()
 		var ex: Array[RID] = [_solid.get_rid()]
 		if Game.player != null:
 			ex.append(Game.player.get_rid())
-		q.exclude = ex
-		var hit := space.intersect_ray(q)
-		if not hit.is_empty() and not hit["collider"] is Interactable:
-			if absf(speed) > 5.0:
-				Game.audio.play_3d(CLANK, global_position, 2.0)
-				if Game.player != null and riding:
-					Game.player.shake(0.06, 0.35)
-			speed = -speed * 0.15
-			return
+		var best_hit: Dictionary = {}
+		var best_d := INF
+		for lat: float in [0.0, -0.40, 0.40]:
+			var from := global_position + Vector3(0, 0.62, 0) + right * lat
+			var q := PhysicsRayQueryParameters3D.create(from, from + dir * reach, Geo.LAYER_WORLD)
+			q.exclude = ex
+			var hit := space.intersect_ray(q)
+			if not hit.is_empty() and not (hit["collider"] is Interactable):
+				var hd := from.distance_squared_to(hit["position"] as Vector3)
+				if hd < best_d:
+					best_d = hd
+					best_hit = hit
+		if not best_hit.is_empty():
+			var hn := best_hit["normal"] as Vector3
+			hn.y = 0.0
+			if hn.length_squared() > 0.01:
+				hn = hn.normalized()
+			else:
+				hn = -dir
+			# Почти лобовой удар — притормозили и чуть оттолкнулись; по касательной — скользим вдоль препятствия!
+			if dir.dot(hn) < -0.86:
+				if absf(speed) > 5.0:
+					Game.audio.play_3d(CLANK, global_position, 2.0)
+					if Game.player != null and riding:
+						Game.player.shake(0.06, 0.35)
+				speed = -speed * 0.12
+				_place(global_position + hn * 0.05)
+				return
+			var slide := step - hn * step.dot(hn)
+			slide.y = 0.0
+			step = slide * 0.75 + hn * 0.02
+			speed *= 0.78
 		driven += step.length()
 	_place(global_position + step)
 	_tick_trail()

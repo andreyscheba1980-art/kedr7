@@ -40,10 +40,10 @@ var debt := 0                       ## пропущенных «замечани
 ## Мелкие «фоновые» пугалки других систем (шорохи, шёпот, силуэты, глаза в кронах, ложные шаги)
 ## идут через request_ambient: не чаще раза в AMBIENT_GAP, не больше AMBIENT_PER_NIGHT за ночь, только
 ## пока напряжение набирается — и сами до пика его не дотягивают. Иначе ночь висела на 100 %.
-const AMBIENT_GAP := 40.0
-const AMBIENT_PER_NIGHT := 14
+const AMBIENT_GAP := 22.0
+const AMBIENT_PER_NIGHT := 20
 var _ambient_left := AMBIENT_PER_NIGHT
-var _ambient_wait := 20.0
+var _ambient_wait := 12.0
 
 
 const CausalMimicryClass = preload("res://scripts/director/causal_mimicry.gd")
@@ -93,7 +93,7 @@ func stop() -> void:
 ## Нарастание по ночам: одни и те же события давят слабее в начале недели и в полную силу к концу.
 ## Замер «обычного игрока» (v1.13): уже на 2-й ночи напряжение упиралось в 100 к 02:00 и висело —
 ## сердце стучало полночи. Теперь ночь 1 — 55 %, 2 — 70 %, 3 — 85 %, с 4-й — 100 %.
-const NIGHT_K := [0.55, 0.55, 0.7, 0.85, 1.0, 1.0, 1.05, 1.1]
+const NIGHT_K := [0.76, 0.78, 0.85, 0.92, 1.0, 1.0, 1.05, 1.1]
 
 
 func add_tension(amount: float, reason: String) -> void:
@@ -139,11 +139,11 @@ func in_calm_window() -> bool:
 
 
 ## Принудительная фаза «мнимого покоя» (45–65 с) после жёсткого скримера или погони — чтобы качели страха работали.
-func force_relax(sec := 52.0, release := 38.0, reason := "") -> void:
-	tension = maxf(tension - release, 8.0)
+func force_relax(sec := 28.0, release := 34.0, reason := "") -> void:
+	tension = maxf(tension - release, 12.0)
 	cooldown_left = maxf(cooldown_left, sec)
 	_peak_time = 0.0
-	_ambient_wait = maxf(_ambient_wait, sec * 0.75)
+	_ambient_wait = maxf(_ambient_wait, sec * 0.6)
 	if phase != Phase.PLAYING:
 		phase = Phase.RELAX
 	if reason != "":
@@ -152,16 +152,16 @@ func force_relax(sec := 52.0, release := 38.0, reason := "") -> void:
 
 ## Крупное событие другой системы (осада, диверсия) вместо испуга из пула: только на пике,
 ## после него — передышка, как у обычного испуга.
-func take_peak(reason: String, release := 40.0, rest := 60.0) -> bool:
+func take_peak(reason: String, release := 34.0, rest := 34.0) -> bool:
 	if not enabled or hold or phase != Phase.PEAK:
 		return false
 	if Game.yrka != null and Game.yrka.stage == YrkaThreat.Stage.CHASE:
 		return false
 	scares_played += 1
 	tension = maxf(tension - release, 0.0)
-	cooldown_left = maxf(rest, 48.0)
+	cooldown_left = maxf(rest, 26.0)
 	_peak_time = 0.0
-	_ambient_wait = maxf(_ambient_wait, 35.0)
+	_ambient_wait = maxf(_ambient_wait, 22.0)
 	phase = Phase.RELAX
 	_log("▶ %s (событие охотника), передышка %.0f с" % [reason, cooldown_left])
 	return true
@@ -193,8 +193,8 @@ func _process(delta: float) -> void:
 			if _peak_time >= fake_after_sec + 10.0:
 				# Если во дворе/на улице нет кандидатов для испуга или ложной тревоги,
 				# даём естественную передышку, чтобы напряжение и музыка не висели вечно на 100%.
-				tension = maxf(tension - 45.0, 15.0)
-				cooldown_left = 45.0
+				tension = maxf(tension - 38.0, 15.0)
+				cooldown_left = 26.0
 				_peak_time = 0.0
 				phase = Phase.RELAX
 				_log("пик без кандидатов: естественная разрядка")
@@ -232,6 +232,9 @@ func _compute_rate() -> float:
 		m *= 1.3
 	if Dog.is_near_player():
 		m *= 0.8      # Найда рядом — не так страшно
+	var anom_n := Anomalies.active_count()
+	if anom_n > 0:
+		m *= 1.0 + minf(float(anom_n) * 0.16, 0.5)
 	return base_rate * m
 
 
